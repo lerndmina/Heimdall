@@ -51,6 +51,11 @@ import log from "../../utils/log";
 import ModmailCache from "../../utils/ModmailCache";
 import { tryCatch } from "../../utils/trycatch";
 import { createAttachmentBuildersFromUrls } from "../../utils/AttachmentProcessor";
+import {
+  processAttachmentsForModmail,
+  createFileUploadSummary,
+  createUserFileUploadFeedback,
+} from "../../utils/AttachmentSizeManager";
 import ModmailBanModel from "../../models/ModmailBans";
 import ms from "ms";
 import ModmailMessageService, {
@@ -101,7 +106,9 @@ export default async function (message: Message, client: Client<true>) {
 
 async function handleDM(message: Message, client: Client<true>, user: User) {
   const finalContent = await prepModmailMessage(client, message, 2000);
-  if (!finalContent) return;
+
+  // Allow messages with attachments even if no content
+  if (!finalContent && message.attachments.size === 0) return;
 
   // Use singleton database instance for better performance
   const db = new Database();
@@ -116,7 +123,7 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
     await redisClient.del(closeWithMessageKey);
 
     // Send the final message first
-    await sendMessage(mail, message, finalContent, client);
+    await sendMessage(mail, message, finalContent || "", client);
 
     // Then close the thread using the same logic as the closeModmail command
     const getter = new ThingGetter(client);
@@ -184,9 +191,9 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
         ],
       });
     }
-    await newModmail(customIds, message, finalContent, user, client);
+    await newModmail(customIds, message, finalContent || "", user, client);
   } else {
-    await sendMessage(mail, message, finalContent, client);
+    await sendMessage(mail, message, finalContent || "", client);
   }
 }
 
@@ -506,15 +513,42 @@ async function newModmail(
       if (message.attachments.size > 0) {
         try {
           const webhook = await client.fetchWebhook(config.webhookId!, config.webhookToken!);
-          const attachmentBuilders = createAttachmentBuildersFromUrls(message.attachments);
+          const attachmentResult = await processAttachmentsForModmail(message.attachments, message);
 
-          await webhook.send({
-            content: "The original message had attachments, see below:",
-            files: attachmentBuilders,
-            threadId: result.thread!.id,
-            username: i.user.displayName,
-            avatarURL: i.user.displayAvatarURL(),
-          });
+          // Only send webhook messages if there are successful attachments
+          // Since the thread is already created, we don't prevent its creation, but we don't send empty attachment messages
+          if (attachmentResult.discordAttachments.length > 0) {
+            await webhook.send({
+              content: "The original message had attachments, see below:",
+              files: attachmentResult.discordAttachments,
+              threadId: result.thread!.id,
+              username: i.user.displayName,
+              avatarURL: i.user.displayAvatarURL(),
+            });
+          }
+
+          // Send large file summary if needed
+          const fileUploadSummary = createFileUploadSummary(attachmentResult);
+          if (fileUploadSummary) {
+            await webhook.send({
+              content: `📁 **File Upload Summary:**\n${fileUploadSummary}`,
+              threadId: result.thread!.id,
+              username: i.user.displayName,
+              avatarURL: i.user.displayAvatarURL(),
+            });
+          }
+
+          // Always send feedback to user about file processing (including failures)
+          const userFeedback = createUserFileUploadFeedback(attachmentResult);
+          if (userFeedback) {
+            await tryCatch(
+              (
+                await getter.getUser(i.user.id)
+              ).send({
+                content: userFeedback,
+              })
+            );
+          }
         } catch (error) {
           log.error("Failed to send initial message attachments via webhook:", error);
         }
@@ -589,8 +623,26 @@ async function sendMessage( // Send a message from dms to the modmail thread
     const guild = await getter.getGuild(mail.guildId);
     const thread = (await getter.getChannel(mail.forumThreadId)) as ThreadChannel;
 
-    // Create attachment builders from URLs
-    const attachmentBuilders = createAttachmentBuildersFromUrls(message.attachments);
+    // Process attachments with size-aware handling
+    const attachmentResult = await processAttachmentsForModmail(message.attachments, message);
+
+    // Check if all attachments were processed successfully (atomicity requirement)
+    if (!attachmentResult.allSuccessful) {
+      // Some attachments failed, don't send the message
+      const userFeedback = createUserFileUploadFeedback(attachmentResult);
+      if (userFeedback) {
+        const getter = new ThingGetter(client);
+        await tryCatch(
+          (
+            await getter.getUser(message.author.id)
+          ).send({
+            content: userFeedback,
+          })
+        );
+      }
+      // Don't send the message to the modmail thread
+      return;
+    }
 
     // Get the webhook from the ModmailConfig with caching
     const db = new Database();
@@ -598,9 +650,13 @@ async function sendMessage( // Send a message from dms to the modmail thread
 
     if (!config?.webhookId || !config?.webhookToken) {
       // If there's no webhook in config, fall back to normal message
+      const fallbackContent = cleanMessageContent
+        ? `${message.author.username} says: ${cleanMessageContent}`
+        : `${message.author.username} sent files:`;
+
       const fallbackMsg = await thread.send({
-        content: `${message.author.username} says: ${cleanMessageContent}\n\n\`\`\`No webhook found in ModmailConfig, please recreate the modmail setup.\`\`\``,
-        files: attachmentBuilders,
+        content: `${fallbackContent}\n\n\`\`\`No webhook found in ModmailConfig, please recreate the modmail setup.\`\`\``,
+        files: attachmentResult.discordAttachments,
       });
 
       // Track the message even for fallback
@@ -658,16 +714,17 @@ async function sendMessage( // Send a message from dms to the modmail thread
           color: embed.color,
           fieldsCount: embed.fields?.length || 0,
         })),
-        hasAttachments: attachmentBuilders.length > 0,
-        attachmentCount: attachmentBuilders.length,
+        hasAttachments: attachmentResult.discordAttachments.length > 0,
+        attachmentCount: attachmentResult.discordAttachments.length,
+        hasLargeFiles: attachmentResult.hasLargeFiles,
       });
     }
 
     // Send message with the user's avatar and username from the stored data or current values
     const webhookMessage = await webhook.send({
-      content: ModmailMessageService.truncateMessage(cleanMessageContent),
+      content: cleanMessageContent || "*Attachments only*",
       embeds: allEmbeds.length > 0 ? allEmbeds : undefined,
-      files: attachmentBuilders,
+      files: attachmentResult.discordAttachments,
       threadId: thread.id,
       username: mail.userDisplayName || message.author.displayName,
       avatarURL: mail.userAvatar || message.author.displayAvatarURL(),
@@ -715,8 +772,33 @@ async function sendMessage( // Send a message from dms to the modmail thread
 
     log.debug(`Tracked user message ${trackingMessageId} for user ${message.author.id}`);
 
-    // React to the message to indicate it was sent
-    await message.react("📨");
+    // Send follow-up message for large files if needed
+    const fileUploadSummary = createFileUploadSummary(attachmentResult);
+    if (fileUploadSummary) {
+      await webhook.send({
+        content: `📁 **File Upload Summary:**\n${fileUploadSummary}`,
+        threadId: thread.id,
+        username: mail.userDisplayName || message.author.displayName,
+        avatarURL: mail.userAvatar || message.author.displayAvatarURL(),
+      });
+    }
+
+    // Provide feedback to user about their message/files
+    if (attachmentResult.hasLargeFiles || !attachmentResult.allSuccessful) {
+      // Send feedback to user about file processing
+      const userFeedback = createUserFileUploadFeedback(attachmentResult);
+      if (userFeedback) {
+        await tryCatch(
+          (
+            await getter.getUser(message.author.id)
+          ).send({
+            content: userFeedback,
+          })
+        );
+      }
+    }
+
+    // Reactions are now handled by processAttachmentsForModmail
 
     // Update the user's avatar and display name if they're not set or have changed
     if (!mail.userAvatar || !mail.userDisplayName) {
@@ -752,7 +834,9 @@ async function sendMessage( // Send a message from dms to the modmail thread
     log.error(error as string);
     return message.react("<:error:1182430951897321472>");
   }
-  return message.react("📨");
+
+  // Return success reaction - the webhook sending already handled the reactions above
+  return;
 }
 
 async function handleReply(message: Message, client: Client<true>, staffUser: User) {
@@ -777,10 +861,23 @@ async function handleReply(message: Message, client: Client<true>, staffUser: Us
     return message.react("🕵️"); // Messages starting with . are staff only
   }
   const finalContent = removeMentions((await prepModmailMessage(client, message, 1024)) || "");
-  if (!finalContent) return;
 
-  // Create attachment builders from URLs
-  const attachmentBuilders = createAttachmentBuildersFromUrls(message.attachments);
+  // Allow messages with attachments even if no content (for staff)
+  if (!finalContent && message.attachments.size === 0) return;
+
+  // Process attachments with size-aware handling
+  const attachmentResult = await processAttachmentsForModmail(message.attachments, message, true);
+
+  // Check if all attachments were processed successfully (atomicity requirement)
+  if (!attachmentResult.allSuccessful) {
+    // Some attachments failed, don't send the message
+    await message.react("❌");
+    await message.reply({
+      content:
+        "❌ **Message not sent** - Some attachments could not be processed. Please check file sizes and try again.",
+    });
+    return;
+  }
 
   debugMsg(
     "Sending message to user " +
@@ -792,11 +889,22 @@ async function handleReply(message: Message, client: Client<true>, staffUser: Us
   );
 
   const staffMemberName = getter.getMemberName(await getter.getMember(guild, staffUser.id));
-  const dmContent = ModmailMessageFormatter.formatStaffReplyForDM(
-    finalContent,
-    staffMemberName,
-    guild.name
-  );
+
+  // Handle the case where there's no content but there are attachments
+  let dmContent: string;
+  if (!finalContent && attachmentResult.discordAttachments.length > 0) {
+    dmContent = ModmailMessageFormatter.formatStaffReplyForDM(
+      "*Sent attachments*",
+      staffMemberName,
+      guild.name
+    );
+  } else {
+    dmContent = ModmailMessageFormatter.formatStaffReplyForDM(
+      finalContent,
+      staffMemberName,
+      guild.name
+    );
+  }
 
   // Get additional embeds for messages that reference other messages (like forwards/replies)
   const { fetchReferencedMessageEmbeds } = await import("../../utils/TinyUtils");
@@ -817,8 +925,9 @@ async function handleReply(message: Message, client: Client<true>, staffUser: Us
         color: embed.color,
         fieldsCount: embed.fields?.length || 0,
       })),
-      hasAttachments: attachmentBuilders.length > 0,
-      attachmentCount: attachmentBuilders.length,
+      hasAttachments: attachmentResult.discordAttachments.length > 0,
+      attachmentCount: attachmentResult.discordAttachments.length,
+      hasLargeFiles: attachmentResult.hasLargeFiles,
     });
   }
 
@@ -827,7 +936,7 @@ async function handleReply(message: Message, client: Client<true>, staffUser: Us
       await getter.getUser(mail.userId)
     ).send({
       content: dmContent,
-      files: attachmentBuilders,
+      files: attachmentResult.discordAttachments,
       embeds: allEmbeds.length > 0 ? allEmbeds : undefined,
     })
   );
@@ -846,6 +955,39 @@ async function handleReply(message: Message, client: Client<true>, staffUser: Us
       ],
       components: [createCloseThreadButton()],
     });
+  }
+
+  // Send follow-up DM for large files if needed
+  const fileUploadSummary = createFileUploadSummary(attachmentResult);
+  if (fileUploadSummary && data.data) {
+    await tryCatch(
+      (
+        await getter.getUser(mail.userId)
+      ).send({
+        content: `📁 **Staff File Upload Summary:**\n${fileUploadSummary}`,
+      })
+    );
+  }
+
+  // Also inform user about file processing (with better context for staff messages)
+  if ((attachmentResult.hasLargeFiles || !attachmentResult.allSuccessful) && data.data) {
+    const userFeedback = createUserFileUploadFeedback(attachmentResult, true);
+    if (userFeedback) {
+      await tryCatch(
+        (
+          await getter.getUser(mail.userId)
+        ).send({
+          content: userFeedback,
+        })
+      );
+    }
+  }
+
+  // React based on attachment processing success
+  if (attachmentResult.allSuccessful) {
+    await message.react("📨");
+  } else {
+    await message.react("⚠️");
   }
 
   // Track the staff message in our system
