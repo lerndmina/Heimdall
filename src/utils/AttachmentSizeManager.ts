@@ -2,6 +2,7 @@ import { Attachment, AttachmentBuilder, Collection, Message } from "discord.js";
 import ZiplineService from "../services/ZiplineService";
 import FetchEnvs, { envExists } from "./FetchEnvs";
 import log from "./log";
+import { tryCatch } from "./trycatch";
 
 const env = FetchEnvs();
 
@@ -26,7 +27,11 @@ interface AttachmentProcessingResult {
 }
 
 /**
- * Process attachments based on size and upload large files to Zipline service
+ * Enhanced attachment processing with improved error handling and proper timestamp formatting
+ * - Uses tryCatch utility for consistent error handling
+ * - Properly handles Zipline deletesAt ISO timestamp
+ * - Better user feedback with detailed error messages
+ * - Robust file download and upload processing
  */
 export async function processAttachmentsForModmail(
   attachments: Collection<string, Attachment>,
@@ -52,10 +57,9 @@ export async function processAttachmentsForModmail(
 
   // Add loading reaction if there are large files to process (only for user messages)
   if (hasLargeFiles && message && !isStaffMessage) {
-    try {
-      await message.react("⏳");
-    } catch (error) {
-      log.warn("Failed to add loading reaction:", error);
+    const { error: reactionError } = await tryCatch(message.react("⏳"));
+    if (reactionError) {
+      log.warn("Failed to add loading reaction:", reactionError);
     }
   }
 
@@ -102,18 +106,22 @@ export async function processAttachmentsForModmail(
 
   // Remove loading reaction and add final status reaction (only for user messages)
   if (hasLargeFiles && message && !isStaffMessage) {
-    try {
-      // Remove loading reaction
-      await message.reactions.resolve("⏳")?.users.remove(message.client.user);
-
-      // Add final status reaction
-      if (result.allSuccessful) {
-        await message.react("📨"); // Success
-      } else {
-        await message.react("⚠️"); // Partial success or failures
+    // Remove loading reaction
+    const loadingReaction = message.reactions.resolve("⏳");
+    if (loadingReaction) {
+      const { error: removeReactionError } = await tryCatch(
+        loadingReaction.users.remove(message.client.user)
+      );
+      if (removeReactionError) {
+        log.warn("Failed to remove loading reaction:", removeReactionError);
       }
-    } catch (error) {
-      log.warn("Failed to update reactions:", error);
+    }
+
+    // Add final status reaction
+    const reactionEmoji = result.allSuccessful ? "📨" : "⚠️";
+    const { error: statusReactionError } = await tryCatch(message.react(reactionEmoji));
+    if (statusReactionError) {
+      log.warn("Failed to update status reaction:", statusReactionError);
     }
   }
 
@@ -164,39 +172,49 @@ async function processAttachment(
     };
   }
 
-  try {
-    // Download the file and upload to Zipline
-    const response = await fetch(attachment.url);
-    if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
-    }
+  // Download the file and upload to Zipline with enhanced error handling
+  const { data: downloadResponse, error: downloadError } = await tryCatch(fetch(attachment.url));
+  if (downloadError || !downloadResponse?.ok) {
+    log.error(
+      `Failed to download ${fileName}:`,
+      downloadError || `${downloadResponse?.status} ${downloadResponse?.statusText}`
+    );
+    return {
+      type: "rejected",
+      error:
+        `❌ **${fileName}** (${formatFileSize(
+          fileSize
+        )}) could not be downloaded for processing.\n` +
+        `Please upload to Google Drive or [shrt.zip](https://shrt.zip) and share the link.`,
+      originalAttachment: attachment,
+    };
+  }
 
-    const fileBuffer = Buffer.from(await response.arrayBuffer());
+  const { data: arrayBuffer, error: arrayBufferError } = await tryCatch(
+    downloadResponse.arrayBuffer()
+  );
+  if (arrayBufferError) {
+    log.error(`Failed to get array buffer for ${fileName}:`, arrayBufferError);
+    return {
+      type: "rejected",
+      error:
+        `❌ **${fileName}** (${formatFileSize(fileSize)}) could not be processed.\n` +
+        `Please upload to Google Drive or [shrt.zip](https://shrt.zip) and share the link.`,
+      originalAttachment: attachment,
+    };
+  }
 
-    const uploadResult = await ziplineService.uploadFile(fileBuffer, fileName, {
+  const fileBuffer = Buffer.from(arrayBuffer);
+
+  const { data: uploadResult, error: uploadError } = await tryCatch(
+    ziplineService.uploadFile(fileBuffer, fileName, {
       maxDays: 30, // 30 day expiry as requested
       embed: false,
-    });
+    })
+  );
 
-    if (uploadResult.files && uploadResult.files.length > 0) {
-      const uploadedFile = uploadResult.files[0];
-      const expiryDate = uploadResult.deletesAt
-        ? new Date(uploadResult.deletesAt).toLocaleDateString()
-        : "30 days";
-
-      return {
-        type: "zipline",
-        message:
-          `📎 **${fileName}** (${formatFileSize(fileSize)}) - [Download Link](${
-            uploadedFile.url
-          })\n` + `⏰ **Expires on ${expiryDate}**`,
-        originalAttachment: attachment,
-      };
-    } else {
-      throw new Error("No files returned from upload");
-    }
-  } catch (error) {
-    log.error(`Failed to upload ${fileName} to Zipline:`, error);
+  if (uploadError) {
+    log.error(`Failed to upload ${fileName} to Zipline:`, uploadError);
     return {
       type: "rejected",
       error:
@@ -205,6 +223,48 @@ async function processAttachment(
       originalAttachment: attachment,
     };
   }
+
+  if (!uploadResult?.files || uploadResult.files.length === 0) {
+    log.error(`No files returned from Zipline upload for ${fileName}`);
+    return {
+      type: "rejected",
+      error:
+        `❌ **${fileName}** (${formatFileSize(fileSize)}) upload failed.\n` +
+        `Please upload to Google Drive or [shrt.zip](https://shrt.zip) and share the link.`,
+      originalAttachment: attachment,
+    };
+  }
+
+  const uploadedFile = uploadResult.files[0];
+
+  // Handle deletesAt properly - it's already an ISO timestamp string
+  let expiryMessage = "30 days";
+  if (uploadResult.deletesAt) {
+    try {
+      const expiryDate = new Date(uploadResult.deletesAt);
+      const now = new Date();
+      const diffTime = expiryDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays > 0) {
+        expiryMessage = `${diffDays} day${diffDays !== 1 ? "s" : ""}`;
+      } else {
+        expiryMessage = "soon";
+      }
+    } catch (error) {
+      log.warn(`Failed to parse deletesAt timestamp: ${uploadResult.deletesAt}`, error);
+      // Fallback to the raw timestamp formatted nicely
+      expiryMessage = uploadResult.deletesAt.split("T")[0]; // Just the date part
+    }
+  }
+
+  return {
+    type: "zipline",
+    message:
+      `📎 **${fileName}** (${formatFileSize(fileSize)}) - [Download Link](${uploadedFile.url})\n` +
+      `⏰ **Expires in ${expiryMessage}**`,
+    originalAttachment: attachment,
+  };
 }
 
 /**
