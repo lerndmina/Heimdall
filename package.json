@@ -9,13 +9,7 @@
   "scripts": {
     "dev": "npx nodemon --watch 'src/**/*.ts' --exec 'npx tsx' src/Bot.ts",
     "start": "tsx src/Bot.ts",
-    "build": "bunx tsc",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
-    "test:ui": "vitest --ui",
-    "test:run": "vitest run",
-    "test:zipline": "vitest zipline-service",
-    "test:zipline:watch": "vitest zipline-service --watch"
+    "build": "bunx tsc"
   },
   "author": "",
   "license": "ISC",
@@ -46,9 +40,7 @@
   "devDependencies": {
     "@types/fancy-log": "^2.0.2",
     "@types/node": "^20.17.31",
-    "@vitest/ui": "3.2.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "typescript": "^5.8.3"
   }
 }
