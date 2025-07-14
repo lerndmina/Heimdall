@@ -21,7 +21,6 @@ import { createClient } from "redis";
 import fetchEnvs, { envExists } from "./utils/FetchEnvs";
 import { debugMsg } from "./utils/TinyUtils";
 import log from "./utils/log";
-import healthCheck from "./Health";
 import aiModeration from "./services/aiModeration";
 import mariadb from "mariadb";
 // Configure logger to use environment variables
@@ -84,6 +83,17 @@ export const Start = async () => {
       await createFivemPool();
       updateAprilFoolsStatus();
       scheduleNextMidnight();
+
+      // Start API server
+      try {
+        const { ApiServer } = await import("./api/server");
+        const apiServer = new ApiServer(client, commandKit);
+        await apiServer.start();
+        log.info(`API server started on port ${env.API_PORT}`);
+      } catch (error) {
+        log.error("Failed to start API server:", error);
+      }
+
       await client.login(env.BOT_TOKEN);
     });
 

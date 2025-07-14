@@ -35,7 +35,7 @@ export async function getModmailUserDisplayName(
   if (guild) {
     try {
       const member = await getter.getMember(guild, user.id);
-      return getter.getMemberName(member);
+      return `${getter.getMemberName(member)} (${user.username})`;
     } catch (error) {
       // Fallback to user methods if guild member fetch fails
       return getter.getUsername(user);

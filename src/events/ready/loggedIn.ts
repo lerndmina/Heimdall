@@ -7,7 +7,6 @@ import { ActivityEnum } from "../../commands/utilities/settings";
 import { debugMsg } from "../../utils/TinyUtils";
 import TicTacToeSchema, { TicTacToeSchemaType } from "../../models/TicTacToeSchema";
 import log from "../../utils/log";
-import healthCheck from "../../Health";
 import { ModmailScheduler } from "../../services/ModmailScheduler";
 
 const db = new Database();
@@ -37,9 +36,6 @@ export default async (c: Client<true>, client: Client<true>, handler: CommandKit
   } catch (error) {
     log.error("Failed to initialize modmail scheduler:", error);
   }
-
-  // begin healthcheck
-  healthCheck({ client, handler });
 };
 
 // Export scheduler for other modules to use if needed

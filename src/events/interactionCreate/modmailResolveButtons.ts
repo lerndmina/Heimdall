@@ -159,7 +159,7 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
         await updateModmailThreadName(
           interaction.channel as ThreadChannel,
           userDisplayName,
-          staffDisplayName
+          interaction.user.username
         );
       }
 

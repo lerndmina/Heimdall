@@ -43,6 +43,11 @@ function getter() {
     MODMAIL_AUTO_CLOSE_HOURS: number;
     MODMAIL_CHECK_INTERVAL_MINUTES: number;
     MODMAIL_TESTING_MODE: boolean;
+    // API Configuration
+    API_PORT: number;
+    API_CORS_ORIGINS: string;
+    API_RATE_LIMIT_WINDOW: number;
+    API_RATE_LIMIT_MAX: number;
   } = {
     BOT_TOKEN: process.env.BOT_TOKEN || "",
     OWNER_IDS: (process.env.OWNER_IDS || "").trim().split(","),
@@ -78,6 +83,11 @@ function getter() {
     MODMAIL_AUTO_CLOSE_HOURS: parseInt(process.env.MODMAIL_AUTO_CLOSE_HOURS || "168"),
     MODMAIL_CHECK_INTERVAL_MINUTES: parseInt(process.env.MODMAIL_CHECK_INTERVAL_MINUTES || "30"),
     MODMAIL_TESTING_MODE: process.env.MODMAIL_TESTING_MODE === "true",
+    // API Configuration
+    API_PORT: parseInt(process.env.API_PORT || "3000"),
+    API_CORS_ORIGINS: process.env.API_CORS_ORIGINS || "http://localhost:3000",
+    API_RATE_LIMIT_WINDOW: parseInt(process.env.API_RATE_LIMIT_WINDOW || "900000"), // 15 minutes
+    API_RATE_LIMIT_MAX: parseInt(process.env.API_RATE_LIMIT_MAX || "100"), // 100 requests per window
   };
 
   var missingKeys: string[] = [];
