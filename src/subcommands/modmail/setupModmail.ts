@@ -1,5 +1,4 @@
 import { SlashCommandBuilder, EmbedBuilder, userMention, ForumChannel } from "discord.js";
-import BasicEmbed from "../../utils/BasicEmbed";
 import ModmailConfig from "../../models/ModmailConfig";
 import { CommandOptions, SlashCommandProps } from "commandkit";
 import { waitingEmoji } from "../../Bot";

@@ -17,7 +17,7 @@ import { ThingGetter } from "../../utils/TinyUtils";
 import { handleTag } from "../messageCreate/gotMail";
 import FetchEnvs from "../../utils/FetchEnvs";
 import log from "../../utils/log";
-import { sendModmailCloseMessage } from "../../utils/ModmailUtils";
+import { sendModmailCloseMessage, getModmailUserDisplayName } from "../../utils/ModmailUtils";
 import ModmailCache from "../../utils/ModmailCache";
 import BasicEmbed from "../../utils/BasicEmbed";
 
@@ -204,7 +204,7 @@ async function handleConfirmedClose(
 
   const isDMChannel = interaction.channel?.type === 1;
   const closedBy = isDMChannel ? "User" : "Staff";
-  const closedByName = interaction.user.username;
+  const closedByName = await getModmailUserDisplayName(getter, interaction.user, interaction.guild);
   const reason = isDMChannel ? "Closed by user via button" : "Closed via inactivity button";
 
   // Get the forum thread

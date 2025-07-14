@@ -8,7 +8,7 @@ import {
 } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
 import ButtonWrapper from "../../utils/ButtonWrapper";
-import BasicEmbed from "../../utils/BasicEmbed";
+import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import { initialReply } from "../../utils/initialReply";
 
 export const sendModmailButtonOptions: CommandOptions = {
@@ -47,13 +47,7 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
   await channel.send({
     content: "",
     components: buttons,
-    embeds: [
-      BasicEmbed(
-        client,
-        "Modmail",
-        `Click the button below to open a modmail thread and contact staff.\nAlternatively, you can simply send me a DM and I'll open a modmail thread for you.`
-      ),
-    ],
+    embeds: [ModmailEmbeds.buttonMessage(client)],
   });
 
   return interaction.editReply({

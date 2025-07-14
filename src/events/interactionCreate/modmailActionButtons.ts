@@ -19,6 +19,7 @@ import {
   sendModmailCloseMessage,
   sendMessageToBothChannels,
   markModmailAsResolved,
+  getModmailUserDisplayName,
 } from "../../utils/ModmailUtils";
 import BasicEmbed from "../../utils/BasicEmbed";
 
@@ -83,7 +84,7 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
 
     switch (customId) {
       case "modmail_mark_resolved":
-        return await handleMarkResolved(interaction, client, modmail, db);
+        return await handleMarkResolved(interaction, client, modmail, db, getter);
 
       case "modmail_close_with_reason":
         return await handleCloseWithReason(interaction, modmail);
@@ -119,16 +120,24 @@ async function handleMarkResolved(
   interaction: ButtonInteraction,
   client: Client<true>,
   modmail: ModmailDoc,
-  db: Database
+  db: Database,
+  getter: ThingGetter
 ): Promise<boolean> {
   try {
     await interaction.deferReply({ ephemeral: true });
+
+    // Get the proper display name for the resolving user
+    const resolvedByUsername = await getModmailUserDisplayName(
+      getter,
+      interaction.user,
+      interaction.guild
+    );
 
     // Use the centralized function to mark as resolved
     const result = await markModmailAsResolved(
       client,
       modmail,
-      interaction.user.username,
+      resolvedByUsername,
       interaction.user.id
     );
 

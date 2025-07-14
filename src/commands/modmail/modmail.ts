@@ -1,5 +1,5 @@
 import { ChannelType, ForumChannel, SlashCommandBuilder, ThreadChannel } from "discord.js";
-import BasicEmbed from "../../utils/BasicEmbed";
+import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import Modmail from "../../models/Modmail";
 import { waitingEmoji } from "../../Bot";
 import { ThingGetter } from "../../utils/TinyUtils";
@@ -194,9 +194,7 @@ export async function run({ interaction, client, handler }: SlashCommandProps) {
       break;
     default:
       return interaction.reply({
-        embeds: [
-          BasicEmbed(client, "‼️ Error", "This subcommand does not exist.", undefined, "Red"),
-        ],
+        embeds: [ModmailEmbeds.subcommandNotFound(client)],
         ephemeral: true,
       });
   }

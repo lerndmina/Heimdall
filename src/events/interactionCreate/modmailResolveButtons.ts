@@ -19,8 +19,9 @@ import {
   sendModmailCloseMessage,
   sendMessageToBothChannels,
   createDisabledResolveButtons,
+  getModmailUserDisplayName,
 } from "../../utils/ModmailUtils";
-import BasicEmbed from "../../utils/BasicEmbed";
+import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 
 const env = FetchEnvs();
 
@@ -134,14 +135,14 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
       }
 
       // Send claim notification
-      const claimEmbed = BasicEmbed(
-        client,
-        "🎫 Ticket Claimed",
-        `Your support ticket has been claimed by **${interaction.user.username}**.\n\n` +
-          `They will be assisting you shortly. Please be patient while they review your request.`,
-        undefined,
-        "Blue"
+      // Get the proper username/member name for the staff member
+      const staffDisplayName = await getModmailUserDisplayName(
+        getter,
+        interaction.user,
+        interaction.guild
       );
+
+      const claimEmbed = ModmailEmbeds.ticketClaimed(client, staffDisplayName);
 
       await sendMessageToBothChannels(client, modmail, claimEmbed);
 
@@ -177,13 +178,7 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
           .setEmoji("❌")
       );
 
-      const confirmEmbed = BasicEmbed(
-        client,
-        "✅ Confirm Close Resolved Thread",
-        "Are you sure you want to close this resolved modmail thread?",
-        undefined,
-        "Yellow"
-      );
+      const confirmEmbed = ModmailEmbeds.confirmCloseResolved(client);
 
       await interaction.editReply({
         embeds: [confirmEmbed],
@@ -231,14 +226,13 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
       }
 
       // Send continuation message
-      const continueEmbed = BasicEmbed(
-        client,
-        "🆘 Additional Help Requested",
-        `${interaction.user.username} has indicated they need more help with their support request.\n\n` +
-          `The thread is now active again and staff will continue to assist you.`,
-        undefined,
-        "Orange"
+      // Get the proper username for the user requesting help
+      const userDisplayName = await getModmailUserDisplayName(
+        getter,
+        interaction.user,
+        interaction.guild
       );
+      const continueEmbed = ModmailEmbeds.additionalHelpRequested(client, userDisplayName);
 
       await sendMessageToBothChannels(client, modmail, continueEmbed);
 
@@ -293,7 +287,7 @@ async function handleConfirmedResolveClose(
   }
 
   const closedBy = "User";
-  const closedByName = interaction.user.username;
+  const closedByName = await getModmailUserDisplayName(getter, interaction.user, interaction.guild);
   const reason = "Resolved - Closed by user";
 
   // Disable the buttons in the original message

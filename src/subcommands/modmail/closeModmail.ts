@@ -1,5 +1,5 @@
 import { ChannelType, ForumChannel, SlashCommandBuilder, ThreadChannel } from "discord.js";
-import BasicEmbed from "../../utils/BasicEmbed";
+import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import Modmail from "../../models/Modmail";
 import { waitingEmoji } from "../../Bot";
 import { ThingGetter } from "../../utils/TinyUtils";
@@ -27,15 +27,7 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
   if (!interaction.channel) {
     log.error("Request made to slash command without required values - close.ts");
     return interaction.reply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "❌ Error",
-          "This command cannot be used in this context. Please try again from a modmail thread.",
-          undefined,
-          "Red"
-        ),
-      ],
+      embeds: [ModmailEmbeds.invalidContext(client)],
       ephemeral: true,
     });
   }
@@ -57,30 +49,14 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
   if (mailError) {
     log.error("Failed to find modmail:", mailError);
     return interaction.reply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "❌ Database Error",
-          "Failed to access modmail data. Please try again later.",
-          undefined,
-          "Red"
-        ),
-      ],
+      embeds: [ModmailEmbeds.databaseError(client)],
       ephemeral: true,
     });
   }
 
   if (!mail) {
     return interaction.reply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "❌ Not a Modmail Thread",
-          "This channel is not a modmail thread. Use this command only in active modmail threads.",
-          undefined,
-          "Red"
-        ),
-      ],
+      embeds: [ModmailEmbeds.notModmailThread(client)],
       ephemeral: true,
     });
   }
@@ -110,15 +86,7 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
   if (threadError) {
     log.error("Failed to get forum thread:", threadError);
     return interaction.editReply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "❌ Thread Error",
-          "Failed to access the modmail thread. It may have been deleted.",
-          undefined,
-          "Red"
-        ),
-      ],
+      embeds: [ModmailEmbeds.threadError(client)],
     });
   }
 
@@ -209,15 +177,7 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
   // Send success message
   const { error: successError } = await tryCatch(
     interaction.editReply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "✅ Thread Closed",
-          `Successfully closed modmail thread.\n\n**Reason:** ${reason}\n**Closed by:** ${closedBy} (${closedByName})`,
-          undefined,
-          "Green"
-        ),
-      ],
+      embeds: [ModmailEmbeds.threadClosedSuccess(client, reason, closedBy, closedByName)],
     })
   );
 

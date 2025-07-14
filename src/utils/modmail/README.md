@@ -13,6 +13,7 @@ Provides standardized, beautiful embed messages for all modmail operations.
 **Features:**
 
 - Consistent styling and branding across all modmail messages
+- Uses BasicEmbed internally for consistent project-wide styling
 - Type-safe embed creation with proper Discord color handling
 - Support for success, error, warning, and info message types
 - Reusable field and description formatting

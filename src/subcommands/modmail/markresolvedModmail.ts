@@ -1,5 +1,4 @@
 import { ChannelType } from "discord.js";
-import BasicEmbed from "../../utils/BasicEmbed";
 import Modmail from "../../models/Modmail";
 import { SlashCommandProps } from "commandkit";
 import log from "../../utils/log";

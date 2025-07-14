@@ -1,12 +1,12 @@
 import { ChannelType, PermissionFlagsBits } from "discord.js";
-import BasicEmbed from "../../utils/BasicEmbed";
+import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import Modmail from "../../models/Modmail";
 import { ThingGetter } from "../../utils/TinyUtils";
 import Database from "../../utils/data/database";
 import { SlashCommandProps } from "commandkit";
 import log from "../../utils/log";
 import { initialReply } from "../../utils/initialReply";
-import { sendMessageToBothChannels } from "../../utils/ModmailUtils";
+import { sendMessageToBothChannels, getModmailUserDisplayName } from "../../utils/ModmailUtils";
 
 export default async function ({ interaction, client }: SlashCommandProps) {
   if (!interaction.channel)
@@ -15,15 +15,7 @@ export default async function ({ interaction, client }: SlashCommandProps) {
   // Check if user has Manage Server permission
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
     return interaction.reply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "❌ Permission Denied",
-          "You need the **Manage Server** permission to use this command.",
-          undefined,
-          "Red"
-        ),
-      ],
+      embeds: [ModmailEmbeds.noPermission(client)],
       ephemeral: true,
     });
   }
@@ -36,15 +28,7 @@ export default async function ({ interaction, client }: SlashCommandProps) {
 
   if (!mail) {
     return interaction.reply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "❌ Error",
-          "This command can only be used in a modmail thread.",
-          undefined,
-          "Red"
-        ),
-      ],
+      embeds: [ModmailEmbeds.notModmailThread(client)],
       ephemeral: true,
     });
   }
@@ -52,15 +36,7 @@ export default async function ({ interaction, client }: SlashCommandProps) {
   // Check if auto-close is already enabled
   if (!mail.autoCloseDisabled) {
     return interaction.reply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "ℹ️ Already Enabled",
-          "Auto-closing is already enabled for this modmail thread.",
-          undefined,
-          "Blue"
-        ),
-      ],
+      embeds: [ModmailEmbeds.autoCloseAlreadyEnabled(client)],
       ephemeral: true,
     });
   }
@@ -90,14 +66,8 @@ export default async function ({ interaction, client }: SlashCommandProps) {
     const forumThread = await getter.getChannel(mail.forumThreadId);
 
     if (forumThread && "send" in forumThread) {
-      const embed = BasicEmbed(
-        client,
-        "🔓 Auto-Close Re-Enabled",
-        `Auto-closing has been **re-enabled** for this modmail thread by ${interaction.user.username}.\n\n` +
-          `This thread will now receive inactivity warnings and may be automatically closed due to inactivity.`,
-        undefined,
-        "Green"
-      );
+      const username = await getModmailUserDisplayName(getter, interaction.user, interaction.guild);
+      const embed = ModmailEmbeds.autoCloseEnabled(client, username);
 
       const data = await sendMessageToBothChannels(client, mail, embed, undefined, {});
       if (!data.dmSuccess) {
@@ -109,16 +79,7 @@ export default async function ({ interaction, client }: SlashCommandProps) {
     }
 
     await interaction.editReply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "✅ Success",
-          `Auto-closing has been re-enabled for this modmail thread.\n\n` +
-            `This thread will now receive inactivity warnings and may be automatically closed.`,
-          undefined,
-          "Green"
-        ),
-      ],
+      embeds: [ModmailEmbeds.autoCloseEnabledSuccess(client)],
     });
 
     log.info(`Auto-close re-enabled for modmail ${mail._id} by user ${interaction.user.id}`);
@@ -127,12 +88,9 @@ export default async function ({ interaction, client }: SlashCommandProps) {
 
     await interaction.editReply({
       embeds: [
-        BasicEmbed(
+        ModmailEmbeds.commandError(
           client,
-          "❌ Error",
-          "An error occurred while re-enabling auto-close for this thread.",
-          undefined,
-          "Red"
+          "An error occurred while re-enabling auto-close for this thread."
         ),
       ],
     });

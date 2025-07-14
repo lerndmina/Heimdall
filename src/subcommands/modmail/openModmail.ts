@@ -15,7 +15,6 @@ import {
 } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
 import ButtonWrapper from "../../utils/ButtonWrapper";
-import BasicEmbed from "../../utils/BasicEmbed";
 import { ThingGetter } from "../../utils/TinyUtils";
 import Database from "../../utils/data/database";
 import ModmailCache from "../../utils/ModmailCache";

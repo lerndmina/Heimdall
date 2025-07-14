@@ -3,6 +3,7 @@ import ZiplineService from "../services/ZiplineService";
 import FetchEnvs, { envExists } from "./FetchEnvs";
 import log from "./log";
 import { tryCatch } from "./trycatch";
+import { ModmailEmbeds } from "./modmail/ModmailEmbeds";
 
 const env = FetchEnvs();
 
@@ -154,9 +155,7 @@ async function processAttachment(
   if (fileSize > ZIPLINE_MAX_SIZE) {
     return {
       type: "rejected",
-      error:
-        `❌ **${fileName}** (${formatFileSize(fileSize)}) is too large. Maximum size is 95MB.\n` +
-        `Please compress your file or upload it to Google Drive or [shrt.zip](https://shrt.zip) and share the link.`,
+      error: ModmailEmbeds.fileTooLargeOverall(fileName, formatFileSize(fileSize)),
       originalAttachment: attachment,
     };
   }
@@ -165,9 +164,7 @@ async function processAttachment(
   if (!ziplineService) {
     return {
       type: "rejected",
-      error:
-        `❌ **${fileName}** (${formatFileSize(fileSize)}) is too large for Discord (8MB limit).\n` +
-        `File upload service is currently unavailable. Please upload to Google Drive or [shrt.zip](https://shrt.zip) and share the link.`,
+      error: ModmailEmbeds.fileTooLargeForDiscord(fileName, formatFileSize(fileSize)),
       originalAttachment: attachment,
     };
   }
@@ -181,11 +178,7 @@ async function processAttachment(
     );
     return {
       type: "rejected",
-      error:
-        `❌ **${fileName}** (${formatFileSize(
-          fileSize
-        )}) could not be downloaded for processing.\n` +
-        `Please upload to Google Drive or [shrt.zip](https://shrt.zip) and share the link.`,
+      error: ModmailEmbeds.fileDownloadFailed(fileName, formatFileSize(fileSize)),
       originalAttachment: attachment,
     };
   }
@@ -197,9 +190,7 @@ async function processAttachment(
     log.error(`Failed to get array buffer for ${fileName}:`, arrayBufferError);
     return {
       type: "rejected",
-      error:
-        `❌ **${fileName}** (${formatFileSize(fileSize)}) could not be processed.\n` +
-        `Please upload to Google Drive or [shrt.zip](https://shrt.zip) and share the link.`,
+      error: ModmailEmbeds.fileProcessingFailed(fileName, formatFileSize(fileSize)),
       originalAttachment: attachment,
     };
   }
@@ -217,9 +208,7 @@ async function processAttachment(
     log.error(`Failed to upload ${fileName} to Zipline:`, uploadError);
     return {
       type: "rejected",
-      error:
-        `❌ **${fileName}** (${formatFileSize(fileSize)}) could not be uploaded.\n` +
-        `Please upload to Google Drive or [shrt.zip](https://shrt.zip) and share the link.`,
+      error: ModmailEmbeds.fileUploadFailed(fileName, formatFileSize(fileSize)),
       originalAttachment: attachment,
     };
   }
@@ -228,9 +217,7 @@ async function processAttachment(
     log.error(`No files returned from Zipline upload for ${fileName}`);
     return {
       type: "rejected",
-      error:
-        `❌ **${fileName}** (${formatFileSize(fileSize)}) upload failed.\n` +
-        `Please upload to Google Drive or [shrt.zip](https://shrt.zip) and share the link.`,
+      error: ModmailEmbeds.fileUploadFailed(fileName, formatFileSize(fileSize)),
       originalAttachment: attachment,
     };
   }
@@ -351,9 +338,7 @@ export function createFileProcessingStatus(
 
   if (tooLargeFiles.length > 0) {
     messages.push(
-      `**Files too large:**\n${tooLargeFiles.join(
-        "\n"
-      )}\nPlease compress or use Google Drive/[shrt.zip](https://shrt.zip)`
+      `**Files too large:**\n${tooLargeFiles.join("\n")}\n${ModmailEmbeds.fileUploadFallbackShort}`
     );
   }
 

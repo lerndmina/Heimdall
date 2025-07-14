@@ -15,13 +15,36 @@ import { ModmailType } from "../models/Modmail";
 import { ThingGetter } from "./TinyUtils";
 import log from "./log";
 import FetchEnvs, { envExists } from "./FetchEnvs";
-import BasicEmbed from "./BasicEmbed";
 import Database from "./data/database";
 import Modmail from "../models/Modmail";
 import ModmailConfig from "../models/ModmailConfig";
 import ModmailCache from "./ModmailCache";
+import { ModmailEmbeds } from "./modmail/ModmailEmbeds";
 
 const env = FetchEnvs();
+
+/**
+ * Get the proper display name for a user in the modmail context
+ * Tries to get guild member name first, falls back to username
+ */
+export async function getModmailUserDisplayName(
+  getter: ThingGetter,
+  user: User,
+  guild?: Guild | null
+): Promise<string> {
+  if (guild) {
+    try {
+      const member = await getter.getMember(guild, user.id);
+      return getter.getMemberName(member);
+    } catch (error) {
+      // Fallback to user methods if guild member fetch fails
+      return getter.getUsername(user);
+    }
+  } else {
+    // No guild context, use user methods
+    return getter.getUsername(user);
+  }
+}
 
 /**
  * Send a message to both the user's DMs and the modmail thread
@@ -263,13 +286,7 @@ export async function sendModmailCloseMessage(
   closedByName: string,
   reason: string
 ): Promise<{ dmSuccess: boolean; threadSuccess: boolean }> {
-  const embed = BasicEmbed(
-    client,
-    `Modmail Closed (${closedBy})`,
-    `This modmail thread has been closed by ${closedBy.toLowerCase()} \`${closedByName}\`.\n\nReason: ${reason}\n\nYou can open a modmail by sending another message to the bot.`,
-    undefined,
-    "Red"
-  );
+  const embed = ModmailEmbeds.threadClosed(client, reason, closedByName);
 
   return await sendMessageToBothChannels(client, modmail, embed);
 }
@@ -319,17 +336,7 @@ export async function markModmailAsResolved(
     );
 
     // Create embed for resolution message
-    const resolveEmbed = BasicEmbed(
-      client,
-      "✅ Issue Marked as Resolved",
-      `Your support request has been marked as **resolved** by ${resolvedByUsername}.\n\n` +
-        `• **Click "Close Thread"** if your issue is fully resolved\n` +
-        `• **Click "I Need More Help"** if you need further assistance\n` +
-        `• **Send a message** if you have additional questions\n\n` +
-        `This thread will automatically close in **24 hours** if no action is taken.`,
-      undefined,
-      "Green"
-    );
+    const resolveEmbed = ModmailEmbeds.threadResolved(client);
 
     // Send message to both channels - buttons only in DMs
     await sendMessageToBothChannels(client, modmail, resolveEmbed, undefined, {
@@ -476,14 +483,11 @@ export async function createModmailThread(
     await thread.send({
       content: notificationContent,
       embeds: [
-        BasicEmbed(
+        ModmailEmbeds.staffNotification(
           client,
-          "Modmail",
-          `Hey! ${memberName} has opened a modmail thread!${
-            openedBy?.type === "Staff" ? ` (opened by staff member ${openedBy.username})` : ""
-          }`,
-          undefined,
-          "Random"
+          memberName,
+          openedBy?.type === "Staff",
+          openedBy?.username
         ),
       ],
       components: createModmailActionButtons(),
@@ -530,17 +534,9 @@ export async function createModmailThread(
 
       await dmChannel.send({
         embeds: [
-          BasicEmbed(
-            client,
-            openedBy?.type === "Staff" ? "Modmail Thread Opened" : "Modmail",
-            openedBy?.type === "Staff"
-              ? `Staff have opened a modmail thread for you. Please respond here to communicate with staff.`
-              : `Successfully created a modmail thread in **${guild.name}**!\n\nWe will get back to you as soon as possible. While you wait, why not grab a hot beverage!\n\nOnce we have solved your issue, you can use the "Close Thread" button below or \`/modmail close\` to close the thread. If you need to send us more information, just send it here!\n\nIf you want to add more information to your original message, just send it here!`,
-            reason && reason !== "(no reason specified)" && openedBy?.type === "Staff"
-              ? [{ name: "Reason", value: reason, inline: false }]
-              : [],
-            openedBy?.type === "Staff" ? "Aqua" : "Random"
-          ),
+          openedBy?.type === "Staff"
+            ? ModmailEmbeds.staffOpenedThread(client, reason)
+            : ModmailEmbeds.threadCreated(client, guild.name),
         ],
         components: [closeButton],
       });

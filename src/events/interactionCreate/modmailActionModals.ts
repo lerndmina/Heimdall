@@ -12,7 +12,7 @@ import ModmailConfig from "../../models/ModmailConfig";
 import ModmailBanModel, { ModmailBanType } from "../../models/ModmailBans";
 import { ThingGetter, getDiscordDate, TimeType } from "../../utils/TinyUtils";
 import { handleTag } from "../messageCreate/gotMail";
-import { sendModmailCloseMessage } from "../../utils/ModmailUtils";
+import { sendModmailCloseMessage, getModmailUserDisplayName } from "../../utils/ModmailUtils";
 import BasicEmbed from "../../utils/BasicEmbed";
 import FetchEnvs from "../../utils/FetchEnvs";
 import ms from "ms";
@@ -91,7 +91,11 @@ async function handleCloseModal(
     }
 
     const closedBy = "Staff";
-    const closedByName = interaction.user.username;
+    const closedByName = await getModmailUserDisplayName(
+      getter,
+      interaction.user,
+      interaction.guild
+    );
 
     // Send closure message using consistent styling
     await sendModmailCloseMessage(client, modmail, closedBy, closedByName, reason);
@@ -257,7 +261,11 @@ async function handleBanModal(
 
     // Close the current modmail thread
     const closedBy = "Staff";
-    const closedByName = interaction.user.username;
+    const closedByName = await getModmailUserDisplayName(
+      getter,
+      interaction.user,
+      interaction.guild
+    );
     const closeReason = `User banned from modmail: ${reason}`;
 
     await sendModmailCloseMessage(client, modmail, closedBy, closedByName, closeReason);
@@ -360,14 +368,23 @@ async function handleCloseWithMessageModal(
         // Fallback to normal message
         const forumThread = (await getter.getChannel(modmail.forumThreadId)) as ThreadChannel;
         if (forumThread) {
-          await forumThread.send(`${interaction.user.username} says: ${finalMessage}`);
+          const userDisplayName = await getModmailUserDisplayName(
+            getter,
+            interaction.user,
+            interaction.guild
+          );
+          await forumThread.send(`${userDisplayName} says: ${finalMessage}`);
         }
       }
     }
 
     // Now close the thread using the same logic as regular close
     const closedBy = "User";
-    const closedByName = interaction.user.username;
+    const closedByName = await getModmailUserDisplayName(
+      getter,
+      interaction.user,
+      interaction.guild
+    );
     const reason = "Closed by user with final message"; // Send closure message
     await sendModmailCloseMessage(client, modmail, closedBy, closedByName, reason);
 
