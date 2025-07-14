@@ -6,6 +6,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ThreadChannel,
 } from "discord.js";
 import Database from "../../utils/data/database";
 import Modmail from "../../models/Modmail";
@@ -145,6 +146,22 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
       const claimEmbed = ModmailEmbeds.ticketClaimed(client, staffDisplayName);
 
       await sendMessageToBothChannels(client, modmail, claimEmbed);
+
+      // Update the thread name to include the claimed staff member
+      if (interaction.channel?.isThread()) {
+        const { updateModmailThreadName } = await import("../../utils/ModmailUtils");
+        const userDisplayName = await getModmailUserDisplayName(
+          getter,
+          await getter.getUser(modmail.userId),
+          interaction.guild
+        );
+
+        await updateModmailThreadName(
+          interaction.channel as ThreadChannel,
+          userDisplayName,
+          staffDisplayName
+        );
+      }
 
       await interaction.editReply({
         content: `✅ Successfully claimed ticket for <@${modmail.userId}>. You can now assist them in the thread.`,

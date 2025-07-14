@@ -47,6 +47,98 @@ export async function getModmailUserDisplayName(
 }
 
 /**
+ * Generate a modmail thread name with the format: username | claimedStaff/unknown | truncatedMessage
+ * @param username - The user's display name
+ * @param claimedStaffName - The name of the staff member who claimed the ticket (or null if unclaimed)
+ * @param message - The truncated user message or reason
+ * @returns A properly formatted and truncated thread name
+ */
+export function generateModmailThreadName(
+  username: string,
+  claimedStaffName: string | null,
+  message: string
+): string {
+  const DISCORD_MAX_THREAD_NAME = 100;
+
+  // Format: username | claimedStaff/unknown | message
+  const claimedPart = claimedStaffName || "unknown";
+  const baseName = `${username} | ${claimedPart} | `;
+
+  // Calculate remaining space for the message
+  const remainingSpace = DISCORD_MAX_THREAD_NAME - baseName.length;
+
+  // Ensure we have at least some space for the message
+  if (remainingSpace < 10) {
+    // If the username + claimed staff part is too long, truncate the username
+    const maxUsernameLength = Math.max(10, DISCORD_MAX_THREAD_NAME - claimedPart.length - 20); // 20 for " | unknown | " + some message space
+    const truncatedUsername =
+      username.length > maxUsernameLength
+        ? username.substring(0, maxUsernameLength - 3) + "..."
+        : username;
+
+    const newBaseName = `${truncatedUsername} | ${claimedPart} | `;
+    const newRemainingSpace = DISCORD_MAX_THREAD_NAME - newBaseName.length;
+
+    const truncatedMessage =
+      message.length > newRemainingSpace
+        ? message.substring(0, Math.max(3, newRemainingSpace - 3)) + "..."
+        : message;
+
+    return `${newBaseName}${truncatedMessage}`;
+  }
+
+  // Truncate the message to fit
+  const truncatedMessage =
+    message.length > remainingSpace ? message.substring(0, remainingSpace - 3) + "..." : message;
+
+  return `${baseName}${truncatedMessage}`;
+}
+
+/**
+ * Update a modmail thread name when it's claimed by a staff member
+ * @param thread - The Discord thread to rename
+ * @param username - The user's display name
+ * @param claimedStaffName - The name of the staff member who claimed the ticket
+ * @param originalReason - The original reason/message from the thread
+ */
+export async function updateModmailThreadName(
+  thread: ThreadChannel,
+  username: string,
+  claimedStaffName: string,
+  originalReason: string = "Modmail"
+): Promise<void> {
+  try {
+    // Extract the original message from the current thread name
+    // Current format might be "username | message" or "username | unknown | message"
+    let messageForTitle = originalReason;
+
+    // Try to extract the message part from the current name
+    const currentName = thread.name;
+    const parts = currentName.split(" | ");
+
+    if (parts.length >= 2) {
+      // If it already has the new format (username | staff | message)
+      if (parts.length >= 3) {
+        messageForTitle = parts.slice(2).join(" | ");
+      } else {
+        // Old format (username | message)
+        messageForTitle = parts.slice(1).join(" | ");
+      }
+    }
+
+    const newName = generateModmailThreadName(username, claimedStaffName, messageForTitle);
+
+    // Only update if the name actually changed
+    if (newName !== currentName) {
+      await thread.setName(newName);
+      log.debug(`Updated modmail thread name from "${currentName}" to "${newName}"`);
+    }
+  } catch (error) {
+    log.error("Failed to update modmail thread name:", error);
+  }
+}
+
+/**
  * Send a message to both the user's DMs and the modmail thread
  */
 export async function sendMessageToBothChannels(
@@ -418,12 +510,14 @@ export async function createModmailThread(
     if (reason && reason.includes("-# the user has force")) {
       cleanedReason = reason.split("-# the user has force")[0].trim();
     }
-    const threadName =
-      cleanedReason && cleanedReason !== "(no reason specified)"
-        ? `${memberName} | ${cleanedReason.substring(0, 50)}${
-            cleanedReason.length > 50 ? "..." : ""
-          }`
-        : `${memberName} | Modmail`;
+
+    // Use the new thread naming format: username | claimedStaff/unknown | truncatedMessage
+    const messageForTitle =
+      cleanedReason && cleanedReason !== "(no reason specified)" ? cleanedReason : "Modmail";
+
+    // If opened by staff, they automatically claim it
+    const claimedStaffName = openedBy?.type === "Staff" ? openedBy.username : null;
+    const threadName = generateModmailThreadName(memberName, claimedStaffName, messageForTitle);
 
     let threadContent = "";
     if (openedBy?.type === "Staff") {
@@ -494,23 +588,26 @@ export async function createModmailThread(
     });
 
     // Create modmail entry in database
-    const modmail = await db.findOneAndUpdate(
-      Modmail,
-      { userId: targetUser.id },
-      {
-        guildId: guild.id,
-        forumThreadId: thread.id,
-        forumChannelId: forumChannel.id,
-        userId: targetUser.id,
-        userAvatar: targetUser.displayAvatarURL(),
-        userDisplayName: memberName,
-        lastUserActivityAt: new Date(),
-      },
-      {
-        upsert: true,
-        new: true,
-      }
-    );
+    const modmailData: any = {
+      guildId: guild.id,
+      forumThreadId: thread.id,
+      forumChannelId: forumChannel.id,
+      userId: targetUser.id,
+      userAvatar: targetUser.displayAvatarURL(),
+      userDisplayName: memberName,
+      lastUserActivityAt: new Date(),
+    };
+
+    // If opened by staff, they automatically claim the ticket
+    if (openedBy?.type === "Staff") {
+      modmailData.claimedBy = openedBy.userId;
+      modmailData.claimedAt = new Date();
+    }
+
+    const modmail = await db.findOneAndUpdate(Modmail, { userId: targetUser.id }, modmailData, {
+      upsert: true,
+      new: true,
+    });
 
     // Handle updating the tag for the thread
     const { handleTag } = require("../events/messageCreate/gotMail");
