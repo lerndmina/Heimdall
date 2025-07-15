@@ -132,7 +132,7 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
   // Use singleton database instance for better performance
   const db = new Database();
   const requestId = message.id;
-  const mail = await db.findOne(Modmail, { userId: user.id }, true);
+  const mail = await db.findOne(Modmail, { userId: user.id, isClosed: false }, true);
 
   // Check if user is trying to close with a message
   const closeWithMessageKey = `${env.MODMAIL_TABLE}:close_with_message:${user.id}`;
@@ -168,8 +168,16 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
       log.error("Failed to close thread:", error);
     }
 
-    // Remove from database and clean cache
-    await db.deleteOne(Modmail, { forumThreadId: forumThread.id });
+    // Mark modmail as closed instead of deleting
+    await db.findOneAndUpdate(Modmail, 
+      { forumThreadId: forumThread.id },
+      {
+        isClosed: true,
+        closedAt: new Date(),
+        closedBy: user.id,
+        closedReason: reason
+      }
+    );
     await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
 
     // Notify user
@@ -214,13 +222,21 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
     if (!isValidThread) {
       log.warn(`Invalid modmail thread detected for user ${user.id}, creating new modmail`);
 
-      // Clean up the invalid modmail record
+      // Mark the invalid modmail record as closed instead of deleting
       const { error: cleanupError } = await tryCatch(
-        db.findOneAndDelete(Modmail, { userId: user.id, forumThreadId: mail.forumThreadId })
+        db.findOneAndUpdate(Modmail, 
+          { userId: user.id, forumThreadId: mail.forumThreadId },
+          {
+            isClosed: true,
+            closedAt: new Date(),
+            closedBy: "system",
+            closedReason: "Thread no longer exists"
+          }
+        )
       );
 
       if (cleanupError) {
-        log.error("Failed to cleanup invalid modmail record:", cleanupError);
+        log.error("Failed to mark invalid modmail record as closed:", cleanupError);
       }
 
       // Create a new modmail instead of failing
@@ -690,7 +706,7 @@ async function sendMessage( // Send a message from dms to the modmail thread
       const { error: notifyError } = await tryCatch(
         message.author.send({
           content:
-            "❌ **Modmail Error**\n\nYour modmail thread appears to have been deleted. Please send a new message to create a fresh modmail thread.",
+            "❌ **Modmail Error**\n\nYour modmail thread appears to have been closed or removed. Please send a new message to create a fresh modmail thread.",
         })
       );
 

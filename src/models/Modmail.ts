@@ -177,6 +177,24 @@ const modmailSchema = new Schema({
     type: Date,
     required: false,
   },
+  // Thread closure tracking
+  isClosed: {
+    type: Boolean,
+    default: false,
+    index: true, // Index for filtering open/closed threads
+  },
+  closedAt: {
+    type: Date,
+    required: false,
+  },
+  closedBy: {
+    type: String,
+    required: false,
+  },
+  closedReason: {
+    type: String,
+    required: false,
+  },
   // New messages array for tracking all messages
   messages: {
     type: [modmailMessageSchema],
@@ -188,6 +206,7 @@ const modmailSchema = new Schema({
 modmailSchema.index({ guildId: 1, userId: 1 }); // Guild-user combination
 modmailSchema.index({ userId: 1, lastUserActivityAt: -1 }); // User activity
 modmailSchema.index({ guildId: 1, markedResolved: 1 }); // Guild resolution status
+modmailSchema.index({ guildId: 1, isClosed: 1 }); // Guild open/closed status
 modmailSchema.index({ autoCloseScheduledAt: 1, autoCloseDisabled: 1 }); // Auto-close scheduling
 
 export default model(env.MODMAIL_TABLE, modmailSchema);

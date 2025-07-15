@@ -53,7 +53,7 @@ export default async function ({ interaction, client }: SlashCommandProps) {
   let mail;
   if (interaction.channel.type === ChannelType.DM) {
     const { data: dmMail, error: dmError } = await tryCatch(
-      Modmail.findOne({ userId: interaction.user.id })
+      Modmail.findOne({ userId: interaction.user.id, isClosed: false })
     );
     if (dmError) {
       log.error("Failed to find DM modmail:", dmError);

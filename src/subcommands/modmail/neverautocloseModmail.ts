@@ -21,9 +21,9 @@ export default async function ({ interaction, client }: SlashCommandProps) {
   }
 
   // Find the modmail thread
-  let mail = await Modmail.findOne({ forumThreadId: interaction.channel.id });
+  let mail = await Modmail.findOne({ forumThreadId: interaction.channel.id, isClosed: false });
   if (!mail && interaction.channel.type === ChannelType.DM) {
-    mail = await Modmail.findOne({ userId: interaction.user.id });
+    mail = await Modmail.findOne({ userId: interaction.user.id, isClosed: false });
   }
 
   if (!mail) {

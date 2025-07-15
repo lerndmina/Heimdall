@@ -9,10 +9,10 @@ import log from "../../utils/log";
 interface ModmailListQuery {
   page?: number;
   limit?: number;
-  status?: "open" | "closed" | "all";
+  status?: "open" | "closed" | "resolved" | "all";
   userId?: string;
   search?: string;
-  sortBy?: "lastActivity" | "created" | "resolved";
+  sortBy?: "lastActivity" | "created" | "resolved" | "closed";
   sortOrder?: "asc" | "desc";
 }
 
@@ -50,7 +50,13 @@ export async function getModmailThreads(req: Request, res: Response) {
 
     // Filter by status
     if (status !== "all") {
-      query.markedResolved = status === "closed";
+      if (status === "closed") {
+        query.isClosed = true;
+      } else if (status === "open") {
+        query.isClosed = false;
+      } else if (status === "resolved") {
+        query.markedResolved = true;
+      }
     }
 
     // Filter by user
@@ -77,6 +83,9 @@ export async function getModmailThreads(req: Request, res: Response) {
         break;
       case "resolved":
         sortOptions.resolvedAt = sortOrder === "desc" ? -1 : 1;
+        break;
+      case "closed":
+        sortOptions.closedAt = sortOrder === "desc" ? -1 : 1;
         break;
       default:
         sortOptions.lastUserActivityAt = -1;
@@ -184,8 +193,8 @@ export async function getModmailStats(req: Request, res: Response) {
     // Aggregate statistics
     const [totalStats, openThreads, closedThreads, messageStats] = await Promise.all([
       Modmail.countDocuments(timeQuery),
-      Modmail.countDocuments({ ...timeQuery, markedResolved: false }),
-      Modmail.countDocuments({ ...timeQuery, markedResolved: true }),
+      Modmail.countDocuments({ ...timeQuery, isClosed: false }),
+      Modmail.countDocuments({ ...timeQuery, isClosed: true }),
       Modmail.aggregate([
         { $match: timeQuery },
         { $unwind: { path: "$messages", preserveNullAndEmptyArrays: true } },

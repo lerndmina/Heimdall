@@ -128,10 +128,15 @@ export async function checkExistingModmail(
  * Get a modmail thread by thread ID
  */
 export async function getModmailByThreadId(
-  threadId: string
+  threadId: string,
+  includeClosedThreads: boolean = false
 ): Promise<{ modmail?: any; error?: string }> {
   const db = new Database();
-  const { data: modmail, error } = await tryCatch(db.findOne(Modmail, { forumThreadId: threadId }));
+  const query = includeClosedThreads 
+    ? { forumThreadId: threadId }
+    : { forumThreadId: threadId, isClosed: false };
+  
+  const { data: modmail, error } = await tryCatch(db.findOne(Modmail, query));
 
   if (error) {
     log.error("Failed to get modmail by thread ID:", error);

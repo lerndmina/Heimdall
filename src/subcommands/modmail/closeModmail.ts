@@ -38,9 +38,9 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
   // Find modmail with improved error handling
   const { data: mail, error: mailError } = await tryCatch(
     (async () => {
-      let mail = await Modmail.findOne({ forumThreadId: interaction.channel!.id });
+      let mail = await Modmail.findOne({ forumThreadId: interaction.channel!.id, isClosed: false });
       if (!mail && interaction.channel!.type === ChannelType.DM) {
-        mail = await Modmail.findOne({ userId: interaction.user.id });
+        mail = await Modmail.findOne({ userId: interaction.user.id, isClosed: false });
       }
       return mail;
     })()
@@ -159,12 +159,20 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
     }
   }
 
-  // Clean up database entries
-  const { error: deleteError } = await tryCatch(
-    db.deleteOne(Modmail, { forumThreadId: forumThread?.id })
+  // Mark thread as closed instead of deleting
+  const { error: closeError } = await tryCatch(
+    db.findOneAndUpdate(Modmail, 
+      { forumThreadId: forumThread?.id },
+      {
+        isClosed: true,
+        closedAt: new Date(),
+        closedBy: interaction.user.id,
+        closedReason: reason
+      }
+    )
   );
-  if (deleteError) {
-    log.error("Failed to delete modmail from database:", deleteError);
+  if (closeError) {
+    log.error("Failed to mark modmail as closed in database:", closeError);
   }
 
   const { error: cacheError } = await tryCatch(

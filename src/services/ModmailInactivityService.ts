@@ -142,7 +142,7 @@ export class ModmailInactivityService {
 
       // Find all active modmail threads using direct Mongoose query
       // We need to find modmails that are not closed (assuming they have some active status)
-      const activeModmails = await Modmail.find({}).lean();
+      const activeModmails = await Modmail.find({ isClosed: false }).lean();
 
       if (!activeModmails || activeModmails.length === 0) {
         log.debug("No active modmail threads found");
@@ -378,8 +378,16 @@ export class ModmailInactivityService {
         }
       }
 
-      // Remove from database
-      await this.db.deleteOne(Modmail, { _id: modmail._id });
+      // Mark modmail as closed instead of deleting
+      await this.db.findOneAndUpdate(Modmail, 
+        { _id: modmail._id },
+        {
+          isClosed: true,
+          closedAt: new Date(),
+          closedBy: "system",
+          closedReason: reason
+        }
+      );
 
       // Clean cache
       const env = require("../utils/FetchEnvs").default();
