@@ -82,8 +82,11 @@ export class ApiServer {
       });
     });
 
-    // Health routes (no authentication required)
+    // Health routes under /api prefix
     this.app.use("/api", createHealthRoutes(this.client, this.handler));
+
+    // Health routes at root level (without /api prefix)
+    this.app.use("/", createHealthRoutes(this.client, this.handler));
 
     // TODO: Add authenticated routes here in future phases
     // this.app.use('/api/modmail', authenticateApiKey, modmailRoutes);
