@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { validateApiKey, hasScope } from "../../utils/api/apiKeyUtils";
 import { createErrorResponse } from "../utils/apiResponse";
 import log from "../../utils/log";
+import envs from "../../utils/FetchEnvs";
 
 // Extend Express Request to include API key info
 declare global {
@@ -116,8 +117,17 @@ export function logRequests(req: Request, res: Response, next: NextFunction) {
     const duration = Date.now() - start;
     const keyInfo = req.apiKey ? `${req.apiKey.keyId} (${req.apiKey.name})` : "unauthenticated";
 
-    log.info(
-      `API ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms - ${keyInfo} - ${req.ip}`
+    // Get client IP - check proxy headers if trust proxy is enabled
+    let clientIp = req.ip;
+    if (envs().API_TRUST_PROXY) {
+      clientIp =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        (req.headers["x-real-ip"] as string) ||
+        req.ip;
+    }
+
+    log.debug(
+      `API ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms - ${keyInfo} - ${clientIp}`
     );
   });
 

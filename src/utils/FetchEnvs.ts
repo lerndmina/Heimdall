@@ -49,6 +49,7 @@ function getter() {
     API_CORS_ORIGINS: string;
     API_RATE_LIMIT_WINDOW: number;
     API_RATE_LIMIT_MAX: number;
+    API_TRUST_PROXY: boolean;
   } = {
     BOT_TOKEN: process.env.BOT_TOKEN || "",
     OWNER_IDS: (process.env.OWNER_IDS || "").trim().split(","),
@@ -97,6 +98,7 @@ function getter() {
       return typeof parsed === "number" ? parsed : 900000; // fallback to 15 minutes
     })(),
     API_RATE_LIMIT_MAX: parseInt(process.env.API_RATE_LIMIT_MAX || "100"), // 100 requests per window
+    API_TRUST_PROXY: process.env.API_TRUST_PROXY !== "false", // defaults to true
   };
 
   var missingKeys: string[] = [];
