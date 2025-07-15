@@ -6,6 +6,7 @@ import { Client } from "discord.js";
 import { addRequestId, logRequests } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { createHealthRoutes } from "./routes/health";
+import { createModmailRoutes } from "./routes/modmail";
 import log from "../utils/log";
 import FetchEnvs from "../utils/FetchEnvs";
 
@@ -77,7 +78,24 @@ export class ApiServer {
         timestamp: new Date().toISOString(),
         endpoints: {
           health: "/api/health",
-          modmail: "/api/modmail",
+          modmail: {
+            threads: "/api/modmail/{guildId}/threads",
+            thread: "/api/modmail/{guildId}/threads/{threadId}",
+            messages: "/api/modmail/{guildId}/threads/{threadId}/messages",
+            stats: "/api/modmail/{guildId}/stats",
+            config: "/api/modmail/{guildId}/config",
+          },
+        },
+        authentication: {
+          type: "API Key",
+          header: "Authorization",
+          format: "Bearer {api_key} or {api_key}",
+          scopes: {
+            "modmail:read": "Read modmail data",
+            "modmail:write": "Read and write modmail data",
+            "modmail:admin": "Full modmail administration",
+            full: "All permissions",
+          },
         },
       });
     });
@@ -88,8 +106,8 @@ export class ApiServer {
     // Health routes at root level (without /api prefix)
     this.app.use("/", createHealthRoutes(this.client, this.handler));
 
-    // TODO: Add authenticated routes here in future phases
-    // this.app.use('/api/modmail', authenticateApiKey, modmailRoutes);
+    // Modmail API routes (requires authentication)
+    this.app.use("/api/modmail", createModmailRoutes());
   }
 
   private setupErrorHandling() {
