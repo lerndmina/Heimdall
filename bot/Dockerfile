@@ -1,7 +1,7 @@
 # Multi-platform build arguments
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
-FROM --platform=$TARGETPLATFORM oven/bun:latest
+FROM --platform=$TARGETPLATFORM oven/bun:1.1.34
 
 # Install FFmpeg, Node.js, and wget for health checks
 RUN apt-get update && \
@@ -15,9 +15,13 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copy package files first
-COPY package.json bun.lock ./
+COPY package.json ./
+COPY bun.lock ./
 
-# Install dependencies with bun, leveraging its speed
+# Verify bun installation and show version
+RUN bun --version
+
+# Install dependencies with bun
 RUN bun install --frozen-lockfile
 
 # Copy TypeScript config for build
