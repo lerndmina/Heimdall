@@ -1,6 +1,7 @@
 import { SnowflakeUtil } from "discord.js";
 import log from "./log";
 import { configDotenv } from "dotenv";
+import ms from "ms";
 
 configDotenv(); // Load environment variables from .env file
 
@@ -86,7 +87,15 @@ function getter() {
     // API Configuration
     API_PORT: parseInt(process.env.API_PORT || "3000"),
     API_CORS_ORIGINS: process.env.API_CORS_ORIGINS || "http://localhost:3000",
-    API_RATE_LIMIT_WINDOW: parseInt(process.env.API_RATE_LIMIT_WINDOW || "900000"), // 15 minutes
+    API_RATE_LIMIT_WINDOW: (() => {
+      const value = process.env.API_RATE_LIMIT_WINDOW || "15m";
+      // If it's a number string, parse it as milliseconds, otherwise use ms()
+      if (/^\d+$/.test(value)) {
+        return parseInt(value);
+      }
+      const parsed = ms(value as any);
+      return typeof parsed === "number" ? parsed : 900000; // fallback to 15 minutes
+    })(),
     API_RATE_LIMIT_MAX: parseInt(process.env.API_RATE_LIMIT_MAX || "100"), // 100 requests per window
   };
 
