@@ -169,13 +169,14 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
     }
 
     // Mark modmail as closed instead of deleting
-    await db.findOneAndUpdate(Modmail, 
+    await db.findOneAndUpdate(
+      Modmail,
       { forumThreadId: forumThread.id },
       {
         isClosed: true,
         closedAt: new Date(),
         closedBy: user.id,
-        closedReason: reason
+        closedReason: reason,
       }
     );
     await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
@@ -224,13 +225,14 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
 
       // Mark the invalid modmail record as closed instead of deleting
       const { error: cleanupError } = await tryCatch(
-        db.findOneAndUpdate(Modmail, 
+        db.findOneAndUpdate(
+          Modmail,
           { userId: user.id, forumThreadId: mail.forumThreadId },
           {
             isClosed: true,
             closedAt: new Date(),
             closedBy: "system",
-            closedReason: "Thread no longer exists"
+            closedReason: "Thread no longer exists",
           }
         )
       );

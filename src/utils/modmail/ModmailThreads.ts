@@ -132,10 +132,10 @@ export async function getModmailByThreadId(
   includeClosedThreads: boolean = false
 ): Promise<{ modmail?: any; error?: string }> {
   const db = new Database();
-  const query = includeClosedThreads 
+  const query = includeClosedThreads
     ? { forumThreadId: threadId }
     : { forumThreadId: threadId, isClosed: false };
-  
+
   const { data: modmail, error } = await tryCatch(db.findOne(Modmail, query));
 
   if (error) {

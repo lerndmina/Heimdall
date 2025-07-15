@@ -379,13 +379,14 @@ export class ModmailInactivityService {
       }
 
       // Mark modmail as closed instead of deleting
-      await this.db.findOneAndUpdate(Modmail, 
+      await this.db.findOneAndUpdate(
+        Modmail,
         { _id: modmail._id },
         {
           isClosed: true,
           closedAt: new Date(),
           closedBy: "system",
-          closedReason: reason
+          closedReason: reason,
         }
       );
 

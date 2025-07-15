@@ -161,13 +161,14 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
 
   // Mark thread as closed instead of deleting
   const { error: closeError } = await tryCatch(
-    db.findOneAndUpdate(Modmail, 
+    db.findOneAndUpdate(
+      Modmail,
       { forumThreadId: forumThread?.id },
       {
         isClosed: true,
         closedAt: new Date(),
         closedBy: interaction.user.id,
-        closedReason: reason
+        closedReason: reason,
       }
     )
   );
