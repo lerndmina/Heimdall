@@ -66,6 +66,24 @@ const env = FetchEnvs();
 
 const MAX_TITLE_LENGTH = 50;
 
+/**
+ * Validates if a modmail thread still exists
+ * @param mail The modmail record to validate
+ * @param client Discord client instance
+ * @returns Promise<boolean> true if thread exists, false otherwise
+ */
+async function validateModmailThread(mail: any, client: Client<true>): Promise<boolean> {
+  const getter = new ThingGetter(client);
+  const { data: thread, error } = await tryCatch(getter.getChannel(mail.forumThreadId));
+
+  if (error && (error as any).code === 10003) {
+    // Thread doesn't exist
+    return false;
+  }
+
+  return !error && !!thread;
+}
+
 export default async function (message: Message, client: Client<true>) {
   if (message.author.bot) return;
   const user = message.author;
@@ -191,6 +209,26 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
     }
     await newModmail(customIds, message, finalContent || "", user, client);
   } else {
+    // Validate that the modmail thread still exists before processing
+    const isValidThread = await validateModmailThread(mail, client);
+    if (!isValidThread) {
+      log.warn(`Invalid modmail thread detected for user ${user.id}, creating new modmail`);
+
+      // Clean up the invalid modmail record
+      const { error: cleanupError } = await tryCatch(
+        db.findOneAndDelete(Modmail, { userId: user.id, forumThreadId: mail.forumThreadId })
+      );
+
+      if (cleanupError) {
+        log.error("Failed to cleanup invalid modmail record:", cleanupError);
+      }
+
+      // Create a new modmail instead of failing
+      const messageContent = finalContent || "*Attachment only*";
+      await newModmail(customIds, message, messageContent, user, client);
+      return;
+    }
+
     await sendMessage(mail, message, finalContent || "", client);
   }
 }
@@ -606,6 +644,7 @@ async function sendMessage( // Send a message from dms to the modmail thread
   const cleanMessageContent = removeMentions(messageContent);
   const getter = new ThingGetter(client);
   const messageService = new ModmailMessageService();
+  const db = new Database();
 
   const { data: guildData, error: guildError } = await tryCatch(getter.getGuild(mail.guildId));
   if (guildError) {
@@ -622,6 +661,47 @@ async function sendMessage( // Send a message from dms to the modmail thread
   );
   if (threadError) {
     log.error("Failed to get thread for modmail:", threadError);
+
+    // If it's an "Unknown Channel" error, clean up the stale modmail record
+    if ((threadError as any).code === 10003) {
+      log.warn(
+        `Thread ${mail.forumThreadId} no longer exists, cleaning up modmail record for user ${mail.userId}`
+      );
+
+      // Mark the modmail as closed/invalid
+      const { error: cleanupError } = await tryCatch(
+        db.findOneAndUpdate(
+          Modmail,
+          { userId: mail.userId, forumThreadId: mail.forumThreadId },
+          {
+            status: "closed",
+            closedAt: new Date(),
+            closedReason: "Thread deleted externally",
+          },
+          { new: true, upsert: true }
+        )
+      );
+
+      if (cleanupError) {
+        log.error("Failed to cleanup stale modmail record:", cleanupError);
+      }
+
+      // Notify user that their modmail was closed
+      const { error: notifyError } = await tryCatch(
+        message.author.send({
+          content:
+            "❌ **Modmail Error**\n\nYour modmail thread appears to have been deleted. Please send a new message to create a fresh modmail thread.",
+        })
+      );
+
+      if (notifyError) {
+        log.warn("Failed to notify user about deleted thread:", notifyError);
+      }
+
+      return;
+    }
+
+    // For other errors, just react with error and return
     const { error: reactionError } = await tryCatch(message.react("❌"));
     if (reactionError) {
       log.warn("Failed to add error reaction:", reactionError);
@@ -655,7 +735,6 @@ async function sendMessage( // Send a message from dms to the modmail thread
   }
 
   // Get the webhook from the ModmailConfig with caching
-  const db = new Database();
   const { data: config, error: configError } = await tryCatch(
     ModmailCache.getModmailConfig(mail.guildId, db)
   );
@@ -869,7 +948,7 @@ async function sendMessage( // Send a message from dms to the modmail thread
 
   if (updateError) {
     log.error("Failed to update user activity:", updateError);
-    const { error: reactionError } = await tryCatch(message.react("<:error:1182430951897321472>"));
+    const { error: reactionError } = await tryCatch(message.react("🚫"));
     if (reactionError) {
       log.warn("Failed to add error reaction:", reactionError);
     }
