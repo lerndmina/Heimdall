@@ -2,29 +2,34 @@ import { Router, Request, Response } from "express";
 import { getHealthStatus } from "../controllers/HealthController";
 import { createSuccessResponse } from "../utils/apiResponse";
 import { asyncHandler } from "../middleware/errorHandler";
+import { optionalApiKeyAuth } from "../middleware/auth";
 
 export function createHealthRoutes(client: any, handler: any): Router {
   const router = Router();
 
   /**
    * GET /api/health
-   * Get comprehensive health status
+   * Get health status - detailed if authenticated, simple if not
    */
   router.get(
     "/health",
+    optionalApiKeyAuth,
     asyncHandler(async (req: Request, res: Response) => {
+      // If not authenticated, return simple OK response
+      if (!req.apiKey) {
+        return res.status(200).json({ status: "ok" });
+      }
+
+      // If authenticated, return full health details
       const health = getHealthStatus(client, handler);
-
-      // Set appropriate status code based on health
       const statusCode = health.status === "healthy" ? 200 : 503;
-
       res.status(statusCode).json(createSuccessResponse(health, req.requestId));
     })
   );
 
   /**
    * GET /api/health/simple
-   * Simple health check for load balancers
+   * Simple health check for load balancers (no auth required)
    */
   router.get(
     "/health/simple",
@@ -41,11 +46,19 @@ export function createHealthRoutes(client: any, handler: any): Router {
 
   /**
    * GET /api/health/discord
-   * Discord-specific health check
+   * Discord-specific health check (requires authentication)
    */
   router.get(
     "/health/discord",
+    optionalApiKeyAuth,
     asyncHandler(async (req: Request, res: Response) => {
+      // Require authentication for detailed component info
+      if (!req.apiKey) {
+        return res
+          .status(401)
+          .json({ error: "Authentication required for detailed health information" });
+      }
+
       const health = getHealthStatus(client, handler);
 
       res.status(200).json(createSuccessResponse(health.components.discord, req.requestId));
@@ -54,11 +67,19 @@ export function createHealthRoutes(client: any, handler: any): Router {
 
   /**
    * GET /api/health/database
-   * Database-specific health check
+   * Database-specific health check (requires authentication)
    */
   router.get(
     "/health/database",
+    optionalApiKeyAuth,
     asyncHandler(async (req: Request, res: Response) => {
+      // Require authentication for detailed component info
+      if (!req.apiKey) {
+        return res
+          .status(401)
+          .json({ error: "Authentication required for detailed health information" });
+      }
+
       const health = getHealthStatus(client, handler);
 
       res.status(200).json(createSuccessResponse(health.components.database, req.requestId));
@@ -67,11 +88,19 @@ export function createHealthRoutes(client: any, handler: any): Router {
 
   /**
    * GET /api/health/redis
-   * Redis-specific health check
+   * Redis-specific health check (requires authentication)
    */
   router.get(
     "/health/redis",
+    optionalApiKeyAuth,
     asyncHandler(async (req: Request, res: Response) => {
+      // Require authentication for detailed component info
+      if (!req.apiKey) {
+        return res
+          .status(401)
+          .json({ error: "Authentication required for detailed health information" });
+      }
+
       const health = getHealthStatus(client, handler);
 
       res.status(200).json(createSuccessResponse(health.components.redis, req.requestId));

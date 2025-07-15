@@ -38,13 +38,19 @@ export async function authenticateApiKey(req: Request, res: Response, next: Next
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!authHeader) {
       return res
         .status(401)
-        .json(createErrorResponse("Missing or invalid Authorization header", 401, req.requestId));
+        .json(createErrorResponse("Missing Authorization header", 401, req.requestId));
     }
 
-    const apiKey = authHeader.substring(7); // Remove 'Bearer ' prefix
+    // Support both "Bearer <key>" and "<key>" formats
+    let apiKey: string;
+    if (authHeader.startsWith("Bearer ")) {
+      apiKey = authHeader.substring(7); // Remove 'Bearer ' prefix
+    } else {
+      apiKey = authHeader; // Use the header value directly
+    }
 
     const validation = await validateApiKey(apiKey);
 
@@ -116,4 +122,44 @@ export function logRequests(req: Request, res: Response, next: NextFunction) {
   });
 
   next();
+}
+
+/**
+ * Optional API Key authentication middleware - doesn't fail if no auth provided
+ */
+export async function optionalApiKeyAuth(req: Request, res: Response, next: NextFunction) {
+  try {
+    const authHeader = req.headers.authorization;
+
+    // If no auth header, continue without authentication
+    if (!authHeader) {
+      return next();
+    }
+
+    // Support both "Bearer <key>" and "<key>" formats
+    let apiKey: string;
+    if (authHeader.startsWith("Bearer ")) {
+      apiKey = authHeader.substring(7); // Remove 'Bearer ' prefix
+    } else {
+      apiKey = authHeader; // Use the header value directly
+    }
+
+    const validation = await validateApiKey(apiKey);
+
+    if (validation.isValid) {
+      req.apiKey = validation.keyInfo;
+      log.debug(
+        `API request authenticated: ${validation.keyInfo!.keyId} (${validation.keyInfo!.name})`
+      );
+    } else {
+      log.warn(`Invalid API key attempt from ${req.ip}: ${validation.error}`);
+      // Don't fail - just continue without auth
+    }
+
+    next();
+  } catch (error) {
+    log.error("Error in optional API key authentication:", error);
+    // Don't fail - just continue without auth
+    next();
+  }
 }

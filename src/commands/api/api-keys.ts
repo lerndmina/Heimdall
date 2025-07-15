@@ -1,11 +1,85 @@
 import type { SlashCommandProps, CommandOptions } from "commandkit";
-import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
+import {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+  Snowflake,
+  EmbedField,
+  MessageComponentInteraction,
+} from "discord.js";
+import { createSignal, createEffect, ButtonKit } from "commandkit";
 import { createApiKey, listApiKeys, revokeApiKey } from "../../utils/api/apiKeyUtils";
 import BasicEmbed from "../../utils/BasicEmbed";
 import FetchEnvs from "../../utils/FetchEnvs";
 import log from "../../utils/log";
 
 const env = FetchEnvs();
+
+// Pagination configuration
+const KEYS_PER_PAGE = 5;
+
+function getButtons(interactionId: Snowflake) {
+  // Decrement button
+  const dec = new ButtonKit()
+    .setEmoji("⬅️")
+    .setStyle(ButtonStyle.Primary)
+    .setCustomId("decrement-" + interactionId);
+
+  // Increment button
+  const inc = new ButtonKit()
+    .setEmoji("➡️")
+    .setStyle(ButtonStyle.Primary)
+    .setCustomId("increment-" + interactionId);
+
+  // Disposal button
+  const trash = new ButtonKit()
+    .setEmoji("🗑️")
+    .setStyle(ButtonStyle.Danger)
+    .setCustomId("trash-" + interactionId);
+
+  // Create an action row
+  const row = new ActionRowBuilder<ButtonKit>().addComponents(dec, inc, trash);
+
+  return { dec, inc, trash, row };
+}
+
+function isCountInBounds(count: number, change: number, maxPages: number) {
+  const min = 0;
+  const max = maxPages - 1;
+  return count + change >= min && count + change <= max;
+}
+
+function formatApiKeyForEmbed(key: any, index: number) {
+  // Handle date conversion safely
+  const createdAt = key.createdAt instanceof Date ? key.createdAt : new Date(key.createdAt);
+  const lastUsed = key.lastUsed
+    ? key.lastUsed instanceof Date
+      ? key.lastUsed
+      : new Date(key.lastUsed)
+    : null;
+  const expiresAt = key.expiresAt
+    ? key.expiresAt instanceof Date
+      ? key.expiresAt
+      : new Date(key.expiresAt)
+    : null;
+
+  const lastUsedText = lastUsed ? `<t:${Math.floor(lastUsed.getTime() / 1000)}:R>` : "Never";
+
+  const expiresText = expiresAt ? `<t:${Math.floor(expiresAt.getTime() / 1000)}:F>` : "Never";
+
+  return {
+    name: `${index + 1}. ${key.name}`,
+    value: [
+      `**Key ID:** \`${key.keyId}\``,
+      `**Scopes:** ${key.scopes.join(", ")}`,
+      `**Created:** <t:${Math.floor(createdAt.getTime() / 1000)}:R>`,
+      `**Last Used:** ${lastUsedText}`,
+      `**Expires:** ${expiresText}`,
+    ].join("\n"),
+    inline: false,
+  };
+}
 
 export const data = new SlashCommandBuilder()
   .setName("api-keys")
@@ -162,45 +236,123 @@ async function handleList(interaction: any, client: any) {
           BasicEmbed(
             client,
             "No API Keys",
-            "You don't have any active API keys.",
+            "You don't have any API keys yet. Use `/api-keys generate` to create one.",
             undefined,
-            "Yellow"
+            "Orange"
           ),
         ],
       });
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle("🔑 Your API Keys")
-      .setColor("Blue")
-      .setTimestamp()
-      .setFooter({ text: "Heimdall API", iconURL: client.user.displayAvatarURL() });
+    // Split keys into pages
+    const pages: EmbedField[][] = [];
+    for (let i = 0; i < keys.length; i += KEYS_PER_PAGE) {
+      const pageKeys = keys.slice(i, i + KEYS_PER_PAGE);
+      const pageFields = pageKeys.map((key, index) => formatApiKeyForEmbed(key, i + index));
+      pages.push(pageFields);
+    }
 
-    keys.forEach((key, index) => {
-      const lastUsedText = key.lastUsed
-        ? `<t:${Math.floor(key.lastUsed.getTime() / 1000)}:R>`
-        : "Never";
+    // If only one page, show without pagination
+    if (pages.length === 1) {
+      const embed = new EmbedBuilder()
+        .setTitle("🔑 Your API Keys")
+        .setDescription(`Found ${keys.length} API key${keys.length > 1 ? "s" : ""}`)
+        .addFields(pages[0])
+        .setColor("Blue")
+        .setTimestamp()
+        .setFooter({ text: "Heimdall API", iconURL: client.user.displayAvatarURL() });
 
-      const expiresText = key.expiresAt
-        ? `<t:${Math.floor(key.expiresAt.getTime() / 1000)}:F>`
-        : "Never";
+      return interaction.editReply({
+        embeds: [embed],
+      });
+    }
 
-      embed.addFields({
-        name: `${index + 1}. ${key.name}`,
-        value: [
-          `**Key ID:** \`${key.keyId}\``,
-          `**Scopes:** ${key.scopes.join(", ")}`,
-          `**Created:** <t:${Math.floor(key.createdAt.getTime() / 1000)}:R>`,
-          `**Last Used:** ${lastUsedText}`,
-          `**Expires:** ${expiresText}`,
-        ].join("\n"),
-        inline: false,
+    // Multiple pages - use pagination
+    const [count, setCount, disposeCountSubscribers] = createSignal(0);
+    const { dec, inc, trash, row } = getButtons(interaction.id);
+
+    let inter: MessageComponentInteraction | null = null;
+
+    const embedTitle = "🔑 Your API Keys";
+    const getEmbedDescription = (currentPage: number, totalPages: number, totalKeys: number) =>
+      `Found ${totalKeys} API key${totalKeys > 1 ? "s" : ""} • Page ${
+        currentPage + 1
+      } of ${totalPages}`;
+
+    // Send the initial message with the buttons
+    const message = await interaction.editReply({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle(embedTitle)
+          .setDescription(getEmbedDescription(0, pages.length, keys.length))
+          .addFields(pages[0])
+          .setColor("Blue")
+          .setTimestamp()
+          .setFooter({ text: "Heimdall API", iconURL: client.user.displayAvatarURL() }),
+      ],
+      components: [row],
+    });
+
+    // Subscribe to count signal and update the message every time the count changes
+    createEffect(() => {
+      const value = count();
+
+      inter?.update({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle(embedTitle)
+            .setDescription(getEmbedDescription(value, pages.length, keys.length))
+            .addFields(pages[value])
+            .setColor("Blue")
+            .setTimestamp()
+            .setFooter({ text: "Heimdall API", iconURL: client.user.displayAvatarURL() }),
+        ],
       });
     });
 
-    await interaction.editReply({
-      embeds: [embed],
-    });
+    // Handler to decrement the count
+    dec.onClick(
+      (interaction) => {
+        inter = interaction;
+        setCount((prev) => {
+          if (isCountInBounds(prev, -1, pages.length)) return prev - 1;
+          return prev;
+        });
+      },
+      { message }
+    );
+
+    // Handler to increment the count
+    inc.onClick(
+      (interaction) => {
+        inter = interaction;
+        setCount((prev) => {
+          if (isCountInBounds(prev, 1, pages.length)) return prev + 1;
+          return prev;
+        });
+      },
+      { message }
+    );
+
+    // Disposal handler
+    trash.onClick(
+      async (interaction) => {
+        const disposed = row.setComponents(
+          row.components.map((button) => {
+            return button.setDisabled(true);
+          })
+        );
+
+        disposeCountSubscribers();
+
+        await interaction.update({
+          content: "API Keys list closed.",
+          components: [disposed],
+          embeds: [],
+        });
+      },
+      { message }
+    );
   } catch (error) {
     log.error("Error listing API keys:", error);
     await interaction.editReply({
