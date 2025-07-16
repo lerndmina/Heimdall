@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
+// import rateLimit from "express-rate-limit"; // Disabled rate limiting
 import { CommandKit } from "commandkit";
 import { Client } from "discord.js";
 import { addRequestId, logRequests } from "./middleware/auth";
@@ -49,19 +49,19 @@ export class ApiServer {
       })
     );
 
-    // Rate limiting
-    const limiter = rateLimit({
-      windowMs: env.API_RATE_LIMIT_WINDOW,
-      max: env.API_RATE_LIMIT_MAX,
-      message: {
-        error: "Too many requests from this IP, please try again later.",
-        statusCode: 429,
-      },
-      standardHeaders: true,
-      legacyHeaders: false,
-    });
+    // Rate limiting - DISABLED
+    // const limiter = rateLimit({
+    //   windowMs: 900000, // 15 minutes
+    //   max: 100, // 100 requests per window
+    //   message: {
+    //     error: "Too many requests from this IP, please try again later.",
+    //     statusCode: 429,
+    //   },
+    //   standardHeaders: true,
+    //   legacyHeaders: false,
+    // });
 
-    this.app.use("/api", limiter);
+    // this.app.use("/api", limiter); // Rate limiting disabled
 
     // Body parsing
     this.app.use(express.json({ limit: "10mb" }));
