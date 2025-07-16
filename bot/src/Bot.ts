@@ -90,6 +90,14 @@ export const Start = async () => {
         const apiServer = new ApiServer(client, commandKit);
         await apiServer.start();
         log.info(`API server started on port ${env.API_PORT}`);
+
+        // Start health checker for API server
+        const { healthChecker } = await import("./services/ApiHealthChecker");
+        // Give the API server a moment to fully initialize
+        setTimeout(() => {
+          healthChecker.start();
+          log.info("API health checker started");
+        }, 2000);
       } catch (error) {
         log.error("Failed to start API server:", error);
       }

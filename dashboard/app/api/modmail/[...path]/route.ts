@@ -45,13 +45,16 @@ async function handleModmailRequest(request: NextRequest, pathSegments: string[]
 
     // 2. Parse the request path to determine what they're accessing
     const [firstSegment, ...restSegments] = pathSegments;
+    console.log(`Request path segments:`, { firstSegment, restSegments, pathSegments });
 
     // 3. Authorization Logic
     if (firstSegment === "auth" && restSegments[0] === "validate-user") {
       // Allow users to validate themselves, staff to validate anyone
       const targetUserId = restSegments[1];
+      console.log(`Auth validation request: user ${userId} validating ${targetUserId}`);
       if (targetUserId !== userId) {
         // This is staff trying to validate someone else, check their permissions via bot API
+        console.log(`Staff validation required for user ${userId}`);
         const isStaff = await validateStaffAccess(userId);
         if (!isStaff) {
           return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
@@ -60,6 +63,7 @@ async function handleModmailRequest(request: NextRequest, pathSegments: string[]
     } else if (firstSegment === "user") {
       // User-specific endpoints: /api/modmail/user/{userId}/tickets
       const targetUserId = restSegments[0];
+      console.log(`User data request: user ${userId} accessing ${targetUserId}`);
       if (targetUserId !== userId) {
         // Staff trying to access another user's tickets - verify they have staff access
         const isStaff = await validateStaffAccess(userId);
@@ -70,9 +74,11 @@ async function handleModmailRequest(request: NextRequest, pathSegments: string[]
     } else {
       // Guild-specific endpoints: /api/modmail/{guildId}/*
       const guildId = firstSegment;
+      console.log(`Guild data request: user ${userId} accessing guild ${guildId}`);
       if (guildId) {
         // Check if user has staff access to this guild
         const hasAccess = await validateGuildAccess(userId, guildId);
+        console.log(`Guild access result: ${hasAccess}`);
         if (!hasAccess) {
           return NextResponse.json({ error: "Insufficient permissions for this guild" }, { status: 403 });
         }
@@ -140,7 +146,9 @@ async function validateStaffAccess(userId: string): Promise<boolean> {
 
     if (response.ok) {
       const data = await response.json();
-      return data.isStaff || (data.guilds && data.guilds.length > 0);
+      console.log(`Staff validation for user ${userId}:`, JSON.stringify(data, null, 2));
+      // Check if user has staff access in any guild
+      return data.hasAccess || (data.guilds && data.guilds.some((guild: any) => guild.hasStaffRole));
     }
     return false;
   } catch (error) {
@@ -152,6 +160,8 @@ async function validateStaffAccess(userId: string): Promise<boolean> {
 // Helper function to validate if user has access to specific guild
 async function validateGuildAccess(userId: string, guildId: string): Promise<boolean> {
   try {
+    console.log(`Validating guild access for user ${userId} in guild ${guildId}`);
+
     const response = await fetch(`${BOT_API_URL}/api/modmail/auth/validate-user/${userId}`, {
       headers: {
         Authorization: `Bearer ${INTERNAL_API_KEY}`,
@@ -160,9 +170,22 @@ async function validateGuildAccess(userId: string, guildId: string): Promise<boo
 
     if (response.ok) {
       const data = await response.json();
-      return data.guilds && data.guilds.some((guild: any) => guild.id === guildId);
+      console.log(`Bot API response for user ${userId}:`, JSON.stringify(data, null, 2));
+
+      const hasAccess =
+        data.guilds &&
+        data.guilds.some((guild: any) => {
+          console.log(`Checking guild: ${guild.guildId} === ${guildId} ?`, guild.guildId === guildId);
+          console.log(`Guild has staff role: ${guild.hasStaffRole}`);
+          return guild.guildId === guildId && guild.hasStaffRole;
+        });
+
+      console.log(`Guild access result for ${guildId}: ${hasAccess}`);
+      return hasAccess;
+    } else {
+      console.error(`Bot API returned ${response.status} for user validation`);
+      return false;
     }
-    return false;
   } catch (error) {
     console.error("Error validating guild access:", error);
     return false;
