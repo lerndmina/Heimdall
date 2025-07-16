@@ -11,13 +11,13 @@ import {
   GuildMember,
   ThreadAutoArchiveDuration,
 } from "discord.js";
-import { ModmailType } from "../models/Modmail";
 import { ThingGetter } from "./TinyUtils";
 import log from "./log";
 import FetchEnvs, { envExists } from "./FetchEnvs";
 import Database from "./data/database";
-import Modmail from "../models/Modmail";
 import ModmailConfig from "../models/ModmailConfig";
+import Modmail, { ModmailType } from "../models/Modmail";
+import { ModmailMessageService } from "../services/ModmailMessageService";
 import ModmailCache from "./ModmailCache";
 import { ModmailEmbeds } from "./modmail/ModmailEmbeds";
 
@@ -626,6 +626,36 @@ export async function createModmailThread(
     log.info(
       `Created modmail thread for user ${targetUser.id} with isClosed: ${finalModmail.isClosed}, ID: ${finalModmail._id}`
     );
+
+    // Save the initial message to the database for transcript functionality
+    if (initialMessage && initialMessage.trim()) {
+      const messageService = new ModmailMessageService();
+      const trackingMessageId = `initial-${targetUser.id}-${Date.now()}`;
+      
+      try {
+        await messageService.addMessage(targetUser.id, {
+          messageId: trackingMessageId,
+          type: "user",
+          content: initialMessage,
+          authorId: targetUser.id,
+          authorName: targetMember.user.username,
+          authorAvatar: targetUser.displayAvatarURL(),
+          // Since this is the initial message, it doesn't have Discord message references yet
+          discordMessageId: undefined,
+          discordMessageUrl: undefined,
+          webhookMessageId: undefined,
+          webhookMessageUrl: undefined,
+          dmMessageId: undefined,
+          dmMessageUrl: undefined,
+          attachments: [], // Initial message attachments will be handled separately when sent
+        });
+        
+        log.debug(`Saved initial message ${trackingMessageId} to database for user ${targetUser.id}`);
+      } catch (error) {
+        log.error(`Failed to save initial message to database: ${error}`);
+        // Don't fail the whole modmail creation if message saving fails
+      }
+    }
 
     // Handle updating the tag for the thread
     const { handleTag } = require("../events/messageCreate/gotMail");

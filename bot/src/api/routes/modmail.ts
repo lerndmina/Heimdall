@@ -8,6 +8,7 @@ import {
   validateUserAccess,
   generateTranscript,
   searchModmail,
+  getUserTickets,
 } from "../controllers/ModmailController";
 import { authenticateApiKey, requireScope } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errorHandler";
@@ -98,12 +99,25 @@ export function createModmailRoutes(client?: any, handler?: any): Router {
   router.get("/:guildId/threads/:threadId/transcript", asyncHandler(generateTranscript));
 
   /**
-   * GET /api/auth/validate-user/:userId
+   * GET /api/modmail/auth/validate-user/:userId
    * Validate user permissions for guild access (for dashboard authentication)
    * Query params:
    * - guildId: Specific guild to check (optional, checks all if not provided)
    */
   router.get("/auth/validate-user/:userId", asyncHandler(validateUserAccess));
+
+  /**
+   * GET /api/modmail/user/:userId/tickets
+   * Get all modmail tickets for a specific user across all guilds
+   * Query params:
+   * - page: Page number (default: 1)
+   * - limit: Items per page (default: 20, max: 100)
+   * - status: 'open' | 'closed' | 'all' (default: 'all')
+   * - guildId: Filter by specific guild (optional)
+   * - sortBy: 'lastActivity' | 'created' | 'closed' (default: 'lastActivity')
+   * - sortOrder: 'asc' | 'desc' (default: 'desc')
+   */
+  router.get("/user/:userId/tickets", asyncHandler(getUserTickets));
 
   return router;
 }

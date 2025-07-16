@@ -628,6 +628,32 @@ function generateHTMLTranscript(thread: any, guildName: string): string {
       .replace(/'/g, "&#39;");
   };
 
+  const getStaticAvatarUrl = (avatarUrl?: string): string | undefined => {
+    if (!avatarUrl) return undefined;
+
+    // If it's an animated avatar (starts with a_), convert to static
+    if (avatarUrl.includes("a_")) {
+      return avatarUrl.replace(/\.gif(\?.*)?$/, ".png$1").replace(/a_/, "");
+    }
+
+    // If it's already static or not a Discord CDN URL, return as-is
+    return avatarUrl;
+  };
+
+  const getDisplayContent = (
+    message: any
+  ): { displayContent: string; originalContent?: string } => {
+    if (message.isEdited && message.editedContent) {
+      return {
+        displayContent: message.editedContent,
+        originalContent: message.content,
+      };
+    }
+    return {
+      displayContent: message.content,
+    };
+  };
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -705,7 +731,10 @@ function generateHTMLTranscript(thread: any, guildName: string): string {
             color: #ffffff;
         }
         .staff {
-            color: #f04747;
+            color: #43b581;
+        }
+        .user {
+            color: #7289da;
         }
         .timestamp {
             font-size: 0.75rem;
@@ -714,6 +743,7 @@ function generateHTMLTranscript(thread: any, guildName: string): string {
         .message-text {
             color: #dcddde;
             word-wrap: break-word;
+            white-space: pre-wrap;
         }
         .attachments {
             margin-top: 10px;
@@ -745,6 +775,67 @@ function generateHTMLTranscript(thread: any, guildName: string): string {
         .status-open { background: #3ba55d; color: white; }
         .status-closed { background: #ed4245; color: white; }
         .status-resolved { background: #faa61a; color: white; }
+        .message-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid;
+            margin-left: 5px;
+        }
+        .message-badge.user {
+            border-color: #7289da;
+            color: #7289da;
+        }
+        .message-badge.staff {
+            border-color: #43b581;
+            color: #43b581;
+        }
+        /* Tooltip styles for edited messages */
+        .tooltip {
+            position: relative;
+            display: inline;
+            cursor: help;
+        }
+        .tooltip .tooltip-content {
+            visibility: hidden;
+            width: 300px;
+            background-color: #18191c;
+            color: #dcddde;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid #4f545c;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .tooltip .tooltip-content::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #4f545c transparent transparent transparent;
+        }
+        .tooltip:hover .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+        }
+        .tooltip-label {
+            font-weight: 600;
+            color: #b9bbbe;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
@@ -784,13 +875,16 @@ function generateHTMLTranscript(thread: any, guildName: string): string {
         
         <div class="messages">
             ${messages
-              .map(
-                (message: any) => `
+              .map((message: any) => {
+                const { displayContent, originalContent } = getDisplayContent(message);
+                const staticAvatarUrl = getStaticAvatarUrl(message.authorAvatar);
+
+                return `
                 <div class="message">
                     <div class="avatar">
                         ${
-                          message.authorAvatar
-                            ? `<img src="${message.authorAvatar}" alt="${escapeHtml(
+                          staticAvatarUrl
+                            ? `<img src="${staticAvatarUrl}" alt="${escapeHtml(
                                 message.authorName
                               )}" style="width: 100%; height: 100%; border-radius: 50%;">`
                             : escapeHtml(message.authorName.charAt(0).toUpperCase())
@@ -799,15 +893,38 @@ function generateHTMLTranscript(thread: any, guildName: string): string {
                     <div class="message-content">
                         <div class="message-header">
                             <span class="author-name ${
-                              message.type === "staff" ? "staff" : ""
+                              message.type === "staff" ? "staff" : "user"
                             }">${escapeHtml(message.authorName)}</span>
+                            <span class="message-badge ${
+                              message.type === "staff" ? "staff" : "user"
+                            }">
+                                ${message.type === "staff" ? "Staff" : "User"}
+                            </span>
                             <span class="timestamp">${formatDate(message.createdAt)}</span>
-                            ${message.isEdited ? '<span class="timestamp">(edited)</span>' : ""}
                         </div>
-                        <div class="message-text">${escapeHtml(message.content).replace(
-                          /\n/g,
-                          "<br>"
-                        )}</div>
+                        <div class="message-text">
+                            ${
+                              message.isEdited && originalContent
+                                ? `
+                                <span class="tooltip">
+                                    ${escapeHtml(displayContent).replace(/\n/g, "<br>")}
+                                    <span class="timestamp" style="margin-left: 5px;">(edited)</span>
+                                    <div class="tooltip-content">
+                                        <div class="tooltip-label">Original message:</div>
+                                        ${escapeHtml(originalContent).replace(/\n/g, "<br>")}
+                                    </div>
+                                </span>
+                            `
+                                : `
+                                ${escapeHtml(displayContent).replace(/\n/g, "<br>")}
+                                ${
+                                  message.isEdited
+                                    ? '<span class="timestamp" style="margin-left: 5px;">(edited)</span>'
+                                    : ""
+                                }
+                            `
+                            }
+                        </div>
                         ${
                           message.attachments && message.attachments.length > 0
                             ? `
@@ -834,8 +951,8 @@ function generateHTMLTranscript(thread: any, guildName: string): string {
                         }
                     </div>
                 </div>
-            `
-              )
+            `;
+              })
               .join("")}
         </div>
         
@@ -906,4 +1023,125 @@ function sanitizeModmailMessage(message: any) {
     dmMessageId: message.dmMessageId,
     dmMessageUrl: message.dmMessageUrl,
   };
+}
+
+/**
+ * Get all modmail tickets for a specific user across all guilds
+ */
+export async function getUserTickets(req: Request, res: Response) {
+  try {
+    const { userId } = req.params;
+    const {
+      page = 1,
+      limit = 20,
+      status = "all",
+      guildId,
+      search,
+      sortBy = "lastActivity",
+      sortOrder = "desc",
+    } = req.query as ModmailListQuery & { guildId?: string };
+
+    // Validate pagination
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(100, Math.max(1, Number(limit))); // Max 100 per page
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query
+    const query: any = { userId };
+
+    // Filter by guild if specified
+    if (guildId) {
+      query.guildId = guildId;
+    }
+
+    // Filter by status
+    if (status !== "all") {
+      if (status === "closed") {
+        query.isClosed = true;
+      } else if (status === "open") {
+        query.isClosed = false;
+      } else if (status === "resolved") {
+        query.markedResolved = true;
+      }
+    }
+
+    // Text search in content
+    if (search) {
+      query["messages.content"] = { $regex: search, $options: "i" };
+    }
+
+    // Build sort
+    const sortOptions: any = {};
+    switch (sortBy) {
+      case "lastActivity":
+        sortOptions.lastUserActivityAt = sortOrder === "desc" ? -1 : 1;
+        break;
+      case "created":
+        sortOptions.createdAt = sortOrder === "desc" ? -1 : 1;
+        break;
+      case "resolved":
+        sortOptions.resolvedAt = sortOrder === "desc" ? -1 : 1;
+        break;
+      case "closed":
+        sortOptions.closedAt = sortOrder === "desc" ? -1 : 1;
+        break;
+      default:
+        sortOptions.lastUserActivityAt = -1;
+    }
+
+    // Execute queries
+    const [threads, totalCount] = await Promise.all([
+      Modmail.find(query).sort(sortOptions).skip(skip).limit(limitNum).lean(),
+      Modmail.countDocuments(query),
+    ]);
+
+    // Get the client from res.locals to fetch guild names
+    const client = res.locals.client as Client;
+
+    // Create a map of unique guild IDs to fetch guild names
+    const uniqueGuildIds = [...new Set(threads.map((thread) => thread.guildId))];
+    const guildNames: { [guildId: string]: string } = {};
+
+    // Fetch guild names from Discord
+    for (const guildId of uniqueGuildIds) {
+      try {
+        const guild = await client.guilds.fetch(guildId);
+        guildNames[guildId] = guild.name;
+      } catch (error) {
+        log.warn(`Failed to fetch guild name for ${guildId}:`, error);
+        guildNames[guildId] = `Guild ${guildId}`;
+      }
+    }
+
+    // Enhance threads with guild names
+    const enhancedThreads = threads.map((thread) => {
+      const sanitized = sanitizeModmailThread(thread);
+      return {
+        ...sanitized,
+        guildName: guildNames[thread.guildId] || `Guild ${thread.guildId}`,
+      };
+    });
+
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    res.json(
+      createSuccessResponse(
+        {
+          tickets: enhancedThreads,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: totalCount,
+            pages: totalPages,
+            hasNext: pageNum < totalPages,
+            hasPrev: pageNum > 1,
+          },
+        },
+        req.requestId
+      )
+    );
+  } catch (error) {
+    log.error("Error fetching user tickets:", error);
+    res.status(500).json(createErrorResponse("Failed to fetch user tickets", 500, req.requestId));
+  }
 }
