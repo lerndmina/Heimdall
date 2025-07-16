@@ -74,14 +74,17 @@ async function handleModmailRequest(request: NextRequest, pathSegments: string[]
     } else {
       // Guild-specific endpoints: /api/modmail/{guildId}/*
       const guildId = firstSegment;
-      console.log(`Guild data request: user ${userId} accessing guild ${guildId}`);
+      console.log(`🔍 Guild data request: user ${userId} accessing guild ${guildId}`);
       if (guildId) {
         // Check if user has staff access to this guild
+        console.log(`🔍 Calling validateGuildAccess for user ${userId} in guild ${guildId}`);
         const hasAccess = await validateGuildAccess(userId, guildId);
-        console.log(`Guild access result: ${hasAccess}`);
+        console.log(`🔍 Guild access result: ${hasAccess}`);
         if (!hasAccess) {
+          console.log(`❌ Access denied for user ${userId} to guild ${guildId}`);
           return NextResponse.json({ error: "Insufficient permissions for this guild" }, { status: 403 });
         }
+        console.log(`✅ Access granted for user ${userId} to guild ${guildId}`);
       }
     }
 
@@ -145,10 +148,12 @@ async function validateStaffAccess(userId: string): Promise<boolean> {
     });
 
     if (response.ok) {
-      const data = await response.json();
-      console.log(`Staff validation for user ${userId}:`, JSON.stringify(data, null, 2));
-      // Check if user has staff access in any guild
-      return data.hasAccess || (data.guilds && data.guilds.some((guild: any) => guild.hasStaffRole));
+      const response_data = await response.json();
+      console.log(`Staff validation for user ${userId}:`, JSON.stringify(response_data, null, 2));
+      // Check if user has staff access in any guild - extract from nested data structure
+      const hasAccess = response_data.data?.hasAccess;
+      const guilds = response_data.data?.guilds;
+      return hasAccess || (guilds && guilds.some((guild: any) => guild.hasStaffRole));
     }
     return false;
   } catch (error) {
@@ -160,7 +165,7 @@ async function validateStaffAccess(userId: string): Promise<boolean> {
 // Helper function to validate if user has access to specific guild
 async function validateGuildAccess(userId: string, guildId: string): Promise<boolean> {
   try {
-    console.log(`Validating guild access for user ${userId} in guild ${guildId}`);
+    console.log(`🔍 Validating guild access for user ${userId} in guild ${guildId}`);
 
     const response = await fetch(`${BOT_API_URL}/api/modmail/auth/validate-user/${userId}`, {
       headers: {
@@ -168,26 +173,45 @@ async function validateGuildAccess(userId: string, guildId: string): Promise<boo
       },
     });
 
+    console.log(`🔍 Bot API response status: ${response.status}`);
+
     if (response.ok) {
-      const data = await response.json();
-      console.log(`Bot API response for user ${userId}:`, JSON.stringify(data, null, 2));
+      const response_data = await response.json();
+      console.log(`🔍 Bot API response for user ${userId}:`, JSON.stringify(response_data, null, 2));
 
-      const hasAccess =
-        data.guilds &&
-        data.guilds.some((guild: any) => {
-          console.log(`Checking guild: ${guild.guildId} === ${guildId} ?`, guild.guildId === guildId);
-          console.log(`Guild has staff role: ${guild.hasStaffRole}`);
-          return guild.guildId === guildId && guild.hasStaffRole;
-        });
+      // Extract guilds from the nested data structure
+      const guilds = response_data.data?.guilds;
+      if (!guilds || !Array.isArray(guilds)) {
+        console.log(`❌ No guilds array found in response.data`);
+        return false;
+      }
 
-      console.log(`Guild access result for ${guildId}: ${hasAccess}`);
+      console.log(`🔍 Found ${guilds.length} guilds for user ${userId}`);
+
+      const hasAccess = guilds.some((guild: any) => {
+        console.log(`🔍 Checking guild: "${guild.guildId}" === "${guildId}" ? ${guild.guildId === guildId}`);
+        console.log(`🔍 Guild data:`, JSON.stringify(guild, null, 2));
+        console.log(`🔍 Guild has staff role: ${guild.hasStaffRole}`);
+
+        const guildMatches = guild.guildId === guildId;
+        const hasStaffRole = guild.hasStaffRole;
+        const result = guildMatches && hasStaffRole;
+
+        console.log(`🔍 Final check for guild ${guild.guildId}: match=${guildMatches}, staff=${hasStaffRole}, result=${result}`);
+
+        return result;
+      });
+
+      console.log(`🔍 Final guild access result for ${guildId}: ${hasAccess}`);
       return hasAccess;
     } else {
-      console.error(`Bot API returned ${response.status} for user validation`);
+      console.error(`❌ Bot API returned ${response.status} for user validation`);
+      const errorText = await response.text().catch(() => "Unable to read error");
+      console.error(`❌ Bot API error response:`, errorText);
       return false;
     }
   } catch (error) {
-    console.error("Error validating guild access:", error);
+    console.error("❌ Error validating guild access:", error);
     return false;
   }
 }
