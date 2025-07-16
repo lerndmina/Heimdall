@@ -4,25 +4,29 @@ import { auth } from "@/lib/auth";
 const BOT_API_URL = process.env.BOT_API_URL || "http://localhost:3001";
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "";
 
+// Helper to check if we're in development mode
+const isDev = process.env.NODE_ENV === "development";
+const debugLog = isDev ? console.log : () => {};
+
 export async function GET(request: NextRequest, context: { params: Promise<{ guildId: string; threadId: string }> }) {
   try {
-    console.log("transcript route: Starting request processing");
+    debugLog("transcript route: Starting request processing");
 
     // Get session to ensure user is authenticated
     const session = await auth();
     if (!session?.user?.id) {
-      console.log("transcript route: No session found");
+      debugLog("transcript route: No session found");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log("transcript route: Session found for user:", session.user.id);
+    debugLog("transcript route: Session found for user:", session.user.id);
 
     // Get parameters
     const { guildId, threadId } = await context.params;
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format") || "html";
 
-    console.log("transcript route: Processing transcript request", { guildId, threadId, format });
+    debugLog("transcript route: Processing transcript request", { guildId, threadId, format });
 
     // First, get the thread to check permissions
     const threadResponse = await fetch(`${BOT_API_URL}/api/modmail/${guildId}/threads/${threadId}?includeMessages=false`, {
@@ -34,7 +38,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ gui
     });
 
     if (!threadResponse.ok) {
-      console.log("transcript route: Failed to fetch thread for permission check");
+      debugLog("transcript route: Failed to fetch thread for permission check");
       return NextResponse.json({ error: "Thread not found" }, { status: 404 });
     }
 
@@ -42,21 +46,21 @@ export async function GET(request: NextRequest, context: { params: Promise<{ gui
     const thread = threadData?.data;
 
     if (!thread) {
-      console.log("transcript route: Thread data not found");
+      debugLog("transcript route: Thread data not found");
       return NextResponse.json({ error: "Thread not found" }, { status: 404 });
     }
 
-    console.log("transcript route: Thread found, checking permissions", {
+    debugLog("transcript route: Thread found, checking permissions", {
       userId: session.user.id,
       threadUserId: thread.userId,
     });
 
     // Check if user is the ticket owner
     if (thread.userId === session.user.id) {
-      console.log("transcript route: User is ticket owner - access granted");
+      debugLog("transcript route: User is ticket owner - access granted");
     } else {
       // Check if user has staff role in this guild
-      console.log("transcript route: User is not ticket owner, checking staff permissions");
+      debugLog("transcript route: User is not ticket owner, checking staff permissions");
 
       const userValidationResponse = await fetch(`${BOT_API_URL}/api/modmail/auth/validate-user/${session.user.id}`, {
         method: "GET",
@@ -67,7 +71,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ gui
       });
 
       if (!userValidationResponse.ok) {
-        console.log("transcript route: Failed to validate user permissions");
+        debugLog("transcript route: Failed to validate user permissions");
 
         // Handle rate limiting gracefully
         if (userValidationResponse.status === 429) {
@@ -94,7 +98,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ gui
       const hasStaffRole = guilds.some((guild: any) => guild.guildId === guildId && guild.hasStaffRole);
 
       if (!hasStaffRole) {
-        console.log("transcript route: User does not have staff role - access denied");
+        debugLog("transcript route: User does not have staff role - access denied");
         return NextResponse.json(
           {
             error: "Forbidden: You can only view transcripts for your own tickets or if you have staff permissions",
@@ -103,11 +107,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ gui
         );
       }
 
-      console.log("transcript route: User has staff role - access granted");
+      debugLog("transcript route: User has staff role - access granted");
     }
 
     // User has permission, generate the transcript
-    console.log("transcript route: Generating transcript");
+    debugLog("transcript route: Generating transcript");
 
     const transcriptResponse = await fetch(`${BOT_API_URL}/api/modmail/${guildId}/threads/${threadId}/transcript?format=${format}`, {
       method: "GET",
@@ -117,11 +121,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ gui
       },
     });
 
-    console.log("transcript route: Bot API response status:", transcriptResponse.status);
+    debugLog("transcript route: Bot API response status:", transcriptResponse.status);
 
     if (!transcriptResponse.ok) {
       const errorData = await transcriptResponse.json().catch(() => ({}));
-      console.log("transcript route: Bot API error:", errorData);
+      debugLog("transcript route: Bot API error:", errorData);
 
       // Handle rate limiting from bot API
       if (transcriptResponse.status === 429) {
@@ -151,11 +155,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ gui
     // Return the transcript with proper content type
     if (format === "json") {
       const data = await transcriptResponse.json();
-      console.log("transcript route: Returning JSON transcript");
+      debugLog("transcript route: Returning JSON transcript");
       return NextResponse.json(data);
     } else {
       const html = await transcriptResponse.text();
-      console.log("transcript route: Returning HTML transcript");
+      debugLog("transcript route: Returning HTML transcript");
       return new NextResponse(html, {
         headers: {
           "Content-Type": "text/html",
