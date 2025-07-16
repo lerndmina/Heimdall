@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MessageSquare, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { MessageSquare, Clock, CheckCircle, AlertCircle, User, Shield, FileText, Download } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useRequireGuild } from "./use-require-guild";
 import { apiClient } from "@/lib/api";
 

@@ -50,7 +50,7 @@ export function DashboardNav({ user }: { user: User }) {
         <div className="flex items-center justify-between h-16">
           {/* Logo and Guild Selector */}
           <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <Shield className="h-8 w-8 text-discord-primary" />
               <span className="font-bold text-xl text-white">Heimdall</span>
             </Link>
@@ -69,11 +69,8 @@ export function DashboardNav({ user }: { user: User }) {
                   key={item.name}
                   href={item.href}
                   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-discord-primary text-white"
-                      : "text-discord-text hover:bg-discord-darker hover:text-white"
-                  }`}
-                >
+                    isActive ? "bg-discord-primary text-white" : "text-discord-text hover:bg-discord-darker hover:text-white"
+                  }`}>
                   <Icon className="h-4 w-4" />
                   {item.name}
                 </Link>
@@ -85,24 +82,13 @@ export function DashboardNav({ user }: { user: User }) {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-white">
               <Avatar className="h-8 w-8">
-                <AvatarImage
-                  src={
-                    user.avatar
-                      ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
-                      : user.image || undefined
-                  }
-                />
+                <AvatarImage src={user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : user.image || undefined} />
                 <AvatarFallback>{user.name?.[0] || "U"}</AvatarFallback>
               </Avatar>
               <span className="hidden sm:block">{user.name}</span>
             </div>
 
-            <Button
-              onClick={() => signOut()}
-              variant="ghost"
-              size="sm"
-              className="text-discord-text hover:text-white"
-            >
+            <Button onClick={() => signOut()} variant="ghost" size="sm" className="text-discord-text hover:text-white">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -121,11 +107,8 @@ export function DashboardNav({ user }: { user: User }) {
                 key={item.name}
                 href={item.href}
                 className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-discord-primary text-white"
-                    : "text-discord-text hover:bg-discord-darker hover:text-white"
-                }`}
-              >
+                  isActive ? "bg-discord-primary text-white" : "text-discord-text hover:bg-discord-darker hover:text-white"
+                }`}>
                 <Icon className="h-4 w-4" />
                 {item.name}
               </Link>

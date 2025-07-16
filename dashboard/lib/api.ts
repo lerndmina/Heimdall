@@ -33,11 +33,7 @@ class ApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new ApiError(
-          errorData.message || `HTTP ${response.status}`,
-          response.status,
-          errorData
-        );
+        throw new ApiError(errorData.message || `HTTP ${response.status}`, response.status, errorData);
       }
 
       return await response.json();
@@ -45,10 +41,7 @@ class ApiClient {
       if (error instanceof ApiError) {
         throw error;
       }
-      throw new ApiError(
-        `Network error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        0
-      );
+      throw new ApiError(`Network error: ${error instanceof Error ? error.message : "Unknown error"}`, 0);
     }
   }
 
@@ -81,9 +74,7 @@ class ApiClient {
   }
 
   async getModmailThread(guildId: string, threadId: string, includeMessages = true) {
-    return this.request(
-      `/api/modmail/${guildId}/threads/${threadId}?includeMessages=${includeMessages}`
-    );
+    return this.request(`/api/modmail/${guildId}/threads/${threadId}?includeMessages=${includeMessages}`);
   }
 
   async getModmailMessages(
@@ -136,23 +127,38 @@ class ApiClient {
     return this.request(`/api/modmail/${guildId}/search?${searchParams}`);
   }
 
-  async generateTranscript(guildId: string, threadId: string, format: "html" | "json" = "html") {
-    const response = await fetch(
-      `${this.baseUrl}/api/modmail/${guildId}/threads/${threadId}/transcript?format=${format}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+  async getUserTickets(
+    userId: string,
+    params: {
+      page?: number;
+      limit?: number;
+      status?: "open" | "closed" | "resolved" | "all";
+      guildId?: string;
+      search?: string;
+      sortBy?: "lastActivity" | "created" | "resolved" | "closed";
+      sortOrder?: "asc" | "desc";
+    } = {}
+  ) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        searchParams.set(key, String(value));
       }
-    );
+    });
+
+    return this.request(`/api/modmail/user/${userId}/tickets?${searchParams}`);
+  }
+
+  async generateTranscript(guildId: string, threadId: string, format: "html" | "json" = "html") {
+    const response = await fetch(`${this.baseUrl}/api/modmail/${guildId}/threads/${threadId}/transcript?format=${format}`, {
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+    });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new ApiError(
-        errorData.message || `HTTP ${response.status}`,
-        response.status,
-        errorData
-      );
+      throw new ApiError(errorData.message || `HTTP ${response.status}`, response.status, errorData);
     }
 
     if (format === "json") {

@@ -36,6 +36,18 @@ interface ModmailThread {
   markedResolved: boolean;
 }
 
+interface TicketsResponse {
+  tickets: ModmailThread[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
 export function UserTickets({ user }: UserTicketsProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,33 +55,59 @@ export function UserTickets({ user }: UserTicketsProps) {
 
   // Get user's modmail threads across all guilds
   const {
-    data: userThreads,
+    data: ticketsResponse,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["user-threads", user.id, searchQuery],
+    queryKey: ["user-tickets", user.id, searchQuery, selectedGuild],
     queryFn: async () => {
-      // This would need to be implemented in the API to search across all guilds
-      // For now, we'll use a placeholder
-      return {
-        threads: [] as ModmailThread[],
-        guilds: [] as { guildId: string; guildName: string }[],
-      };
+      return await apiClient.getUserTickets(user.id, {
+        search: searchQuery || undefined,
+        guildId: selectedGuild !== "all" ? selectedGuild : undefined,
+        limit: 50,
+      });
     },
     retry: 2,
   });
+
+  // Extract unique guilds from the tickets
+  const ticketsData = ticketsResponse as any;
+  const guilds =
+    ticketsData?.data?.tickets?.reduce((acc: { guildId: string; guildName?: string }[], ticket: ModmailThread) => {
+      if (!acc.find((g) => g.guildId === ticket.guildId)) {
+        acc.push({
+          guildId: ticket.guildId,
+          guildName: ticket.guildName || `Guild ${ticket.guildId}`,
+        });
+      }
+      return acc;
+    }, []) || [];
 
   const handleBack = () => {
     router.push("/");
   };
 
   const handleViewTranscript = (threadId: string, guildId: string) => {
+    if (!threadId || !guildId || threadId === "undefined" || guildId === "undefined") {
+      console.error("Invalid thread or guild ID for viewing:", { threadId, guildId });
+      alert("Error: Invalid thread or guild ID. Please try refreshing the page.");
+      return;
+    }
     router.push(`/transcript/${guildId}/${threadId}`);
   };
 
   const handleDownloadTranscript = async (threadId: string, guildId: string) => {
     try {
+      // Validate inputs
+      if (!threadId || !guildId || threadId === "undefined" || guildId === "undefined") {
+        console.error("Invalid thread or guild ID:", { threadId, guildId });
+        alert("Error: Invalid thread or guild ID. Please try refreshing the page.");
+        return;
+      }
+
+      console.log("Downloading transcript for:", { threadId, guildId });
       const transcript = await apiClient.generateTranscript(guildId, threadId, "html");
+
       // Create download
       const blob = new Blob([transcript], { type: "text/html" });
       const url = URL.createObjectURL(blob);
@@ -82,11 +120,12 @@ export function UserTickets({ user }: UserTicketsProps) {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to download transcript:", error);
+      alert(`Failed to download transcript: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
   const filteredThreads =
-    userThreads?.threads?.filter((thread: ModmailThread) => {
+    ticketsData?.data?.tickets?.filter((thread: ModmailThread) => {
       const matchesSearch = !searchQuery || thread.userDisplayName.toLowerCase().includes(searchQuery.toLowerCase()) || thread.guildName?.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesGuild = selectedGuild === "all" || thread.guildId === selectedGuild;
@@ -169,8 +208,8 @@ export function UserTickets({ user }: UserTicketsProps) {
             </div>
             <select value={selectedGuild} onChange={(e) => setSelectedGuild(e.target.value)} className="px-3 py-2 bg-discord-darker border border-discord-dark rounded-md text-white">
               <option value="all">All Servers</option>
-              {userThreads?.guilds?.map((guild) => (
-                <option key={guild.guildId} value={guild.guildId}>
+              {guilds?.map((guild: { guildId: string; guildName?: string }, index: number) => (
+                <option key={guild.guildId || `guild-${index}`} value={guild.guildId}>
                   {guild.guildName}
                 </option>
               ))}
