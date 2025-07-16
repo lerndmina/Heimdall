@@ -2,6 +2,7 @@ import { ChannelType, Client, Message, TextChannel } from "discord.js";
 import log from "../utils/log";
 import { ModerationCategory } from "../models/ModeratedChannels";
 import ModeratedChannel from "../models/ModeratedChannels";
+import ModerationHit, { ModerationHitStatus } from "../models/ModerationHit";
 import { processModerationResult } from "../utils/moderationUtils";
 import OpenAI from "openai";
 import FetchEnvs from "../utils/FetchEnvs";
@@ -138,6 +139,28 @@ export default async (message: Message, client: Client<true>) => {
       );
 
       try {
+        // Store the moderation hit in the database using findOneAndUpdate (upsert)
+        const moderationHit = await db.findOneAndUpdate(
+          ModerationHit,
+          { messageId: message.id }, // Find by messageId (unique identifier)
+          {
+            guildId: message.guild.id,
+            channelId: message.channel.id,
+            messageId: message.id,
+            userId: message.author.id,
+            messageContent: textContent,
+            flaggedCategories,
+            confidenceScores,
+            contentTypes,
+            status: ModerationHitStatus.PENDING,
+          },
+          { upsert: true, new: true } // Create if doesn't exist, return updated document
+        );
+
+        log.debug(
+          `Stored moderation hit in database with ID: ${moderationHit?.messageId || "unknown"}`
+        );
+
         // Send to the modlog channel if configured
         if (channelConfig.modlogChannelId) {
           const modlogChannel = client.channels.cache.get(
