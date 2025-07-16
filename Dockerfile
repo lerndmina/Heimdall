@@ -75,6 +75,8 @@ WORKDIR /app/dashboard
 RUN rm -f bun.lock
 # Generate Prisma client before building
 RUN bunx prisma generate
+# Clean any existing build
+RUN rm -rf .next
 RUN bun run build
 
 # Go back to root
@@ -111,6 +113,19 @@ RUN echo '{\n\
   ]\n\
   }' > ecosystem.config.json
 
+# Debug: Show network configuration
+RUN echo "Debug info will be shown at runtime"
+
+# Create startup script with debug info
+RUN echo '#!/bin/bash\n\
+  echo "=== Container Network Debug Info ==="\n\
+  echo "Container hostname: $(hostname)"\n\
+  echo "Container IP addresses:"\n\
+  ip addr show | grep "inet " | grep -v "127.0.0.1"\n\
+  echo "Listening ports:"\n\
+  echo "Starting services..."\n\
+  exec pm2-runtime start ecosystem.config.json' > /app/start.sh && chmod +x /app/start.sh
+
 # Expose ports (3000 for dashboard, 3001 for bot API)
 EXPOSE 3000 3001
 
@@ -120,4 +135,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   (wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1)
 
 # Start both services with PM2
-CMD ["pm2-runtime", "start", "ecosystem.config.json"]
+CMD ["/app/start.sh"]

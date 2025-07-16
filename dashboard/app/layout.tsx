@@ -12,6 +12,8 @@ async function getBotName(): Promise<string> {
       // Add cache headers to avoid excessive API calls during build
       cache: "force-cache",
       next: { revalidate: 3600 }, // Revalidate every hour
+      // Add timeout to avoid hanging during build
+      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
 
     if (!response.ok) {
