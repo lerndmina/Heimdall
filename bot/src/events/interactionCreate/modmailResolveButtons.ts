@@ -23,6 +23,7 @@ import {
   getModmailUserDisplayName,
 } from "../../utils/ModmailUtils";
 import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
+import { closeModmailThreadSafe } from "../../utils/modmail/ModmailThreads";
 
 const env = FetchEnvs();
 
@@ -328,44 +329,29 @@ async function handleConfirmedResolveClose(
   // Send closure message using consistent styling
   await sendModmailCloseMessage(client, modmail, closedBy, closedByName, reason);
 
-  // Update tags to closed
-  const config = await ModmailCache.getModmailConfig(modmail.guildId, db);
-  if (config) {
-    const forumThread = await getter.getChannel(modmail.forumThreadId);
-    if (forumThread && "setLocked" in forumThread) {
-      const forumChannel = await getter.getChannel(config.forumChannelId);
-      if (forumChannel && forumChannel.type === ChannelType.GuildForum) {
-        await handleTag(null, config, db, forumThread, forumChannel);
-      } else if (forumChannel) {
-        log.warn(`Expected forum channel type GuildForum, got ${forumChannel.type}`);
-      }
-
-      // Lock and archive thread
-      try {
-        await forumThread.setLocked(true, `${closedBy} closed: ${reason}`);
-        await forumThread.setArchived(true, `${closedBy} closed: ${reason}`);
-      } catch (error) {
-        log.warn(`Failed to lock/archive thread ${modmail.forumThreadId}:`, error);
-      }
-    }
-  }
-
-  // Close the modmail thread in the database
-  const env = FetchEnvs();
-  await db.findOneAndUpdate(
-    Modmail,
-    { _id: modmail._id },
-    {
-      isOpen: false,
-      closedAt: new Date(),
-      closeReason: reason,
-      closedBy: interaction.user.id,
+  // Use the centralized close utility (but send close message separately since we already did it)
+  const closeResult = await closeModmailThreadSafe(client, {
+    modmailId: modmail._id,
+    reason,
+    closedBy: {
+      type: "User",
+      username: closedByName,
+      userId: interaction.user.id,
     },
-    { upsert: false, new: true }
-  );
-  // Clean cache for both simple userId patterns and compound query patterns
-  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
-  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
+    lockAndArchive: true,
+    sendCloseMessage: false, // We already sent it above
+    updateTags: true,
+  });
+
+  if (!closeResult.success) {
+    log.error("Failed to close modmail thread:", closeResult.error);
+    await interaction.editReply({
+      content: "❌ Failed to close the thread properly. Please contact support.",
+      embeds: [],
+      components: [],
+    });
+    return true;
+  }
 
   await interaction.editReply({
     content: `✅ Thread closed successfully! Thank you for using our support system.`,

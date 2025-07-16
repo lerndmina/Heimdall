@@ -20,6 +20,7 @@ import log from "../../utils/log";
 import { sendModmailCloseMessage, getModmailUserDisplayName } from "../../utils/ModmailUtils";
 import ModmailCache from "../../utils/ModmailCache";
 import BasicEmbed from "../../utils/BasicEmbed";
+import { closeModmailThreadSafe } from "../../utils/modmail/ModmailThreads";
 
 const env = FetchEnvs();
 
@@ -230,39 +231,29 @@ async function handleConfirmedClose(
   // Send closure message using consistent styling
   await sendModmailCloseMessage(client, modmail, closedBy, closedByName, reason);
 
-  // Update tags to closed
-  const config = await ModmailCache.getModmailConfig(modmail.guildId, db);
-  if (config) {
-    const forumChannel = await getter.getChannel(config.forumChannelId);
-    if (forumChannel.type === ChannelType.GuildForum) {
-      await handleTag(null, config, db, forumThread, forumChannel);
-    }
-  }
-
-  // Lock and archive thread
-  try {
-    await forumThread.setLocked(true, `${closedBy} closed via button: ${reason}`);
-    await forumThread.setArchived(true, `${closedBy} closed via button: ${reason}`);
-  } catch (error) {
-    log.warn(`Failed to lock/archive thread ${modmail.forumThreadId}:`, error);
-  }
-
-  // Close the modmail thread in the database
-  await db.findOneAndUpdate(
-    Modmail,
-    { _id: modmail._id },
-    {
-      isOpen: false,
-      closedAt: new Date(),
-      closeReason: reason,
-      closedBy: interaction.user.id,
+  // Use the centralized close utility (but send close message separately since we already did it)
+  const closeResult = await closeModmailThreadSafe(client, {
+    modmailId: modmail._id,
+    reason,
+    closedBy: {
+      type: closedBy as "User" | "Staff",
+      username: closedByName,
+      userId: interaction.user.id,
     },
-    { upsert: false, new: true }
-  );
-  const env = FetchEnvs();
-  // Clean cache for both simple userId patterns and compound query patterns
-  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
-  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`); // Disable buttons in the original message if it was a DM close with confirmation
+    lockAndArchive: true,
+    sendCloseMessage: false, // We already sent it above
+    updateTags: true,
+  });
+
+  if (!closeResult.success) {
+    log.error("Failed to close modmail thread:", closeResult.error);
+    const content = "❌ Failed to close the thread properly. Please contact support.";
+    if (isStaffDirectClose) {
+      return interaction.editReply({ content });
+    } else {
+      return interaction.editReply({ content, embeds: [], components: [] });
+    }
+  } // Disable buttons in the original message if it was a DM close with confirmation
   if (isDMChannel && !isStaffDirectClose) {
     await interaction.editReply({
       content: `✅ Modmail thread closed successfully! (Closed by ${closedBy.toLowerCase()})`,

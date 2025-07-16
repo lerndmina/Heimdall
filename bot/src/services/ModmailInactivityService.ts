@@ -14,6 +14,7 @@ import BasicEmbed from "../utils/BasicEmbed";
 import log from "../utils/log";
 import { redisClient } from "../Bot";
 import ModmailCache from "../utils/ModmailCache";
+import { closeModmailThreadSafe } from "../utils/modmail/ModmailThreads";
 
 // Extended types that include MongoDB document fields
 type ModmailDoc = ModmailType & { _id: string; createdAt?: Date; updatedAt?: Date };
@@ -330,72 +331,29 @@ export class ModmailInactivityService {
   }
 
   /**
-   * Close a modmail thread (following the same pattern as closeModmail.ts)
+   * Close a modmail thread using the centralized utility
    */
   private async closeModmailThread(modmail: ModmailDoc, reason: string): Promise<void> {
     try {
-      const { ThingGetter } = require("../utils/TinyUtils");
-      const { handleTag } = require("../events/messageCreate/gotMail");
-      const getter = new ThingGetter(this.client);
+      // Use the centralized close utility
+      const closeResult = await closeModmailThreadSafe(this.client, {
+        modmailId: modmail._id,
+        reason,
+        closedBy: {
+          type: "System",
+          username: "Auto-close System",
+          userId: "system",
+        },
+        lockAndArchive: true,
+        sendCloseMessage: true,
+        updateTags: true,
+      });
 
-      // Get the thread
-      const forumThread = await getter.getChannel(modmail.forumThreadId);
-
-      if (!forumThread || !("setLocked" in forumThread)) {
-        log.warn(`Thread ${modmail.forumThreadId} not found or not a thread channel`);
-        // Still proceed with database cleanup
+      if (!closeResult.success) {
+        log.error(`Failed to close modmail ${modmail._id}:`, closeResult.error);
       } else {
-        // Check if thread is already archived
-        if (forumThread.archived) {
-          log.debug(`Thread ${modmail.forumThreadId} is already archived, skipping operations`);
-        } else {
-          // Update tags BEFORE archiving (following closeModmail.ts pattern)
-          try {
-            const config = await ModmailCache.getModmailConfig(modmail.guildId, this.db);
-            if (config) {
-              const forumChannel = await getter.getChannel(config.forumChannelId);
-              if (forumChannel) {
-                await handleTag(null, config, this.db, forumThread, forumChannel);
-              }
-            }
-          } catch (error) {
-            log.warn(`Failed to update tags for thread ${modmail.forumThreadId}:`, error);
-            // Continue with archiving even if tag update fails
-          }
-
-          // Now lock and archive the thread
-          try {
-            await forumThread.setLocked(true, `Auto-closed: ${reason}`);
-            await forumThread.setArchived(true, `Auto-closed: ${reason}`);
-            log.debug(`Successfully locked and archived thread ${modmail.forumThreadId}`);
-          } catch (error: any) {
-            log.warn(`Failed to lock/archive thread ${modmail.forumThreadId}:`, error);
-            // If archiving fails, that's okay - the thread might already be archived
-            if (error.code === 50083) {
-              log.debug(`Thread ${modmail.forumThreadId} was already archived`);
-            }
-          }
-        }
+        log.debug(`Successfully closed modmail ${modmail._id} via auto-close`);
       }
-
-      // Mark modmail as closed instead of deleting
-      await this.db.findOneAndUpdate(
-        Modmail,
-        { _id: modmail._id },
-        {
-          isClosed: true,
-          closedAt: new Date(),
-          closedBy: "system",
-          closedReason: reason,
-        }
-      );
-
-      // Clean cache for both simple userId patterns and compound query patterns
-      const env = require("../utils/FetchEnvs").default();
-      await this.db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
-      await this.db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
-
-      log.debug(`Successfully cleaned up modmail ${modmail._id} from database`);
     } catch (error) {
       log.error(`Error in closeModmailThread for ${modmail._id}:`, error);
     }

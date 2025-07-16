@@ -82,7 +82,9 @@ async function handleCloseModal(
 
     const reason = interaction.fields.getTextInputValue("close_reason");
     const db = new Database();
-    const getter = new ThingGetter(client); // Find the modmail
+    const getter = new ThingGetter(client);
+
+    // Find the modmail
     const modmail = (await db.findOne(Modmail, { _id: modmailId })) as ModmailDoc;
     if (!modmail) {
       await interaction.editReply({
@@ -91,45 +93,27 @@ async function handleCloseModal(
       return true;
     }
 
-    const closedBy = "Staff";
     const closedByName = await getModmailUserDisplayName(
       getter,
       interaction.user,
       interaction.guild
     );
 
-    // Send closure message using consistent styling
-    await sendModmailCloseMessage(client, modmail, closedBy, closedByName, reason);
-
-    // Get the forum thread
-    const forumThread = (await getter.getChannel(modmail.forumThreadId)) as ThreadChannel;
-    // Update tags to closed
-    const config = await ModmailCache.getModmailConfig(modmail.guildId, db);
-    if (config && forumThread) {
-      const forumChannel = (await getter.getChannel(config.forumChannelId)) as ForumChannel;
-      if (forumChannel && forumChannel.type === ChannelType.GuildForum) {
-        await handleTag(null, config, db, forumThread, forumChannel);
-      }
-    }
-
-    // Lock and archive thread
-    if (forumThread && "setLocked" in forumThread) {
-      try {
-        await forumThread.setLocked(true, `${closedBy} closed: ${reason}`);
-        await forumThread.setArchived(true, `${closedBy} closed: ${reason}`);
-      } catch (error) {
-        log.warn(`Failed to lock/archive thread ${modmail.forumThreadId}:`, error);
-      }
-    }
-
-    const closeData = await closeModmailThreadSafe(modmail.forumThreadId, reason, {
-      type: closedBy,
-      username: closedByName,
-      userId: interaction.user.id,
+    // Use the centralized close utility
+    const closeData = await closeModmailThreadSafe(client, {
+      modmailId: modmail._id,
+      reason,
+      closedBy: {
+        type: "Staff",
+        username: closedByName,
+        userId: interaction.user.id,
+      },
+      lockAndArchive: true,
+      sendCloseMessage: true,
+      updateTags: true,
     });
 
     if (!closeData.success) {
-      // Rethrow to hit the catch block
       throw new Error(closeData.error || "Failed to close modmail thread");
     }
 
@@ -202,13 +186,15 @@ async function handleBanModal(
       durationFormatted = "Permanent";
     } else {
       try {
-        duration = ms(durationString);
-        if (!duration || duration <= 0) {
+        // @ts-ignore - ms library has conflicting type definitions
+        const parsedDuration = ms(durationString);
+        if (!parsedDuration || parsedDuration <= 0) {
           await interaction.editReply({
             content: "❌ Invalid duration format. Use formats like: 1d, 1w, 1m, or 'permanent'",
           });
           return true;
         }
+        duration = parsedDuration;
         expiresAt = new Date(Date.now() + duration);
         durationFormatted = ms(duration, { long: true });
       } catch (error) {
@@ -276,33 +262,21 @@ async function handleBanModal(
     );
     const closeReason = `User banned from modmail: ${reason}`;
 
-    await sendModmailCloseMessage(client, modmail, closedBy, closedByName, closeReason);
-
-    // Handle thread archiving
-    const forumThread = await getter.getChannel(modmail.forumThreadId);
-    const config = await ModmailCache.getModmailConfig(modmail.guildId, db);
-    if (config && forumThread && "setLocked" in forumThread) {
-      const forumChannel = await getter.getChannel(config.forumChannelId);
-      if (forumChannel && forumChannel.type === ChannelType.GuildForum) {
-        await handleTag(null, config, db, forumThread, forumChannel as ForumChannel);
-      }
-
-      try {
-        await forumThread.setLocked(true, closeReason);
-        await forumThread.setArchived(true, closeReason);
-      } catch (error) {
-        log.warn(`Failed to lock/archive thread ${modmail.forumThreadId}:`, error);
-      }
-    }
-
-    const closeData = await closeModmailThreadSafe(modmail.forumThreadId, reason, {
-      type: closedBy,
-      username: closedByName,
-      userId: interaction.user.id,
+    // Use the centralized close utility
+    const closeData = await closeModmailThreadSafe(client, {
+      modmailId: modmail._id,
+      reason: closeReason,
+      closedBy: {
+        type: "Staff",
+        username: closedByName,
+        userId: interaction.user.id,
+      },
+      lockAndArchive: true,
+      sendCloseMessage: true,
+      updateTags: true,
     });
 
     if (!closeData.success) {
-      // Rethrow to hit the catch block
       throw new Error(closeData.error || "Failed to close modmail thread");
     }
 
@@ -393,51 +367,32 @@ async function handleCloseWithMessageModal(
       }
     }
 
-    // Now close the thread using the same logic as regular close
+    // Now close the thread using the centralized utility
     const closedBy = "User";
     const closedByName = await getModmailUserDisplayName(
       getter,
       interaction.user,
       interaction.guild
     );
-    const reason = "Closed by user with final message"; // Send closure message
-    await sendModmailCloseMessage(client, modmail, closedBy, closedByName, reason);
+    const reason = "Closed by user with final message";
 
-    // Get the forum thread
-    const forumThread = (await getter.getChannel(modmail.forumThreadId)) as ThreadChannel;
-
-    // Update tags to closed
-    if (config && forumThread) {
-      const forumChannel = (await getter.getChannel(config.forumChannelId)) as ForumChannel;
-      if (forumChannel && forumChannel.type === ChannelType.GuildForum) {
-        const { handleTag } = await import("../messageCreate/gotMail");
-        await handleTag(null, config, db, forumThread, forumChannel);
-      }
-    }
-
-    // Lock and archive thread
-    if (forumThread && "setLocked" in forumThread) {
-      try {
-        await forumThread.setLocked(true, `${closedBy} closed: ${reason}`);
-        await forumThread.setArchived(true, `${closedBy} closed: ${reason}`);
-      } catch (error) {
-        log.warn(`Failed to lock/archive thread ${modmail.forumThreadId}:`, error);
-      }
-    }
-
-    const closeData = await closeModmailThreadSafe(modmail.forumThreadId, reason, {
-      type: closedBy,
-      username: closedByName,
-      userId: interaction.user.id,
+    // Use the centralized close utility
+    const closeData = await closeModmailThreadSafe(client, {
+      modmailId: modmail._id,
+      reason,
+      closedBy: {
+        type: "User",
+        username: closedByName,
+        userId: interaction.user.id,
+      },
+      lockAndArchive: true,
+      sendCloseMessage: true,
+      updateTags: true,
     });
 
     if (!closeData.success) {
-      // Rethrow to hit the catch block
       throw new Error(closeData.error || "Failed to close modmail thread");
     }
-    // Clean cache for both simple userId patterns and compound query patterns
-    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
-    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
 
     await interaction.editReply({
       content: "✅ Your final message has been sent and the modmail thread has been closed.",
