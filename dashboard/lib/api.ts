@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.BOT_API_URL || "http://localhost:3001";
+// Client-side API calls should go through the dashboard's API routes
+// These routes will then proxy to the bot API server-side
+const API_BASE_URL = typeof window !== "undefined" ? "" : process.env.BOT_API_URL || "http://localhost:3001";
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "";
 
 class ApiError extends Error {
@@ -12,14 +14,18 @@ class ApiClient {
   private baseUrl: string;
   private apiKey: string;
   private pendingRequests = new Map<string, Promise<any>>();
+  private isClientSide: boolean;
 
   constructor(baseUrl: string, apiKey: string) {
-    this.baseUrl = baseUrl;
+    this.isClientSide = typeof window !== "undefined";
+    this.baseUrl = this.isClientSide ? "" : baseUrl; // Client-side uses relative URLs
     this.apiKey = apiKey;
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
+    // For client-side requests, always use relative URLs to dashboard API routes
+    // For server-side requests, use the full bot API URL
+    const url = this.isClientSide ? `/api${endpoint}` : `${this.baseUrl}${endpoint}`;
     const requestKey = `${options.method || "GET"}:${url}`;
 
     // Check if we already have a pending request for this endpoint
@@ -28,9 +34,10 @@ class ApiClient {
       return this.pendingRequests.get(requestKey);
     }
 
-    const headers = {
+    const headers: HeadersInit = {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${this.apiKey}`,
+      // Only include API key for server-side requests to bot API
+      ...(this.isClientSide ? {} : { Authorization: `Bearer ${this.apiKey}` }),
       ...options.headers,
     };
 
@@ -186,11 +193,16 @@ class ApiClient {
   }
 
   async generateTranscript(guildId: string, threadId: string, format: "html" | "json" = "html") {
-    const response = await fetch(`${this.baseUrl}/api/modmail/${guildId}/threads/${threadId}/transcript?format=${format}`, {
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-    });
+    // Use the same pattern as other methods - go through dashboard API routes
+    const url = this.isClientSide
+      ? `/api/modmail/${guildId}/threads/${threadId}/transcript?format=${format}`
+      : `${this.baseUrl}/api/modmail/${guildId}/threads/${threadId}/transcript?format=${format}`;
+
+    const headers: HeadersInit = {
+      ...(this.isClientSide ? {} : { Authorization: `Bearer ${this.apiKey}` }),
+    };
+
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

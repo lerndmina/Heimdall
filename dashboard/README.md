@@ -62,7 +62,9 @@ cp .env.local.example .env.local
 
 ### 2. Environment Variables
 
-Edit `dashboard/.env.local`:
+#### Development Environment
+
+Edit `dashboard/.env` (for local development):
 
 ```env
 # Authentication
@@ -76,6 +78,31 @@ DISCORD_CLIENT_SECRET=your-discord-client-secret
 # Bot API Connection
 BOT_API_URL=http://localhost:3001
 INTERNAL_API_KEY=your-internal-api-key
+
+# Trust the reverse proxy (for production)
+AUTH_TRUST_HOST=true
+```
+
+#### Production Environment
+
+For Docker/production deployment, set these environment variables:
+
+```env
+# Authentication
+NEXTAUTH_SECRET=your-secret-key-here
+NEXTAUTH_URL=https://your-dashboard-domain.com
+AUTH_TRUST_HOST=true
+
+# Discord OAuth
+DISCORD_CLIENT_ID=your-discord-client-id
+DISCORD_CLIENT_SECRET=your-discord-client-secret
+
+# Bot API Connection - Use your bot API domain
+BOT_API_URL=https://your-bot-api-domain.com
+INTERNAL_API_KEY=your-internal-api-key
+
+# Database for session storage
+DATABASE_URL=your-postgres-connection-string
 ```
 
 ### 3. Bot Configuration
@@ -155,6 +182,7 @@ dashboard/
 
 - **Discord OAuth**: Secure authentication flow
 - **Role-based Access**: Only staff members can access guild data
+- **API Proxy Architecture**: Dashboard proxies requests to bot API (client never directly calls bot API)
 - **API Key Protection**: Internal API calls secured with keys
 - **CSRF Protection**: Built-in with NextAuth.js
 - **Rate Limiting**: Prevents API abuse
@@ -170,13 +198,23 @@ The dashboard uses shadcn/ui components with a Discord-inspired dark theme:
 
 ## 📊 API Integration
 
-The dashboard communicates with the bot via REST API:
+The dashboard uses a proxy architecture for security:
+
+**Client → Dashboard API Routes → Bot API**
+
+- **Client-side**: Only makes requests to `/api/*` routes on same domain
+- **Dashboard API Routes**: Proxy requests to bot API using server-side credentials
+- **Bot API**: Internal API secured with API keys
+
+### API Routes
 
 - **User Validation**: `/api/modmail/auth/validate-user/{userId}`
 - **Thread Management**: `/api/modmail/{guildId}/threads`
 - **Statistics**: `/api/modmail/{guildId}/stats`
 - **Search**: `/api/modmail/{guildId}/search`
 - **Transcripts**: `/api/modmail/{guildId}/threads/{threadId}/transcript`
+
+All these routes are automatically proxied to the bot API using the `BOT_API_URL` and `INTERNAL_API_KEY` environment variables.
 
 ## 🐛 Troubleshooting
 
@@ -186,18 +224,43 @@ The dashboard communicates with the bot via REST API:
 
    - Ensure the bot is running on the configured port
    - Check `BOT_API_URL` in dashboard environment
+   - For production: Verify your bot API is accessible at the configured URL
 
-2. **"Authentication failed"**
+2. **API calls fail then try localhost**
+
+   - This should no longer happen with the proxy architecture
+   - Dashboard client-side only calls `/api/*` routes (same domain)
+   - Dashboard API routes proxy to bot API using server-side `BOT_API_URL`
+   - If you see direct calls to bot API domain, check that client is using updated API client
+
+3. **Environment variables not loading in production**
+
+   - Check if Docker container is receiving the environment variables
+   - Verify no local `.env` file is overriding Docker environment
+   - For Next.js: Server-side env vars should work automatically
+   - **Debug**: Create an API route to check what environment variables are loaded:
+     ```typescript
+     // app/api/debug-env/route.ts (remove after debugging)
+     export async function GET() {
+       return Response.json({
+         BOT_API_URL: process.env.BOT_API_URL,
+         NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+         NODE_ENV: process.env.NODE_ENV,
+       });
+     }
+     ```
+
+4. **"Authentication failed"**
 
    - Verify Discord OAuth credentials
    - Check redirect URI in Discord application
 
-3. **"No accessible guilds"**
+5. **"No accessible guilds"**
 
    - User must have the staff role in at least one guild
    - Check modmail configuration in the bot
 
-4. **TypeScript errors during development**
+6. **TypeScript errors during development**
    - This is normal during initial setup
    - Install dependencies: `bun install`
 
