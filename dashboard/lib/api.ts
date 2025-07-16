@@ -1,6 +1,6 @@
 // Client-side API calls should go through the dashboard's API routes
 // These routes will then proxy to the bot API server-side
-const API_BASE_URL = typeof window !== "undefined" ? "" : process.env.BOT_API_URL || "http://localhost:3001";
+const BOT_API_URL = process.env.BOT_API_URL || "http://localhost:3001";
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "";
 
 class ApiError extends Error {
@@ -16,21 +16,29 @@ class ApiClient {
   private pendingRequests = new Map<string, Promise<any>>();
   private isClientSide: boolean;
 
-  constructor(baseUrl: string, apiKey: string) {
+  constructor() {
     this.isClientSide = typeof window !== "undefined";
-    this.baseUrl = this.isClientSide ? "" : baseUrl; // Client-side uses relative URLs
-    this.apiKey = apiKey;
+    // Client-side: empty base URL (use relative URLs)
+    // Server-side: use bot API URL
+    this.baseUrl = this.isClientSide ? "" : BOT_API_URL;
+    this.apiKey = INTERNAL_API_KEY;
+
+    // Debug logging (can be removed in production)
+    if (this.isClientSide) {
+      console.log("ApiClient initialized for client-side with relative URLs");
+    } else {
+      console.log("ApiClient initialized for server-side with bot API URL:", this.baseUrl);
+    }
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    // For client-side requests, always use relative URLs to dashboard API routes
+    // For client-side requests, use relative URLs (endpoint already includes /api)
     // For server-side requests, use the full bot API URL
-    const url = this.isClientSide ? `/api${endpoint}` : `${this.baseUrl}${endpoint}`;
+    const url = this.isClientSide ? endpoint : `${this.baseUrl}${endpoint}`;
     const requestKey = `${options.method || "GET"}:${url}`;
 
     // Check if we already have a pending request for this endpoint
     if (this.pendingRequests.has(requestKey)) {
-      console.log(`Deduplicating request to ${endpoint}`);
       return this.pendingRequests.get(requestKey);
     }
 
@@ -217,5 +225,5 @@ class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient(API_BASE_URL, INTERNAL_API_KEY);
+export const apiClient = new ApiClient();
 export { ApiError };
