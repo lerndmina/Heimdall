@@ -2,6 +2,8 @@ import { auth } from "@/lib/auth";
 import { AuthButton } from "@/components/auth/auth-button";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { UserTypeSelector } from "@/components/auth/user-type-selector";
+import { HeroSection } from "@/components/auth/hero-section";
+import { LandingHero } from "@/components/auth/landing-hero";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, MessageSquare, BarChart3, FileText } from "lucide-react";
 
@@ -19,15 +21,7 @@ export default async function HomePage() {
 
         <div className="container mx-auto px-4 py-16">
           {/* Header */}
-          <div className="text-center mb-16">
-            <div className="flex items-center justify-center mb-6">
-              <Shield className="h-16 w-16 text-discord-primary mr-4" />
-              <h1 className="text-6xl font-bold text-white">Heimdall</h1>
-            </div>
-            <p className="text-xl text-discord-text mb-8 max-w-2xl mx-auto">
-              Welcome back, <span className="text-white font-semibold">{session.user.name}</span>! How would you like to use Heimdall today?
-            </p>
-          </div>
+          <HeroSection userName={session.user.name} />
 
           <UserTypeSelector user={session.user} />
         </div>
@@ -40,14 +34,7 @@ export default async function HomePage() {
     <div className="min-h-screen bg-gradient-to-br from-discord-darkest to-discord-darker">
       <div className="container mx-auto px-4 py-16">
         {/* Header */}
-        <div className="text-center mb-16">
-          <div className="flex items-center justify-center mb-6">
-            <Shield className="h-16 w-16 text-discord-primary mr-4" />
-            <h1 className="text-6xl font-bold text-white">Heimdall</h1>
-          </div>
-          <p className="text-xl text-discord-text mb-8 max-w-2xl mx-auto">Professional Discord modmail management dashboard. Monitor, respond, and analyze your community interactions with ease.</p>
-          <AuthButton />
-        </div>
+        <LandingHero />
 
         {/* Features Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">

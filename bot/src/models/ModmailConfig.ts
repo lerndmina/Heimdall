@@ -20,47 +20,60 @@ const tagsSchema = new Schema(
   { _id: false }
 );
 
-const ModmailConfig = new Schema({
-  guildId: {
-    type: String,
-    required: true,
-    unique: true, // Ensure one config per guild
-    index: true, // Index for faster guild lookups
+const ModmailConfig = new Schema(
+  {
+    guildId: {
+      type: String,
+      required: true,
+      unique: true, // Ensure one config per guild
+      index: true, // Index for faster guild lookups
+    },
+    guildDescription: {
+      type: String,
+      required: false,
+    },
+    forumChannelId: {
+      type: String,
+      required: true,
+      index: true, // Index for channel-based queries
+    },
+    staffRoleId: {
+      type: String,
+      required: true,
+    },
+    webhookId: {
+      type: String,
+      required: false,
+    },
+    webhookToken: {
+      type: String,
+      required: false,
+    },
+    tags: {
+      type: [tagsSchema],
+      required: false,
+    },
+    inactivityWarningHours: {
+      type: Number,
+      default: 24,
+    },
+    autoCloseHours: {
+      type: Number,
+      default: 168, // 7 days
+    },
+    enableAutoClose: {
+      type: Boolean,
+      default: false,
+    },
+    enableInactivityWarning: {
+      type: Boolean,
+      default: false,
+    },
   },
-  guildDescription: {
-    type: String,
-    required: false,
-  },
-  forumChannelId: {
-    type: String,
-    required: true,
-    index: true, // Index for channel-based queries
-  },
-  staffRoleId: {
-    type: String,
-    required: true,
-  },
-  webhookId: {
-    type: String,
-    required: false,
-  },
-  webhookToken: {
-    type: String,
-    required: false,
-  },
-  tags: {
-    type: [tagsSchema],
-    required: false,
-  },
-  inactivityWarningHours: {
-    type: Number,
-    default: 24,
-  },
-  autoCloseHours: {
-    type: Number,
-    default: 168, // 7 days
-  },
-});
+  {
+    timestamps: true, // Adds createdAt and updatedAt automatically
+  }
+);
 
 export default model("ModmailConfig", ModmailConfig);
 export type ModmailConfigType = InferSchemaType<typeof ModmailConfig>;

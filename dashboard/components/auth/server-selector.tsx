@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, ArrowRight, Shield, Users, MessageSquare, AlertCircle, Loader2 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import { discordApi } from "@/lib/discord-api";
+import { useBotName } from "@/hooks/use-bot-info";
 
 interface User {
   id: string;
@@ -35,6 +36,7 @@ interface Guild {
 export function ServerSelector({ user }: ServerSelectorProps) {
   const router = useRouter();
   const { data: session } = useSession();
+  const botName = useBotName();
   const [selectedGuild, setSelectedGuild] = useState<string | null>(null);
 
   // Get user's Discord guilds
@@ -195,10 +197,10 @@ export function ServerSelector({ user }: ServerSelectorProps) {
             <div className="text-center">
               <Users className="h-16 w-16 text-discord-muted mx-auto mb-4" />
               <h3 className="text-xl font-medium text-white mb-2">No Staff Servers Found</h3>
-              <p className="text-discord-muted mb-6">You don't appear to have staff permissions on any servers with Heimdall configured.</p>
+              <p className="text-discord-muted mb-6">You don't appear to have staff permissions on any servers with {botName} configured.</p>
               <div className="space-y-2 text-sm text-discord-text">
                 <p>• Make sure you have the required staff role on your Discord server</p>
-                <p>• Ensure Heimdall is properly configured on your server</p>
+                <p>• Ensure {botName} is properly configured on your server</p>
                 <p>• Contact your server administrator if you believe this is an error</p>
               </div>
             </div>

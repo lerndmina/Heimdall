@@ -4,6 +4,7 @@ import {
   getModmailThread,
   getModmailStats,
   getModmailConfig,
+  updateModmailConfig,
   getModmailMessages,
   validateUserAccess,
   generateTranscript,
@@ -75,6 +76,12 @@ export function createModmailRoutes(client?: any, handler?: any): Router {
    * Get modmail configuration for a guild
    */
   router.get("/:guildId/config", asyncHandler(getModmailConfig));
+
+  /**
+   * POST /api/modmail/:guildId/config
+   * Update modmail configuration for a guild
+   */
+  router.post("/:guildId/config", requireScope("modmail:write"), asyncHandler(updateModmailConfig));
 
   /**
    * GET /api/modmail/:guildId/search

@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, ArrowRight, Shield, Users, MessageSquare, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { useServerCache } from "../dashboard/server-cache-provider";
 import { useRole } from "./role-provider";
+import { useBotName } from "@/hooks/use-bot-info";
 
 interface User {
   id: string;
@@ -25,6 +26,7 @@ export function CachedServerSelector({ user }: ServerSelectorProps) {
   const router = useRouter();
   const { clearRole } = useRole();
   const { servers, isLoading, error, refreshServers, initializeCache, checkServerPermissions } = useServerCache();
+  const botName = useBotName();
   const [selectedGuild, setSelectedGuild] = useState<string | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
 
@@ -195,7 +197,7 @@ export function CachedServerSelector({ user }: ServerSelectorProps) {
             <AlertCircle className="h-12 w-12 text-discord-muted" />
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">No Servers Available</h3>
-          <p className="text-discord-muted mb-6 max-w-md mx-auto">You don't have staff permissions on any servers with Heimdall modmail enabled.</p>
+          <p className="text-discord-muted mb-6 max-w-md mx-auto">You don't have staff permissions on any servers with {botName} modmail enabled.</p>
           <div className="flex gap-4 justify-center">
             <Button onClick={refreshServers} variant="outline" className="border-discord-primary text-discord-primary hover:bg-discord-primary hover:text-white">
               <RefreshCw className="h-4 w-4 mr-2" />

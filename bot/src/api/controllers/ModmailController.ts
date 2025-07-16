@@ -289,6 +289,9 @@ export async function getModmailConfig(req: Request, res: Response) {
       tags: config.tags,
       inactivityWarningHours: config.inactivityWarningHours,
       autoCloseHours: config.autoCloseHours,
+      enableAutoClose: (config as any).enableAutoClose || false,
+      enableInactivityWarning: (config as any).enableInactivityWarning || false,
+      updatedAt: (config as any).updatedAt,
       // Don't expose webhook credentials
       hasWebhook: !!(config.webhookId && config.webhookToken),
     };
@@ -299,6 +302,61 @@ export async function getModmailConfig(req: Request, res: Response) {
     res
       .status(500)
       .json(createErrorResponse("Failed to fetch modmail configuration", 500, req.requestId));
+  }
+}
+
+/**
+ * Update modmail configuration for a guild
+ */
+export async function updateModmailConfig(req: Request, res: Response) {
+  try {
+    const { guildId } = req.params;
+    const updateData = req.body;
+
+    // Validate that we have at least some update data
+    if (!updateData || Object.keys(updateData).length === 0) {
+      return res
+        .status(400)
+        .json(createErrorResponse("No update data provided", 400, req.requestId));
+    }
+
+    // Find existing config or create new one
+    let config = await ModmailConfig.findOne({ guildId });
+
+    if (!config) {
+      // Create new config if it doesn't exist
+      config = new ModmailConfig({
+        guildId,
+        ...updateData,
+      });
+    } else {
+      // Update existing config
+      Object.assign(config, updateData);
+    }
+
+    await config.save();
+
+    // Return sanitized config (same as getModmailConfig)
+    const sanitizedConfig = {
+      guildId: config.guildId,
+      guildDescription: config.guildDescription,
+      forumChannelId: config.forumChannelId,
+      staffRoleId: config.staffRoleId,
+      tags: config.tags,
+      inactivityWarningHours: config.inactivityWarningHours,
+      autoCloseHours: config.autoCloseHours,
+      enableAutoClose: (config as any).enableAutoClose,
+      enableInactivityWarning: (config as any).enableInactivityWarning,
+      updatedAt: (config as any).updatedAt || new Date(),
+      hasWebhook: !!(config.webhookId && config.webhookToken),
+    };
+
+    res.json(createSuccessResponse(sanitizedConfig, req.requestId));
+  } catch (error) {
+    log.error("Error updating modmail configuration:", error);
+    res
+      .status(500)
+      .json(createErrorResponse("Failed to update modmail configuration", 500, req.requestId));
   }
 }
 

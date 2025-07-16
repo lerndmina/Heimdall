@@ -5,6 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { RoleProvider } from "@/components/auth/role-provider";
+import { DynamicTitle } from "@/components/dynamic-title";
 import { useState } from "react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -25,6 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <RoleProvider>
+            <DynamicTitle />
             {children}
             <Toaster />
           </RoleProvider>

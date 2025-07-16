@@ -75,12 +75,16 @@ export class ModmailInactivityService {
           $or: [
             { inactivityWarningHours: { $exists: false } },
             { autoCloseHours: { $exists: false } },
+            { enableInactivityWarning: { $exists: false } },
+            { enableAutoClose: { $exists: false } },
           ],
         },
         {
           $set: {
             inactivityWarningHours: getInactivityWarningHours(),
             autoCloseHours: getAutoCloseHours(),
+            enableInactivityWarning: false, // Default to disabled for existing configs
+            enableAutoClose: false, // Default to disabled for existing configs
           },
         }
       );
@@ -189,8 +193,17 @@ export class ModmailInactivityService {
 
       // Get config for this guild
       const config = await ModmailCache.getModmailConfig(modmail.guildId, this.db);
-      const warningHours = config?.inactivityWarningHours || getInactivityWarningHours();
-      const autoCloseHours = config?.autoCloseHours || getAutoCloseHours();
+
+      // Check if inactivity features are disabled in guild config
+      if (config && config.enableInactivityWarning === false && config.enableAutoClose === false) {
+        log.debug(
+          `Modmail ${modmail._id} has both inactivity warning and auto-close disabled in guild config, skipping inactivity processing`
+        );
+        return;
+      }
+
+      const warningHours = getInactivityWarningHours(config);
+      const autoCloseHours = getAutoCloseHours(config);
 
       const hoursSinceLastActivity = (now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60);
       log.debug(
@@ -216,19 +229,23 @@ export class ModmailInactivityService {
 
       // Only process regular inactivity logic if NOT marked as resolved
       // Check if we should send inactivity warning
-      if (!modmail.inactivityNotificationSent && hoursSinceLastActivity >= warningHours) {
-        await this.sendInactivityWarning(modmail);
+      if (
+        config?.enableInactivityWarning !== false &&
+        !modmail.inactivityNotificationSent &&
+        hoursSinceLastActivity >= warningHours
+      ) {
+        await this.sendInactivityWarning(modmail, config);
         return;
       }
 
       // Check if we should auto-close
-      if (modmail.inactivityNotificationSent) {
+      if (config?.enableAutoClose !== false && modmail.inactivityNotificationSent) {
         const hoursSinceWarning =
           (now.getTime() - new Date(modmail.inactivityNotificationSent).getTime()) /
           (1000 * 60 * 60);
 
         if (hoursSinceWarning >= autoCloseHours) {
-          await this.autoCloseModmail(modmail);
+          await this.autoCloseModmail(modmail, config);
         }
       }
     } catch (error) {
@@ -239,19 +256,33 @@ export class ModmailInactivityService {
   /**
    * Send inactivity warning to user and thread
    */
-  private async sendInactivityWarning(modmail: ModmailDoc): Promise<void> {
+  private async sendInactivityWarning(modmail: ModmailDoc, config?: any): Promise<void> {
     try {
       log.info(`Sending inactivity warning for modmail ${modmail._id}`);
+
+      const warningHours = getInactivityWarningHours(config);
+      const autoCloseHours = getAutoCloseHours(config);
+      const autoCloseEnabled = config?.enableAutoClose !== false;
+
+      // Build the warning message conditionally based on auto-close setting
+      let warningMessage = `Your modmail thread has been inactive for ${formatTimeHours(
+        warningHours
+      )}. If you no longer need assistance, you can close this thread using the button below.\n\n`;
+
+      if (autoCloseEnabled) {
+        warningMessage += `**This thread will be automatically closed in ${formatTimeHours(
+          autoCloseHours
+        )} if there's no further activity.**\n\n`;
+      } else {
+        warningMessage += `**Auto-close is disabled for this server, so this thread will remain open until manually closed.**\n\n`;
+      }
+
+      warningMessage += `If you still need help, simply send another message and we'll continue assisting you.`;
+
       const warningEmbed = BasicEmbed(
         this.client,
         "🕐 Modmail Inactivity Notice",
-        `Your modmail thread has been inactive for ${formatTimeHours(
-          getInactivityWarningHours()
-        )}. If you no longer need assistance, you can close this thread using the button below.\n\n` +
-          `**This thread will be automatically closed in ${formatTimeHours(
-            getAutoCloseHours()
-          )} if there's no further activity.**\n\n` +
-          `If you still need help, simply send another message and we'll continue assisting you.`,
+        warningMessage,
         undefined,
         "Yellow"
       );
@@ -267,15 +298,19 @@ export class ModmailInactivityService {
 
       if (dmSuccess || threadSuccess) {
         // Update the modmail to mark that notification was sent
-        await this.db.findOneAndUpdate(
-          Modmail,
-          { _id: modmail._id },
-          {
-            inactivityNotificationSent: new Date(),
-            autoCloseScheduledAt: new Date(Date.now() + getAutoCloseHours() * 60 * 60 * 1000),
-          },
-          { upsert: false, new: true }
-        );
+        const updateData: any = {
+          inactivityNotificationSent: new Date(),
+        };
+
+        // Only set autoCloseScheduledAt if auto-close is enabled
+        if (autoCloseEnabled) {
+          updateData.autoCloseScheduledAt = new Date(Date.now() + autoCloseHours * 60 * 60 * 1000);
+        }
+
+        await this.db.findOneAndUpdate(Modmail, { _id: modmail._id }, updateData, {
+          upsert: false,
+          new: true,
+        });
 
         log.info(`Inactivity warning sent for modmail ${modmail._id}`);
       } else {
@@ -291,13 +326,15 @@ export class ModmailInactivityService {
   /**
    * Auto-close an inactive modmail thread
    */
-  private async autoCloseModmail(modmail: ModmailDoc): Promise<void> {
+  private async autoCloseModmail(modmail: ModmailDoc, config?: any): Promise<void> {
     try {
       log.info(`Auto-closing inactive modmail ${modmail._id}`);
 
+      const autoCloseHours = getAutoCloseHours(config);
+
       // Send closure message using the consistent styling
       const reason = `Auto-closed due to ${formatTimeHours(
-        getAutoCloseHours()
+        autoCloseHours
       )} of inactivity after the warning was sent.`;
       await sendModmailCloseMessage(this.client, modmail, "System", "Auto-Close System", reason);
 

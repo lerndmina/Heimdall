@@ -9,6 +9,7 @@ import { useGuild } from "./guild-provider";
 import { GuildSelector } from "./guild-selector";
 import { useRole } from "../auth/role-provider";
 import { signOut } from "next-auth/react";
+import { useBotName } from "@/hooks/use-bot-info";
 
 const navigation = [
   {
@@ -45,6 +46,7 @@ export function DashboardNav({ user }: { user: User }) {
   const pathname = usePathname();
   const { selectedGuild, isLoading } = useGuild();
   const { clearRole } = useRole();
+  const botName = useBotName();
 
   const handleBackToRoleSelection = () => {
     clearRole();
@@ -59,7 +61,7 @@ export function DashboardNav({ user }: { user: User }) {
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2">
               <Shield className="h-8 w-8 text-discord-primary" />
-              <span className="font-bold text-xl text-white">Heimdall</span>
+              <span className="font-bold text-xl text-white">{botName}</span>
             </Link>
 
             <Button onClick={handleBackToRoleSelection} variant="ghost" size="sm" className="text-discord-text hover:text-white">

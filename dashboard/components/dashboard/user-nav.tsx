@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { signOut } from "next-auth/react";
 import { useRole } from "../auth/role-provider";
+import { useBotName } from "@/hooks/use-bot-info";
 
 const userNavigation = [
   {
@@ -27,6 +28,7 @@ interface User {
 export function UserNav({ user }: { user: User }) {
   const pathname = usePathname();
   const { clearRole } = useRole();
+  const botName = useBotName();
 
   const handleBackToRoleSelection = () => {
     clearRole();
@@ -41,7 +43,7 @@ export function UserNav({ user }: { user: User }) {
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2">
               <Shield className="h-8 w-8 text-discord-primary" />
-              <span className="font-bold text-xl text-white">Heimdall</span>
+              <span className="font-bold text-xl text-white">{botName}</span>
             </Link>
 
             <Button onClick={handleBackToRoleSelection} variant="ghost" size="sm" className="text-discord-text hover:text-white">

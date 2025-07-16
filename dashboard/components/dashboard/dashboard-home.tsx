@@ -12,7 +12,11 @@ import { apiClient } from "@/lib/api";
 export function DashboardHome() {
   const { selectedGuild } = useRequireGuild();
 
-  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    error: statsError,
+  } = useQuery({
     queryKey: ["modmail-stats", selectedGuild?.guildId],
     queryFn: async () => {
       if (!selectedGuild) return null;
@@ -26,7 +30,11 @@ export function DashboardHome() {
     refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
   });
 
-  const { data: threads, isLoading: threadsLoading, error: threadsError } = useQuery({
+  const {
+    data: threads,
+    isLoading: threadsLoading,
+    error: threadsError,
+  } = useQuery({
     queryKey: ["modmail-threads", selectedGuild?.guildId, "recent"],
     queryFn: async () => {
       if (!selectedGuild) return null;
@@ -88,7 +96,7 @@ export function DashboardHome() {
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
         <p className="text-discord-text">Overview of modmail activity for {selectedGuild.guildName}</p>
-        
+
         {/* Error display */}
         {(statsError || threadsError) && (
           <div className="mt-4 p-4 bg-discord-danger/10 border border-discord-danger rounded-lg">

@@ -284,27 +284,47 @@ export function createModmailActionButtons(): ActionRowBuilder<ButtonBuilder>[] 
 }
 
 /**
- * Get the inactivity warning hours from config or environment
+ * Get the inactivity warning hours from guild config, with fallback to environment or defaults
  */
-export function getInactivityWarningHours(): number {
+export function getInactivityWarningHours(config?: any): number {
   if (env.MODMAIL_TESTING_MODE) {
     return 2 / 60; // 2 minutes in testing mode
   }
 
-  return envExists(env.MODMAIL_INACTIVITY_WARNING_HOURS)
-    ? env.MODMAIL_INACTIVITY_WARNING_HOURS
-    : 24; // Default to 24 hours if not set
+  // Use config value if provided and valid
+  if (config?.inactivityWarningHours && typeof config.inactivityWarningHours === "number") {
+    return config.inactivityWarningHours;
+  }
+
+  // Fallback to environment variable if available
+  if (envExists(env.MODMAIL_INACTIVITY_WARNING_HOURS)) {
+    return env.MODMAIL_INACTIVITY_WARNING_HOURS;
+  }
+
+  // Default to 24 hours
+  return 24;
 }
 
 /**
- * Get the auto-close hours from config or environment
+ * Get the auto-close hours from guild config, with fallback to environment or defaults
  */
-export function getAutoCloseHours(): number {
+export function getAutoCloseHours(config?: any): number {
   if (env.MODMAIL_TESTING_MODE) {
     return 5 / 60; // 5 minutes in testing mode
   }
 
-  return envExists(env.MODMAIL_AUTO_CLOSE_HOURS) ? env.MODMAIL_AUTO_CLOSE_HOURS : 24 * 7; // Default to 7 days if not set
+  // Use config value if provided and valid
+  if (config?.autoCloseHours && typeof config.autoCloseHours === "number") {
+    return config.autoCloseHours;
+  }
+
+  // Fallback to environment variable if available
+  if (envExists(env.MODMAIL_AUTO_CLOSE_HOURS)) {
+    return env.MODMAIL_AUTO_CLOSE_HOURS;
+  }
+
+  // Default to 7 days
+  return 24 * 7;
 }
 
 /**
@@ -631,7 +651,7 @@ export async function createModmailThread(
     if (initialMessage && initialMessage.trim()) {
       const messageService = new ModmailMessageService();
       const trackingMessageId = `initial-${targetUser.id}-${Date.now()}`;
-      
+
       try {
         await messageService.addMessage(targetUser.id, {
           messageId: trackingMessageId,
@@ -649,8 +669,10 @@ export async function createModmailThread(
           dmMessageUrl: undefined,
           attachments: [], // Initial message attachments will be handled separately when sent
         });
-        
-        log.debug(`Saved initial message ${trackingMessageId} to database for user ${targetUser.id}`);
+
+        log.debug(
+          `Saved initial message ${trackingMessageId} to database for user ${targetUser.id}`
+        );
       } catch (error) {
         log.error(`Failed to save initial message to database: ${error}`);
         // Don't fail the whole modmail creation if message saving fails

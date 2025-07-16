@@ -134,6 +134,13 @@ class ApiClient {
     return this.request(`/api/modmail/${guildId}/config`);
   }
 
+  async updateModmailConfig(guildId: string, config: any) {
+    return this.request(`/api/modmail/${guildId}/config`, {
+      method: "POST",
+      body: JSON.stringify(config),
+    });
+  }
+
   async searchModmail(
     guildId: string,
     params: {
