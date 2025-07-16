@@ -2,38 +2,49 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const clientId = process.env.DISCORD_CLIENT_ID;
-    const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+    // First try to get bot info from our bot's API
+    const botApiUrl = process.env.BOT_API_URL;
+    const internalApiKey = process.env.INTERNAL_API_KEY;
 
-    if (!clientId || !clientSecret) {
-      return NextResponse.json({ error: "Discord credentials not configured" }, { status: 500 });
+    if (botApiUrl && internalApiKey) {
+      try {
+        const botApiResponse = await fetch(`${botApiUrl}/bot-info`, {
+          headers: {
+            Authorization: `Bearer ${internalApiKey}`,
+          },
+          // Add timeout to avoid hanging
+          signal: AbortSignal.timeout(3000),
+        });
+
+        if (botApiResponse.ok) {
+          const botData = await botApiResponse.json();
+          const response = NextResponse.json(botData);
+          response.headers.set("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
+          return response;
+        }
+      } catch (error) {
+        console.warn("Bot API not available, falling back to Discord API");
+      }
     }
 
-    // Get access token using client credentials
-    const tokenResponse = await fetch("https://discord.com/api/v10/oauth2/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        scope: "identify",
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
-    });
+    // Fallback: Use Discord API directly with bot token
+    const botToken = process.env.BOT_TOKEN;
 
-    if (!tokenResponse.ok) {
-      throw new Error(`Discord token API error: ${tokenResponse.status}`);
+    if (!botToken) {
+      return NextResponse.json({
+        name: "Heimdall",
+        description: "Discord Bot Dashboard",
+        id: process.env.DISCORD_CLIENT_ID || "unknown",
+      });
     }
 
-    const tokenData = await tokenResponse.json();
-
-    // Get bot information using the access token
-    const botResponse = await fetch("https://discord.com/api/v10/oauth2/@me", {
+    // Get bot information using the bot token
+    const botResponse = await fetch("https://discord.com/api/v10/applications/@me", {
       headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
+        Authorization: `Bot ${botToken}`,
       },
+      // Add timeout to avoid hanging during build
+      signal: AbortSignal.timeout(5000),
     });
 
     if (!botResponse.ok) {
@@ -44,10 +55,10 @@ export async function GET() {
 
     // Cache the response for 1 hour
     const response = NextResponse.json({
-      id: botData.application.id,
-      name: botData.application.name,
-      description: botData.application.description,
-      icon: botData.application.icon,
+      id: botData.id,
+      name: botData.name,
+      description: botData.description,
+      icon: botData.icon,
     });
 
     response.headers.set("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");

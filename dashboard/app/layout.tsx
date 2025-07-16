@@ -6,27 +6,7 @@ import { Providers } from "@/components/providers";
 const inter = Inter({ subsets: ["latin"] });
 
 async function getBotName(): Promise<string> {
-  try {
-    // Use our existing API route instead of duplicating Discord API logic
-    const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const response = await fetch(`${baseUrl}/api/bot-info`, {
-      // Add cache headers to avoid excessive API calls during build
-      cache: "force-cache",
-      next: { revalidate: 3600 }, // Revalidate every hour
-      // Add timeout to avoid hanging during build
-      signal: AbortSignal.timeout(5000), // 5 second timeout
-    });
-
-    if (!response.ok) {
-      return "Heimdall";
-    }
-
-    const data = await response.json();
-    return data.name || "Heimdall";
-  } catch (error) {
-    console.error("Error fetching bot name for metadata:", error);
-    return "Heimdall";
-  }
+  return process.env.BOT_NAME || "Heimdall";
 }
 
 export async function generateMetadata(): Promise<Metadata> {

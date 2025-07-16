@@ -7,6 +7,7 @@ import { addRequestId, logRequests } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { createHealthRoutes } from "./routes/health";
 import { createModmailRoutes } from "./routes/modmail";
+import { createBotInfoRoutes } from "./routes/bot-info";
 import log from "../utils/log";
 import FetchEnvs from "../utils/FetchEnvs";
 
@@ -31,8 +32,20 @@ export class ApiServer {
     // CORS configuration
     this.app.use(
       cors({
-        origin: env.API_CORS_ORIGINS ? env.API_CORS_ORIGINS.split(",") : "*",
+        origin: "*", // Allow all origins for development
         credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        allowedHeaders: [
+          "Content-Type",
+          "Authorization",
+          "X-Requested-With",
+          "Accept",
+          "Origin",
+          "Cache-Control",
+          "Pragma",
+        ],
+        exposedHeaders: ["Content-Length", "Content-Range"],
+        optionsSuccessStatus: 200,
       })
     );
 
@@ -78,12 +91,14 @@ export class ApiServer {
         timestamp: new Date().toISOString(),
         endpoints: {
           health: "/api/health",
+          "bot-info": "/api/bot-info",
           modmail: {
             threads: "/api/modmail/{guildId}/threads",
             thread: "/api/modmail/{guildId}/threads/{threadId}",
             messages: "/api/modmail/{guildId}/threads/{threadId}/messages",
             stats: "/api/modmail/{guildId}/stats",
             config: "/api/modmail/{guildId}/config",
+            "user-tickets": "/api/modmail/user/{userId}/tickets",
           },
         },
         authentication: {
@@ -103,8 +118,8 @@ export class ApiServer {
     // Health routes under /api prefix
     this.app.use("/api", createHealthRoutes(this.client, this.handler));
 
-    // Health routes at root level (without /api prefix)
-    this.app.use("/", createHealthRoutes(this.client, this.handler));
+    // Bot info routes under /api prefix
+    this.app.use("/api", createBotInfoRoutes(this.client));
 
     // Modmail API routes (requires authentication)
     this.app.use("/api/modmail", createModmailRoutes(this.client, this.handler));
