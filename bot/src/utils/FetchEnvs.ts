@@ -86,8 +86,8 @@ function getter() {
     MODMAIL_CHECK_INTERVAL_MINUTES: parseInt(process.env.MODMAIL_CHECK_INTERVAL_MINUTES || "30"),
     MODMAIL_TESTING_MODE: process.env.MODMAIL_TESTING_MODE === "true",
     // API Configuration
-    API_PORT: parseInt(process.env.API_PORT || "3000"),
-    API_CORS_ORIGINS: process.env.API_CORS_ORIGINS || "http://localhost:3000",
+    API_PORT: parseInt(process.env.API_PORT || "3001"),
+    API_CORS_ORIGINS: process.env.API_CORS_ORIGINS || "http://localhost:3001",
     API_RATE_LIMIT_WINDOW: (() => {
       const value = process.env.API_RATE_LIMIT_WINDOW || "15m";
       // If it's a number string, parse it as milliseconds, otherwise use ms()
