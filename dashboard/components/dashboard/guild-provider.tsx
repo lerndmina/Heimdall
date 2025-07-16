@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, createContext, useContext, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api";
+import { useUserValidation } from "@/hooks/use-user-validation";
 
 interface Guild {
   guildId: string;
@@ -30,12 +29,9 @@ export function GuildProvider({ children, userId }: { children: React.ReactNode;
     data: userAccess,
     isLoading,
     error,
-  } = useQuery({
-    queryKey: ["user-access", userId],
-    queryFn: () => apiClient.validateUser(userId),
-  });
+  } = useUserValidation(userId);
 
-  const guilds = (userAccess as any)?.data?.guilds?.filter((guild: any) => guild.hasStaffRole) || [];
+  const guilds = userAccess?.data?.guilds?.filter((guild: any) => guild.hasStaffRole) || [];
 
   // Custom setSelectedGuild that also saves to sessionStorage
   const handleSetSelectedGuild = (guild: Guild | null) => {
@@ -49,22 +45,27 @@ export function GuildProvider({ children, userId }: { children: React.ReactNode;
 
   useEffect(() => {
     if (guilds.length > 0) {
-      // Try to restore from sessionStorage first
+      // Always try to restore from sessionStorage when guilds become available
       const savedGuildId = sessionStorage.getItem(SELECTED_GUILD_KEY);
       if (savedGuildId) {
         const savedGuild = guilds.find((guild: any) => guild.guildId === savedGuildId);
         if (savedGuild) {
+          console.log(`Restoring guild from sessionStorage: ${savedGuild.guildName} (${savedGuildId})`);
           setSelectedGuild(savedGuild);
           return;
+        } else {
+          console.log(`Guild ${savedGuildId} from sessionStorage not found in available guilds, clearing`);
+          sessionStorage.removeItem(SELECTED_GUILD_KEY);
         }
       }
 
       // Otherwise, select the first guild if none is selected
       if (!selectedGuild) {
+        console.log(`No saved guild, selecting first available: ${guilds[0].guildName}`);
         handleSetSelectedGuild(guilds[0]);
       }
     }
-  }, [guilds, selectedGuild]);
+  }, [guilds]); // Remove selectedGuild from dependencies to avoid infinite loop
 
   const value: GuildContextType = {
     guilds,

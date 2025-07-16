@@ -58,8 +58,16 @@ export function ServerCacheProvider({ children, userId }: ServerCacheProviderPro
       const cacheTimeKey = `heimdall-servers-cache-time-${targetUserId}`;
       localStorage.setItem(cacheKey, JSON.stringify(serverList));
       localStorage.setItem(cacheTimeKey, Date.now().toString());
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch servers from API:", error);
+      
+      // Handle rate limiting gracefully
+      if (error?.status === 429) {
+        const rateLimitError = new Error("Rate limited - please wait before trying again");
+        rateLimitError.name = "RateLimitError";
+        throw rateLimitError;
+      }
+      
       throw error;
     }
   }, []);

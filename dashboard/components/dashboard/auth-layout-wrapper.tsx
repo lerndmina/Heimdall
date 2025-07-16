@@ -20,18 +20,19 @@ interface AuthLayoutWrapperProps {
 }
 
 export function AuthLayoutWrapper({ user, children }: AuthLayoutWrapperProps) {
-  const { userRole, isStaffMode } = useRole();
+  const { userRole, isStaffMode, isLoading } = useRole();
   const router = useRouter();
 
-  // Redirect to role selection if no role is chosen
+  // Redirect to role selection if no role is chosen (only after loading is complete)
   useEffect(() => {
-    if (!userRole) {
+    if (!isLoading && !userRole) {
+      console.log("No user role found after loading from localStorage, redirecting to role selection");
       router.push("/");
     }
-  }, [userRole, router]);
+  }, [userRole, router, isLoading]);
 
-  // If no role selected, don't render anything (will redirect)
-  if (!userRole) {
+  // If still loading or no role selected, don't render anything
+  if (isLoading || !userRole) {
     return null;
   }
 

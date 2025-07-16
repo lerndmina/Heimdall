@@ -20,7 +20,7 @@ export function useRequireGuild() {
     if (!hasCheckedSessionStorage) {
       const timer = setTimeout(() => {
         setHasCheckedSessionStorage(true);
-      }, 100); // Small delay to allow sessionStorage restoration
+      }, 200); // Increase delay to allow sessionStorage restoration
       return () => clearTimeout(timer);
     }
 
@@ -35,6 +35,16 @@ export function useRequireGuild() {
         if (!savedGuildId) {
           console.log("Has guilds but none selected and no sessionStorage, redirecting to server-select");
           router.push("/server-select");
+        } else {
+          // Give the guild provider more time to restore the saved guild
+          console.log(`Found savedGuildId ${savedGuildId} but selectedGuild not set yet, waiting...`);
+          const restoreTimer = setTimeout(() => {
+            if (!selectedGuild) {
+              console.log("Timeout waiting for guild restoration, redirecting to server-select");
+              router.push("/server-select");
+            }
+          }, 500);
+          return () => clearTimeout(restoreTimer);
         }
       }
     }

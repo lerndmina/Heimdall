@@ -1,6 +1,7 @@
 // Client-side API calls should go through the dashboard's API routes
 // These routes will then proxy to the bot API server-side
-// Note: BOT_API_URL should NOT be available on client-side (not in next.config.js env)
+import { clientCache } from "./client-cache";
+
 const BOT_API_URL = process.env.BOT_API_URL || "http://localhost:3001";
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "";
 
@@ -19,16 +20,10 @@ class ApiClient {
 
   constructor() {
     this.isClientSide = typeof window !== "undefined";
-    
-    // Client-side: Always use empty base URL (relative URLs) regardless of env vars
+    // Client-side: empty base URL (use relative URLs)
     // Server-side: use bot API URL
-    if (this.isClientSide) {
-      this.baseUrl = "";
-      this.apiKey = "";
-    } else {
-      this.baseUrl = BOT_API_URL;
-      this.apiKey = INTERNAL_API_KEY;
-    }
+    this.baseUrl = this.isClientSide ? "" : BOT_API_URL;
+    this.apiKey = INTERNAL_API_KEY;
 
     // Debug logging (can be removed in production)
     if (this.isClientSide) {
@@ -98,7 +93,12 @@ class ApiClient {
 
   // User validation
   async validateUser(userId: string) {
-    return this.request(`/api/modmail/auth/validate-user/${userId}`);
+    // Use client-side cache to prevent duplicate requests
+    const cacheKey = `validate-user-${userId}`;
+    return clientCache.get(cacheKey, () => 
+      this.request(`/api/modmail/auth/validate-user/${userId}`),
+      10 * 60 * 1000 // 10 minutes cache
+    );
   }
 
   // Modmail operations

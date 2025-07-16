@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, ArrowRight, Shield, Users, MessageSquare, AlertCircle, Loader2 } from "lucide-react";
-import { apiClient } from "@/lib/api";
+import { useUserValidation } from "@/hooks/use-user-validation";
 import { discordApi } from "@/lib/discord-api";
 import { useBotName } from "@/hooks/use-bot-info";
 
@@ -61,12 +61,7 @@ export function ServerSelector({ user }: ServerSelectorProps) {
     data: botValidation,
     isLoading: botLoading,
     error: botError,
-  } = useQuery({
-    queryKey: ["bot-validation", user.id],
-    queryFn: () => apiClient.validateUser(user.id),
-    enabled: !!user.id,
-    retry: 2,
-  });
+  } = useUserValidation(user.id);
 
   const isLoading = discordLoading || botLoading;
   const error = discordError || botError;

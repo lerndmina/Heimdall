@@ -15,7 +15,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 5 * 60 * 1000, // 5 minutes
-            retry: 2,
+            gcTime: 10 * 60 * 1000, // 10 minutes garbage collection
+            retry: (failureCount, error: any) => {
+              // Don't retry on rate limiting or auth errors
+              if (error?.status === 429 || error?.status === 403 || error?.status === 401) {
+                return false;
+              }
+              return failureCount < 2;
+            },
+            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+            refetchOnWindowFocus: false, // Prevent excessive refetching
           },
         },
       })
