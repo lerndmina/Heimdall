@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { StaffTranscriptViewer } from "@/components/transcript/staff-transcript-viewer";
 
 interface TranscriptViewPageProps {
-  params: {
+  params: Promise<{
     guildId: string;
     threadId: string;
-  };
+  }>;
 }
 
 export default async function TranscriptViewPage({ params }: TranscriptViewPageProps) {
@@ -16,5 +16,7 @@ export default async function TranscriptViewPage({ params }: TranscriptViewPageP
     redirect("/");
   }
 
-  return <StaffTranscriptViewer guildId={params.guildId} threadId={params.threadId} user={session.user} />;
+  const { guildId, threadId } = await params;
+
+  return <StaffTranscriptViewer guildId={guildId} threadId={threadId} user={session.user} />;
 }

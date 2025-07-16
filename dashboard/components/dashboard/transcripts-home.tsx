@@ -419,7 +419,7 @@ export function TranscriptsHome() {
 
                         {/* Actions */}
                         <div className="flex items-center gap-2">
-                          <Link href={`/transcript/${selectedGuild.guildId}/${thread.forumThreadId}`}>
+                          <Link href={`/transcripts/${selectedGuild.guildId}/${thread.forumThreadId}`}>
                             <Button variant="outline" size="sm" className="border-discord-primary text-discord-primary hover:bg-discord-primary hover:text-white">
                               <Eye className="h-4 w-4 mr-2" />
                               View

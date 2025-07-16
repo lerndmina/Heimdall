@@ -68,11 +68,46 @@ export function StaffTranscriptViewer({ guildId, threadId, user }: StaffTranscri
   const [copySuccess, setCopySuccess] = useState(false);
   const [downloadingTranscript, setDownloadingTranscript] = useState(false);
 
-  // Get the modmail thread with messages
+  // Validate user permissions for this transcript
+  const {
+    data: permissionData,
+    isLoading: isCheckingPermissions,
+    error: permissionError,
+  } = useQuery({
+    queryKey: ["transcript-permissions", guildId, threadId, user.id],
+    queryFn: async () => {
+      // First, get the thread to check if user is the ticket owner
+      const threadResponse = await apiClient.getModmailThread(guildId, threadId, false);
+      const thread = (threadResponse as any)?.data;
+
+      if (!thread) {
+        throw new Error("Transcript not found");
+      }
+
+      // Check if user is the ticket owner
+      if (thread.userId === user.id) {
+        return { authorized: true, reason: "ticket_owner" };
+      }
+
+      // Check if user has staff role in this guild
+      const userValidation = await apiClient.validateUser(user.id);
+      const guilds = (userValidation as any)?.data?.guilds || [];
+      const hasStaffRole = guilds.some((guild: any) => guild.guildId === guildId && guild.hasStaffRole);
+
+      if (hasStaffRole) {
+        return { authorized: true, reason: "staff_role" };
+      }
+
+      return { authorized: false, reason: "no_permission" };
+    },
+    retry: 1,
+  });
+
+  // Get the modmail thread with messages (only if authorized)
   const {
     data: threadData,
-    isLoading,
-    error,
+    isLoading: isLoadingThread,
+    error: threadError,
     refetch,
   } = useQuery({
     queryKey: ["modmail-thread", guildId, threadId],
@@ -80,8 +115,12 @@ export function StaffTranscriptViewer({ guildId, threadId, user }: StaffTranscri
       const response = await apiClient.getModmailThread(guildId, threadId, true);
       return response;
     },
+    enabled: permissionData?.authorized === true,
     retry: 2,
   });
+
+  const isLoading = isCheckingPermissions || isLoadingThread;
+  const error = permissionError || threadError;
 
   const handleBack = useCallback(() => {
     router.push("/transcripts");
@@ -175,6 +214,33 @@ export function StaffTranscriptViewer({ guildId, threadId, user }: StaffTranscri
     }
     return <User className="h-4 w-4 text-discord-muted" />;
   };
+
+  // Check for unauthorized access
+  if (permissionData && !permissionData.authorized) {
+    return (
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center">
+          <div className="flex items-center justify-center mb-6">
+            <Shield className="h-12 w-12 text-discord-danger mr-4" />
+            <h1 className="text-4xl font-bold text-white">Access Denied</h1>
+          </div>
+          <Card className="bg-discord-dark border-discord-danger">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center mb-4">
+                <Ban className="h-12 w-12 text-discord-danger" />
+              </div>
+              <p className="text-white mb-2">You don't have permission to view this transcript</p>
+              <p className="text-discord-muted mb-4">You can only view transcripts for tickets you created or if you have staff permissions in this server.</p>
+              <Button onClick={handleBack} variant="outline">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Transcripts
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

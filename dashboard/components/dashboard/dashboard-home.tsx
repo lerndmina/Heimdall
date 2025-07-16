@@ -12,23 +12,36 @@ import { apiClient } from "@/lib/api";
 export function DashboardHome() {
   const { selectedGuild } = useRequireGuild();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ["modmail-stats", selectedGuild?.guildId],
-    queryFn: () => (selectedGuild ? apiClient.getModmailStats(selectedGuild.guildId) : null),
+    queryFn: async () => {
+      if (!selectedGuild) return null;
+      console.log("Fetching stats for guild:", selectedGuild.guildId);
+      const result = await apiClient.getModmailStats(selectedGuild.guildId, "all");
+      console.log("Stats result:", result);
+      return result;
+    },
     enabled: !!selectedGuild,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
   });
 
-  const { data: threads, isLoading: threadsLoading } = useQuery({
+  const { data: threads, isLoading: threadsLoading, error: threadsError } = useQuery({
     queryKey: ["modmail-threads", selectedGuild?.guildId, "recent"],
-    queryFn: () =>
-      selectedGuild
-        ? apiClient.getModmailThreads(selectedGuild.guildId, {
-            limit: 5,
-            sortBy: "lastActivity",
-            sortOrder: "desc",
-          })
-        : null,
+    queryFn: async () => {
+      if (!selectedGuild) return null;
+      console.log("Fetching recent threads for guild:", selectedGuild.guildId);
+      const result = await apiClient.getModmailThreads(selectedGuild.guildId, {
+        limit: 5,
+        sortBy: "lastActivity",
+        sortOrder: "desc",
+      });
+      console.log("Threads result:", result);
+      return result;
+    },
     enabled: !!selectedGuild,
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+    refetchInterval: 2 * 60 * 1000, // Auto-refresh every 2 minutes
   });
 
   if (!selectedGuild) {
@@ -43,8 +56,31 @@ export function DashboardHome() {
     );
   }
 
-  const statsData = (stats as any)?.data || {};
-  const threadsData = (threads as any)?.data?.threads || [];
+  // Handle different response structures
+  let statsData: any = {};
+  if (stats) {
+    if ((stats as any)?.data) {
+      statsData = (stats as any).data;
+    } else if ((stats as any)?.success && (stats as any)?.data) {
+      statsData = (stats as any).data;
+    } else {
+      statsData = stats as any;
+    }
+  }
+
+  let threadsData: any[] = [];
+  if (threads) {
+    if ((threads as any)?.data?.threads) {
+      threadsData = (threads as any).data.threads;
+    } else if ((threads as any)?.data && Array.isArray((threads as any).data)) {
+      threadsData = (threads as any).data;
+    } else if (Array.isArray(threads)) {
+      threadsData = threads;
+    }
+  }
+
+  console.log("Processed statsData:", statsData);
+  console.log("Processed threadsData:", threadsData);
 
   return (
     <div className="space-y-8">
@@ -52,6 +88,20 @@ export function DashboardHome() {
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
         <p className="text-discord-text">Overview of modmail activity for {selectedGuild.guildName}</p>
+        
+        {/* Error display */}
+        {(statsError || threadsError) && (
+          <div className="mt-4 p-4 bg-discord-danger/10 border border-discord-danger rounded-lg">
+            <div className="flex items-center">
+              <AlertCircle className="h-4 w-4 text-discord-danger mr-2" />
+              <span className="text-discord-danger text-sm">
+                {statsError && `Failed to load stats: ${statsError.message}`}
+                {statsError && threadsError && " | "}
+                {threadsError && `Failed to load threads: ${threadsError.message}`}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
