@@ -3,9 +3,9 @@ ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 FROM --platform=$TARGETPLATFORM oven/bun:1.1.34
 
-# Install system dependencies (FFmpeg for bot, Node.js for compatibility, curl/wget for health checks)
+# Install system dependencies (FFmpeg for bot, Node.js for compatibility, curl/wget for health checks, procps for PM2)
 RUN apt-get update && \
-  apt-get install -y ffmpeg curl wget && \
+  apt-get install -y ffmpeg curl wget procps && \
   curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
   apt-get install -y nodejs && \
   apt-get clean && \
@@ -71,6 +71,8 @@ RUN npm install -g tsx
 
 # Build dashboard (Next.js requires build for production)
 WORKDIR /app/dashboard
+# Remove duplicate lockfile to avoid warnings
+RUN rm -f bun.lock
 # Generate Prisma client before building
 RUN bunx prisma generate
 RUN bun run build
@@ -90,7 +92,8 @@ RUN echo '{\n\
   "script": "bun",\n\
   "args": "run start",\n\
   "env": {\n\
-  "NODE_ENV": "production"\n\
+  "NODE_ENV": "production",\n\
+  "PORT": "3001"\n\
   }\n\
   },\n\
   {\n\
@@ -100,19 +103,21 @@ RUN echo '{\n\
   "args": "run start",\n\
   "env": {\n\
   "NODE_ENV": "production",\n\
-  "PORT": "3001"\n\
+  "PORT": "3000",\n\
+  "HOSTNAME": "0.0.0.0",\n\
+  "BOT_API_URL": "http://localhost:3001"\n\
   }\n\
   }\n\
   ]\n\
   }' > ecosystem.config.json
 
-# Expose ports (3000 for bot API, 3001 for dashboard)
+# Expose ports (3000 for dashboard, 3001 for bot API)
 EXPOSE 3000 3001
 
 # Add health check for both services
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD (wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1) && \
-  (wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1)
+  CMD (wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1) && \
+  (wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1)
 
 # Start both services with PM2
 CMD ["pm2-runtime", "start", "ecosystem.config.json"]
