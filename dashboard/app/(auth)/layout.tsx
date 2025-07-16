@@ -15,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="min-h-screen bg-discord-darkest">
       <AuthLayoutWrapper user={session.user}>
         <SmartNav user={session.user} />
-        <main className="container mx-auto px-4 py-8">{children}</main>
+        <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-full overflow-x-hidden">{children}</main>
       </AuthLayoutWrapper>
     </div>
   );
