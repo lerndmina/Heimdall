@@ -96,7 +96,12 @@ RUN echo '{\n\
   "env": {\n\
   "NODE_ENV": "production",\n\
   "PORT": "3001"\n\
-  }\n\
+  },\n\
+  "max_restarts": 5,\n\
+  "min_uptime": "10s",\n\
+  "kill_timeout": 3000,\n\
+  "wait_ready": true,\n\
+  "listen_timeout": 8000\n\
   },\n\
   {\n\
   "name": "heimdall-dashboard",\n\
@@ -106,8 +111,13 @@ RUN echo '{\n\
   "env": {\n\
   "NODE_ENV": "production",\n\
   "PORT": "3000",\n\
-  "HOSTNAME": "0.0.0.0",\n\
-  "BOT_API_URL": "http://localhost:3001"\n\
+  "HOSTNAME": "0.0.0.0"\n\
+  },\n\
+  "max_restarts": 5,\n\
+  "min_uptime": "10s",\n\
+  "kill_timeout": 3000,\n\
+  "wait_ready": true,\n\
+  "listen_timeout": 8000\n\
   }\n\
   }\n\
   ]\n\
@@ -123,14 +133,18 @@ RUN echo '#!/bin/bash\n\
   echo "Container IP addresses:"\n\
   ip addr show | grep "inet " | grep -v "127.0.0.1"\n\
   echo "Listening ports:"\n\
+  echo "Memory info:"\n\
+  free -m\n\
+  echo "Environment variables (filtered):"\n\
+  env | grep -E "(NODE_ENV|PORT|BOT_API_URL|NEXTAUTH)" | sort\n\
   echo "Starting services..."\n\
-  exec pm2-runtime start ecosystem.config.json' > /app/start.sh && chmod +x /app/start.sh
+  exec pm2-runtime start ecosystem.config.json --auto-exit' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose ports (3000 for dashboard, 3001 for bot API)
 EXPOSE 3000 3001
 
 # Add health check for both services
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=60s --timeout=15s --start-period=90s --retries=3 \
   CMD (wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1) && \
   (wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1)
 

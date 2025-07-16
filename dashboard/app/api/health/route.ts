@@ -22,11 +22,11 @@ export async function GET() {
 
   // Try to connect to bot API
   try {
-    const response = await fetch(`${botApiUrl}/health`, {
+    const response = await fetch(`${botApiUrl}/api/health`, {
       headers: {
         Authorization: `Bearer ${internalApiKey}`,
       },
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(5000),
     });
 
     if (response.ok) {

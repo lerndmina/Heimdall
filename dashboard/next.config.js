@@ -7,8 +7,8 @@ const nextConfig = {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
     DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
-    BOT_API_URL: process.env.BOT_API_URL,
-    INTERNAL_API_KEY: process.env.INTERNAL_API_KEY,
+    // BOT_API_URL and INTERNAL_API_KEY should NOT be exposed to client-side
+    // They are only used server-side for API routes
   },
 };
 
