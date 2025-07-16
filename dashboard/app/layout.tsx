@@ -8,7 +8,8 @@ const inter = Inter({ subsets: ["latin"] });
 async function getBotName(): Promise<string> {
   try {
     // Use our existing API route instead of duplicating Discord API logic
-    const response = await fetch(`${process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/bot-info`, {
+    const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/bot-info`, {
       // Add cache headers to avoid excessive API calls during build
       cache: "force-cache",
       next: { revalidate: 3600 }, // Revalidate every hour

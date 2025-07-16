@@ -6,6 +6,8 @@ import { prisma } from "./prisma";
 
 export const config = {
   adapter: PrismaAdapter(prisma),
+  // Trust host when behind reverse proxy
+  trustHost: true,
   providers: [
     Discord({
       clientId: process.env.DISCORD_CLIENT_ID!,
