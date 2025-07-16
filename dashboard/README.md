@@ -198,23 +198,31 @@ The dashboard uses shadcn/ui components with a Discord-inspired dark theme:
 
 ## 📊 API Integration
 
-The dashboard uses a proxy architecture for security:
+The dashboard uses a secure proxy architecture with proper authentication and authorization:
 
-**Client → Dashboard API Routes → Bot API**
+**Client → Dashboard API Routes (Auth + Validation) → Bot API**
 
 - **Client-side**: Only makes requests to `/api/*` routes on same domain
-- **Dashboard API Routes**: Proxy requests to bot API using server-side credentials
+- **Dashboard API Routes**: Validate user authentication and permissions before proxying to bot API
 - **Bot API**: Internal API secured with API keys
+
+### Authorization Logic
+
+1. **Authentication**: All requests require valid NextAuth session
+2. **User Data Access**: Users can view their own modmail tickets
+3. **Staff Access**: Users with staff roles can view guild modmail data for authorized guilds
+4. **Guild Validation**: Staff access verified via bot API for each guild
 
 ### API Routes
 
 - **User Validation**: `/api/modmail/auth/validate-user/{userId}`
-- **Thread Management**: `/api/modmail/{guildId}/threads`
-- **Statistics**: `/api/modmail/{guildId}/stats`
-- **Search**: `/api/modmail/{guildId}/search`
-- **Transcripts**: `/api/modmail/{guildId}/threads/{threadId}/transcript`
+- **User Tickets**: `/api/modmail/user/{userId}/tickets` (own tickets or staff access)
+- **Thread Management**: `/api/modmail/{guildId}/threads` (requires guild staff access)
+- **Statistics**: `/api/modmail/{guildId}/stats` (requires guild staff access)
+- **Search**: `/api/modmail/{guildId}/search` (requires guild staff access)
+- **Transcripts**: `/api/modmail/{guildId}/threads/{threadId}/transcript` (requires guild staff access)
 
-All these routes are automatically proxied to the bot API using the `BOT_API_URL` and `INTERNAL_API_KEY` environment variables.
+All routes validate user permissions before proxying to the bot API using `BOT_API_URL` and `INTERNAL_API_KEY`.
 
 ## 🐛 Troubleshooting
 
