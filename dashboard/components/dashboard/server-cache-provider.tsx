@@ -60,14 +60,14 @@ export function ServerCacheProvider({ children, userId }: ServerCacheProviderPro
       localStorage.setItem(cacheTimeKey, Date.now().toString());
     } catch (error: any) {
       console.error("Failed to fetch servers from API:", error);
-      
+
       // Handle rate limiting gracefully
       if (error?.status === 429) {
         const rateLimitError = new Error("Rate limited - please wait before trying again");
         rateLimitError.name = "RateLimitError";
         throw rateLimitError;
       }
-      
+
       throw error;
     }
   }, []);

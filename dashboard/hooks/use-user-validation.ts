@@ -53,9 +53,9 @@ export function useUserValidation(userId: string | undefined) {
  */
 export function useStaffGuilds(userId: string | undefined) {
   const { data, isLoading, error } = useUserValidation(userId);
-  
-  const staffGuilds = data?.data?.guilds?.filter(guild => guild.hasStaffRole) || [];
-  
+
+  const staffGuilds = data?.data?.guilds?.filter((guild) => guild.hasStaffRole) || [];
+
   return {
     guilds: staffGuilds,
     isLoading,

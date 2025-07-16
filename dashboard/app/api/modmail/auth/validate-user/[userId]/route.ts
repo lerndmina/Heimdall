@@ -44,24 +44,24 @@ export async function GET(request: NextRequest, context: { params: Promise<{ use
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.log("validate-user route: Bot API error:", errorData);
-      
+
       // Handle rate limiting specifically
       if (response.status === 429) {
         console.warn("validate-user route: Rate limited by bot API");
         return NextResponse.json(
-          { 
+          {
             error: "Too many requests - please wait before trying again",
-            retryAfter: response.headers.get("retry-after") || "60"
-          }, 
-          { 
+            retryAfter: response.headers.get("retry-after") || "60",
+          },
+          {
             status: 429,
             headers: {
-              "Retry-After": response.headers.get("retry-after") || "60"
-            }
+              "Retry-After": response.headers.get("retry-after") || "60",
+            },
           }
         );
       }
-      
+
       return NextResponse.json({ error: errorData.message || "Failed to validate user" }, { status: response.status });
     }
 

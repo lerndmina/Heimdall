@@ -134,9 +134,10 @@ export function TranscriptViewer({ guildId, threadId, user }: TranscriptViewerPr
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to download transcript:", error);
-      alert("Failed to download transcript. Please try again.");
+      const errorMessage = error?.message || "Unknown error occurred";
+      alert(`Failed to download transcript: ${errorMessage}`);
     }
   };
 

@@ -118,9 +118,10 @@ export function UserTickets({ user }: UserTicketsProps) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to download transcript:", error);
-      alert(`Failed to download transcript: ${error instanceof Error ? error.message : "Unknown error"}`);
+      const errorMessage = error?.message || "Unknown error occurred";
+      alert(`Failed to download transcript: ${errorMessage}`);
     }
   };
 

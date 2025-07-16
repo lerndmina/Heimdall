@@ -20,13 +20,13 @@ class ClientCache {
     }
 
     // If we have valid cached data, return it
-    if (cached && (now - cached.timestamp) < ttl) {
+    if (cached && now - cached.timestamp < ttl) {
       return cached.data;
     }
 
     // Otherwise, fetch new data
     const promise = provider();
-    
+
     // Store the promise immediately to prevent duplicate calls
     this.cache.set(key, { data: null, timestamp: now, promise });
 
@@ -62,14 +62,14 @@ class ClientCache {
   cleanup(): void {
     const now = Date.now();
     const keysToDelete: string[] = [];
-    
+
     this.cache.forEach((entry, key) => {
-      if (!entry.promise && (now - entry.timestamp) > this.defaultTTL) {
+      if (!entry.promise && now - entry.timestamp > this.defaultTTL) {
         keysToDelete.push(key);
       }
     });
-    
-    keysToDelete.forEach(key => this.cache.delete(key));
+
+    keysToDelete.forEach((key) => this.cache.delete(key));
   }
 }
 

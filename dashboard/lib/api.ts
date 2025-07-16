@@ -95,8 +95,9 @@ class ApiClient {
   async validateUser(userId: string) {
     // Use client-side cache to prevent duplicate requests
     const cacheKey = `validate-user-${userId}`;
-    return clientCache.get(cacheKey, () => 
-      this.request(`/api/modmail/auth/validate-user/${userId}`),
+    return clientCache.get(
+      cacheKey,
+      () => this.request(`/api/modmail/auth/validate-user/${userId}`),
       10 * 60 * 1000 // 10 minutes cache
     );
   }
@@ -221,6 +222,16 @@ class ApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+
+      // Provide user-friendly error messages
+      if (response.status === 403) {
+        throw new ApiError("You don't have permission to view this transcript. You can only view transcripts for tickets you opened or if you have staff permissions.", response.status, errorData);
+      } else if (response.status === 404) {
+        throw new ApiError("Transcript not found. The ticket may have been deleted.", response.status, errorData);
+      } else if (response.status === 429) {
+        throw new ApiError("Too many requests. Please wait a moment before trying again.", response.status, errorData);
+      }
+
       throw new ApiError(errorData.message || `HTTP ${response.status}`, response.status, errorData);
     }
 

@@ -57,11 +57,7 @@ export function ServerSelector({ user }: ServerSelectorProps) {
   });
 
   // Get bot validation for these guilds - use the user prop which comes from server-side session
-  const {
-    data: botValidation,
-    isLoading: botLoading,
-    error: botError,
-  } = useUserValidation(user.id);
+  const { data: botValidation, isLoading: botLoading, error: botError } = useUserValidation(user.id);
 
   const isLoading = discordLoading || botLoading;
   const error = discordError || botError;
