@@ -1,15 +1,42 @@
 # Multi-platform build arguments
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
-FROM --platform=$TARGETPLATFORM oven/bun:1.1.34
+FROM oven/bun:1.1.34
 
 # Install system dependencies (FFmpeg for bot, Node.js for compatibility, curl/wget for health checks, procps for PM2, iproute2 for networking)
-RUN apt-get update && \
-  apt-get install -y ffmpeg curl wget procps iproute2 && \
+# Use DEBIAN_FRONTEND=noninteractive to avoid issues with ARM64 emulation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update package lists
+RUN apt-get update
+
+# Install basic utilities first
+RUN apt-get install -y --no-install-recommends \
+  ffmpeg \
+  curl \
+  wget \
+  procps \
+  iproute2 \
+  ca-certificates \
+  gnupg \
+  lsb-release \
+  xz-utils
+
+# Install Node.js 18.x - use a more reliable method for ARM64 builds
+# Try direct binary installation first, fall back to package manager
+RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+  echo "Installing Node.js for ARM64 using direct binary method..." && \
+  curl -fsSL https://nodejs.org/dist/v18.20.4/node-v18.20.4-linux-arm64.tar.xz | tar -xJ -C /usr/local --strip-components=1; \
+  else \
+  echo "Installing Node.js using NodeSource repository..." && \
   curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-  apt-get install -y nodejs && \
-  apt-get clean && \
-  rm -rf /var/lib/apt/lists/*
+  apt-get install -y --no-install-recommends nodejs; \
+  fi
+
+# Clean up and reset DEBIAN_FRONTEND
+RUN apt-get clean && \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+ENV DEBIAN_FRONTEND=
 
 # Set the working directory
 WORKDIR /app
@@ -71,8 +98,6 @@ RUN npm install -g tsx
 
 # Build dashboard (Next.js requires build for production)
 WORKDIR /app/dashboard
-# Remove duplicate lockfile to avoid warnings
-RUN rm -f bun.lock
 # Generate Prisma client before building
 RUN bunx prisma generate
 # Clean any existing build
