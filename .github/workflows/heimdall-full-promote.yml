@@ -1,0 +1,256 @@
+name: Promote Heimdall Full System
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version/Tag to promote to latest (e.g., sha-abc123, nightly, main)"
+        required: true
+        type: string
+        default: "nightly"
+      environment:
+        description: "Target environment for promotion"
+        required: true
+        type: choice
+        options:
+          - "production"
+          - "staging"
+        default: "production"
+      force_promote:
+        description: "Force promotion even if target tag already exists"
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}-full
+
+jobs:
+  validate-inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      source_tag: ${{ steps.validate.outputs.source_tag }}
+      target_tag: ${{ steps.validate.outputs.target_tag }}
+    steps:
+      - name: Validate inputs and determine tags
+        id: validate
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+
+          # Validate version format
+          if [[ ! "$VERSION" =~ ^(nightly|main|sha-[a-f0-9]{7}|v[0-9]+\.[0-9]+\.[0-9]+.*)$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Valid formats: nightly, main, sha-abc123, v1.0.0"
+            exit 1
+          fi
+
+          # Set source and target tags
+          SOURCE_TAG="$VERSION"
+          if [ "$ENVIRONMENT" = "production" ]; then
+            TARGET_TAG="latest"
+          else
+            TARGET_TAG="$ENVIRONMENT"
+          fi
+
+          echo "source_tag=$SOURCE_TAG" >> $GITHUB_OUTPUT
+          echo "target_tag=$TARGET_TAG" >> $GITHUB_OUTPUT
+
+          echo "✅ Validation complete:"
+          echo "  Source tag: $SOURCE_TAG"
+          echo "  Target tag: $TARGET_TAG"
+          echo "  Environment: $ENVIRONMENT"
+
+  check-source-exists:
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    steps:
+      - name: Check if source image exists
+        run: |
+          echo "🔍 Checking if source image exists..."
+
+          # Check if the source tag exists in the registry
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.source_tag }} > /dev/null 2>&1; then
+            echo "✅ Source image found: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.source_tag }}"
+          else
+            echo "❌ Source image not found: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.source_tag }}"
+            echo ""
+            echo "Available tags for ${{ env.IMAGE_NAME }}:"
+            # This would require authentication, so we'll just fail here
+            echo "Please verify the tag exists in the GitHub Container Registry"
+            exit 1
+          fi
+
+  promote:
+    runs-on: ubuntu-latest
+    needs: [validate-inputs, check-source-exists]
+    permissions:
+      packages: write
+      contents: read
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check target tag status
+        id: check_target
+        run: |
+          TARGET_EXISTS="false"
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.target_tag }} > /dev/null 2>&1; then
+            TARGET_EXISTS="true"
+            echo "⚠️ Target tag already exists: ${{ needs.validate-inputs.outputs.target_tag }}"
+          else
+            echo "✅ Target tag is available: ${{ needs.validate-inputs.outputs.target_tag }}"
+          fi
+          echo "target_exists=$TARGET_EXISTS" >> $GITHUB_OUTPUT
+
+      - name: Confirm promotion
+        if: steps.check_target.outputs.target_exists == 'true' && github.event.inputs.force_promote != 'true'
+        run: |
+          echo "❌ Target tag '${{ needs.validate-inputs.outputs.target_tag }}' already exists!"
+          echo "To overwrite, re-run this workflow with 'force_promote' enabled."
+          exit 1
+
+      - name: Pull source image
+        run: |
+          echo "📥 Pulling source image..."
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.source_tag }}
+
+      - name: Tag and push target image
+        run: |
+          echo "🏷️ Tagging image..."
+          docker tag \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.source_tag }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.target_tag }}
+
+          echo "📤 Pushing target image..."
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.target_tag }}
+
+      - name: Verify promotion
+        run: |
+          echo "🔍 Verifying promotion..."
+
+          # Get digest of source and target images
+          SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.source_tag }} | cut -d@ -f2)
+          TARGET_DIGEST=$(docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.target_tag }} | jq -r '.config.digest')
+
+          echo "Source digest: $SOURCE_DIGEST"
+          echo "Target digest: $TARGET_DIGEST"
+
+          if [ "$SOURCE_DIGEST" = "$TARGET_DIGEST" ]; then
+            echo "✅ Promotion verified successfully!"
+          else
+            echo "❌ Promotion verification failed - digests don't match"
+            exit 1
+          fi
+
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Heimdall Full System Promotion Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Promotion Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source Tag**: \`${{ needs.validate-inputs.outputs.source_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Tag**: \`${{ needs.validate-inputs.outputs.target_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: \`${{ github.event.inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Forced**: \`${{ github.event.inputs.force_promote }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🐳 Image Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry**: \`${{ env.REGISTRY }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository**: \`${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Full Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.target_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Components Included" >> $GITHUB_STEP_SUMMARY
+          echo "- **Discord Bot**: Full bot functionality with all commands and events" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web Dashboard**: Next.js dashboard with authentication and modmail management" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Server**: Express.js API for bot-dashboard communication" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Container Registry](https://github.com/${{ github.repository }}/pkgs/container/$(echo ${{ env.IMAGE_NAME }} | cut -d'/' -f2))" >> $GITHUB_STEP_SUMMARY
+          echo "- [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Status" >> $GITHUB_STEP_SUMMARY
+          echo "Promotion completed successfully! The full Heimdall system is now available with the \`${{ needs.validate-inputs.outputs.target_tag }}\` tag." >> $GITHUB_STEP_SUMMARY
+
+  notify-deployment:
+    runs-on: ubuntu-latest
+    needs: [validate-inputs, promote]
+    if: success() && github.event.inputs.environment == 'production'
+    steps:
+      - name: Create GitHub Release (for production promotions)
+        if: needs.validate-inputs.outputs.target_tag == 'latest'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sourceTag = '${{ needs.validate-inputs.outputs.source_tag }}';
+            const currentDate = new Date().toISOString().split('T')[0];
+
+            try {
+              await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: `deployment-${currentDate}-${sourceTag}`,
+                name: `🚀 Production Deployment - ${currentDate}`,
+                body: `## Heimdall Full System Deployment
+                
+                This release marks the promotion of the Heimdall full system to production.
+                
+                ### 📋 Deployment Details
+                - **Source Tag**: \`${sourceTag}\`
+                - **Target Tag**: \`latest\`
+                - **Deployment Date**: \`${currentDate}\`
+                - **Environment**: Production
+                
+                ### 📦 Components Deployed
+                - **Discord Bot**: Complete bot functionality
+                - **Web Dashboard**: Next.js dashboard application
+                - **API Server**: Express.js API server
+                
+                ### 🐳 Docker Image
+                \`\`\`
+                ghcr.io/${{ github.repository }}-full:latest
+                \`\`\`
+                
+                ### 🔧 Deployment Commands
+                \`\`\`bash
+                # Pull the latest image
+                docker pull ghcr.io/${{ github.repository }}-full:latest
+                
+                # Run the full system
+                docker run -d \\
+                  --name heimdall-full \\
+                  -p 3000:3000 \\
+                  -p 3001:3001 \\
+                  -e NODE_ENV=production \\
+                  -e DATABASE_URL="your-database-url" \\
+                  -e NEXTAUTH_SECRET="your-nextauth-secret" \\
+                  -e NEXTAUTH_URL="your-dashboard-url" \\
+                  -e BOT_API_URL="your-bot-api-url" \\
+                  ghcr.io/${{ github.repository }}-full:latest
+                \`\`\`
+                `,
+                draft: false,
+                prerelease: false
+              });
+              console.log('✅ Release created successfully');
+            } catch (error) {
+              console.log('⚠️ Release creation failed (may already exist):', error.message);
+            }
+
+      - name: Deployment notification
+        run: |
+          echo "🎉 Deployment notification would be sent here"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-inputs.outputs.target_tag }}"
+          echo ""
+          echo "In a real setup, this could:"
+          echo "- Send Slack/Discord notifications"
+          echo "- Update deployment tracking systems"
+          echo "- Trigger downstream deployments"
+          echo "- Update status pages"
