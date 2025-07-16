@@ -71,6 +71,8 @@ RUN npm install -g tsx
 
 # Build dashboard (Next.js requires build for production)
 WORKDIR /app/dashboard
+# Generate Prisma client before building
+RUN bunx prisma generate
 RUN bun run build
 
 # Go back to root
