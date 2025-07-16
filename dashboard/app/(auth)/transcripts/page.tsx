@@ -1,13 +1,13 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { DashboardHome } from "@/components/dashboard/dashboard-home";
+import { TranscriptsHome } from "@/components/dashboard/transcripts-home";
 
-export default async function DashboardPage() {
+export default async function TranscriptsPage() {
   const session = await auth();
 
   if (!session?.user) {
     redirect("/");
   }
 
-  return <DashboardHome />;
+  return <TranscriptsHome />;
 }

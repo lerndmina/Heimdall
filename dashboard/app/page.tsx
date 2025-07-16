@@ -1,8 +1,41 @@
+import { auth } from "@/lib/auth";
 import { AuthButton } from "@/components/auth/auth-button";
+import { SignOutButton } from "@/components/auth/sign-out-button";
+import { UserTypeSelector } from "@/components/auth/user-type-selector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, MessageSquare, BarChart3, FileText } from "lucide-react";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth();
+
+  // If user is authenticated, show user type selection
+  if (session?.user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-discord-darkest to-discord-darker">
+        {/* Sign Out Button */}
+        <div className="absolute top-6 right-6">
+          <SignOutButton />
+        </div>
+
+        <div className="container mx-auto px-4 py-16">
+          {/* Header */}
+          <div className="text-center mb-16">
+            <div className="flex items-center justify-center mb-6">
+              <Shield className="h-16 w-16 text-discord-primary mr-4" />
+              <h1 className="text-6xl font-bold text-white">Heimdall</h1>
+            </div>
+            <p className="text-xl text-discord-text mb-8 max-w-2xl mx-auto">
+              Welcome back, <span className="text-white font-semibold">{session.user.name}</span>! How would you like to use Heimdall today?
+            </p>
+          </div>
+
+          <UserTypeSelector user={session.user} />
+        </div>
+      </div>
+    );
+  }
+
+  // If user is not authenticated, show the landing page
   return (
     <div className="min-h-screen bg-gradient-to-br from-discord-darkest to-discord-darker">
       <div className="container mx-auto px-4 py-16">
@@ -12,10 +45,7 @@ export default function HomePage() {
             <Shield className="h-16 w-16 text-discord-primary mr-4" />
             <h1 className="text-6xl font-bold text-white">Heimdall</h1>
           </div>
-          <p className="text-xl text-discord-text mb-8 max-w-2xl mx-auto">
-            Professional Discord modmail management dashboard. Monitor, respond, and analyze your
-            community interactions with ease.
-          </p>
+          <p className="text-xl text-discord-text mb-8 max-w-2xl mx-auto">Professional Discord modmail management dashboard. Monitor, respond, and analyze your community interactions with ease.</p>
           <AuthButton />
         </div>
 
@@ -27,9 +57,7 @@ export default function HomePage() {
                 <MessageSquare className="h-6 w-6 text-discord-primary mr-2" />
                 Modmail Management
               </CardTitle>
-              <CardDescription className="text-discord-muted">
-                View and manage all modmail threads in one place
-              </CardDescription>
+              <CardDescription className="text-discord-muted">View and manage all modmail threads in one place</CardDescription>
             </CardHeader>
             <CardContent className="text-discord-text">
               <ul className="space-y-2">
@@ -47,9 +75,7 @@ export default function HomePage() {
                 <FileText className="h-6 w-6 text-discord-primary mr-2" />
                 Beautiful Transcripts
               </CardTitle>
-              <CardDescription className="text-discord-muted">
-                Generate and share conversation transcripts
-              </CardDescription>
+              <CardDescription className="text-discord-muted">Generate and share conversation transcripts</CardDescription>
             </CardHeader>
             <CardContent className="text-discord-text">
               <ul className="space-y-2">
@@ -67,9 +93,7 @@ export default function HomePage() {
                 <BarChart3 className="h-6 w-6 text-discord-primary mr-2" />
                 Analytics & Insights
               </CardTitle>
-              <CardDescription className="text-discord-muted">
-                Monitor performance and response metrics
-              </CardDescription>
+              <CardDescription className="text-discord-muted">Monitor performance and response metrics</CardDescription>
             </CardHeader>
             <CardContent className="text-discord-text">
               <ul className="space-y-2">

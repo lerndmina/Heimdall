@@ -1,13 +1,13 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { DashboardHome } from "@/components/dashboard/dashboard-home";
+import { ModmailHome } from "@/components/dashboard/modmail-home";
 
-export default async function DashboardPage() {
+export default async function ModmailPage() {
   const session = await auth();
 
   if (!session?.user) {
     redirect("/");
   }
 
-  return <DashboardHome />;
+  return <ModmailHome />;
 }

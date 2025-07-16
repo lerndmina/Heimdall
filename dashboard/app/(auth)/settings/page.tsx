@@ -1,13 +1,13 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { DashboardHome } from "@/components/dashboard/dashboard-home";
+import { SettingsHome } from "@/components/dashboard/settings-home";
 
-export default async function DashboardPage() {
+export default async function SettingsPage() {
   const session = await auth();
 
   if (!session?.user) {
     redirect("/");
   }
 
-  return <DashboardHome />;
+  return <SettingsHome />;
 }

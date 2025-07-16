@@ -3,11 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { MessageSquare, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useGuild } from "./guild-provider";
+import { useRequireGuild } from "./use-require-guild";
 import { apiClient } from "@/lib/api";
 
 export function DashboardHome() {
-  const { selectedGuild } = useGuild();
+  const { selectedGuild } = useRequireGuild();
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["modmail-stats", selectedGuild?.guildId],
@@ -34,25 +34,21 @@ export function DashboardHome() {
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-discord-warning mx-auto mb-4" />
           <h3 className="text-lg font-medium text-white mb-2">No Guild Selected</h3>
-          <p className="text-discord-muted">
-            Please select a guild from the navigation to view the dashboard.
-          </p>
+          <p className="text-discord-muted">Please select a guild from the navigation to view the dashboard.</p>
         </div>
       </div>
     );
   }
 
-  const statsData = stats?.data || {};
-  const threadsData = threads?.data?.threads || [];
+  const statsData = (stats as any)?.data || {};
+  const threadsData = (threads as any)?.data?.threads || [];
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
-        <p className="text-discord-text">
-          Overview of modmail activity for {selectedGuild.guildName}
-        </p>
+        <p className="text-discord-text">Overview of modmail activity for {selectedGuild.guildName}</p>
       </div>
 
       {/* Stats Cards */}
@@ -65,9 +61,7 @@ export function DashboardHome() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {statsLoading ? "..." : statsData.total || 0}
-            </div>
+            <div className="text-2xl font-bold text-white">{statsLoading ? "..." : statsData.total || 0}</div>
           </CardContent>
         </Card>
 
@@ -79,9 +73,7 @@ export function DashboardHome() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {statsLoading ? "..." : statsData.open || 0}
-            </div>
+            <div className="text-2xl font-bold text-white">{statsLoading ? "..." : statsData.open || 0}</div>
           </CardContent>
         </Card>
 
@@ -93,9 +85,7 @@ export function DashboardHome() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {statsLoading ? "..." : statsData.closed || 0}
-            </div>
+            <div className="text-2xl font-bold text-white">{statsLoading ? "..." : statsData.closed || 0}</div>
           </CardContent>
         </Card>
 
@@ -107,9 +97,7 @@ export function DashboardHome() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {statsLoading ? "..." : statsData.totalMessages || 0}
-            </div>
+            <div className="text-2xl font-bold text-white">{statsLoading ? "..." : statsData.totalMessages || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -118,9 +106,7 @@ export function DashboardHome() {
       <Card className="bg-discord-dark border-discord-darker">
         <CardHeader>
           <CardTitle className="text-white">Recent Activity</CardTitle>
-          <CardDescription className="text-discord-muted">
-            Latest modmail threads and updates
-          </CardDescription>
+          <CardDescription className="text-discord-muted">Latest modmail threads and updates</CardDescription>
         </CardHeader>
         <CardContent>
           {threadsLoading ? (
@@ -135,32 +121,15 @@ export function DashboardHome() {
           ) : (
             <div className="space-y-4">
               {threadsData.map((thread: any) => (
-                <div
-                  key={thread.forumThreadId}
-                  className="flex items-center justify-between p-4 bg-discord-darker rounded-lg border border-discord-dark"
-                >
+                <div key={thread.forumThreadId} className="flex items-center justify-between p-4 bg-discord-darker rounded-lg border border-discord-dark">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`w-3 h-3 rounded-full ${
-                        thread.isClosed
-                          ? "bg-discord-danger"
-                          : thread.markedResolved
-                          ? "bg-discord-warning"
-                          : "bg-discord-success"
-                      }`}
-                    />
+                    <div className={`w-3 h-3 rounded-full ${thread.isClosed ? "bg-discord-danger" : thread.markedResolved ? "bg-discord-warning" : "bg-discord-success"}`} />
                     <div>
-                      <div className="font-medium text-white">
-                        {thread.userDisplayName || "Unknown User"}
-                      </div>
-                      <div className="text-sm text-discord-muted">
-                        {thread.messageCount} messages
-                      </div>
+                      <div className="font-medium text-white">{thread.userDisplayName || "Unknown User"}</div>
+                      <div className="text-sm text-discord-muted">{thread.messageCount} messages</div>
                     </div>
                   </div>
-                  <div className="text-sm text-discord-muted">
-                    {new Date(thread.lastUserActivityAt).toLocaleDateString()}
-                  </div>
+                  <div className="text-sm text-discord-muted">{new Date(thread.lastUserActivityAt).toLocaleDateString()}</div>
                 </div>
               ))}
             </div>

@@ -21,6 +21,8 @@ interface GuildContextType {
 
 const GuildContext = createContext<GuildContextType | undefined>(undefined);
 
+const SELECTED_GUILD_KEY = "heimdall-selected-guild";
+
 export function GuildProvider({ children, userId }: { children: React.ReactNode; userId: string }) {
   const [selectedGuild, setSelectedGuild] = useState<Guild | null>(null);
 
@@ -33,18 +35,41 @@ export function GuildProvider({ children, userId }: { children: React.ReactNode;
     queryFn: () => apiClient.validateUser(userId),
   });
 
-  const guilds = userAccess?.guilds?.filter((guild) => guild.hasStaffRole) || [];
+  const guilds = (userAccess as any)?.data?.guilds?.filter((guild: any) => guild.hasStaffRole) || [];
+
+  // Custom setSelectedGuild that also saves to sessionStorage
+  const handleSetSelectedGuild = (guild: Guild | null) => {
+    setSelectedGuild(guild);
+    if (guild) {
+      sessionStorage.setItem(SELECTED_GUILD_KEY, guild.guildId);
+    } else {
+      sessionStorage.removeItem(SELECTED_GUILD_KEY);
+    }
+  };
 
   useEffect(() => {
-    if (guilds.length > 0 && !selectedGuild) {
-      setSelectedGuild(guilds[0]);
+    if (guilds.length > 0) {
+      // Try to restore from sessionStorage first
+      const savedGuildId = sessionStorage.getItem(SELECTED_GUILD_KEY);
+      if (savedGuildId) {
+        const savedGuild = guilds.find((guild: any) => guild.guildId === savedGuildId);
+        if (savedGuild) {
+          setSelectedGuild(savedGuild);
+          return;
+        }
+      }
+
+      // Otherwise, select the first guild if none is selected
+      if (!selectedGuild) {
+        handleSetSelectedGuild(guilds[0]);
+      }
     }
   }, [guilds, selectedGuild]);
 
   const value: GuildContextType = {
     guilds,
     selectedGuild,
-    setSelectedGuild,
+    setSelectedGuild: handleSetSelectedGuild,
     isLoading,
     error: error as Error | null,
   };
