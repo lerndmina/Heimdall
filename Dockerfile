@@ -3,9 +3,9 @@ ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 FROM --platform=$TARGETPLATFORM oven/bun:1.1.34
 
-# Install system dependencies (FFmpeg for bot, Node.js for compatibility, curl/wget for health checks, procps for PM2)
+# Install system dependencies (FFmpeg for bot, Node.js for compatibility, curl/wget for health checks, procps for PM2, iproute2 for networking)
 RUN apt-get update && \
-  apt-get install -y ffmpeg curl wget procps && \
+  apt-get install -y ffmpeg curl wget procps iproute2 && \
   curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
   apt-get install -y nodejs && \
   apt-get clean && \
@@ -138,7 +138,7 @@ RUN echo '#!/bin/bash\n\
   echo "Environment variables (filtered):"\n\
   env | grep -E "(NODE_ENV|PORT|BOT_API_URL|NEXTAUTH)" | sort\n\
   echo "Starting services..."\n\
-  exec pm2-runtime start ecosystem.config.json --auto-exit' > /app/start.sh && chmod +x /app/start.sh
+  exec pm2-runtime start ecosystem.config.json' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose ports (3000 for dashboard, 3001 for bot API)
 EXPOSE 3000 3001
