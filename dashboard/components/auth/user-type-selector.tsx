@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, Settings, FileText, Users, ArrowRight, Shield, User } from "lucide-react";
+import { useRole } from "./role-provider";
 
 interface User {
   id: string;
@@ -20,16 +21,19 @@ interface UserTypeSelectorProps {
 
 export function UserTypeSelector({ user }: UserTypeSelectorProps) {
   const router = useRouter();
+  const { setUserRole } = useRole();
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
   const handleUserPath = async () => {
     setIsLoading("user");
+    setUserRole("user");
     // Navigate to user transcripts
     router.push("/my-tickets");
   };
 
   const handleStaffPath = async () => {
     setIsLoading("staff");
+    setUserRole("staff");
     // Navigate to server selection
     router.push("/server-select");
   };

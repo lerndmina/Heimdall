@@ -5,6 +5,7 @@ import Modmail, { ModmailType, ModmailMessageType } from "../../models/Modmail";
 import ModmailConfig, { ModmailConfigType } from "../../models/ModmailConfig";
 import { createSuccessResponse, createErrorResponse } from "../utils/apiResponse";
 import log from "../../utils/log";
+import { generateDynamicHTMLTranscript } from "../../utils/dynamic-transcript-generator";
 
 interface ModmailListQuery {
   page?: number;
@@ -151,7 +152,26 @@ export async function getModmailThread(req: Request, res: Response) {
       delete sanitizedThread.messages;
     }
 
-    res.json(createSuccessResponse(sanitizedThread, req.requestId));
+    // Get the client from res.locals to fetch guild name
+    const client = res.locals.client as Client;
+    let guildName = "Unknown Server";
+
+    // Fetch guild name from Discord
+    try {
+      const guild = await client.guilds.fetch(guildId);
+      guildName = guild.name;
+    } catch (error) {
+      log.warn(`Failed to fetch guild name for ${guildId}:`, error);
+      guildName = `Guild ${guildId}`;
+    }
+
+    // Add guild name to the response
+    const enhancedThread = {
+      ...sanitizedThread,
+      guildName,
+    };
+
+    res.json(createSuccessResponse(enhancedThread, req.requestId));
   } catch (error) {
     log.error("Error fetching modmail thread:", error);
     res.status(500).json(createErrorResponse("Failed to fetch modmail thread", 500, req.requestId));
@@ -481,7 +501,7 @@ export async function generateTranscript(req: Request, res: Response) {
       res.json(createSuccessResponse(jsonTranscript, req.requestId));
     } else {
       // Generate HTML transcript
-      const html = generateHTMLTranscript(thread, guildName);
+      const html = generateDynamicHTMLTranscript(thread, guildName);
 
       res.setHeader("Content-Type", "text/html");
       res.send(html);
@@ -598,371 +618,6 @@ export async function searchModmail(req: Request, res: Response) {
     log.error("Error searching modmail:", error);
     res.status(500).json(createErrorResponse("Failed to search modmail", 500, req.requestId));
   }
-}
-
-/**
- * Generate HTML transcript content
- */
-function generateHTMLTranscript(thread: any, guildName: string): string {
-  const messages = (thread.messages || []).sort(
-    (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  );
-
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  const escapeHtml = (text: string) => {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  };
-
-  const getStaticAvatarUrl = (avatarUrl?: string): string | undefined => {
-    if (!avatarUrl) return undefined;
-
-    // If it's an animated avatar (starts with a_), convert to static
-    if (avatarUrl.includes("a_")) {
-      return avatarUrl.replace(/\.gif(\?.*)?$/, ".png$1").replace(/a_/, "");
-    }
-
-    // If it's already static or not a Discord CDN URL, return as-is
-    return avatarUrl;
-  };
-
-  const getDisplayContent = (
-    message: any
-  ): { displayContent: string; originalContent?: string } => {
-    if (message.isEdited && message.editedContent) {
-      return {
-        displayContent: message.editedContent,
-        originalContent: message.content,
-      };
-    }
-    return {
-      displayContent: message.content,
-    };
-  };
-
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modmail Transcript - ${escapeHtml(thread.userDisplayName || "Unknown User")}</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #36393f;
-            color: #dcddde;
-            margin: 0;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #2f3136;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        .header {
-            background: #5865f2;
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }
-        .thread-info {
-            background: #40444b;
-            padding: 15px 20px;
-            border-bottom: 1px solid #4f545c;
-        }
-        .thread-info h3 {
-            margin: 0 0 10px 0;
-            color: #ffffff;
-        }
-        .thread-info p {
-            margin: 5px 0;
-            color: #b9bbbe;
-        }
-        .messages {
-            padding: 20px;
-        }
-        .message {
-            margin-bottom: 20px;
-            display: flex;
-            align-items: flex-start;
-            gap: 15px;
-        }
-        .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #7289da;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            flex-shrink: 0;
-        }
-        .message-content {
-            flex: 1;
-        }
-        .message-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 5px;
-        }
-        .author-name {
-            font-weight: 600;
-            color: #ffffff;
-        }
-        .staff {
-            color: #43b581;
-        }
-        .user {
-            color: #7289da;
-        }
-        .timestamp {
-            font-size: 0.75rem;
-            color: #72767d;
-        }
-        .message-text {
-            color: #dcddde;
-            word-wrap: break-word;
-            white-space: pre-wrap;
-        }
-        .attachments {
-            margin-top: 10px;
-        }
-        .attachment {
-            background: #40444b;
-            border: 1px solid #4f545c;
-            border-radius: 4px;
-            padding: 10px;
-            margin-top: 5px;
-            font-size: 0.9rem;
-        }
-        .footer {
-            background: #40444b;
-            padding: 15px 20px;
-            text-align: center;
-            font-size: 0.9rem;
-            color: #72767d;
-            border-top: 1px solid #4f545c;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .status-open { background: #3ba55d; color: white; }
-        .status-closed { background: #ed4245; color: white; }
-        .status-resolved { background: #faa61a; color: white; }
-        .message-badge {
-            font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 3px;
-            border: 1px solid;
-            margin-left: 5px;
-        }
-        .message-badge.user {
-            border-color: #7289da;
-            color: #7289da;
-        }
-        .message-badge.staff {
-            border-color: #43b581;
-            color: #43b581;
-        }
-        /* Tooltip styles for edited messages */
-        .tooltip {
-            position: relative;
-            display: inline;
-            cursor: help;
-        }
-        .tooltip .tooltip-content {
-            visibility: hidden;
-            width: 300px;
-            background-color: #18191c;
-            color: #dcddde;
-            text-align: left;
-            border-radius: 6px;
-            padding: 10px;
-            position: absolute;
-            z-index: 1000;
-            bottom: 125%;
-            left: 50%;
-            margin-left: -150px;
-            opacity: 0;
-            transition: opacity 0.3s;
-            border: 1px solid #4f545c;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            font-size: 0.875rem;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-        .tooltip .tooltip-content::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #4f545c transparent transparent transparent;
-        }
-        .tooltip:hover .tooltip-content {
-            visibility: visible;
-            opacity: 1;
-        }
-        .tooltip-label {
-            font-weight: 600;
-            color: #b9bbbe;
-            margin-bottom: 5px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Modmail Transcript</h1>
-            <p>${escapeHtml(guildName)}</p>
-        </div>
-        
-        <div class="thread-info">
-            <h3>${escapeHtml(thread.userDisplayName || "Unknown User")}</h3>
-            <p><strong>User ID:</strong> ${thread.userId}</p>
-            <p><strong>Thread ID:</strong> ${thread.forumThreadId}</p>
-            <p><strong>Created:</strong> ${formatDate(
-              thread.createdAt || thread._id?.getTimestamp()
-            )}</p>
-            ${
-              thread.isClosed
-                ? `<p><strong>Closed:</strong> ${formatDate(thread.closedAt)} ${
-                    thread.closedReason ? `(${escapeHtml(thread.closedReason)})` : ""
-                  }</p>`
-                : ""
-            }
-            <p><strong>Status:</strong> 
-                <span class="status-badge ${
-                  thread.isClosed
-                    ? "status-closed"
-                    : thread.markedResolved
-                    ? "status-resolved"
-                    : "status-open"
-                }">
-                    ${thread.isClosed ? "Closed" : thread.markedResolved ? "Resolved" : "Open"}
-                </span>
-            </p>
-            <p><strong>Total Messages:</strong> ${messages.length}</p>
-        </div>
-        
-        <div class="messages">
-            ${messages
-              .map((message: any) => {
-                const { displayContent, originalContent } = getDisplayContent(message);
-                const staticAvatarUrl = getStaticAvatarUrl(message.authorAvatar);
-
-                return `
-                <div class="message">
-                    <div class="avatar">
-                        ${
-                          staticAvatarUrl
-                            ? `<img src="${staticAvatarUrl}" alt="${escapeHtml(
-                                message.authorName
-                              )}" style="width: 100%; height: 100%; border-radius: 50%;">`
-                            : escapeHtml(message.authorName.charAt(0).toUpperCase())
-                        }
-                    </div>
-                    <div class="message-content">
-                        <div class="message-header">
-                            <span class="author-name ${
-                              message.type === "staff" ? "staff" : "user"
-                            }">${escapeHtml(message.authorName)}</span>
-                            <span class="message-badge ${
-                              message.type === "staff" ? "staff" : "user"
-                            }">
-                                ${message.type === "staff" ? "Staff" : "User"}
-                            </span>
-                            <span class="timestamp">${formatDate(message.createdAt)}</span>
-                        </div>
-                        <div class="message-text">
-                            ${
-                              message.isEdited && originalContent
-                                ? `
-                                <span class="tooltip">
-                                    ${escapeHtml(displayContent).replace(/\n/g, "<br>")}
-                                    <span class="timestamp" style="margin-left: 5px;">(edited)</span>
-                                    <div class="tooltip-content">
-                                        <div class="tooltip-label">Original message:</div>
-                                        ${escapeHtml(originalContent).replace(/\n/g, "<br>")}
-                                    </div>
-                                </span>
-                            `
-                                : `
-                                ${escapeHtml(displayContent).replace(/\n/g, "<br>")}
-                                ${
-                                  message.isEdited
-                                    ? '<span class="timestamp" style="margin-left: 5px;">(edited)</span>'
-                                    : ""
-                                }
-                            `
-                            }
-                        </div>
-                        ${
-                          message.attachments && message.attachments.length > 0
-                            ? `
-                            <div class="attachments">
-                                ${message.attachments
-                                  .map(
-                                    (att: any) => `
-                                    <div class="attachment">
-                                        📎 <strong>${escapeHtml(att.filename)}</strong> (${(
-                                      att.size / 1024
-                                    ).toFixed(1)} KB)
-                                        ${
-                                          att.url
-                                            ? `<br><a href="${att.url}" target="_blank" style="color: #00b0f4;">Download</a>`
-                                            : ""
-                                        }
-                                    </div>
-                                `
-                                  )
-                                  .join("")}
-                            </div>
-                        `
-                            : ""
-                        }
-                    </div>
-                </div>
-            `;
-              })
-              .join("")}
-        </div>
-        
-        <div class="footer">
-            <p>Transcript generated on ${formatDate(new Date())}</p>
-            <p>Generated by Heimdall Bot Dashboard</p>
-        </div>
-    </div>
-</body>
-</html>`;
 }
 
 /**

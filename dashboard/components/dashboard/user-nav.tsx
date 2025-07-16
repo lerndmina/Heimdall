@@ -2,34 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, MessageSquare, BarChart3, FileText, Settings, LogOut, ArrowLeft } from "lucide-react";
+import { FileText, Settings, LogOut, Shield, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useGuild } from "./guild-provider";
-import { GuildSelector } from "./guild-selector";
-import { useRole } from "../auth/role-provider";
 import { signOut } from "next-auth/react";
+import { useRole } from "../auth/role-provider";
 
-const navigation = [
+const userNavigation = [
   {
-    name: "Dashboard",
-    href: "/dashboard",
-    icon: BarChart3,
-  },
-  {
-    name: "Modmail",
-    href: "/modmail",
-    icon: MessageSquare,
-  },
-  {
-    name: "Transcripts",
-    href: "/transcripts",
+    name: "My Tickets",
+    href: "/my-tickets",
     icon: FileText,
-  },
-  {
-    name: "Settings",
-    href: "/settings",
-    icon: Settings,
   },
 ];
 
@@ -41,9 +24,8 @@ interface User {
   avatar?: string;
 }
 
-export function DashboardNav({ user }: { user: User }) {
+export function UserNav({ user }: { user: User }) {
   const pathname = usePathname();
-  const { selectedGuild, isLoading } = useGuild();
   const { clearRole } = useRole();
 
   const handleBackToRoleSelection = () => {
@@ -55,7 +37,7 @@ export function DashboardNav({ user }: { user: User }) {
     <nav className="bg-discord-dark border-b border-discord-darker">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Logo, Switch Mode, and Guild Selector */}
+          {/* Logo and Back Button */}
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2">
               <Shield className="h-8 w-8 text-discord-primary" />
@@ -66,13 +48,11 @@ export function DashboardNav({ user }: { user: User }) {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Switch Mode
             </Button>
-
-            {!isLoading && <GuildSelector />}
           </div>
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-4">
-            {navigation.map((item) => {
+            {userNavigation.map((item) => {
               const Icon = item.icon;
               const isActive = pathname.startsWith(item.href);
 
@@ -110,7 +90,12 @@ export function DashboardNav({ user }: { user: User }) {
       {/* Mobile Navigation */}
       <div className="md:hidden border-t border-discord-darker">
         <div className="px-2 py-3 space-y-1">
-          {navigation.map((item) => {
+          <Button onClick={handleBackToRoleSelection} variant="ghost" size="sm" className="w-full justify-start text-discord-text hover:text-white">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Switch Mode
+          </Button>
+
+          {userNavigation.map((item) => {
             const Icon = item.icon;
             const isActive = pathname.startsWith(item.href);
 

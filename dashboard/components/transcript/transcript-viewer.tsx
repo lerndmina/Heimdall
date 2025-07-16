@@ -275,64 +275,64 @@ export function TranscriptViewer({ guildId, threadId, user }: TranscriptViewerPr
       </Card>
 
       {/* Messages */}
-      <Card className="bg-discord-dark border-discord-darker">
-        <CardHeader>
-          <CardTitle className="text-white">Conversation</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="bg-discord-dark rounded-lg border border-discord-darker">
+        <div className="p-6 border-b border-discord-darker">
+          <h2 className="text-white text-xl font-semibold">Conversation</h2>
+        </div>
+        <div className="p-6">
           {thread.messages && thread.messages.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {thread.messages.map((message, index) => {
                 const { displayContent, originalContent } = getDisplayContent(message);
                 const staticAvatarUrl = getStaticAvatarUrl(message.authorAvatar);
 
                 return (
-                  <div key={message.messageId || index} className="flex gap-3">
+                  <div key={message.messageId || index} className="flex gap-4">
                     <div className="flex-shrink-0">
                       {staticAvatarUrl ? (
-                        <img src={staticAvatarUrl} alt={message.authorName} className="w-8 h-8 rounded-full" />
+                        <img src={staticAvatarUrl} alt={message.authorName} className="w-10 h-10 rounded-full" />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-discord-primary flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-discord-primary flex items-center justify-center">
                           <span className="text-white text-sm font-medium">{(message.type === "user" ? thread.userDisplayName : message.authorName)?.charAt(0)?.toUpperCase() || "?"}</span>
                         </div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`font-medium ${message.type === "user" ? "text-discord-primary" : "text-discord-success"}`}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className={`font-semibold ${message.type === "user" ? "text-discord-primary" : "text-green-400"}`}>
                           {message.type === "user" ? thread.userDisplayName : message.authorName}
                         </span>
-                        <span className="text-xs text-discord-muted">{formatTranscriptDate(message.createdAt)}</span>
-                        <Badge variant="outline" className={`text-xs ${message.type === "user" ? "border-discord-primary text-discord-primary" : "border-discord-success text-discord-success"}`}>
+                        <span className={`text-xs px-2 py-1 rounded border ${message.type === "user" ? "border-discord-primary text-discord-primary" : "border-green-400 text-green-400"}`}>
                           {message.type === "user" ? "User" : "Staff"}
-                        </Badge>
+                        </span>
+                        <span className="text-xs text-gray-400">{formatTranscriptDate(message.createdAt)}</span>
                       </div>
-                      <div className="text-discord-text whitespace-pre-wrap break-words">
+                      <div className="text-gray-200 leading-relaxed">
                         {message.isEdited && originalContent ? (
                           <span className="relative cursor-help group" title={`Original message: ${originalContent}`}>
                             {displayContent}
-                            <span className="text-xs text-discord-muted ml-2">(edited)</span>
-                            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-10 max-w-sm p-2 bg-gray-800 text-white text-sm rounded shadow-lg border border-gray-600">
-                              <div className="font-semibold text-gray-300 mb-1">Original message:</div>
+                            <span className="text-xs text-gray-400 ml-2">(edited)</span>
+                            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-10 max-w-sm p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl border border-gray-600">
+                              <div className="font-semibold text-gray-300 mb-2">Original message:</div>
                               <div className="whitespace-pre-wrap break-words">{originalContent}</div>
                             </div>
                           </span>
                         ) : (
                           <>
-                            {displayContent}
-                            {message.isEdited && <span className="text-xs text-discord-muted ml-2">(edited {message.editedAt ? formatTranscriptDate(message.editedAt) : ""})</span>}
+                            <span className="whitespace-pre-wrap break-words">{displayContent}</span>
+                            {message.isEdited && <span className="text-xs text-gray-400 ml-2">(edited {message.editedAt ? formatTranscriptDate(message.editedAt) : ""})</span>}
                           </>
                         )}
                       </div>
                       {message.attachments && message.attachments.length > 0 && (
-                        <div className="mt-2 space-y-1">
+                        <div className="mt-3 space-y-2">
                           {message.attachments.map((attachment, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-sm text-discord-muted">
-                              <FileText className="h-4 w-4" />
-                              <span>{attachment.filename}</span>
+                            <div key={idx} className="flex items-center gap-2 p-3 bg-gray-800 rounded border border-gray-700 text-sm">
+                              <FileText className="h-4 w-4 text-gray-400" />
+                              <span className="text-gray-300">{attachment.filename}</span>
                               {attachment.url && (
-                                <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-discord-primary hover:underline">
-                                  <ExternalLink className="h-3 w-3" />
+                                <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 ml-auto">
+                                  <ExternalLink className="h-4 w-4" />
                                 </a>
                               )}
                             </div>
@@ -345,13 +345,13 @@ export function TranscriptViewer({ guildId, threadId, user }: TranscriptViewerPr
               })}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <MessageSquare className="h-12 w-12 text-discord-muted mx-auto mb-4" />
-              <p className="text-discord-muted">No messages found in this conversation.</p>
+            <div className="text-center py-12">
+              <MessageSquare className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-400">No messages found in this conversation.</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
