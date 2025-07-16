@@ -1,0 +1,7 @@
+- The settings button in the staff dashoard should require admin perms on the discord not just the staff role.
+- Add a stats tab in place of the modmail tab to show stats about tickets like:
+  - Total tickets created
+  - Total tickets closed
+  - Average time to close a ticket
+  - Most active staff member
+  - Average time to first response
