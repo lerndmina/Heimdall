@@ -56,9 +56,9 @@ async function handleDMMessageUpdate(
   if (!newMessage.author?.id) return;
 
   try {
-    // Use shared database instance
+    // Use shared database instance - only process updates for open modmail threads
     const db = new Database();
-    const modmail = await db.findOne(Modmail, { userId: newMessage.author.id });
+    const modmail = await db.findOne(Modmail, { userId: newMessage.author.id, isClosed: false });
     if (!modmail) return;
 
     // Find the tracked message by Discord message ID
@@ -108,8 +108,11 @@ async function handleThreadMessageUpdate(
   if (!newMessage.author || !newMessage.channelId) return;
 
   try {
-    // Check if this is a modmail thread
-    const modmail = await db.findOne(Modmail, { forumThreadId: newMessage.channelId });
+    // Check if this is an open modmail thread
+    const modmail = await db.findOne(Modmail, {
+      forumThreadId: newMessage.channelId,
+      isClosed: false,
+    });
     if (!modmail) return;
 
     // Skip messages that start with "." (staff-only messages)

@@ -5,6 +5,7 @@ import { tryCatch } from "../trycatch";
 import Database from "../data/database";
 import Modmail from "../../models/Modmail";
 import log from "../log";
+import FetchEnvs from "../FetchEnvs";
 
 /**
  * Modmail thread operations utility
@@ -111,7 +112,9 @@ export async function checkExistingModmail(
   userId: string
 ): Promise<{ exists: boolean; modmail?: any }> {
   const db = new Database();
-  const { data: existingModmail, error } = await tryCatch(db.findOne(Modmail, { userId }));
+  const { data: existingModmail, error } = await tryCatch(
+    db.findOne(Modmail, { userId, isClosed: false })
+  );
 
   if (error) {
     log.error("Failed to check existing modmail:", error);
@@ -182,6 +185,7 @@ export async function closeModmailThreadSafe(
   closedBy?: { type: "User" | "Staff"; username: string; userId: string }
 ): Promise<{ success: boolean; error?: string }> {
   const db = new Database();
+  const env = FetchEnvs();
 
   // Update the modmail record to mark as closed
   const { data: modmail, error: updateError } = await tryCatch(
@@ -198,6 +202,9 @@ export async function closeModmailThreadSafe(
     )
   );
 
+  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
+  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
+
   if (updateError) {
     log.error("Failed to update modmail close status:", updateError);
     return { success: false, error: "Failed to update modmail status" };
@@ -205,14 +212,6 @@ export async function closeModmailThreadSafe(
 
   if (!modmail) {
     return { success: false, error: "Modmail thread not found" };
-  }
-
-  // Delete the modmail record (traditional behavior)
-  const { error: deleteError } = await tryCatch(db.deleteOne(Modmail, { forumThreadId: threadId }));
-
-  if (deleteError) {
-    log.error("Failed to delete modmail record:", deleteError);
-    return { success: false, error: "Failed to remove modmail record" };
   }
 
   return { success: true };

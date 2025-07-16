@@ -64,10 +64,15 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
     let modmail;
 
     if (interaction.channel?.type === 1) {
-      // DM channel
-      modmail = await db.findOne(Modmail, { userId: interaction.user.id }, true);
+      // DM channel - only find open modmail threads
+      modmail = await db.findOne(Modmail, { userId: interaction.user.id, isClosed: false }, true);
     } else if (interaction.channel?.isThread()) {
-      modmail = await db.findOne(Modmail, { forumThreadId: interaction.channel.id }, true);
+      // Thread channel - only find open modmail threads
+      modmail = await db.findOne(
+        Modmail,
+        { forumThreadId: interaction.channel.id, isClosed: false },
+        true
+      );
     }
 
     if (!modmail) {
@@ -287,12 +292,12 @@ async function handleConfirmedResolveClose(
 ) {
   await interaction.deferUpdate();
 
-  // Find modmail again
+  // Find open modmail again
   let modmail;
   if (interaction.channel?.type === 1) {
-    modmail = await db.findOne(Modmail, { userId: interaction.user.id });
+    modmail = await db.findOne(Modmail, { userId: interaction.user.id, isClosed: false });
   } else if (interaction.channel?.isThread()) {
-    modmail = await db.findOne(Modmail, { forumThreadId: interaction.channel.id });
+    modmail = await db.findOne(Modmail, { forumThreadId: interaction.channel.id, isClosed: false });
   }
 
   if (!modmail) {
@@ -345,10 +350,22 @@ async function handleConfirmedResolveClose(
     }
   }
 
-  // Remove from database
+  // Close the modmail thread in the database
   const env = FetchEnvs();
-  await db.deleteOne(Modmail, { _id: modmail._id });
+  await db.findOneAndUpdate(
+    Modmail,
+    { _id: modmail._id },
+    {
+      isOpen: false,
+      closedAt: new Date(),
+      closeReason: reason,
+      closedBy: interaction.user.id,
+    },
+    { upsert: false, new: true }
+  );
+  // Clean cache for both simple userId patterns and compound query patterns
   await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
+  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
 
   await interaction.editReply({
     content: `✅ Thread closed successfully! Thank you for using our support system.`,

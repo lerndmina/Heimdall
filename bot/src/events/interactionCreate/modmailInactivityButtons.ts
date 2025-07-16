@@ -98,10 +98,15 @@ async function handleInitialClose(
   let modmail;
 
   if (interaction.channel?.type === 1) {
-    // DM channel
-    modmail = await db.findOne(Modmail, { userId: interaction.user.id }, true);
+    // DM channel - only find open modmail threads
+    modmail = await db.findOne(Modmail, { userId: interaction.user.id, isClosed: false }, true);
   } else if (interaction.channel?.isThread()) {
-    modmail = await db.findOne(Modmail, { forumThreadId: interaction.channel.id }, true);
+    // Thread channel - only find open modmail threads
+    modmail = await db.findOne(
+      Modmail,
+      { forumThreadId: interaction.channel.id, isClosed: false },
+      true
+    );
   }
 
   if (!modmail) {
@@ -185,12 +190,16 @@ async function handleConfirmedClose(
     await interaction.deferUpdate();
   }
 
-  // Find modmail again
+  // Find open modmail again
   let modmail;
   if (interaction.channel?.type === 1) {
-    modmail = await db.findOne(Modmail, { userId: interaction.user.id }, true);
+    modmail = await db.findOne(Modmail, { userId: interaction.user.id, isClosed: false }, true);
   } else if (interaction.channel?.isThread()) {
-    modmail = await db.findOne(Modmail, { forumThreadId: interaction.channel.id }, true);
+    modmail = await db.findOne(
+      Modmail,
+      { forumThreadId: interaction.channel.id, isClosed: false },
+      true
+    );
   }
 
   if (!modmail) {
@@ -238,10 +247,22 @@ async function handleConfirmedClose(
     log.warn(`Failed to lock/archive thread ${modmail.forumThreadId}:`, error);
   }
 
-  // Remove from database
-  await db.deleteOne(Modmail, { _id: modmail._id });
+  // Close the modmail thread in the database
+  await db.findOneAndUpdate(
+    Modmail,
+    { _id: modmail._id },
+    {
+      isOpen: false,
+      closedAt: new Date(),
+      closeReason: reason,
+      closedBy: interaction.user.id,
+    },
+    { upsert: false, new: true }
+  );
   const env = FetchEnvs();
-  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`); // Disable buttons in the original message if it was a DM close with confirmation
+  // Clean cache for both simple userId patterns and compound query patterns
+  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
+  await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`); // Disable buttons in the original message if it was a DM close with confirmation
   if (isDMChannel && !isStaffDirectClose) {
     await interaction.editReply({
       content: `✅ Modmail thread closed successfully! (Closed by ${closedBy.toLowerCase()})`,
@@ -265,14 +286,19 @@ async function handleCloseWithMessage(
   db: Database,
   getter: ThingGetter
 ) {
-  // Find modmail by user ID (if in DMs) or by thread ID (if in thread)
+  // Find open modmail by user ID (if in DMs) or by thread ID (if in thread)
   let modmail;
 
   if (interaction.channel?.type === 1) {
-    // DM channel
-    modmail = await db.findOne(Modmail, { userId: interaction.user.id }, true);
+    // DM channel - only find open modmail threads
+    modmail = await db.findOne(Modmail, { userId: interaction.user.id, isClosed: false }, true);
   } else if (interaction.channel?.isThread()) {
-    modmail = await db.findOne(Modmail, { forumThreadId: interaction.channel.id }, true);
+    // Thread channel - only find open modmail threads
+    modmail = await db.findOne(
+      Modmail,
+      { forumThreadId: interaction.channel.id, isClosed: false },
+      true
+    );
   }
 
   if (!modmail) {

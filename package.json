@@ -12,7 +12,8 @@
     "build:dashboard": "cd dashboard && bun run build",
     "start": "cd bot && bun run start",
     "start:dashboard": "cd dashboard && bun run start",
-    "install:all": "cd bot && bun install && cd ../dashboard && bun install"
+    "install:all": "cd bot && bun install && cd ../dashboard && bun install",
+    "db:push": "cd dashboard && bunx prisma db push"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

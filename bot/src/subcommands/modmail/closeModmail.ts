@@ -176,11 +176,15 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
     log.error("Failed to mark modmail as closed in database:", closeError);
   }
 
-  const { error: cacheError } = await tryCatch(
+  // Clean cache for both simple userId patterns and compound query patterns
+  const { error: cacheError1 } = await tryCatch(
     db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`)
   );
-  if (cacheError) {
-    log.warn("Failed to clean cache:", cacheError);
+  const { error: cacheError2 } = await tryCatch(
+    db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`)
+  );
+  if (cacheError1 || cacheError2) {
+    log.warn("Failed to clean cache:", cacheError1 || cacheError2);
   }
 
   // Send success message

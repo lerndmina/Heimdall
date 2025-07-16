@@ -491,10 +491,11 @@ export async function createModmailThread(
     } = options;
 
     // Clean cache for the user to prevent conflicts with stale data
+    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:${targetUser.id}*`);
     await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:${targetUser.id}`);
 
-    // Check if modmail already exists
-    const existingModmail = await db.findOne(Modmail, { userId: targetUser.id });
+    // Check if modmail already exists (only check for open threads)
+    const existingModmail = await db.findOne(Modmail, { userId: targetUser.id, isClosed: false });
     if (existingModmail) {
       return {
         success: false,
@@ -596,6 +597,18 @@ export async function createModmailThread(
       userAvatar: targetUser.displayAvatarURL(),
       userDisplayName: memberName,
       lastUserActivityAt: new Date(),
+      // Ensure the thread is marked as open
+      isClosed: false,
+      closedAt: null,
+      closedBy: null,
+      closedReason: null,
+      // Reset any previous resolution state
+      markedResolved: false,
+      resolvedAt: null,
+      // Reset inactivity tracking
+      inactivityNotificationSent: null,
+      autoCloseScheduledAt: null,
+      autoCloseDisabled: false,
     };
 
     // If opened by staff, they automatically claim the ticket
@@ -604,18 +617,33 @@ export async function createModmailThread(
       modmailData.claimedAt = new Date();
     }
 
-    const modmail = await db.findOneAndUpdate(Modmail, { userId: targetUser.id }, modmailData, {
-      upsert: true,
-      new: true,
-    });
+    // Create new modmail record using Mongoose directly
+    // We use direct Mongoose creation since we've already verified no open modmail exists
+    const finalModmail = new Modmail(modmailData);
+    await finalModmail.save();
+
+    // Debug log the created modmail status
+    log.info(
+      `Created modmail thread for user ${targetUser.id} with isClosed: ${finalModmail.isClosed}, ID: ${finalModmail._id}`
+    );
 
     // Handle updating the tag for the thread
     const { handleTag } = require("../events/messageCreate/gotMail");
     if (modmailConfig) {
-      await handleTag(modmail, modmailConfig, db, thread, forumChannel);
+      await handleTag(finalModmail, modmailConfig, db, thread, forumChannel);
     } else {
       log.error(`Could not update tags: ModmailConfig is null for guild: ${guild.id}`);
-    } // Send DM to user with close button
+    }
+
+    // Clean cache to ensure fresh data on next lookup
+    // Clean all cache entries related to this user's modmail
+    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:${targetUser.id}*`);
+    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:${targetUser.id}`);
+    await db.cleanCache(
+      `${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*forumThreadId:${thread.id}*`
+    );
+
+    // Send DM to user with close button
     let dmSuccess = false;
     try {
       const dmChannel = await targetUser.createDM();
@@ -645,7 +673,7 @@ export async function createModmailThread(
     return {
       success: true,
       thread,
-      modmail: modmail as ModmailType & { _id: any },
+      modmail: finalModmail as ModmailType & { _id: any },
       dmSuccess,
     };
   } catch (error) {

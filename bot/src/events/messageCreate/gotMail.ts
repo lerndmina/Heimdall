@@ -179,7 +179,9 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
         closedReason: reason,
       }
     );
+    // Clean cache for both simple userId patterns and compound query patterns
     await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
+    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
 
     // Notify user
     await message.reply({
@@ -241,6 +243,10 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
         log.error("Failed to mark invalid modmail record as closed:", cleanupError);
       }
 
+      // Clean cache for both simple userId patterns and compound query patterns
+      await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
+      await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
+
       // Create a new modmail instead of failing
       const messageContent = finalContent || "*Attachment only*";
       await newModmail(customIds, message, messageContent, user, client);
@@ -266,6 +272,45 @@ async function newModmail(
   user: User,
   client: Client<true>
 ) {
+  // Rate limiting to prevent rapid modmail creation attempts
+  const rateLimitKey = `modmail_creation_rate_limit:${user.id}`;
+  const isRateLimited = await redisClient.get(rateLimitKey);
+
+  if (isRateLimited) {
+    const { error: reactionError } = await tryCatch(message.react("⏰"));
+    if (reactionError) {
+      log.warn("Failed to add rate limit reaction:", reactionError);
+    }
+
+    const { data: rateLimitMsg, error: rateLimitError } = await tryCatch(
+      message.reply({
+        embeds: [
+          ModmailEmbeds.warning(
+            client,
+            "Please Wait",
+            "You're creating modmail tickets too quickly. Please wait a moment before trying again."
+          ),
+        ],
+      })
+    );
+
+    if (rateLimitError) {
+      log.warn("Failed to send rate limit message:", rateLimitError);
+    } else if (rateLimitMsg) {
+      // Delete the rate limit message after 10 seconds
+      setTimeout(async () => {
+        const { error: deleteError } = await tryCatch(rateLimitMsg.delete());
+        if (deleteError) {
+          log.debug("Failed to delete rate limit message:", deleteError);
+        }
+      }, 10000);
+    }
+    return;
+  }
+
+  // Set rate limit for 5 seconds
+  await redisClient.setEx(rateLimitKey, 5, "true");
+
   // Check if the message is longer than 50 characters
   const minCharacters = 50;
   let forced = false;
@@ -527,6 +572,20 @@ async function newModmail(
       });
       if (!result?.success) {
         log.error(`Failed to create modmail thread: ${result?.error}`);
+
+        // Add error reaction to indicate failure
+        const { error: reactionError } = await tryCatch(message.react("❌"));
+        if (reactionError) {
+          log.warn("Failed to add error reaction for thread creation failure:", reactionError);
+        }
+
+        // Clear rate limit if thread creation failed, allowing user to try again
+        // But only if it's not an "already exists" error
+        if (!result?.error?.includes("already open")) {
+          const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
+          await redisClient.del(rateLimitKey);
+        }
+
         return reply.edit({
           content: "",
           embeds: [
@@ -602,6 +661,16 @@ async function newModmail(
 
       // Check if DM was successful, if not notify user
       if (!result.dmSuccess) {
+        // Clear rate limit even if DM failed, since thread was created successfully
+        const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
+        await redisClient.del(rateLimitKey);
+
+        // Add success reaction since the thread was still created successfully
+        const { error: reactionError } = await tryCatch(message.react("📨"));
+        if (reactionError) {
+          log.warn("Failed to add success reaction for DM-failed case:", reactionError);
+        }
+
         return reply.edit({
           content: "",
           embeds: [
@@ -615,7 +684,16 @@ async function newModmail(
         });
       }
 
-      // Success - DM was sent, so just update the reply to indicate success
+      // Success - clear rate limit and update reply
+      const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
+      await redisClient.del(rateLimitKey);
+
+      // Add success reaction to the original user message
+      const { error: reactionError } = await tryCatch(message.react("📨"));
+      if (reactionError) {
+        log.warn("Failed to add success reaction to original message:", reactionError);
+      }
+
       reply.edit({
         content: "✅ Done! Modmail thread created successfully.",
         embeds: [],
@@ -659,6 +737,10 @@ async function sendMessage( // Send a message from dms to the modmail thread
   messageContent: string,
   client: Client<true>
 ) {
+  log.debug(
+    `[sendMessage] Starting to process user message from ${message.author.id} for modmail ${mail._id}`
+  );
+
   const cleanMessageContent = removeMentions(messageContent);
   const getter = new ThingGetter(client);
   const messageService = new ModmailMessageService();
@@ -735,6 +817,12 @@ async function sendMessage( // Send a message from dms to the modmail thread
 
   // Check if all attachments were processed successfully (atomicity requirement)
   if (!attachmentResult.allSuccessful) {
+    // Add warning reaction to indicate attachment processing failed
+    const { error: warningReactionError } = await tryCatch(message.react("⚠️"));
+    if (warningReactionError) {
+      log.warn("Failed to add warning reaction for failed attachments:", warningReactionError);
+    }
+
     // Some attachments failed, don't send the message
     const userFeedback = createUserFileUploadFeedback(attachmentResult);
     if (userFeedback) {
@@ -866,6 +954,8 @@ async function sendMessage( // Send a message from dms to the modmail thread
     username: mail.userDisplayName || message.author.displayName,
     avatarURL: mail.userAvatar || message.author.displayAvatarURL(),
   });
+
+  await message.react("📨"); // React with a success emoji
 
   log.debug(
     `Webhook message sent successfully - ID: ${webhookMessage.id}, Thread ID: ${thread.id}, Guild ID: ${mail.guildId}`
@@ -999,9 +1089,9 @@ async function handleReply(message: Message, client: Client<true>, staffUser: Us
     return;
   }
 
-  // Find modmail with error handling
+  // Find modmail with error handling - only process open threads
   const { data: mail, error: mailError } = await tryCatch(
-    db.findOne(Modmail, { forumThreadId: thread.id })
+    db.findOne(Modmail, { forumThreadId: thread.id, isClosed: false })
   );
 
   if (mailError) {
@@ -1180,14 +1270,20 @@ async function handleReply(message: Message, client: Client<true>, staffUser: Us
 
   // React based on attachment processing success
   if (attachmentResult.allSuccessful) {
+    log.debug("Adding success reaction (📨) to user message");
     const { error: successReactionError } = await tryCatch(message.react("📨"));
     if (successReactionError) {
       log.warn("Failed to add success reaction:", successReactionError);
+    } else {
+      log.debug("Successfully added 📨 reaction to user message");
     }
   } else {
+    log.debug("Adding warning reaction (⚠️) to user message due to attachment issues");
     const { error: warningReactionError } = await tryCatch(message.react("⚠️"));
     if (warningReactionError) {
       log.warn("Failed to add warning reaction:", warningReactionError);
+    } else {
+      log.debug("Successfully added ⚠️ reaction to user message");
     }
   }
 

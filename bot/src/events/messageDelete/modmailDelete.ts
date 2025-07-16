@@ -43,9 +43,9 @@ async function handleDMMessageDeletion(
   if (!message.author) return;
 
   try {
-    // Find the modmail thread for this user
+    // Find the open modmail thread for this user
     const db = new Database();
-    const modmail = await db.findOne(Modmail, { userId: message.author.id });
+    const modmail = await db.findOne(Modmail, { userId: message.author.id, isClosed: false });
     if (!modmail) return;
 
     // Find the tracked message by Discord message ID
@@ -92,8 +92,11 @@ async function handleThreadMessageDeletion(
   if (!message.author || !message.channelId) return;
 
   try {
-    // Check if this is a modmail thread
-    const modmail = await db.findOne(Modmail, { forumThreadId: message.channelId });
+    // Check if this is an open modmail thread
+    const modmail = await db.findOne(Modmail, {
+      forumThreadId: message.channelId,
+      isClosed: false,
+    });
     if (!modmail) return;
 
     // Skip messages that start with "." (staff-only messages)

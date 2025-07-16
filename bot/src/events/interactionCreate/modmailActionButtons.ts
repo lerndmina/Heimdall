@@ -46,13 +46,19 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
     let modmail: ModmailDoc | null = null;
 
     if (interaction.channel?.type === 1) {
-      // DM channel
-      modmail = (await db.findOne(Modmail, { userId: interaction.user.id }, true)) as ModmailDoc;
+      // DM channel - only find open modmail threads
+      modmail = (await db.findOne(
+        Modmail,
+        { userId: interaction.user.id, isClosed: false },
+        true
+      )) as ModmailDoc;
     } else if (interaction.channel?.isThread()) {
+      // Thread channel - only find open modmail threads
       modmail = (await db.findOne(
         Modmail,
         {
           forumThreadId: interaction.channel.id,
+          isClosed: false,
         },
         true
       )) as ModmailDoc;

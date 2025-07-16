@@ -18,6 +18,7 @@ import FetchEnvs from "../../utils/FetchEnvs";
 import ms from "ms";
 import ModmailCache from "../../utils/ModmailCache";
 import ModmailMessageService from "../../services/ModmailMessageService";
+import { closeModmailThreadSafe } from "../../utils/modmail/ModmailThreads";
 
 const env = FetchEnvs();
 
@@ -121,9 +122,16 @@ async function handleCloseModal(
       }
     }
 
-    // Remove from database
-    await db.deleteOne(Modmail, { _id: modmail._id });
-    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
+    const closeData = await closeModmailThreadSafe(modmail.forumThreadId, reason, {
+      type: closedBy,
+      username: closedByName,
+      userId: interaction.user.id,
+    });
+
+    if (!closeData.success) {
+      // Rethrow to hit the catch block
+      throw new Error(closeData.error || "Failed to close modmail thread");
+    }
 
     await interaction.editReply({
       content: `✅ Modmail thread closed successfully!\n**Reason:** ${reason}`,
@@ -287,9 +295,16 @@ async function handleBanModal(
       }
     }
 
-    // Remove from database
-    await db.deleteOne(Modmail, { _id: modmail._id });
-    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
+    const closeData = await closeModmailThreadSafe(modmail.forumThreadId, reason, {
+      type: closedBy,
+      username: closedByName,
+      userId: interaction.user.id,
+    });
+
+    if (!closeData.success) {
+      // Rethrow to hit the catch block
+      throw new Error(closeData.error || "Failed to close modmail thread");
+    }
 
     await interaction.editReply({
       content:
@@ -410,9 +425,19 @@ async function handleCloseWithMessageModal(
       }
     }
 
-    // Remove from database
-    await db.deleteOne(Modmail, { _id: modmail._id });
+    const closeData = await closeModmailThreadSafe(modmail.forumThreadId, reason, {
+      type: closedBy,
+      username: closedByName,
+      userId: interaction.user.id,
+    });
+
+    if (!closeData.success) {
+      // Rethrow to hit the catch block
+      throw new Error(closeData.error || "Failed to close modmail thread");
+    }
+    // Clean cache for both simple userId patterns and compound query patterns
     await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
+    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
 
     await interaction.editReply({
       content: "✅ Your final message has been sent and the modmail thread has been closed.",

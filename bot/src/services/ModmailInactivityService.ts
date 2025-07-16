@@ -390,9 +390,10 @@ export class ModmailInactivityService {
         }
       );
 
-      // Clean cache
+      // Clean cache for both simple userId patterns and compound query patterns
       const env = require("../utils/FetchEnvs").default();
       await this.db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
+      await this.db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
 
       log.debug(`Successfully cleaned up modmail ${modmail._id} from database`);
     } catch (error) {

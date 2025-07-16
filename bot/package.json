@@ -7,9 +7,9 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "bun --watch src/Bot.ts",
-    "start": "bun src/Bot.ts",
-    "build": "bun run tsc"
+    "dev": "bunx nodemon --watch 'src/**/*.ts' --exec 'npx tsx' src/Bot.ts",
+    "start": "tsx src/Bot.ts",
+    "build": "bunx tsc"
   },
   "author": "",
   "license": "ISC",
