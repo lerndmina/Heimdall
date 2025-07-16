@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,52 +30,56 @@ export function CachedServerSelector({ user }: ServerSelectorProps) {
 
   // Initialize cache when component mounts
   useEffect(() => {
+    console.log(`CachedServerSelector: Initializing cache for user ${user.id}`);
     initializeCache(user.id);
-  }, [user.id, initializeCache]);
+  }, [user.id]); // Remove initializeCache from dependencies to prevent infinite re-renders
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     clearRole();
     router.push("/");
-  };
+  }, [clearRole, router]);
 
-  const handleSelectServer = async (guildId: string) => {
-    setIsNavigating(true);
+  const handleSelectServer = useCallback(
+    async (guildId: string) => {
+      setIsNavigating(true);
 
-    try {
-      // Check permissions before navigating
-      const hasPermission = await checkServerPermissions(guildId);
+      try {
+        // Check permissions before navigating
+        const hasPermission = await checkServerPermissions(guildId);
 
-      if (!hasPermission) {
-        alert("You don't have permission to access this server's modmail.");
+        if (!hasPermission) {
+          alert("You don't have permission to access this server's modmail.");
+          setIsNavigating(false);
+          return;
+        }
+
+        // Navigate to dashboard
+        sessionStorage.setItem("heimdall-selected-guild", guildId);
+        router.push("/dashboard");
+      } catch (error) {
+        console.error("Failed to verify server permissions:", error);
+        alert("Failed to verify server permissions. Please try again.");
         setIsNavigating(false);
-        return;
       }
+    },
+    [checkServerPermissions, router]
+  );
 
-      // Navigate to dashboard
-      sessionStorage.setItem("heimdall-selected-guild", guildId);
-      router.push("/dashboard");
-    } catch (error) {
-      console.error("Failed to verify server permissions:", error);
-      alert("Failed to verify server permissions. Please try again.");
-      setIsNavigating(false);
-    }
-  };
-
-  const getServerIcon = (server: any) => {
+  const getServerIcon = useCallback((server: any) => {
     if (server.icon) {
       return `https://cdn.discordapp.com/icons/${server.id}/${server.icon}.png`;
     }
     return null;
-  };
+  }, []);
 
-  const getServerInitials = (name: string) => {
+  const getServerInitials = useCallback((name: string) => {
     return name
       .split(" ")
       .map((word) => word.charAt(0))
       .join("")
       .toUpperCase()
       .slice(0, 2);
-  };
+  }, []);
 
   if (error) {
     return (

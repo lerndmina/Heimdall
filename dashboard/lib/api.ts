@@ -11,6 +11,7 @@ class ApiError extends Error {
 class ApiClient {
   private baseUrl: string;
   private apiKey: string;
+  private pendingRequests = new Map<string, Promise<any>>();
 
   constructor(baseUrl: string, apiKey: string) {
     this.baseUrl = baseUrl;
@@ -19,30 +20,58 @@ class ApiClient {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const requestKey = `${options.method || "GET"}:${url}`;
+
+    // Check if we already have a pending request for this endpoint
+    if (this.pendingRequests.has(requestKey)) {
+      console.log(`Deduplicating request to ${endpoint}`);
+      return this.pendingRequests.get(requestKey);
+    }
+
     const headers = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${this.apiKey}`,
       ...options.headers,
     };
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
+    const requestPromise = (async () => {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          headers,
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new ApiError(errorData.message || `HTTP ${response.status}`, response.status, errorData);
-      }
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
 
-      return await response.json();
-    } catch (error) {
-      if (error instanceof ApiError) {
-        throw error;
+          // Log rate limiting errors for debugging
+          if (response.status === 429) {
+            console.warn(`Rate limited on ${endpoint}:`, {
+              status: response.status,
+              headers: Object.fromEntries(response.headers.entries()),
+              data: errorData,
+            });
+          }
+
+          throw new ApiError(errorData.message || `HTTP ${response.status}`, response.status, errorData);
+        }
+
+        return await response.json();
+      } catch (error) {
+        if (error instanceof ApiError) {
+          throw error;
+        }
+        throw new ApiError(`Network error: ${error instanceof Error ? error.message : "Unknown error"}`, 0);
+      } finally {
+        // Clean up the pending request
+        this.pendingRequests.delete(requestKey);
       }
-      throw new ApiError(`Network error: ${error instanceof Error ? error.message : "Unknown error"}`, 0);
-    }
+    })();
+
+    // Store the pending request
+    this.pendingRequests.set(requestKey, requestPromise);
+
+    return requestPromise;
   }
 
   // User validation
