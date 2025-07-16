@@ -96,13 +96,15 @@ COPY dashboard/ ./dashboard/
 # Install tsx globally for bot execution
 RUN npm install -g tsx
 
-# Build dashboard (Next.js requires build for production)
+# Build dashboard preparation - generate Prisma client but don't build Next.js yet
 WORKDIR /app/dashboard
-# Generate Prisma client before building
+# Generate Prisma client (this doesn't need env vars)
 RUN bunx prisma generate
 # Clean any existing build
 RUN rm -rf .next
-RUN bun run build
+
+# Don't build Next.js here - it will be built at runtime with proper env vars
+# This allows the container to respect Docker environment variables
 
 # Go back to root
 WORKDIR /app
@@ -118,14 +120,26 @@ RUN echo '#!/bin/bash\n\
   free -m\n\
   echo "Environment variables (filtered):"\n\
   env | grep -E "(NODE_ENV|PORT|BOT_API_URL|NEXTAUTH)" | sort\n\
+  echo ""\n\
+  echo "=== Building Dashboard with Runtime Environment ==="\n\
+  cd /app/dashboard\n\
+  echo "Building Next.js dashboard with current environment variables..."\n\
+  bun run build\n\
+  if [ $? -ne 0 ]; then\n\
+  echo "Dashboard build failed, starting in development mode..."\n\
+  export DASHBOARD_DEV_MODE=true\n\
+  fi\n\
+  cd /app\n\
+  echo ""\n\
+  echo "=== Starting Services ==="\n\
   echo "Starting services with concurrently..."\n\
   exec bun run start' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose ports (3000 for dashboard, 3001 for bot API)
 EXPOSE 3000 3001
 
-# Add health check for both services
-HEALTHCHECK --interval=60s --timeout=15s --start-period=90s --retries=3 \
+# Add health check for both services (longer start period for runtime build)
+HEALTHCHECK --interval=60s --timeout=15s --start-period=180s --retries=3 \
   CMD (wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1) && \
   (wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1)
 
