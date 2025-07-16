@@ -69,6 +69,10 @@ COPY dashboard/ ./dashboard/
 # Install tsx globally for bot execution
 RUN npm install -g tsx
 
+# Build dashboard (Next.js requires build for production)
+WORKDIR /app/dashboard
+RUN bun run build
+
 # Go back to root
 WORKDIR /app
 
