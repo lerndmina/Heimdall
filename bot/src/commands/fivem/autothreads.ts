@@ -97,9 +97,13 @@ export async function run({ interaction, client, handler }: SlashCommandProps) {
       });
     }
 
-    if (!channel || channel.type !== ChannelType.GuildText) {
+    if (
+      !channel ||
+      (channel.type !== ChannelType.GuildAnnouncement && channel.type !== ChannelType.GuildText)
+    ) {
       return interaction.editReply({
-        content: "You must provide a valid guild text channel to apply this regex to.",
+        content:
+          "You must provide a valid guild text or announcement channel to apply this regex to.",
       });
     }
 
@@ -148,9 +152,13 @@ export async function run({ interaction, client, handler }: SlashCommandProps) {
   } else if (subcommand === "remove") {
     const channel = interaction.options.getChannel("channel");
 
-    if (!channel || channel.type !== ChannelType.GuildText) {
+    if (
+      !channel ||
+      (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
+    ) {
       return interaction.editReply({
-        content: "You must provide a valid guild text channel to remove the regex from.",
+        content:
+          "You must provide a valid guild text or announcement channel to remove the regex from.",
       });
     }
 
