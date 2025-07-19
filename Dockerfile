@@ -89,9 +89,9 @@ COPY dashboard/lib/ ./dashboard/lib/
 COPY dashboard/types/ ./dashboard/types/
 COPY dashboard/prisma/ ./dashboard/prisma/
 
-# Copy any remaining files
-COPY bot/ ./bot/
-COPY dashboard/ ./dashboard/
+# Copy additional required files (specific files only, not entire directories)
+COPY bot/FixCommandKit.ts ./bot/
+COPY bot/fixedcommandkit.js ./bot/
 
 # Install tsx globally for bot execution
 RUN npm install -g tsx

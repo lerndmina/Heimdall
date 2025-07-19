@@ -284,3 +284,7 @@ return res.status(400).json(createErrorResponse("Error message", 400, req.reques
 - `auth` - NextAuth configuration and helpers
 
 This structure ensures maintainable, scalable code that follows established patterns and best practices for both Discord bot development and modern web application development.
+
+Notes:
+Don't write random scripts to test things or new features.
+Don't write readme files for every single fucking new feature.
