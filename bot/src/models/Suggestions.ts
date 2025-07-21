@@ -107,6 +107,30 @@ Suggestion.pre("save", async function (next) {
 // Create the model
 const SuggestionModel = model("Suggestion", Suggestion);
 
+// Utility function to generate unique suggestion ID
+export async function generateUniqueSuggestionId(): Promise<string> {
+  let isUnique = false;
+  let attempts = 0;
+  const maxAttempts = 5;
+
+  while (!isUnique && attempts < maxAttempts) {
+    const candidateId = randomUUID();
+
+    // Check if this ID already exists
+    const existing = await SuggestionModel.findOne({ id: candidateId });
+    isUnique = !existing;
+    attempts++;
+
+    if (!isUnique) {
+      console.log(`ID collision detected (attempt ${attempts}), generating new ID`);
+    } else {
+      return candidateId;
+    }
+  }
+
+  throw new Error(`Failed to generate unique suggestion ID after ${maxAttempts} attempts`);
+}
+
 export type SuggestionsType = InferSchemaType<typeof Suggestion>;
 export type VotesModelType = InferSchemaType<typeof VotesSchema>;
 

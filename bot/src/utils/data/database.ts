@@ -630,4 +630,54 @@ export default class Database {
     if (env.DEBUG_LOG) debugMsg(`DB - getArrayElementCount - Time taken: ${Date.now() - start!}ms`);
     return parseInt(data);
   }
+
+  /**
+   * Find suggestion by ID with fallback for temp IDs
+   * Handles race condition where temp IDs might be used before message update
+   */ async findSuggestionWithFallback<T>(
+    schema: Model<T>,
+    suggestionId: string,
+    cacheTime = ONE_HOUR
+  ): Promise<T | null> {
+    // First try normal lookup
+    const suggestion = await this.findOne(schema, { id: suggestionId }, false, cacheTime);
+
+    if (suggestion) {
+      return suggestion;
+    }
+
+    // If not found and it's a temp ID, try to find by timestamp range
+    if (suggestionId.startsWith("temp-")) {
+      const tempTimestamp = parseInt(suggestionId.replace("temp-", ""));
+      if (!isNaN(tempTimestamp)) {
+        // Look for suggestions created within a 30-second window of the temp ID
+        const windowStart = new Date(tempTimestamp - 30000);
+        const windowEnd = new Date(tempTimestamp + 30000);
+
+        debugMsg(
+          `Temp ID lookup fallback: searching for suggestions created between ${windowStart.toISOString()} and ${windowEnd.toISOString()}`
+        );
+
+        // Find recent suggestions in the time window (this bypasses cache intentionally)
+        const recentSuggestion = await schema
+          .findOne({
+            createdAt: { $gte: windowStart, $lte: windowEnd },
+          })
+          .sort({ createdAt: -1 })
+          .limit(1);
+
+        if (recentSuggestion) {
+          debugMsg(`Found fallback suggestion: ${(recentSuggestion as any).id}`);
+          // Cache the result with the temp ID key for future lookups
+          const tempRedisKey = `${env.MONGODB_DATABASE}:${schema.modelName}:id:${suggestionId}`;
+          await redisClient.set(tempRedisKey, JSON.stringify(recentSuggestion));
+          await redisClient.expire(tempRedisKey, 300); // Short 5-minute cache for temp ID redirects
+
+          return recentSuggestion as T;
+        }
+      }
+    }
+
+    return null;
+  }
 }

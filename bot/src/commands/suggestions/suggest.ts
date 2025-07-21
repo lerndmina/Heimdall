@@ -21,7 +21,11 @@ import Database from "../../utils/data/database";
 import SuggestionConfigModel, { SuggestionConfigType } from "../../models/SuggestionConfig";
 import BasicEmbed from "../../utils/BasicEmbed";
 import { tryCatch } from "../../utils/trycatch";
-import SuggestionModel, { SuggestionStatus, SuggestionsType } from "../../models/Suggestions";
+import SuggestionModel, {
+  SuggestionStatus,
+  SuggestionsType,
+  generateUniqueSuggestionId,
+} from "../../models/Suggestions";
 import FetchEnvs from "../../utils/FetchEnvs";
 import OpenAI from "openai";
 import log from "../../utils/log";
@@ -170,8 +174,13 @@ async function submitSuggestion(
     const title = await getSuggestionTitle(suggestion, reason);
     log.debug("Generated suggestion title", { title, titleLength: title.length });
 
-    // Create a temporary suggestion object for display purposes
-    const tempSuggestion = {
+    // Generate a unique ID first to prevent race conditions
+    const uniqueId = await generateUniqueSuggestionId();
+    log.debug("Generated unique suggestion ID", { suggestionId: uniqueId });
+
+    // Create the real suggestion object with the pre-generated ID
+    const newSuggestion = new SuggestionModel({
+      id: uniqueId, // Set the ID explicitly
       userId: interaction.user.id,
       guildId: interaction.guildId!,
       channelId: suggestionConfig.channelId,
@@ -179,9 +188,10 @@ async function submitSuggestion(
       reason,
       title,
       status: SuggestionStatus.Pending,
-      id: `temp-${Date.now()}`, // Temporary ID for buttons
-      messageLink: "", // Temporary empty messageLink
-    };
+      messageLink: "", // Will be updated after message is sent
+    });
+
+    log.debug("Created suggestion model with real ID", { suggestionId: newSuggestion.id });
 
     // Send message to the suggestions channel first
     log.debug("Attempting to fetch suggestions channel", { channelId: suggestionConfig.channelId });
@@ -211,8 +221,8 @@ async function submitSuggestion(
     }
 
     log.debug("Channel validation passed, creating embed and buttons");
-    const suggestionEmbed = getSuggestionEmbed(interaction, tempSuggestion as SuggestionsType);
-    const row = getSuggestionButtons(0, 0, tempSuggestion as SuggestionsType); // Initialize with 0 upvotes and downvotes
+    const suggestionEmbed = getSuggestionEmbed(interaction, newSuggestion as SuggestionsType);
+    const row = getSuggestionButtons(0, 0, newSuggestion as SuggestionsType); // Use real ID from start
     log.debug("Embed and buttons created, attempting to send message");
 
     const { data: messageResult, error: messageError } = await tryCatch(
@@ -236,18 +246,9 @@ async function submitSuggestion(
       messageUrl: suggestionMessage.url,
     });
 
-    // Now create and save the suggestion to the database with the message URL
-    const newSuggestion = new SuggestionModel({
-      userId: interaction.user.id,
-      guildId: interaction.guildId!,
-      channelId: suggestionConfig.channelId,
-      suggestion,
-      reason,
-      title,
-      status: SuggestionStatus.Pending,
-      messageLink: suggestionMessage.url,
-    });
-    log.debug("Created new suggestion model", {
+    // Update the suggestion with the message URL
+    newSuggestion.messageLink = suggestionMessage.url;
+    log.debug("Updated suggestion with message link", {
       modelId: newSuggestion.id,
       status: newSuggestion.status,
       hasTitle: !!newSuggestion.title,
@@ -284,20 +285,8 @@ async function submitSuggestion(
 
     log.info(`New suggestion created with ID: ${savedSuggestion.id}`);
 
-    // Update the message with the correct suggestion ID in buttons
-    const updatedEmbed = getSuggestionEmbed(interaction, savedSuggestion);
-    const updatedRow = getSuggestionButtons(0, 0, savedSuggestion);
-
-    const { error: updateError } = await tryCatch(
-      suggestionMessage.edit({
-        embeds: [updatedEmbed],
-        components: [updatedRow],
-      })
-    );
-
-    if (updateError) {
-      log.warn("Failed to update message with correct suggestion ID", { error: updateError });
-    }
+    // Since we used the real ID from the start, no message update is needed
+    log.debug("Suggestion submission completed successfully - no message update required");
 
     if (suggestionMessage && !suggestionMessage.hasThread) {
       log.debug("Creating thread for suggestion message", { messageId: suggestionMessage.id });

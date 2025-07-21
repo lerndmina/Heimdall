@@ -53,11 +53,26 @@ export default async (interaction: ButtonInteraction, client: Client) => {
   const [prefix, action, ...idParts] = interaction.customId.split("-");
   const suggestionId = idParts.join("-"); // Rejoin any parts of the ID that might contain hyphens
 
-  const suggestion = await db.findOne(SuggestionModel, { id: suggestionId });
+  // Use enhanced lookup with temp ID fallback
+  let suggestion = await db.findSuggestionWithFallback(SuggestionModel, suggestionId);
+
+  // If still not found, try direct database lookup for temp IDs (race condition handling)
+  if (!suggestion && suggestionId.startsWith("temp-")) {
+    log.warn(`Temp ID not found with fallback, attempting direct lookup: ${suggestionId}`);
+    // This might be a brand new suggestion, wait briefly and try once more
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    suggestion = await db.findSuggestionWithFallback(SuggestionModel, suggestionId);
+  }
+
   if (!suggestion || !suggestion.id) {
+    const isTemporaryId = suggestionId.startsWith("temp-");
+    const errorMessage = isTemporaryId
+      ? "This suggestion is being processed. Please try again in a moment."
+      : "This suggestion does not exist in the database or has an invalid ID.\nThis should never happen. Please contact the bot developer.";
+
     await interaction.reply({
-      content:
-        "This suggestion does not exist in the database or has an invalid ID.\nThis should never happen. Please contact the bot developer.",
+      content: errorMessage,
+      ephemeral: true,
     });
     return;
   }
