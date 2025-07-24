@@ -13,8 +13,12 @@ import { debug } from "console";
 const db = new Database();
 
 export default async (c: Client<true>, client: Client<true>, handler: CommandKit) => {
+  log.info("Starting checkservers event - looking for persistent mcstatus servers");
   const guilds = c.guilds.cache;
   const getter = new ThingGetter(c);
+  let totalServersFound = 0;
+  let totalPersistentServers = 0;
+
   for (const guildIdNameArr of guilds) {
     const id = guildIdNameArr[0];
     const guild = await getter.getGuild(id);
@@ -22,15 +26,40 @@ export default async (c: Client<true>, client: Client<true>, handler: CommandKit
       log.error("Guild not found " + id + " in checkservers");
       continue;
     }
+
     const mcServers = await McServerStatus.find({ guildId: id });
-    if (!mcServers) {
-      debugMsg("No mcServers found for " + id);
+    if (!mcServers || mcServers.length === 0) {
+      log.debug("No mcServers found for guild " + id);
       continue;
     }
+
+    totalServersFound += mcServers.length;
+    log.debug(`Found ${mcServers.length} mcServers for guild ${id}`);
+
     for (const server of mcServers) {
-      beginPersistantLoop(client, server, getter);
+      if (server.persistData) {
+        totalPersistentServers++;
+        log.debug("Starting persistence loop for server", {
+          serverName: server.serverName,
+          guildId: server.guildId,
+          messageId: server.persistData.messageId,
+          channelId: server.persistData.channelId,
+        });
+        beginPersistantLoop(client, server, getter);
+      } else {
+        log.debug("Server has no persistData, skipping", {
+          serverName: server.serverName,
+          guildId: server.guildId,
+        });
+      }
     }
   }
+
+  log.info("Checkservers event completed", {
+    totalServersFound,
+    totalPersistentServers,
+    guildsProcessed: guilds.size,
+  });
 };
 
 /**
@@ -95,11 +124,22 @@ export async function beginPersistantLoop(
     );
     return;
   }
+
+  log.debug("Found channel, attempting to get message", {
+    channelId,
+    messageId,
+    channelName: "name" in channel ? channel.name : "DM Channel",
+    serverName: server.serverName,
+  });
+
   const message = await getter.getMessage(channel, messageId);
   if (!message) {
     log.error({
       message: "Message not found removing persist",
       messageId,
+      channelId,
+      channelName: "name" in channel ? channel.name : "DM Channel",
+      serverName: server.serverName,
       location: "beginPersistantLoop",
     });
     await db.findOneAndUpdate(
@@ -109,6 +149,12 @@ export async function beginPersistantLoop(
     );
     return;
   }
+
+  log.debug("Successfully found message, starting persistence loop", {
+    messageId,
+    channelId,
+    serverName: server.serverName,
+  });
 
   if (!baseInterval) {
     log.error({ message: "Interval not found removing persist", location: "beginPersistantLoop" });
