@@ -126,10 +126,14 @@ export class ThingGetter {
 
   async getMessage(channel: Channel, id: Snowflake): Promise<Message | null> {
     const message = (channel as any).messages.cache.get(id);
-    if (!message) {
-      return await (channel as any).messages.fetch(id);
+    if (message) {
+      return message;
     }
-    return null;
+    try {
+      return await (channel as any).messages.fetch(id);
+    } catch (error) {
+      return null;
+    }
   }
 
   async getMessageFromUrl(url: URL): Promise<Message | null> {
