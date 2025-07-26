@@ -88,6 +88,7 @@ COPY dashboard/hooks/ ./dashboard/hooks/
 COPY dashboard/lib/ ./dashboard/lib/
 COPY dashboard/types/ ./dashboard/types/
 COPY dashboard/prisma/ ./dashboard/prisma/
+COPY dashboard/scripts/ ./dashboard/scripts/
 
 # Copy additional required files (specific files only, not entire directories)
 COPY bot/FixCommandKit.ts ./bot/
@@ -111,30 +112,9 @@ WORKDIR /app
 # Install concurrently for process management (much simpler than PM2)
 RUN bun add concurrently
 
-# Create startup script with concurrently
-RUN echo '#!/bin/bash\n\
-  echo "=== Container Debug Info ==="\n\
-  echo "Container hostname: $(hostname)"\n\
-  echo "Memory info:"\n\
-  free -m\n\
-  echo "Environment variables (filtered):"\n\
-  env | grep -E "(NODE_ENV|PORT|BOT_API_URL|NEXTAUTH|DATABASE_URL)" | sort\n\
-  echo ""\n\
-  echo "=== Database Setup ==="\n\
-  echo "Setting up database schema..."\n\
-  cd /app/dashboard\n\
-  bunx prisma db push --force-reset --accept-data-loss || {\n\
-  echo "Database push failed, trying without force-reset..."\n\
-  bunx prisma db push || {\n\
-  echo "Database setup failed, starting services anyway..."\n\
-  }\n\
-  }\n\
-  cd /app\n\
-  echo "Database setup completed"\n\
-  echo ""\n\
-  echo "=== Starting Services ==="\n\
-  echo "Starting services with concurrently..."\n\
-  exec bun run start' > /app/start.sh && chmod +x /app/start.sh
+# Copy startup script
+COPY scripts/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 # Expose ports (3000 for dashboard, 3001 for bot API)
 EXPOSE 3000 3001

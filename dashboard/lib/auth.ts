@@ -1,11 +1,9 @@
 import NextAuth from "next-auth";
 import Discord from "next-auth/providers/discord";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { NextAuthConfig } from "next-auth";
-import { prisma } from "./prisma";
 
 export const config = {
-  adapter: PrismaAdapter(prisma),
+  // No database adapter - using JWT-only sessions
   // Trust host when behind reverse proxy
   trustHost: true,
   providers: [
@@ -20,7 +18,9 @@ export const config = {
     }),
   ],
   session: {
-    strategy: "jwt", // Force JWT strategy to ensure access token is available
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
   },
   callbacks: {
     async jwt({ token, account, profile, user }) {
