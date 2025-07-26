@@ -54,6 +54,8 @@
 # Local development scripts
 **/start.sh
 **/update.sh
+# Exception: Allow the container startup script
+!scripts/start.sh
 
 # Docker files (not needed inside the image)
 **/Dockerfile*
