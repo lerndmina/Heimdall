@@ -98,8 +98,8 @@ export function DashboardNav({ user }: { user: User }) {
           </div>
 
           {/* User Menu */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="flex items-center gap-1 sm:gap-2 text-white">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 text-white">
               <Avatar className="h-6 sm:h-8 w-6 sm:w-8">
                 <AvatarImage src={user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : user.image || undefined} />
                 <AvatarFallback className="text-xs sm:text-sm">{user.name?.[0] || "U"}</AvatarFallback>
