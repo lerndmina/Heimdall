@@ -44,16 +44,16 @@ function getButtons(interactionId: Snowflake) {
     .setStyle(ButtonStyle.Primary)
     .setCustomId("home-" + interactionId);
 
-  // Disposal button
-  const trash = new ButtonKit()
-    .setEmoji("🗑️")
-    .setStyle(ButtonStyle.Danger)
-    .setCustomId("trash-" + interactionId);
+  // // Disposal button
+  // const trash = new ButtonKit()
+  //   .setEmoji("🗑️")
+  //   .setStyle(ButtonStyle.Danger)
+  //   .setCustomId("trash-" + interactionId);
 
   // Create an action row
-  const row = new ActionRowBuilder<ButtonKit>().addComponents(dec, home, inc, trash);
+  const row = new ActionRowBuilder<ButtonKit>().addComponents(dec, home, inc);
 
-  return { home, dec, inc, trash, row };
+  return { home, dec, inc, row };
 }
 
 const INLINE_BOOL = true;
@@ -66,7 +66,7 @@ export const run = async ({ interaction, client }: SlashCommandProps) => {
 
   // Create the signal & buttons
   const [count, setCount, disposeCountSubscribers] = createSignal(0);
-  const { home, dec, inc, trash, row } = getButtons(interaction.id);
+  const { home, dec, inc, row } = getButtons(interaction.id);
 
   // Temporary variable to hold button interactions
   let inter: MessageComponentInteraction | null = null;
@@ -81,6 +81,7 @@ export const run = async ({ interaction, client }: SlashCommandProps) => {
       BasicEmbed(client, embedTitle + ` page: ${1}/${pages.length}`, embedDescription, pages[0]),
     ],
     components: [row],
+    ephemeral: true,
     fetchReply: true,
   });
 
@@ -136,30 +137,18 @@ export const run = async ({ interaction, client }: SlashCommandProps) => {
     { message }
   );
 
-  // Disposal handler
-  trash.onClick(
-    async (interaction) => {
-      const disposed = row.setComponents(
-        row.components.map((button) => {
-          // Remove the 'onClick' handler and disable the button
-          return button.setDisabled(true);
-        })
-      );
+  //   // Delete handler
+  //   trash.onClick(
+  //     async (buttonInteraction) => {
+  //       // Dispose the signal's subscribers
+  //       disposeCountSubscribers();
 
-      // Dispose the signal's subscribers
-      disposeCountSubscribers();
-
-      // And finally: acknowledge the interaction
-      await interaction.update({
-        content: "",
-        components: [disposed],
-        embeds: [
-          BasicEmbed(client, "Help", "This message has been disposed, please run `/help` again."),
-        ],
-      });
-    },
-    { message }
-  );
+  //       // Delete the message
+  //       await buttonInteraction.deferUpdate();
+  //       await message.delete();
+  //     },
+  //     { message }
+  //   );
 };
 
 function isCountInBounds(count: number, change: number) {
