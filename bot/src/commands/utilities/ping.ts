@@ -7,9 +7,9 @@ import { initialReply } from "../../utils/initialReply";
 
 export const data = new SlashCommandBuilder()
   .setName("ping")
-  .setDescription("Replies with Pong!")
+  .setDescription("Check the bot's latency and websocket ping.")
   .addBooleanOption((option) =>
-    option.setName("private").setDescription("Whether to reply privately or not").setRequired(false)
+    option.setName("public").setDescription("Whether to reply publicly or not").setRequired(false)
   );
 
 export const options: CommandOptions = {
@@ -21,10 +21,8 @@ export const options: CommandOptions = {
 export async function run({ interaction, client, handler }: SlashCommandProps) {
   setCommandCooldown(globalCooldownKey(interaction.commandName), 15);
 
-  var isPrivate = interaction.options.getBoolean("private") || false;
-  await initialReply(interaction, isPrivate);
-
-  if (isPrivate == null) isPrivate = true;
+  var publicReply = interaction.options.getBoolean("public") == true;
+  await initialReply(interaction, !publicReply);
 
   const timestamp = interaction.createdTimestamp;
   const currentTime = Date.now();
