@@ -24,7 +24,7 @@ import {
 import { ButtonBuilder, ButtonStyle, SlashCommandBuilder } from "discord.js";
 import BasicEmbed from "../../utils/BasicEmbed";
 import Modmail, { ModmailType } from "../../models/Modmail";
-import ModmailConfig, { ModmailConfigType, ModmailStatus } from "../../models/ModmailConfig";
+import ModmailConfig, { ModmailConfigType, ModmailStatus, TicketPriority } from "../../models/ModmailConfig";
 import ButtonWrapper from "../../utils/ButtonWrapper";
 import { redisClient, removeMentions, waitingEmoji } from "../../Bot";
 import {
@@ -535,7 +535,7 @@ async function newModmail(
           components: [],
         });
       }
-      const forumChannel = (await getter.getChannel(channelId)) as unknown as ForumChannel;
+      let forumChannel = (await getter.getChannel(channelId)) as unknown as ForumChannel;
       const noMentionsMessage = removeMentions(messageContent);
 
       // Prepare the initial message without attachment URLs since we'll forward actual files
@@ -552,7 +552,56 @@ async function newModmail(
         });
       }
 
-      // Use the centralized function to create the modmail thread
+      // Start category selection flow
+      const { ModmailCategoryFlow } = await import("../../utils/modmail/ModmailCategoryFlow");
+      const categoryFlow = new ModmailCategoryFlow();
+      
+      const categoryResult = await categoryFlow.startCategorySelection({
+        client,
+        user: i.user,
+        guild,
+        originalMessage: message,
+        initialMessage: noMentionsMessage,
+        reply
+      });
+
+      if (!categoryResult.success) {
+        log.error(`Category selection failed: ${categoryResult.error}`);
+        return reply.edit({
+          content: "",
+          embeds: [ModmailEmbeds.error(client, "Category Selection Failed", categoryResult.error || "Unknown error")],
+          components: [],
+        });
+      }
+
+      // Get category information for thread creation
+      let categoryInfo: any = {};
+      if (categoryResult.categoryId) {
+        const { CategoryManager } = await import("../../utils/modmail/CategoryManager");
+        const categoryManager = new CategoryManager();
+        const category = await categoryManager.getCategoryById(guild.id, categoryResult.categoryId);
+        
+        if (category) {
+          const ticketNumber = await categoryManager.getNextTicketNumber(guild.id);
+          categoryInfo = {
+            categoryId: category.id,
+            categoryName: category.name,
+            priority: category.priority,
+            ticketNumber,
+            formResponses: categoryResult.formResponses
+          };
+          
+          // Use category-specific forum channel if configured
+          if (category.forumChannelId && category.forumChannelId !== forumChannel.id) {
+            const categoryForumChannel = await getter.getChannel(category.forumChannelId) as ForumChannel;
+            if (categoryForumChannel) {
+              forumChannel = categoryForumChannel;
+            }
+          }
+        }
+      }
+
+      // Use the centralized function to create the modmail thread with category info
       const result = await createModmailThread(client, {
         guild,
         targetUser: i.user,
@@ -569,6 +618,7 @@ async function newModmail(
           userId: i.user.id,
         },
         initialMessage,
+        ...categoryInfo // Spread category information
       });
       if (!result?.success) {
         log.error(`Failed to create modmail thread: ${result?.error}`);

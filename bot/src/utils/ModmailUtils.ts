@@ -15,7 +15,7 @@ import { ThingGetter } from "./TinyUtils";
 import log from "./log";
 import FetchEnvs, { envExists } from "./FetchEnvs";
 import Database from "./data/database";
-import ModmailConfig from "../models/ModmailConfig";
+import ModmailConfig, { TicketPriority } from "../models/ModmailConfig";
 import Modmail, { ModmailType } from "../models/Modmail";
 import { ModmailMessageService } from "../services/ModmailMessageService";
 import ModmailCache from "./ModmailCache";
@@ -484,6 +484,12 @@ export async function createModmailThread(
     };
     initialMessage?: string;
     forced?: boolean; // If --forced is used and therefore the message is short
+    // Enhanced category support
+    categoryId?: string;
+    categoryName?: string;
+    priority?: TicketPriority;
+    ticketNumber?: number;
+    formResponses?: Record<string, any>;
   }
 ): Promise<
   | {
@@ -537,8 +543,25 @@ export async function createModmailThread(
       cleanedReason && cleanedReason !== "(no reason specified)" ? cleanedReason : "Modmail";
 
     // If opened by staff, they automatically claim it
+    // Generate thread name using the new ticket numbering system
     const claimedStaffName = openedBy?.type === "Staff" ? openedBy.username : null;
-    const threadName = generateModmailThreadName(memberName, claimedStaffName, messageForTitle);
+    let threadName: string;
+    
+    if (options.categoryId && options.ticketNumber && options.priority) {
+      // Use enhanced ticket numbering system
+      const { TicketNumbering } = await import('./modmail/TicketNumbering');
+      const ticketNumbering = new TicketNumbering();
+      
+      threadName = ticketNumbering.generateThreadName({
+        ticketNumber: options.ticketNumber,
+        username: memberName,
+        claimedStaffName: claimedStaffName || undefined,
+        priority: options.priority
+      });
+    } else {
+      // Fallback to old system for backward compatibility
+      threadName = generateModmailThreadName(memberName, claimedStaffName, messageForTitle);
+    }
 
     let threadContent = "";
     if (openedBy?.type === "Staff") {
@@ -617,6 +640,18 @@ export async function createModmailThread(
       userAvatar: targetUser.displayAvatarURL(),
       userDisplayName: memberName,
       lastUserActivityAt: new Date(),
+      // Category information - use provided values or defaults
+      categoryId: options.categoryId || null,
+      categoryName: options.categoryName || null,
+      ticketNumber: options.ticketNumber || null,
+      priority: options.priority || TicketPriority.MEDIUM,
+      formResponses: options.formResponses ? Object.entries(options.formResponses).map(([fieldId, value]) => ({
+        fieldId,
+        fieldLabel: fieldId, // This would ideally come from the form field definition
+        fieldType: typeof value === 'string' ? 'short' : 'select', // Basic type inference
+        value: Array.isArray(value) ? value.join(', ') : String(value)
+      })) : [],
+      createdVia: openedBy?.type === "Staff" ? "command" : "dm",
       // Ensure the thread is marked as open
       isClosed: false,
       closedAt: null,
