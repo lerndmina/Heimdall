@@ -688,11 +688,11 @@ export async function createModmailThread(
         if (options.priority === undefined || options.priority === null) {
           return TicketPriority.MEDIUM; // This is the number 2
         }
-        
-        if (typeof options.priority === 'number' && [1, 2, 3, 4].includes(options.priority)) {
+
+        if (typeof options.priority === "number" && [1, 2, 3, 4].includes(options.priority)) {
           return options.priority;
         }
-        if (typeof options.priority === 'string') {
+        if (typeof options.priority === "string") {
           const numPriority = parseInt(options.priority);
           if (!isNaN(numPriority) && [1, 2, 3, 4].includes(numPriority)) {
             return numPriority;

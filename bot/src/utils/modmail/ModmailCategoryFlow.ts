@@ -80,7 +80,7 @@ export class ModmailCategoryFlow {
             formResponses: {},
           };
         }
-        
+
         // No categories or default category configured, proceed with basic flow
         return {
           success: true,
@@ -217,7 +217,10 @@ export class ModmailCategoryFlow {
         collector.on("collect", async (interaction) => {
           const selectedValue = interaction.values[0];
 
+          log.debug("Category selected:", { selectedValue, userId: interaction.user.id });
+
           if (selectedValue === "cancel") {
+            log.debug("User cancelled category selection");
             await interaction.update({
               embeds: [ModmailEmbeds.cancelled(context.client)],
               components: [],
@@ -226,12 +229,14 @@ export class ModmailCategoryFlow {
             return;
           }
 
+          log.debug("Updating interaction with processing message");
           await interaction.update({
             content: "⏳ Processing...",
             embeds: [],
             components: [],
           });
 
+          log.debug("Interaction updated, resolving with category ID:", selectedValue);
           resolve({ success: true, categoryId: selectedValue });
         });
 

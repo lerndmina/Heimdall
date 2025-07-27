@@ -512,8 +512,11 @@ async function newModmail(
       time: ms("5min"),
     });
 
+    let lastInteraction: StringSelectMenuInteraction | null = null;
+
     collector.on("collect", async (collectedInteraction) => {
       const i = collectedInteraction as StringSelectMenuInteraction;
+      lastInteraction = i;
 
       if (i.values[0].startsWith("cancel-")) {
         await i.update({
@@ -527,13 +530,15 @@ async function newModmail(
       const guildId = value.guild as Snowflake;
       const channelId = value.channel as Snowflake;
       const staffRoleId = value.staffRoleId as Snowflake;
-      await reply.edit({ content: waitingEmoji, components: [], embeds: [] });
+
+      // Acknowledge the server selection interaction first
+      await i.update({ content: waitingEmoji, components: [], embeds: [] });
 
       const getter = new ThingGetter(client);
       const guild = await getter.getGuild(guildId);
       const member = await getter.getMember(guild, i.user.id);
       if (!member) {
-        return reply.edit({
+        return i.editReply({
           content: "",
           embeds: [ModmailEmbeds.notMember(client, guild.name)],
           components: [],
@@ -549,7 +554,7 @@ async function newModmail(
       const db = new Database();
       const config = await db.findOne(ModmailConfig, { guildId: guildId });
       if (!config) {
-        return reply.edit({
+        return i.editReply({
           content: "",
           embeds: [ModmailEmbeds.configNotFound(client)],
           components: [],
@@ -560,18 +565,30 @@ async function newModmail(
       const { ModmailCategoryFlow } = await import("../../utils/modmail/ModmailCategoryFlow");
       const categoryFlow = new ModmailCategoryFlow();
 
+      // Create a proxy object that provides the same interface as InteractionResponse
+      // but uses the interaction's editReply method
+      const replyProxy = {
+        edit: (options: any) => i.editReply(options),
+        createMessageComponentCollector: (options: any) => {
+          // Get the message from the interaction
+          const message = i.message;
+          if (!message) throw new Error("No message found on interaction");
+          return message.createMessageComponentCollector(options);
+        },
+      } as InteractionResponse;
+
       const categoryResult = await categoryFlow.startCategorySelection({
         client,
         user: i.user,
         guild,
         originalMessage: message,
         initialMessage: noMentionsMessage,
-        reply,
+        reply: replyProxy,
       });
 
       if (!categoryResult.success) {
         log.error(`Category selection failed: ${categoryResult.error}`);
-        return reply.edit({
+        return i.editReply({
           content: "",
           embeds: [
             ModmailEmbeds.error(
@@ -587,7 +604,7 @@ async function newModmail(
       // Get category information for thread creation
       let categoryInfo: any = {
         // Always provide a default priority if none is set via category
-        priority: TicketPriority.MEDIUM
+        priority: TicketPriority.MEDIUM,
       };
       if (categoryResult.categoryId) {
         const { CategoryManager } = await import("../../utils/modmail/CategoryManager");
@@ -596,7 +613,7 @@ async function newModmail(
 
         if (category) {
           const ticketNumber = await categoryManager.getNextTicketNumber(guild.id);
-          
+
           categoryInfo = {
             categoryId: category.id,
             categoryName: category.name,
@@ -653,7 +670,7 @@ async function newModmail(
           await redisClient.del(rateLimitKey);
         }
 
-        return reply.edit({
+        return i.editReply({
           content: "",
           embeds: [
             ModmailEmbeds.threadCreationFailed(
@@ -738,7 +755,7 @@ async function newModmail(
           log.warn("Failed to add success reaction for DM-failed case:", reactionError);
         }
 
-        return reply.edit({
+        return i.editReply({
           content: "",
           embeds: [
             ModmailEmbeds.warning(
@@ -761,7 +778,7 @@ async function newModmail(
         log.warn("Failed to add success reaction to original message:", reactionError);
       }
 
-      reply.edit({
+      i.editReply({
         content: "✅ Done! Modmail thread created successfully.",
         embeds: [],
         components: [],
@@ -770,7 +787,10 @@ async function newModmail(
 
     collector.on("end", async (collected) => {
       if (collected.size === 0) {
-        const failedReply = await reply.edit({
+        // Use the original reply if no interaction was captured
+        const messageEditor = lastInteraction || reply;
+        const editMethod = lastInteraction ? "editReply" : "edit";
+        const failedReply = await (messageEditor as any)[editMethod]({
           content: "",
           embeds: [ModmailEmbeds.timeout(client)],
           components: [],

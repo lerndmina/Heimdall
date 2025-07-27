@@ -55,20 +55,20 @@ export default async function listCategories({ interaction, client, handler }: S
     // Show default category if exists
     if (config.defaultCategory) {
       const defaultCat = config.defaultCategory;
-      description += `**🏠 Default Category**\\n`;
-      description += `**Name:** ${defaultCat.name}\\n`;
-      description += `**Status:** ${defaultCat.isActive ? "✅ Active" : "❌ Inactive"}\\n`;
+      description += `**🏠 Default Category**\n`;
+      description += `**Name:** ${defaultCat.name}\n`;
+      description += `**Status:** ${defaultCat.isActive ? "✅ Active" : "❌ Inactive"}\n`;
       description += `**Priority:** ${
         TicketPriority[defaultCat.priority as TicketPriority] || defaultCat.priority
-      }\\n`;
-      description += `**Forum:** <#${defaultCat.forumChannelId}>\\n`;
+      }\n`;
+      description += `**Forum:** <#${defaultCat.forumChannelId}>\n`;
       if (defaultCat.description) {
-        description += `**Description:** ${defaultCat.description}\\n`;
+        description += `**Description:** ${defaultCat.description}\n`;
       }
       if (defaultCat.formFields && defaultCat.formFields.length > 0) {
-        description += `**Form Fields:** ${defaultCat.formFields.length}\\n`;
+        description += `**Form Fields:** ${defaultCat.formFields.length}\n`;
       }
-      description += "\\n";
+      description += "\n";
     }
 
     // Show additional categories
@@ -79,7 +79,7 @@ export default async function listCategories({ interaction, client, handler }: S
       );
     } else {
       if (categories.length > 0) {
-        description += `**📁 Additional Categories (${categories.length})**\\n\\n`;
+        description += `**📁 Additional Categories (${categories.length})**\n\n`;
 
         for (const category of categories) {
           const statusIcon = category.isActive ? "✅" : "❌";
@@ -93,11 +93,11 @@ export default async function listCategories({ interaction, client, handler }: S
               {
                 name: `${category.emoji || "📁"} ${category.name}`,
                 value:
-                  `**ID:** \`${category.id}\`\\n` +
-                  `**Status:** ${statusIcon} ${category.isActive ? "Active" : "Inactive"}\\n` +
-                  `**Priority:** ${priorityName}\\n` +
-                  `**Forum:** <#${category.forumChannelId}>\\n` +
-                  `${category.description ? `**Description:** ${category.description}\\n` : ""}` +
+                  `**ID:** \`${category.id}\`\n` +
+                  `**Status:** ${statusIcon} ${category.isActive ? "Active" : "Inactive"}\n` +
+                  `**Priority:** ${priorityName}\n` +
+                  `**Forum:** <#${category.forumChannelId}>\n` +
+                  `${category.description ? `**Description:** ${category.description}\n` : ""}` +
                   `**Form Fields:** ${formFieldCount}`,
                 inline: true,
               },
@@ -105,7 +105,7 @@ export default async function listCategories({ interaction, client, handler }: S
             fieldCount++;
           } else {
             // If we exceed field limit, add to description
-            description += `${statusIcon} **${category.name}** (${priorityName})\\n`;
+            description += `${statusIcon} **${category.name}** (${priorityName})\n`;
           }
         }
       }
@@ -120,9 +120,9 @@ export default async function listCategories({ interaction, client, handler }: S
       {
         name: "📝 Management Commands",
         value:
-          "`/modmail category create` - Create a new category\\n" +
-          "`/modmail category edit` - Edit an existing category\\n" +
-          "`/modmail category delete` - Delete a category\\n" +
+          "`/modmail category create` - Create a new category\n" +
+          "`/modmail category edit` - Edit an existing category\n" +
+          "`/modmail category delete` - Delete a category\n" +
           "`/modmail category form` - Manage form fields",
         inline: false,
       },
