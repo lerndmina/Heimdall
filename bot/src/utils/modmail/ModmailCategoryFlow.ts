@@ -2,6 +2,9 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ButtonInteraction,
   EmbedBuilder,
   Client,
   Guild,
@@ -14,6 +17,7 @@ import {
   CollectorFilter,
   ComponentType,
   BaseInteraction,
+  Interaction,
 } from "discord.js";
 import { CategoryManager } from "./CategoryManager";
 import { FormBuilder } from "../FormBuilder";
@@ -299,97 +303,50 @@ export class ModmailCategoryFlow {
       const formFields = category.formFields as FormFieldSchema[];
       log.info(`[Form Debug] Form fields:`, formFields);
 
-      const formBuilder = new FormBuilder(formFields);
+      if (!formFields || formFields.length === 0) {
+        return {
+          success: true,
+          formResponses: {},
+          metadata: {},
+        };
+      }
+
       const responseProcessor = new FormResponseProcessor(formFields, context.user.id, category.id);
-      const progressTracker = new FormProgressTracker(formFields);
 
-      log.info(`[Form Debug] Has modal fields: ${formBuilder.hasModalFields()}`);
-      log.info(`[Form Debug] Has select fields: ${formBuilder.hasSelectFields()}`);
+      // Process each field in order
+      for (let i = 0; i < formFields.length; i++) {
+        const field = formFields[i];
+        log.info(
+          `[Form Debug] Processing field ${i + 1}/${formFields.length}: ${field.label} (${
+            field.type
+          })`
+        );
 
-      // Show initial progress
-      await this.showFormProgress(context, progressTracker, category.name);
-
-      // Process fields in their original order by type groups but maintaining order within types
-      const modalFields = formFields.filter(
-        (field) => field.type === FormFieldType.SHORT || field.type === FormFieldType.PARAGRAPH
-      );
-      const selectFields = formFields.filter((field) => field.type === FormFieldType.SELECT);
-
-      // Determine which type comes first in the original order
-      const firstModalIndex = formFields.findIndex(
-        (field) => field.type === FormFieldType.SHORT || field.type === FormFieldType.PARAGRAPH
-      );
-      const firstSelectIndex = formFields.findIndex((field) => field.type === FormFieldType.SELECT);
-
-      const shouldProcessModalsFirst =
-        firstModalIndex !== -1 && (firstSelectIndex === -1 || firstModalIndex < firstSelectIndex);
-
-      if (shouldProcessModalsFirst) {
-        // Process modal fields first if they appear first in the order
-        if (modalFields.length > 0) {
-          log.info(`[Form Debug] Collecting modal responses (first in order)`);
-          const modalResult = await this.collectModalResponses(
+        if (field.type === FormFieldType.SELECT) {
+          // Handle select menu field
+          const selectResult = await this.collectSingleSelectField(
             context,
-            new FormBuilder(modalFields),
-            responseProcessor,
-            category,
-            progressTracker
-          );
-          if (!modalResult.success) {
-            log.error(`[Form Debug] Modal collection failed:`, modalResult);
-            return modalResult;
-          }
-        }
-
-        // Then process select fields
-        if (selectFields.length > 0) {
-          log.info(`[Form Debug] Collecting select menu responses (second in order)`);
-          const selectResult = await this.collectSelectMenuResponses(
-            context,
-            new FormBuilder(selectFields),
-            responseProcessor,
-            progressTracker
+            field,
+            responseProcessor
           );
           if (!selectResult.success) {
-            log.error(`[Form Debug] Select menu collection failed:`, selectResult);
+            log.error(`[Form Debug] Select field collection failed:`, selectResult);
             return selectResult;
           }
-        }
-      } else {
-        // Process select fields first if they appear first in the order
-        if (selectFields.length > 0) {
-          log.info(`[Form Debug] Collecting select menu responses (first in order)`);
-          const selectResult = await this.collectSelectMenuResponses(
+        } else if (field.type === FormFieldType.SHORT || field.type === FormFieldType.PARAGRAPH) {
+          // Handle text input field
+          const modalResult = await this.collectSingleModalField(
             context,
-            new FormBuilder(selectFields),
+            field,
             responseProcessor,
-            progressTracker
-          );
-          if (!selectResult.success) {
-            log.error(`[Form Debug] Select menu collection failed:`, selectResult);
-            return selectResult;
-          }
-        }
-
-        // Then process modal fields
-        if (modalFields.length > 0) {
-          log.info(`[Form Debug] Collecting modal responses (second in order)`);
-          const modalResult = await this.collectModalResponses(
-            context,
-            new FormBuilder(modalFields),
-            responseProcessor,
-            category,
-            progressTracker
+            category.name
           );
           if (!modalResult.success) {
-            log.error(`[Form Debug] Modal collection failed:`, modalResult);
+            log.error(`[Form Debug] Modal field collection failed:`, modalResult);
             return modalResult;
           }
         }
       }
-
-      // Show final progress
-      await this.showFormProgress(context, progressTracker, category.name);
 
       // Validate that all required fields are completed
       if (!responseProcessor.isFormComplete()) {
@@ -789,6 +746,170 @@ export class ModmailCategoryFlow {
     } catch (error) {
       log.error("Error showing form progress:", error);
       // Don't throw, just log - progress display is not critical
+    }
+  }
+
+  /**
+   * Collect response for a single select field
+   * @param context Category selection context
+   * @param field The select field to process
+   * @param responseProcessor Response processor instance
+   * @returns Promise with collection result
+   */
+  private async collectSingleSelectField(
+    context: CategorySelectionContext,
+    field: FormFieldSchema,
+    responseProcessor: FormResponseProcessor
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      log.info(`[Form Debug] Showing select field: ${field.label}`);
+
+      const formBuilder = new FormBuilder([field]);
+      const selectMenuRow = formBuilder.createSelectMenu(field, `form-select-${field.id}`);
+
+      const embed = new EmbedBuilder()
+        .setTitle(`${field.label}${field.required ? " *" : ""}`)
+        .setDescription("Please make your selection.")
+        .setColor(0x3498db)
+        .setFooter({ text: field.required ? "* Required field" : "Optional field" });
+
+      await context.reply.edit({
+        embeds: [embed],
+        components: [selectMenuRow],
+      });
+
+      // Wait for select menu interaction
+      const filter: CollectorFilter<[StringSelectMenuInteraction]> = (i) =>
+        i.customId === `form-select-${field.id}` && i.user.id === context.user.id;
+
+      const collector = context.reply.createMessageComponentCollector({
+        filter,
+        componentType: ComponentType.StringSelect,
+        time: 300000, // 5 minutes
+        max: 1,
+      });
+
+      return new Promise((resolve) => {
+        collector.on("collect", async (interaction) => {
+          try {
+            await interaction.deferUpdate();
+            await responseProcessor.processSelectMenuInteraction(interaction, field.id);
+            log.info(`[Form Debug] Collected response for field: ${field.label}`);
+            resolve({ success: true });
+          } catch (error) {
+            log.error(`Error processing select interaction for field ${field.id}:`, error);
+            resolve({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        });
+
+        collector.on("end", (collected) => {
+          if (collected.size === 0) {
+            resolve({ success: false, error: "No response received (timeout)" });
+          }
+        });
+      });
+    } catch (error) {
+      log.error(`Error collecting select field response:`, error);
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
+
+  /**
+   * Collect response for a single modal field (text input)
+   * @param context Category selection context
+   * @param field The text field to process
+   * @param responseProcessor Response processor instance
+   * @param categoryName Category name for modal title
+   * @returns Promise with collection result
+   */
+  private async collectSingleModalField(
+    context: CategorySelectionContext,
+    field: FormFieldSchema,
+    responseProcessor: FormResponseProcessor,
+    categoryName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      log.info(`[Form Debug] Showing modal field: ${field.label}`);
+
+      const formBuilder = new FormBuilder([field]);
+      const modals = formBuilder.createModals("ticket-form", `${categoryName} - ${field.label}`);
+
+      if (modals.length === 0) {
+        return { success: false, error: "No modal could be created for this field" };
+      }
+
+      const modal = modals[0]; // Single field = single modal
+
+      const embed = new EmbedBuilder()
+        .setTitle("📋 Additional Information Required")
+        .setDescription("Please click the button below to fill out the required form fields.")
+        .setColor(0x3498db)
+        .setFooter({ text: "Form submission required to continue" });
+
+      const continueButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId("continue-with-form")
+          .setLabel("Continue with Form")
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji("📝")
+      );
+
+      await context.reply.edit({
+        embeds: [embed],
+        components: [continueButton],
+      });
+
+      // Wait for button click
+      const buttonFilter: CollectorFilter<[ButtonInteraction]> = (i) =>
+        i.customId === "continue-with-form" && i.user.id === context.user.id;
+
+      const buttonCollector = context.reply.createMessageComponentCollector({
+        filter: buttonFilter,
+        componentType: ComponentType.Button,
+        time: 300000, // 5 minutes
+        max: 1,
+      });
+
+      return new Promise((resolve) => {
+        buttonCollector.on("collect", async (buttonInteraction) => {
+          try {
+            await buttonInteraction.showModal(modal);
+
+            // Use the existing pattern - wait for modal submission with awaitModalSubmit
+            const modalSubmission = await buttonInteraction.awaitModalSubmit({
+              time: 300000, // 5 minutes
+              filter: (i) => i.customId.startsWith("ticket-form") && i.user.id === context.user.id,
+            });
+
+            await modalSubmission.deferUpdate();
+            await responseProcessor.processModalSubmission(modalSubmission, 0);
+            log.info(`[Form Debug] Collected response for field: ${field.label}`);
+            resolve({ success: true });
+          } catch (error) {
+            if (error instanceof Error && error.message?.includes("time")) {
+              resolve({ success: false, error: "No response received (timeout)" });
+            } else {
+              log.error(`Error processing modal for field ${field.id}:`, error);
+              resolve({
+                success: false,
+                error: error instanceof Error ? error.message : "Unknown error",
+              });
+            }
+          }
+        });
+
+        buttonCollector.on("end", (collected) => {
+          if (collected.size === 0) {
+            resolve({ success: false, error: "No response received (timeout)" });
+          }
+        });
+      });
+    } catch (error) {
+      log.error(`Error collecting modal field response:`, error);
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }
 }
