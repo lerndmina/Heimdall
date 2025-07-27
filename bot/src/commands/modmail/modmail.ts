@@ -1,4 +1,10 @@
-import { ChannelType, ForumChannel, SlashCommandBuilder, ThreadChannel } from "discord.js";
+import {
+  ChannelType,
+  ForumChannel,
+  InteractionContextType,
+  SlashCommandBuilder,
+  ThreadChannel,
+} from "discord.js";
 import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import Modmail from "../../models/Modmail";
 import { waitingEmoji } from "../../Bot";
@@ -25,7 +31,7 @@ const env = FetchEnvs();
 export const data = new SlashCommandBuilder()
   .setName("modmail")
   .setDescription("The main modmail command")
-  .setDMPermission(false)
+  .setContexts(InteractionContextType.Guild)
   .addSubcommand((subcommand) =>
     subcommand
       .setName("close")
@@ -158,19 +164,19 @@ export const data = new SlashCommandBuilder()
               .setRequired(true)
               .setMaxLength(50)
           )
-          .addStringOption((option) =>
-            option
-              .setName("description")
-              .setDescription("Category description")
-              .setRequired(false)
-              .setMaxLength(200)
-          )
           .addChannelOption((option) =>
             option
               .setName("forum-channel")
               .setDescription("Forum channel for this category")
               .setRequired(true)
               .addChannelTypes(ChannelType.GuildForum)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("description")
+              .setDescription("Category description")
+              .setRequired(false)
+              .setMaxLength(200)
           )
           .addStringOption((option) =>
             option
