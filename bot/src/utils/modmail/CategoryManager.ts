@@ -1,0 +1,324 @@
+import { Guild } from "discord.js";
+import Database from "../data/database";
+import ModmailConfig, {
+  CategoryType,
+  ModmailConfigType,
+  TicketPriority,
+} from "../../models/ModmailConfig";
+import Modmail from "../../models/Modmail";
+import { v4 as uuidv4 } from "uuid";
+import log from "../log";
+import { tryCatch } from "../trycatch";
+
+/**
+ * Manages ticket categories for modmail system
+ * Provides utilities for category creation, validation, and management
+ */
+export class CategoryManager {
+  private db: Database;
+
+  constructor() {
+    this.db = new Database();
+  }
+
+  /**
+   * Get all available and active categories for a guild
+   * @param guildId - The guild ID to get categories for
+   * @returns Array of active categories including default category
+   */
+  async getAvailableCategories(guildId: string): Promise<CategoryType[]> {
+    const { data: config, error } = await tryCatch(
+      this.db.findOne(ModmailConfig, { guildId }, true)
+    );
+
+    if (error) {
+      log.error(`Failed to fetch categories for guild ${guildId}:`, error);
+      return [];
+    }
+
+    if (!config) {
+      log.warn(`No modmail config found for guild ${guildId}`);
+      return [];
+    }
+
+    const categories: CategoryType[] = [];
+
+    // Always include default category if it exists and is active
+    if (config.defaultCategory && config.defaultCategory.isActive) {
+      categories.push(config.defaultCategory);
+    }
+
+    // Add additional active categories
+    if (config.categories) {
+      const activeCategories = config.categories.filter((cat) => cat.isActive);
+      categories.push(...activeCategories);
+    }
+
+    return categories;
+  }
+
+  /**
+   * Get a specific category by ID
+   * @param guildId - The guild ID
+   * @param categoryId - The category ID to find
+   * @returns The category if found, null otherwise
+   */
+  async getCategoryById(guildId: string, categoryId: string): Promise<CategoryType | null> {
+    const categories = await this.getAvailableCategories(guildId);
+    return categories.find((cat) => cat.id === categoryId) || null;
+  }
+
+  /**
+   * Get the default category for a guild
+   * @param guildId - The guild ID
+   * @returns The default category if configured, null otherwise
+   */
+  async getDefaultCategory(guildId: string): Promise<CategoryType | null> {
+    const { data: config, error } = await tryCatch(
+      this.db.findOne(ModmailConfig, { guildId }, true)
+    );
+
+    if (error || !config?.defaultCategory) {
+      return null;
+    }
+
+    return config.defaultCategory;
+  }
+
+  /**
+   * Check if a user has access to a specific category
+   * Currently returns true for all users, but can be extended for role-based access
+   * @param category - The category to check access for
+   * @param userId - The user ID
+   * @returns True if user has access, false otherwise
+   */
+  async validateCategoryAccess(category: CategoryType, userId: string): Promise<boolean> {
+    // For now, all users have access to all categories
+    // This can be extended later to include role-based restrictions
+    return category.isActive;
+  }
+
+  /**
+   * Get the next ticket number for a guild
+   * @param guildId - The guild ID
+   * @returns The next available ticket number
+   */
+  async getNextTicketNumber(guildId: string): Promise<number> {
+    // For now, let's use a simple approach - get all tickets and find the max
+    const { data: tickets, error } = await tryCatch(
+      this.db.find(Modmail, { guildId, ticketNumber: { $exists: true } })
+    );
+
+    if (error) {
+      log.error(`Failed to get tickets for guild ${guildId}:`, error);
+      return 1; // Start from 1 if we can't determine the last number
+    }
+
+    if (!tickets || tickets.length === 0) {
+      return 1; // First ticket
+    }
+
+    // Find the highest ticket number
+    const maxTicketNumber = Math.max(...tickets.map((t) => t.ticketNumber || 0));
+    return maxTicketNumber + 1;
+  }
+
+  /**
+   * Create a new category for a guild
+   * @param guildId - The guild ID
+   * @param categoryData - The category data
+   * @returns The created category or null if failed
+   */
+  async createCategory(
+    guildId: string,
+    categoryData: Omit<CategoryType, "id">
+  ): Promise<CategoryType | null> {
+    const { data: config, error: fetchError } = await tryCatch(
+      this.db.findOne(ModmailConfig, { guildId })
+    );
+
+    if (fetchError || !config) {
+      log.error(`Failed to fetch config for category creation in guild ${guildId}:`, fetchError);
+      return null;
+    }
+
+    const newCategory: CategoryType = {
+      id: uuidv4(),
+      ...categoryData,
+    };
+
+    // Add to categories array
+    const updatedCategories = [...(config.categories || []), newCategory];
+
+    const { error: updateError } = await tryCatch(
+      this.db.findOneAndUpdate(ModmailConfig, { guildId }, { categories: updatedCategories })
+    );
+
+    if (updateError) {
+      log.error(`Failed to create category in guild ${guildId}:`, updateError);
+      return null;
+    }
+
+    log.info(`Created new category "${newCategory.name}" (${newCategory.id}) in guild ${guildId}`);
+    return newCategory;
+  }
+
+  /**
+   * Update an existing category
+   * @param guildId - The guild ID
+   * @param categoryId - The category ID to update
+   * @param updates - The updates to apply
+   * @returns True if successful, false otherwise
+   */
+  async updateCategory(
+    guildId: string,
+    categoryId: string,
+    updates: Partial<Omit<CategoryType, "id">>
+  ): Promise<boolean> {
+    const { data: config, error: fetchError } = await tryCatch(
+      this.db.findOne(ModmailConfig, { guildId })
+    );
+
+    if (fetchError || !config) {
+      log.error(`Failed to fetch config for category update in guild ${guildId}:`, fetchError);
+      return false;
+    }
+
+    // Check if updating default category
+    if (config.defaultCategory?.id === categoryId) {
+      const updatedDefaultCategory = { ...config.defaultCategory, ...updates };
+
+      const { error: updateError } = await tryCatch(
+        this.db.findOneAndUpdate(
+          ModmailConfig,
+          { guildId },
+          { defaultCategory: updatedDefaultCategory }
+        )
+      );
+
+      if (updateError) {
+        log.error(`Failed to update default category in guild ${guildId}:`, updateError);
+        return false;
+      }
+
+      log.info(`Updated default category (${categoryId}) in guild ${guildId}`);
+      return true;
+    }
+
+    // Update in categories array
+    const categoryIndex = config.categories?.findIndex((cat) => cat.id === categoryId) ?? -1;
+
+    if (categoryIndex === -1) {
+      log.warn(`Category ${categoryId} not found in guild ${guildId}`);
+      return false;
+    }
+
+    const updatedCategories = [...(config.categories || [])];
+    // Create a new category object instead of modifying the existing one
+    updatedCategories[categoryIndex] = {
+      ...JSON.parse(JSON.stringify(updatedCategories[categoryIndex])),
+      ...updates,
+    };
+
+    const { error: updateError } = await tryCatch(
+      this.db.findOneAndUpdate(ModmailConfig, { guildId }, { categories: updatedCategories })
+    );
+
+    if (updateError) {
+      log.error(`Failed to update category ${categoryId} in guild ${guildId}:`, updateError);
+      return false;
+    }
+
+    log.info(`Updated category "${updates.name || "Unknown"}" (${categoryId}) in guild ${guildId}`);
+    return true;
+  }
+
+  /**
+   * Delete a category (sets isActive to false)
+   * @param guildId - The guild ID
+   * @param categoryId - The category ID to delete
+   * @returns True if successful, false otherwise
+   */
+  async deleteCategory(guildId: string, categoryId: string): Promise<boolean> {
+    // Don't allow deleting the default category
+    const defaultCategory = await this.getDefaultCategory(guildId);
+    if (defaultCategory?.id === categoryId) {
+      log.warn(`Attempted to delete default category ${categoryId} in guild ${guildId}`);
+      return false;
+    }
+
+    return await this.updateCategory(guildId, categoryId, { isActive: false });
+  }
+
+  /**
+   * Get category statistics for a guild
+   * @param guildId - The guild ID
+   * @returns Statistics about category usage
+   */
+  async getCategoryStats(
+    guildId: string
+  ): Promise<Record<string, { name: string; count: number; priority: TicketPriority }>> {
+    const categories = await this.getAvailableCategories(guildId);
+    const stats: Record<string, { name: string; count: number; priority: TicketPriority }> = {};
+
+    for (const category of categories) {
+      // Get all tickets for this category
+      const { data: tickets, error } = await tryCatch(
+        this.db.find(Modmail, { guildId, categoryId: category.id })
+      );
+
+      stats[category.id] = {
+        name: category.name,
+        count: error || !tickets ? 0 : tickets.length,
+        priority: category.priority as TicketPriority,
+      };
+    }
+
+    return stats;
+  }
+
+  /**
+   * Validate category configuration
+   * @param category - The category to validate
+   * @returns Validation result with any errors
+   */
+  validateCategory(category: Partial<CategoryType>): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!category.name || category.name.trim().length === 0) {
+      errors.push("Category name is required");
+    }
+
+    if (category.name && category.name.length > 50) {
+      errors.push("Category name must be 50 characters or less");
+    }
+
+    if (!category.forumChannelId) {
+      errors.push("Forum channel ID is required");
+    }
+
+    if (!category.staffRoleId) {
+      errors.push("Staff role ID is required");
+    }
+
+    if (category.description && category.description.length > 200) {
+      errors.push("Category description must be 200 characters or less");
+    }
+
+    if (category.formFields && category.formFields.length > 5) {
+      errors.push("Maximum 5 form fields allowed per category");
+    }
+
+    if (category.priority && !Object.values(TicketPriority).includes(category.priority)) {
+      errors.push("Invalid priority level");
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+}
+
+// Export singleton instance
+export default new CategoryManager();

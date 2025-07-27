@@ -1,5 +1,6 @@
 import { InferSchemaType, Schema, model } from "mongoose";
 import FetchEnvs from "../utils/FetchEnvs";
+import { TicketPriority } from "./ModmailConfig";
 const env = FetchEnvs();
 
 const modmailMessageSchema = new Schema(
@@ -114,6 +115,28 @@ const modmailMessageSchema = new Schema(
   { _id: false }
 ); // Disable _id for subdocuments
 
+const formResponseSchema = new Schema(
+  {
+    fieldId: {
+      type: String,
+      required: true,
+    },
+    fieldLabel: {
+      type: String,
+      required: true,
+    },
+    fieldType: {
+      type: String,
+      required: true,
+    },
+    value: {
+      type: String,
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
 const modmailSchema = new Schema({
   guildId: {
     type: String,
@@ -142,6 +165,46 @@ const modmailSchema = new Schema({
     type: String,
     required: false,
   },
+
+  // Category information
+  categoryId: {
+    type: String,
+    required: false, // Optional for backward compatibility
+    index: true, // Index for category-based queries
+  },
+  categoryName: {
+    type: String,
+    required: false,
+  },
+  ticketNumber: {
+    type: Number,
+    required: false, // Optional for backward compatibility
+    index: true, // Index for ticket number lookups
+  },
+  priority: {
+    type: Number,
+    enum: Object.values(TicketPriority),
+    default: TicketPriority.MEDIUM,
+    index: true, // Index for priority-based queries
+  },
+
+  // Form response data
+  formResponses: {
+    type: [formResponseSchema],
+    default: [],
+  },
+
+  // Enhanced metadata
+  createdVia: {
+    type: String,
+    enum: ["dm", "command", "button", "api"],
+    default: "dm",
+  },
+  initialQuery: {
+    type: String,
+    required: false, // User's original message before form
+  },
+
   lastUserActivityAt: {
     type: Date,
     default: Date.now,
@@ -208,8 +271,12 @@ modmailSchema.index({ userId: 1, lastUserActivityAt: -1 }); // User activity
 modmailSchema.index({ guildId: 1, markedResolved: 1 }); // Guild resolution status
 modmailSchema.index({ guildId: 1, isClosed: 1 }); // Guild open/closed status
 modmailSchema.index({ autoCloseScheduledAt: 1, autoCloseDisabled: 1 }); // Auto-close scheduling
+modmailSchema.index({ guildId: 1, categoryId: 1 }); // Category-based queries
+modmailSchema.index({ guildId: 1, ticketNumber: 1 }); // Ticket number lookups
+modmailSchema.index({ guildId: 1, priority: 1, isClosed: 1 }); // Priority-based filtering
 
 export default model(env.MODMAIL_TABLE, modmailSchema);
 
 export type ModmailType = InferSchemaType<typeof modmailSchema>;
 export type ModmailMessageType = InferSchemaType<typeof modmailMessageSchema>;
+export type FormResponseType = InferSchemaType<typeof formResponseSchema>;

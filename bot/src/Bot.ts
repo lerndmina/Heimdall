@@ -80,6 +80,15 @@ export const Start = async () => {
       }
 
       await redisClient.connect();
+
+      // Run categories migration after Redis is connected
+      try {
+        const { runCategoriesMigrationIfNeeded } = await import("./migrations/001-add-categories");
+        await runCategoriesMigrationIfNeeded();
+      } catch (error) {
+        log.error("Failed to run categories migration:", error);
+      }
+
       await createFivemPool();
       updateAprilFoolsStatus();
       scheduleNextMidnight();

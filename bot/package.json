@@ -38,13 +38,15 @@
     "openai": "^4.96.0",
     "pretty-ms": "^9.2.0",
     "redis": "^4.7.0",
-    "tenorjs": "^1.0.10"
+    "tenorjs": "^1.0.10",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/fancy-log": "^2.0.2",
     "@types/node": "^20.17.31",
+    "@types/uuid": "^10.0.0",
     "concurrently": "^8.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

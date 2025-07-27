@@ -5,6 +5,20 @@ export enum ModmailStatus {
   CLOSED = "closed",
 }
 
+export enum FormFieldType {
+  SHORT = "short",
+  PARAGRAPH = "paragraph",
+  SELECT = "select",
+  NUMBER = "number",
+}
+
+export enum TicketPriority {
+  LOW = 1,
+  MEDIUM = 2,
+  HIGH = 3,
+  URGENT = 4,
+}
+
 const tagsSchema = new Schema(
   {
     snowflake: {
@@ -15,6 +29,112 @@ const tagsSchema = new Schema(
       type: String,
       enum: Object.values(ModmailStatus),
       default: ModmailStatus.OPEN,
+    },
+  },
+  { _id: false }
+);
+
+const formFieldSchema = new Schema(
+  {
+    id: {
+      type: String,
+      required: true,
+    },
+    label: {
+      type: String,
+      required: true,
+      maxlength: 100,
+    },
+    type: {
+      type: String,
+      enum: Object.values(FormFieldType),
+      required: true,
+    },
+    required: {
+      type: Boolean,
+      default: false,
+    },
+    placeholder: {
+      type: String,
+      required: false,
+      maxlength: 100,
+    },
+    options: {
+      type: [String],
+      required: false,
+      validate: {
+        validator: function (this: any, value: string[]) {
+          // Options are required for SELECT type, optional for others
+          return this.type !== FormFieldType.SELECT || (value && value.length > 0);
+        },
+        message: "Options are required for select fields",
+      },
+    },
+    maxLength: {
+      type: Number,
+      required: false,
+      min: 1,
+      max: 4000, // Discord modal limit
+    },
+    minLength: {
+      type: Number,
+      required: false,
+      min: 0,
+      max: 4000,
+    },
+  },
+  { _id: false }
+);
+
+const categorySchema = new Schema(
+  {
+    id: {
+      type: String,
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      maxlength: 50,
+    },
+    description: {
+      type: String,
+      required: false,
+      maxlength: 200,
+    },
+    emoji: {
+      type: String,
+      required: false,
+      maxlength: 10,
+    },
+    forumChannelId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    staffRoleId: {
+      type: String,
+      required: true,
+    },
+    priority: {
+      type: Number,
+      enum: Object.values(TicketPriority),
+      default: TicketPriority.MEDIUM,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    formFields: {
+      type: [formFieldSchema],
+      default: [],
+      validate: {
+        validator: function (value: any[]) {
+          // Maximum 5 form fields per category to fit in Discord modal
+          return value.length <= 5;
+        },
+        message: "Maximum 5 form fields allowed per category",
+      },
     },
   },
   { _id: false }
@@ -32,6 +152,34 @@ const ModmailConfig = new Schema(
       type: String,
       required: false,
     },
+
+    // Master staff role that can access all categories
+    masterStaffRoleId: {
+      type: String,
+      required: false, // Optional for backward compatibility
+      index: true,
+    },
+
+    // Default category (mandatory for all guilds)
+    defaultCategory: {
+      type: categorySchema,
+      required: false, // Optional for backward compatibility
+    },
+
+    // Additional categories
+    categories: {
+      type: [categorySchema],
+      default: [],
+      validate: {
+        validator: function (value: any[]) {
+          // Maximum 25 categories per guild (Discord select menu limit)
+          return value.length <= 25;
+        },
+        message: "Maximum 25 categories allowed per guild",
+      },
+    },
+
+    // Legacy fields for backward compatibility
     forumChannelId: {
       type: String,
       required: true,
@@ -77,3 +225,5 @@ const ModmailConfig = new Schema(
 
 export default model("ModmailConfig", ModmailConfig);
 export type ModmailConfigType = InferSchemaType<typeof ModmailConfig>;
+export type CategoryType = InferSchemaType<typeof categorySchema>;
+export type FormFieldSchema = InferSchemaType<typeof formFieldSchema>;
