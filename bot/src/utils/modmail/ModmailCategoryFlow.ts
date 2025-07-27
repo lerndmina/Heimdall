@@ -90,11 +90,11 @@ export class ModmailCategoryFlow {
           };
         }
 
-        // No categories or default category configured, proceed with basic flow
+        // No categories or default category configured, return error
         return {
-          success: true,
-          categoryId: undefined,
-          formResponses: {},
+          success: false,
+          error:
+            "No modmail categories are available. Please contact an administrator to configure categories or enable the default category.",
         };
       }
 

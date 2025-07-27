@@ -239,7 +239,7 @@ export class FormBuilder {
       // Set default limits to prevent embed overflow
       maxLength = field.type === FormFieldType.PARAGRAPH ? 1000 : 500;
     }
-    
+
     // Ensure we don't exceed Discord's limits
     maxLength = Math.min(maxLength, 4000);
     textInput.setMaxLength(maxLength);

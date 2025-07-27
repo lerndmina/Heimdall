@@ -110,6 +110,12 @@ export const data = new SlashCommandBuilder()
           )
           .setRequired(false)
       )
+      .addBooleanOption((option) =>
+        option
+          .setName("disable-default-category")
+          .setDescription("Disable the default category - users must select a custom category")
+          .setRequired(false)
+      )
   )
   .addSubcommand((subcommand) =>
     subcommand

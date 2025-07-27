@@ -414,7 +414,7 @@ async function newModmail(
     }
 
     // Create button clicked
-    // TODO: Look up which servers the user and bot are in that both have modmail enabled
+    // Look up which servers the user and bot are in that both have modmail enabled
     const sharedGuilds: Guild[] = [];
     const cachedGuilds = client.guilds.cache;
     for (const [, guild] of cachedGuilds) {
@@ -426,13 +426,9 @@ async function newModmail(
         log.debug(`User ${i.user.id} not found in guild ${guild.id}:`, memberError);
       }
     }
-    const stringSelectMenuID = `guildList-${i.id}`;
-    var guildList = new StringSelectMenuBuilder()
-      .setCustomId(stringSelectMenuID)
-      .setPlaceholder("Select a server")
-      .setMinValues(1)
-      .setMaxValues(1);
-    var addedSomething = false;
+
+    // Collect guilds with modmail configured
+    const guildsWithModmail: Array<{ guild: Guild; config: any }> = [];
     const db = new Database();
     for (var guild of sharedGuilds) {
       const { data: config, error: configError } = await tryCatch(
@@ -445,17 +441,265 @@ async function newModmail(
       }
 
       if (config) {
-        addedSomething = true;
-        guildList.addOptions({
-          label: guild.name,
-          value: JSON.stringify({
-            guild: config.guildId,
-            channel: config.forumChannelId,
-            staffRoleId: config.staffRoleId,
-          }),
-          description: config.guildDescription,
+        guildsWithModmail.push({ guild, config });
+      }
+    }
+
+    // Check if no servers have modmail configured
+    if (guildsWithModmail.length === 0) {
+      await orignalMsg.edit({
+        content: "",
+        components: [],
+        embeds: [ModmailEmbeds.noServersAvailable(client)],
+      });
+      return;
+    }
+
+    // If only one server has modmail, skip selection and proceed directly
+    if (guildsWithModmail.length === 1) {
+      const { guild, config } = guildsWithModmail[0];
+
+      // Proceed directly to modmail creation for the single server
+      await orignalMsg.edit({
+        content: waitingEmoji,
+        components: [],
+        embeds: [],
+      });
+
+      // Extract the values we need
+      const guildId = config.guildId;
+      const channelId = config.forumChannelId;
+      const staffRoleId = config.staffRoleId;
+
+      // Proceed with modmail creation (inline the logic from serverSelectedOpenModmailThread)
+      const getter = new ThingGetter(client);
+      const targetGuild = await getter.getGuild(guildId);
+      const member = await getter.getMember(targetGuild, i.user.id);
+
+      if (!member) {
+        return orignalMsg.edit({
+          content: "",
+          embeds: [ModmailEmbeds.notMember(client, targetGuild.name)],
+          components: [],
         });
       }
+
+      let forumChannel = (await getter.getChannel(channelId)) as unknown as ForumChannel;
+      const noMentionsMessage = removeMentions(messageContent);
+
+      // Get the modmail config
+      const modmailConfig = await db.findOne(ModmailConfig, { guildId: guildId });
+      if (!modmailConfig) {
+        return orignalMsg.edit({
+          content: "",
+          embeds: [ModmailEmbeds.configNotFound(client)],
+          components: [],
+        });
+      }
+
+      // Start category selection flow
+      const { ModmailCategoryFlow } = await import("../../utils/modmail/ModmailCategoryFlow");
+      const categoryFlow = new ModmailCategoryFlow();
+
+      // Create a proxy for the reply interface
+      const replyProxy = {
+        edit: (options: any) => orignalMsg.edit(options),
+        createMessageComponentCollector: (options: any) => {
+          return orignalMsg.createMessageComponentCollector(options);
+        },
+      } as InteractionResponse;
+
+      const categoryResult = await categoryFlow.startCategorySelection({
+        client,
+        user: i.user,
+        guild: targetGuild,
+        originalMessage: message,
+        initialMessage: noMentionsMessage,
+        reply: replyProxy,
+      });
+
+      if (!categoryResult.success) {
+        log.error(`Category selection failed: ${categoryResult.error}`);
+        return orignalMsg.edit({
+          content: "",
+          embeds: [
+            ModmailEmbeds.error(
+              client,
+              "Category Selection Failed",
+              categoryResult.error || "Unknown error"
+            ),
+          ],
+          components: [],
+        });
+      }
+
+      // Get category information for thread creation
+      let categoryInfo: any = {
+        priority: TicketPriority.MEDIUM,
+      };
+
+      if (categoryResult.categoryId) {
+        const { CategoryManager } = await import("../../utils/modmail/CategoryManager");
+        const categoryManager = new CategoryManager();
+        const category = await categoryManager.getCategoryById(
+          targetGuild.id,
+          categoryResult.categoryId
+        );
+
+        if (category) {
+          const ticketNumber = await categoryManager.getNextTicketNumber(targetGuild.id);
+
+          categoryInfo = {
+            categoryId: category.id,
+            categoryName: category.name,
+            priority: Number(category.priority) as TicketPriority,
+            ticketNumber,
+            formResponses: categoryResult.formResponses,
+            formMetadata: categoryResult.metadata,
+          };
+
+          // Use category-specific forum channel if configured
+          if (category.forumChannelId && category.forumChannelId !== forumChannel.id) {
+            const categoryForumChannel = (await getter.getChannel(
+              category.forumChannelId
+            )) as ForumChannel;
+            if (categoryForumChannel) {
+              forumChannel = categoryForumChannel;
+            }
+          }
+        }
+      }
+
+      // Create the modmail thread
+      const result = await createModmailThread(client, {
+        guild: targetGuild,
+        targetUser: i.user,
+        targetMember: member,
+        forumChannel,
+        modmailConfig,
+        reason:
+          noMentionsMessage.length >= 50
+            ? noMentionsMessage.substring(0, 50) + "..."
+            : noMentionsMessage,
+        openedBy: {
+          type: "User",
+          username: i.user.username,
+          userId: i.user.id,
+        },
+        initialMessage: noMentionsMessage,
+        ...categoryInfo,
+      });
+
+      if (!result.success) {
+        log.error(`Failed to create modmail thread: ${result.error}`);
+
+        // Clear rate limit even if creation failed
+        if (!result?.error?.includes("already open")) {
+          const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
+          await redisClient.del(rateLimitKey);
+        }
+
+        return orignalMsg.edit({
+          content: "",
+          embeds: [
+            ModmailEmbeds.threadCreationFailed(
+              client,
+              `An error occurred while trying to create a modmail thread. Please contact the bot developer. I've logged the error for them.\n\nHere's the error: \`\`\`${
+                result?.error || "Unknown error"
+              }\`\`\``
+            ),
+          ],
+          components: [],
+        });
+      }
+
+      // Process attachments
+      const attachmentResult = await processAttachmentsForModmail(message.attachments, message);
+
+      // Send attachment webhook if needed
+      if (result.webhook && attachmentResult.discordAttachments.length > 0) {
+        const { error: webhookSendError } = await tryCatch(
+          result.webhook.send({
+            content: "The original message had attachments, see below:",
+            files: attachmentResult.discordAttachments,
+            threadId: result.thread!.id,
+            username: i.user.displayName,
+            avatarURL: i.user.displayAvatarURL(),
+          })
+        );
+
+        if (webhookSendError) {
+          log.error("Failed to send attachment webhook message:", webhookSendError);
+        }
+      }
+
+      // Handle DM failure case
+      if (!result.dmSuccess) {
+        // Clear rate limit even if DM failed, since thread was created successfully
+        const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
+        await redisClient.del(rateLimitKey);
+
+        // Add success reaction since the thread was still created successfully
+        const { error: reactionError } = await tryCatch(message.react("📨"));
+        if (reactionError) {
+          log.warn("Failed to add success reaction for DM-failed case:", reactionError);
+        }
+
+        return orignalMsg.edit({
+          content: "",
+          embeds: [
+            ModmailEmbeds.warning(
+              client,
+              "DM Failed",
+              `Successfully opened a modmail in **${targetGuild.name}**!\n\nHowever, I was unable to send you a DM. Please check your privacy settings and ensure you can receive DMs from server members.\n\nYou can communicate with staff by going to the thread in the server.`
+            ),
+          ],
+          components: [],
+        });
+      }
+
+      // Success - clear rate limit and update reply
+      const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
+      await redisClient.del(rateLimitKey);
+
+      // Add success reaction to the original user message
+      const { error: reactionError } = await tryCatch(message.react("📨"));
+      if (reactionError) {
+        log.warn("Failed to add success reaction:", reactionError);
+      }
+
+      return orignalMsg.edit({
+        content: "",
+        embeds: [
+          ModmailEmbeds.success(
+            client,
+            "Modmail Created",
+            `Successfully opened a modmail in **${targetGuild.name}**! Check your DMs for further communication.`
+          ),
+        ],
+        components: [],
+      });
+    }
+
+    // Multiple servers - show selection menu
+    const stringSelectMenuID = `guildList-${i.id}`;
+    var guildList = new StringSelectMenuBuilder()
+      .setCustomId(stringSelectMenuID)
+      .setPlaceholder("Select a server")
+      .setMinValues(1)
+      .setMaxValues(1);
+
+    // Add all servers with modmail to the selection
+    for (const { guild, config } of guildsWithModmail) {
+      guildList.addOptions({
+        label: guild.name,
+        value: JSON.stringify({
+          guild: config.guildId,
+          channel: config.forumChannelId,
+          staffRoleId: config.staffRoleId,
+        }),
+        description: config.guildDescription,
+      });
     }
 
     const cancelListEntryId = `cancel-${i.id}`;
@@ -466,14 +710,6 @@ async function newModmail(
       emoji: "❌",
     });
 
-    if (!addedSomething) {
-      await orignalMsg.edit({
-        content: "",
-        components: [],
-        embeds: [ModmailEmbeds.noServersAvailable(client)],
-      });
-      return;
-    }
     const row = new ActionRowBuilder().addComponents(guildList);
     await orignalMsg.edit({
       embeds: [ModmailEmbeds.selectServer(client)],

@@ -131,6 +131,7 @@ export class FormFieldManager {
         .setLabel("Close")
         .setStyle(ButtonStyle.Secondary)
         .setEmoji("❌")
+        .setDisabled(false)
     );
 
     const components = [buttons];
@@ -188,6 +189,7 @@ export class FormFieldManager {
     });
 
     collector?.on("end", () => {
+      log.debug("[Form Management] Collectors ended for category", category.id);
       // Clean up - disable components
       const disabledComponents = context.interaction.message?.components?.map((row: any) => {
         const newRow = new ActionRowBuilder();

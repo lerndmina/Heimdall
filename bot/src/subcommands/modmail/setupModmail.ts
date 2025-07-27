@@ -34,6 +34,8 @@ export default async function setupModmail({ interaction, client, handler }: Sla
   const channel = interaction.options.getChannel("channel");
   const role = interaction.options.getRole("role");
   const description = interaction.options.getString("description");
+  const disableDefaultCategory =
+    interaction.options.getBoolean("disable-default-category") ?? false;
 
   // Validate required parameters
   if (!channel || !role) {
@@ -94,6 +96,22 @@ export default async function setupModmail({ interaction, client, handler }: Sla
 
   // Update database configuration
   const db = new Database();
+
+  // Create default category if not disabled
+  let defaultCategory: any = null;
+  if (!disableDefaultCategory) {
+    defaultCategory = {
+      id: require("uuid").v4(),
+      name: "General Support",
+      description: "Default support category for all general inquiries",
+      priority: 2, // Medium priority
+      emoji: "🎫",
+      isActive: true,
+      formFields: [], // Start with no form fields
+      // Note: forumChannelId and staffRoleId are inherited from main config
+    };
+  }
+
   const { data: config, error: dbError } = await tryCatch(
     db.findOneAndUpdate(
       ModmailConfig,
@@ -105,6 +123,7 @@ export default async function setupModmail({ interaction, client, handler }: Sla
         staffRoleId: role.id,
         webhookId: webhook.id,
         webhookToken: webhook.token,
+        defaultCategory: defaultCategory,
       },
       { upsert: true, new: true }
     )
@@ -135,16 +154,16 @@ export default async function setupModmail({ interaction, client, handler }: Sla
   }
 
   // Send success message
+  const successMessage = `Modmail has been setup successfully! The forum channel ${forumChannel} will be used for modmail threads and the role ${role} will be pinged when a new thread is created.${
+    validDescription ? `\n\nDescription: ${validDescription}` : ""
+  }${
+    disableDefaultCategory
+      ? `\n\n⚠️ **Default category is disabled** - Users must select from custom categories you create using \`/modmail category create\`.`
+      : `\n\n✅ **Default category created** - Users can select "General Support" or choose from custom categories.`
+  }`;
+
   await interaction.editReply({
     content: "",
-    embeds: [
-      ModmailEmbeds.success(
-        client,
-        "Modmail Setup Complete",
-        `Modmail has been setup successfully! The forum channel ${forumChannel} will be used for modmail threads and the role ${role} will be pinged when a new thread is created.${
-          validDescription ? `\n\nDescription: ${validDescription}` : ""
-        }`
-      ),
-    ],
+    embeds: [ModmailEmbeds.success(client, "Modmail Setup Complete", successMessage)],
   });
 }
