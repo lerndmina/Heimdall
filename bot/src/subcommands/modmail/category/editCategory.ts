@@ -29,6 +29,7 @@ export default async function editCategory({ interaction, client, handler }: Sla
   const newForumChannel = interaction.options.getChannel("forum-channel") as ForumChannel | null;
   const newPriorityValue = interaction.options.getString("priority");
   const newEmoji = interaction.options.getString("emoji");
+  const newStaffRole = interaction.options.getRole("staff-role");
 
   try {
     const db = new Database();
@@ -132,6 +133,12 @@ export default async function editCategory({ interaction, client, handler }: Sla
       }
       category.emoji = newEmoji || undefined;
       changes.push(`**Emoji:** ${newEmoji || "Removed"}`);
+      hasChanges = true;
+    }
+
+    if (newStaffRole && newStaffRole.id !== category.staffRoleId) {
+      category.staffRoleId = newStaffRole.id;
+      changes.push(`**Staff Role:** <@&${newStaffRole.id}>`);
       hasChanges = true;
     }
 

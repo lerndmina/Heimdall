@@ -61,7 +61,8 @@ export default async function listCategories({ interaction, client, handler }: S
       description += `**Priority:** ${
         TicketPriority[defaultCat.priority as TicketPriority] || defaultCat.priority
       }\n`;
-      description += `**Forum:** <#${defaultCat.forumChannelId}>\n`;
+      description += `**Forum:** <#${config.forumChannelId}> *(inherits from main config)*\n`;
+      description += `**Staff Role:** <@&${config.staffRoleId}> *(inherits from main config)*\n`;
       if (defaultCat.description) {
         description += `**Description:** ${defaultCat.description}\n`;
       }
@@ -97,6 +98,11 @@ export default async function listCategories({ interaction, client, handler }: S
                   `**Status:** ${statusIcon} ${category.isActive ? "Active" : "Inactive"}\n` +
                   `**Priority:** ${priorityName}\n` +
                   `**Forum:** <#${category.forumChannelId}>\n` +
+                  `**Staff Role:** ${
+                    category.staffRoleId
+                      ? `<@&${category.staffRoleId}>`
+                      : `<@&${config.staffRoleId}> *(inherits)*`
+                  }\n` +
                   `${category.description ? `**Description:** ${category.description}\n` : ""}` +
                   `**Form Fields:** ${formFieldCount}`,
                 inline: true,

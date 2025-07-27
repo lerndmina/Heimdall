@@ -61,20 +61,19 @@ export default async function migrateCategories({
     const defaultCategory = {
       id: require("uuid").v4(),
       name: "General Support",
-      description: "Default category for general support requests",
-      forumChannelId: config.forumChannelId,
-      staffRoleId: config.staffRoleId,
+      description: "Default support category for all general inquiries",
       priority: TicketPriority.MEDIUM,
       emoji: "🎫",
       isActive: true,
       formFields: [], // Start with no form fields
+      // Note: forumChannelId and staffRoleId are inherited from main config
     };
 
-    // Add the default category
+    // Add the default category to the config
     await db.findOneAndUpdate(
       ModmailConfig,
       { guildId: interaction.guildId },
-      { categories: [defaultCategory] }
+      { defaultCategory: defaultCategory }
     );
 
     const embed = new EmbedBuilder()
@@ -85,7 +84,8 @@ export default async function migrateCategories({
           `• **Name:** ${defaultCategory.name}\n` +
           `• **ID:** \`${defaultCategory.id}\`\n` +
           `• **Priority:** Medium\n` +
-          `• **Forum Channel:** <#${defaultCategory.forumChannelId}>\n\n` +
+          `• **Forum Channel:** <#${config.forumChannelId}> (inherited from main config)\n` +
+          `• **Staff Role:** <@&${config.staffRoleId}> (inherited from main config)\n\n` +
           `**Next Steps:**\n` +
           `• Use \`/modmail category create\` to add more categories\n` +
           `• Use \`/modmail category form\` to add forms to categories\n` +

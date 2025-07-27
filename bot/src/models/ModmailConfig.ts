@@ -86,6 +86,54 @@ const formFieldSchema = new Schema(
   { _id: false }
 );
 
+const defaultCategorySchema = new Schema(
+  {
+    id: {
+      type: String,
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      maxlength: 50,
+    },
+    description: {
+      type: String,
+      required: false,
+      maxlength: 200,
+    },
+    emoji: {
+      type: String,
+      required: false,
+      maxlength: 10,
+    },
+    // Default category inherits forumChannelId and staffRoleId from main config
+    // forumChannelId: NOT INCLUDED - uses main config's forumChannelId
+    // staffRoleId: NOT INCLUDED - uses main config's staffRoleId
+    priority: {
+      type: Number,
+      enum: Object.values(TicketPriority),
+      default: TicketPriority.MEDIUM,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    formFields: {
+      type: [formFieldSchema],
+      default: [],
+      validate: {
+        validator: function (value: any[]) {
+          // Maximum 5 form fields per category to fit in Discord modal
+          return value.length <= 5;
+        },
+        message: "Maximum 5 form fields allowed per category",
+      },
+    },
+  },
+  { _id: false }
+);
+
 const categorySchema = new Schema(
   {
     id: {
@@ -112,9 +160,10 @@ const categorySchema = new Schema(
       required: true,
       index: true,
     },
+    // staffRoleId is optional for additional categories - if not provided, uses master role
     staffRoleId: {
       type: String,
-      required: true,
+      required: false, // Optional for additional categories
     },
     priority: {
       type: Number,
@@ -162,7 +211,7 @@ const ModmailConfig = new Schema(
 
     // Default category (mandatory for all guilds)
     defaultCategory: {
-      type: categorySchema,
+      type: defaultCategorySchema,
       required: false, // Optional for backward compatibility
     },
 

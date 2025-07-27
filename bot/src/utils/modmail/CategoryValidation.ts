@@ -18,12 +18,14 @@ export class CategoryValidation {
    * @param category - The category to validate
    * @param guild - Optional guild to validate against Discord entities
    * @param client - Optional Discord client for entity validation
+   * @param fallbackStaffRoleId - Fallback staff role ID from main config (for optional category staff roles)
    * @returns Validation result with errors
    */
   static async validateCategory(
     category: Partial<CategoryType>,
     guild?: Guild,
-    client?: Client
+    client?: Client,
+    fallbackStaffRoleId?: string
   ): Promise<{ valid: boolean; errors: string[]; warnings: string[] }> {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -43,8 +45,10 @@ export class CategoryValidation {
       errors.push("Forum channel ID is required");
     }
 
-    if (!category.staffRoleId) {
-      errors.push("Staff role ID is required");
+    // Staff role validation - either category has its own or fallback is available
+    const effectiveStaffRoleId = category.staffRoleId || fallbackStaffRoleId;
+    if (!effectiveStaffRoleId) {
+      errors.push("Staff role ID is required (either for category or main config)");
     }
 
     if (category.priority && !Object.values(TicketPriority).includes(category.priority)) {
@@ -70,10 +74,10 @@ export class CategoryValidation {
     }
 
     // Discord entity validation (if guild and client provided)
-    if (guild && client && category.forumChannelId && category.staffRoleId) {
+    if (guild && client && category.forumChannelId && effectiveStaffRoleId) {
       const discordValidation = await this.validateDiscordEntities(
         category.forumChannelId,
-        category.staffRoleId,
+        effectiveStaffRoleId,
         guild,
         client
       );

@@ -25,9 +25,10 @@ export default async function createCategory({ interaction, client, handler }: S
 
   const name = interaction.options.getString("name", true);
   const description = interaction.options.getString("description");
-  const forumChannel = interaction.options.getChannel("forum-channel") as ForumChannel | null;
+  const forumChannel = interaction.options.getChannel("forum-channel", true) as ForumChannel;
   const priorityValue = interaction.options.getString("priority");
   const emoji = interaction.options.getString("emoji");
+  const staffRole = interaction.options.getRole("staff-role");
 
   try {
     const db = new Database();
@@ -46,8 +47,8 @@ export default async function createCategory({ interaction, client, handler }: S
       });
     }
 
-    // Validate forum channel if provided
-    if (forumChannel && forumChannel.type !== ChannelType.GuildForum) {
+    // Validate forum channel
+    if (forumChannel.type !== ChannelType.GuildForum) {
       return interaction.editReply({
         embeds: [
           ModmailEmbeds.error(
@@ -92,8 +93,8 @@ export default async function createCategory({ interaction, client, handler }: S
       id: require("uuid").v4(),
       name,
       description: description || undefined,
-      forumChannelId: forumChannel?.id || config.forumChannelId,
-      staffRoleId: config.staffRoleId,
+      forumChannelId: forumChannel.id,
+      staffRoleId: staffRole?.id || undefined, // Optional staff role
       priority,
       emoji: emoji || undefined,
       isActive: true,
@@ -115,13 +116,14 @@ export default async function createCategory({ interaction, client, handler }: S
         ModmailEmbeds.success(
           client,
           "Category Created",
-          `Successfully created category **${name}** with ID \`${newCategory.id}\`.\\n\\n` +
-            `**Priority:** ${TicketPriority[priority]}\\n` +
-            `**Forum Channel:** ${
-              forumChannel ? `<#${forumChannel.id}>` : `<#${config.forumChannelId}> (default)`
-            }\\n` +
-            `${description ? `**Description:** ${description}\\n` : ""}` +
-            `${emoji ? `**Emoji:** ${emoji}\\n` : ""}\\n` +
+          `Successfully created category **${name}** with ID \`${newCategory.id}\`.\n\n` +
+            `**Priority:** ${TicketPriority[priority]}\n` +
+            `**Forum Channel:** <#${forumChannel.id}>\n` +
+            `**Staff Role:** ${
+              staffRole ? `<@&${staffRole.id}>` : "*Inherits from main config*"
+            }\n` +
+            `${description ? `**Description:** ${description}\n` : ""}` +
+            `${emoji ? `**Emoji:** ${emoji}\n` : ""}\n` +
             `Use \`/modmail category form\` to add form fields to this category.`
         ),
       ],

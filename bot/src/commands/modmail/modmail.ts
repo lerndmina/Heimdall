@@ -168,8 +168,8 @@ export const data = new SlashCommandBuilder()
           .addChannelOption((option) =>
             option
               .setName("forum-channel")
-              .setDescription("Forum channel for this category (optional, uses default if not set)")
-              .setRequired(false)
+              .setDescription("Forum channel for this category")
+              .setRequired(true)
               .addChannelTypes(ChannelType.GuildForum)
           )
           .addStringOption((option) =>
@@ -186,6 +186,14 @@ export const data = new SlashCommandBuilder()
           )
           .addStringOption((option) =>
             option.setName("emoji").setDescription("Category emoji").setRequired(false)
+          )
+          .addRoleOption((option) =>
+            option
+              .setName("staff-role")
+              .setDescription(
+                "Staff role for this category (optional, uses main staff role if not set)"
+              )
+              .setRequired(false)
           )
       )
       .addSubcommand((subcommand) =>
@@ -237,6 +245,12 @@ export const data = new SlashCommandBuilder()
           )
           .addStringOption((option) =>
             option.setName("emoji").setDescription("New category emoji").setRequired(false)
+          )
+          .addRoleOption((option) =>
+            option
+              .setName("staff-role")
+              .setDescription("New staff role for this category (optional)")
+              .setRequired(false)
           )
       )
       .addSubcommand((subcommand) =>

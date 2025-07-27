@@ -22,6 +22,29 @@ export class CategoryManager {
   }
 
   /**
+   * Convert default category to full CategoryType by adding inherited properties
+   * @param defaultCategory - The default category from config
+   * @param config - The main modmail config
+   * @returns Full CategoryType with inherited properties
+   */
+  private convertDefaultCategoryToFull(
+    defaultCategory: any,
+    config: ModmailConfigType
+  ): CategoryType {
+    return {
+      id: defaultCategory.id,
+      name: defaultCategory.name,
+      description: defaultCategory.description,
+      forumChannelId: config.forumChannelId,
+      staffRoleId: config.staffRoleId,
+      priority: defaultCategory.priority,
+      emoji: defaultCategory.emoji,
+      isActive: defaultCategory.isActive,
+      formFields: defaultCategory.formFields || [],
+    };
+  }
+
+  /**
    * Get all available and active categories for a guild
    * @param guildId - The guild ID to get categories for
    * @returns Array of active categories including default category
@@ -45,7 +68,9 @@ export class CategoryManager {
 
     // Always include default category if it exists and is active
     if (config.defaultCategory && config.defaultCategory.isActive) {
-      categories.push(config.defaultCategory);
+      // Convert default category to full CategoryType by adding inherited properties
+      const fullDefaultCategory = this.convertDefaultCategoryToFull(config.defaultCategory, config);
+      categories.push(fullDefaultCategory);
     }
 
     // Add additional active categories
@@ -82,7 +107,7 @@ export class CategoryManager {
       return null;
     }
 
-    return config.defaultCategory;
+    return this.convertDefaultCategoryToFull(config.defaultCategory, config);
   }
 
   /**
@@ -280,9 +305,13 @@ export class CategoryManager {
   /**
    * Validate category configuration
    * @param category - The category to validate
+   * @param fallbackStaffRoleId - Fallback staff role ID from main config
    * @returns Validation result with any errors
    */
-  validateCategory(category: Partial<CategoryType>): { valid: boolean; errors: string[] } {
+  validateCategory(
+    category: Partial<CategoryType>,
+    fallbackStaffRoleId?: string
+  ): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (!category.name || category.name.trim().length === 0) {
@@ -297,8 +326,10 @@ export class CategoryManager {
       errors.push("Forum channel ID is required");
     }
 
-    if (!category.staffRoleId) {
-      errors.push("Staff role ID is required");
+    // Staff role validation - either category has its own or fallback is available
+    const effectiveStaffRoleId = category.staffRoleId || fallbackStaffRoleId;
+    if (!effectiveStaffRoleId) {
+      errors.push("Staff role ID is required (either for category or main config)");
     }
 
     if (category.description && category.description.length > 200) {
@@ -317,6 +348,16 @@ export class CategoryManager {
       valid: errors.length === 0,
       errors,
     };
+  }
+
+  /**
+   * Get the effective staff role ID for a category (category's own or fallback to main config)
+   * @param category - The category to get staff role for
+   * @param mainConfigStaffRoleId - Staff role ID from main config
+   * @returns The effective staff role ID
+   */
+  static getEffectiveStaffRoleId(category: CategoryType, mainConfigStaffRoleId: string): string {
+    return category.staffRoleId || mainConfigStaffRoleId;
   }
 }
 
