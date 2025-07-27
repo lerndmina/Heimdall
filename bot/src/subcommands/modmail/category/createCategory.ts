@@ -37,6 +37,7 @@ export default async function createCategory({ interaction, client, handler }: S
     const config = await db.findOne(ModmailConfig, { guildId: interaction.guildId });
     if (!config) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -50,6 +51,7 @@ export default async function createCategory({ interaction, client, handler }: S
     // Validate forum channel
     if (forumChannel.type !== ChannelType.GuildForum) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -68,6 +70,7 @@ export default async function createCategory({ interaction, client, handler }: S
     // Validate emoji if provided
     if (emoji && emoji.length > 10) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(client, "Invalid Emoji", "Emoji must be 10 characters or less."),
         ],
@@ -78,6 +81,7 @@ export default async function createCategory({ interaction, client, handler }: S
     const existingCategories = config.categories || [];
     if (existingCategories.some((cat) => cat.name.toLowerCase() === name.toLowerCase())) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -112,6 +116,7 @@ export default async function createCategory({ interaction, client, handler }: S
     );
 
     return interaction.editReply({
+      content: "",
       embeds: [
         ModmailEmbeds.success(
           client,
@@ -131,6 +136,7 @@ export default async function createCategory({ interaction, client, handler }: S
   } catch (error) {
     log.error("Error creating category:", error);
     return interaction.editReply({
+      content: "",
       embeds: [
         ModmailEmbeds.error(
           client,

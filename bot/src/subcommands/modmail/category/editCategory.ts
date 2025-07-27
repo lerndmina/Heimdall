@@ -38,6 +38,7 @@ export default async function editCategory({ interaction, client, handler }: Sla
     const config = await db.findOne(ModmailConfig, { guildId: interaction.guildId });
     if (!config) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -54,6 +55,7 @@ export default async function editCategory({ interaction, client, handler }: Sla
 
     if (categoryIndex === -1) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -77,6 +79,7 @@ export default async function editCategory({ interaction, client, handler }: Sla
         )
       ) {
         return interaction.editReply({
+          content: "",
           embeds: [
             ModmailEmbeds.error(
               client,
@@ -100,6 +103,7 @@ export default async function editCategory({ interaction, client, handler }: Sla
     if (newForumChannel && newForumChannel.id !== category.forumChannelId) {
       if (newForumChannel.type !== ChannelType.GuildForum) {
         return interaction.editReply({
+          content: "",
           embeds: [
             ModmailEmbeds.error(
               client,
@@ -126,6 +130,7 @@ export default async function editCategory({ interaction, client, handler }: Sla
     if (newEmoji !== null && newEmoji !== category.emoji) {
       if (newEmoji && newEmoji.length > 10) {
         return interaction.editReply({
+          content: "",
           embeds: [
             ModmailEmbeds.error(client, "Invalid Emoji", "Emoji must be 10 characters or less."),
           ],
@@ -144,6 +149,7 @@ export default async function editCategory({ interaction, client, handler }: Sla
 
     if (!hasChanges) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -158,6 +164,7 @@ export default async function editCategory({ interaction, client, handler }: Sla
     await db.findOneAndUpdate(ModmailConfig, { guildId: interaction.guildId }, { categories });
 
     return interaction.editReply({
+      content: "",
       embeds: [
         ModmailEmbeds.success(
           client,
@@ -171,6 +178,7 @@ export default async function editCategory({ interaction, client, handler }: Sla
   } catch (error) {
     log.error("Error editing category:", error);
     return interaction.editReply({
+      content: "",
       embeds: [
         ModmailEmbeds.error(
           client,

@@ -33,6 +33,7 @@ export default async function deleteCategory({ interaction, client, handler }: S
     const config = await db.findOne(ModmailConfig, { guildId: interaction.guildId });
     if (!config) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -49,6 +50,7 @@ export default async function deleteCategory({ interaction, client, handler }: S
 
     if (categoryIndex === -1) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -66,6 +68,7 @@ export default async function deleteCategory({ interaction, client, handler }: S
       // TODO: Check for active modmail tickets using this category
       // For now, we'll just show a warning
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -89,6 +92,7 @@ export default async function deleteCategory({ interaction, client, handler }: S
     );
 
     return interaction.editReply({
+      content: "",
       embeds: [
         ModmailEmbeds.success(
           client,
@@ -100,6 +104,7 @@ export default async function deleteCategory({ interaction, client, handler }: S
   } catch (error) {
     log.error("Error deleting category:", error);
     return interaction.editReply({
+      content: "",
       embeds: [
         ModmailEmbeds.error(
           client,

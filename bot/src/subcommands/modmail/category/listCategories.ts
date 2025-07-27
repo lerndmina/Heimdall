@@ -30,6 +30,7 @@ export default async function listCategories({ interaction, client, handler }: S
     const config = await db.findOne(ModmailConfig, { guildId: interaction.guildId });
     if (!config) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -135,11 +136,13 @@ export default async function listCategories({ interaction, client, handler }: S
     ]);
 
     return interaction.editReply({
+      content: "",
       embeds: [embed],
     });
   } catch (error) {
     log.error("Error listing categories:", error);
     return interaction.editReply({
+      content: "",
       embeds: [
         ModmailEmbeds.error(
           client,

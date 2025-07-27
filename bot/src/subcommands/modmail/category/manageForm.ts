@@ -32,6 +32,7 @@ export default async function manageForm({ interaction, client, handler }: Slash
     const config = await db.findOne(ModmailConfig, { guildId: interaction.guildId });
     if (!config) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -48,6 +49,7 @@ export default async function manageForm({ interaction, client, handler }: Slash
 
     if (!category) {
       return interaction.editReply({
+        content: "",
         embeds: [
           ModmailEmbeds.error(
             client,
@@ -61,6 +63,7 @@ export default async function manageForm({ interaction, client, handler }: Slash
     const formFieldCount = category.formFields ? category.formFields.length : 0;
 
     return interaction.editReply({
+      content: "",
       embeds: [
         ModmailEmbeds.error(
           client,
@@ -79,6 +82,7 @@ export default async function manageForm({ interaction, client, handler }: Slash
   } catch (error) {
     log.error("Error in form management:", error);
     return interaction.editReply({
+      content: "",
       embeds: [
         ModmailEmbeds.error(
           client,

@@ -92,8 +92,9 @@ export const data = new SlashCommandBuilder()
       .addChannelOption((option) =>
         option
           .setName("channel")
-          .setDescription("The channel to send the button in")
+          .setDescription("The forum channel to use for modmail threads")
           .setRequired(true)
+          .addChannelTypes(ChannelType.GuildForum)
       )
       .addRoleOption((option) =>
         option
