@@ -24,7 +24,11 @@ import {
 import { ButtonBuilder, ButtonStyle, SlashCommandBuilder } from "discord.js";
 import BasicEmbed from "../../utils/BasicEmbed";
 import Modmail, { ModmailType } from "../../models/Modmail";
-import ModmailConfig, { ModmailConfigType, ModmailStatus, TicketPriority } from "../../models/ModmailConfig";
+import ModmailConfig, {
+  ModmailConfigType,
+  ModmailStatus,
+  TicketPriority,
+} from "../../models/ModmailConfig";
 import ButtonWrapper from "../../utils/ButtonWrapper";
 import { redisClient, removeMentions, waitingEmoji } from "../../Bot";
 import {
@@ -555,21 +559,27 @@ async function newModmail(
       // Start category selection flow
       const { ModmailCategoryFlow } = await import("../../utils/modmail/ModmailCategoryFlow");
       const categoryFlow = new ModmailCategoryFlow();
-      
+
       const categoryResult = await categoryFlow.startCategorySelection({
         client,
         user: i.user,
         guild,
         originalMessage: message,
         initialMessage: noMentionsMessage,
-        reply
+        reply,
       });
 
       if (!categoryResult.success) {
         log.error(`Category selection failed: ${categoryResult.error}`);
         return reply.edit({
           content: "",
-          embeds: [ModmailEmbeds.error(client, "Category Selection Failed", categoryResult.error || "Unknown error")],
+          embeds: [
+            ModmailEmbeds.error(
+              client,
+              "Category Selection Failed",
+              categoryResult.error || "Unknown error"
+            ),
+          ],
           components: [],
         });
       }
@@ -580,7 +590,7 @@ async function newModmail(
         const { CategoryManager } = await import("../../utils/modmail/CategoryManager");
         const categoryManager = new CategoryManager();
         const category = await categoryManager.getCategoryById(guild.id, categoryResult.categoryId);
-        
+
         if (category) {
           const ticketNumber = await categoryManager.getNextTicketNumber(guild.id);
           categoryInfo = {
@@ -588,12 +598,15 @@ async function newModmail(
             categoryName: category.name,
             priority: category.priority,
             ticketNumber,
-            formResponses: categoryResult.formResponses
+            formResponses: categoryResult.formResponses,
+            formMetadata: categoryResult.metadata,
           };
-          
+
           // Use category-specific forum channel if configured
           if (category.forumChannelId && category.forumChannelId !== forumChannel.id) {
-            const categoryForumChannel = await getter.getChannel(category.forumChannelId) as ForumChannel;
+            const categoryForumChannel = (await getter.getChannel(
+              category.forumChannelId
+            )) as ForumChannel;
             if (categoryForumChannel) {
               forumChannel = categoryForumChannel;
             }
@@ -618,7 +631,7 @@ async function newModmail(
           userId: i.user.id,
         },
         initialMessage,
-        ...categoryInfo // Spread category information
+        ...categoryInfo, // Spread category information
       });
       if (!result?.success) {
         log.error(`Failed to create modmail thread: ${result?.error}`);

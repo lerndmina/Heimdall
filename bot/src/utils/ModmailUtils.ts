@@ -490,6 +490,7 @@ export async function createModmailThread(
     priority?: TicketPriority;
     ticketNumber?: number;
     formResponses?: Record<string, any>;
+    formMetadata?: Record<string, { label: string; type: string }>;
   }
 ): Promise<
   | {
@@ -546,17 +547,17 @@ export async function createModmailThread(
     // Generate thread name using the new ticket numbering system
     const claimedStaffName = openedBy?.type === "Staff" ? openedBy.username : null;
     let threadName: string;
-    
+
     if (options.categoryId && options.ticketNumber && options.priority) {
       // Use enhanced ticket numbering system
-      const { TicketNumbering } = await import('./modmail/TicketNumbering');
+      const { TicketNumbering } = await import("./modmail/TicketNumbering");
       const ticketNumbering = new TicketNumbering();
-      
+
       threadName = ticketNumbering.generateThreadName({
         ticketNumber: options.ticketNumber,
         username: memberName,
         claimedStaffName: claimedStaffName || undefined,
-        priority: options.priority
+        priority: options.priority,
       });
     } else {
       // Fallback to old system for backward compatibility
@@ -618,16 +619,54 @@ export async function createModmailThread(
     const notificationContent =
       openedBy?.type === "Staff" ? `<@${openedBy.userId}>` : `<@&${modmailConfig.staffRoleId}>`;
 
+    const embeds = [
+      ModmailEmbeds.staffNotification(
+        client,
+        memberName,
+        openedBy?.type === "Staff",
+        openedBy?.username
+      ),
+    ];
+
+    // Add form responses embed if any form data was collected
+    if (options.formResponses && Object.keys(options.formResponses).length > 0) {
+      const formEmbed = new EmbedBuilder()
+        .setTitle("📝 Form Responses")
+        .setColor(0x3498db)
+        .setTimestamp();
+
+      // Add each form response as a field
+      Object.entries(options.formResponses).forEach(([fieldId, value]) => {
+        const displayValue = Array.isArray(value) ? value.join(", ") : String(value);
+        const fieldLabel =
+          options.formMetadata?.[fieldId]?.label ||
+          fieldId.charAt(0).toUpperCase() + fieldId.slice(1).replace(/([A-Z])/g, " $1");
+
+        formEmbed.addFields([
+          {
+            name: fieldLabel,
+            value:
+              displayValue.length > 1024 ? displayValue.substring(0, 1021) + "..." : displayValue,
+            inline: displayValue.length < 50,
+          },
+        ]);
+      });
+
+      // Add category information if available
+      if (options.categoryName) {
+        formEmbed.setDescription(
+          `**Category:** ${options.categoryName}${
+            options.ticketNumber ? ` | **Ticket #${options.ticketNumber}**` : ""
+          }`
+        );
+      }
+
+      embeds.push(formEmbed);
+    }
+
     await thread.send({
       content: notificationContent,
-      embeds: [
-        ModmailEmbeds.staffNotification(
-          client,
-          memberName,
-          openedBy?.type === "Staff",
-          openedBy?.username
-        ),
-      ],
+      embeds,
       components: createModmailActionButtons(),
     });
 
@@ -645,12 +684,14 @@ export async function createModmailThread(
       categoryName: options.categoryName || null,
       ticketNumber: options.ticketNumber || null,
       priority: options.priority || TicketPriority.MEDIUM,
-      formResponses: options.formResponses ? Object.entries(options.formResponses).map(([fieldId, value]) => ({
-        fieldId,
-        fieldLabel: fieldId, // This would ideally come from the form field definition
-        fieldType: typeof value === 'string' ? 'short' : 'select', // Basic type inference
-        value: Array.isArray(value) ? value.join(', ') : String(value)
-      })) : [],
+      formResponses: options.formResponses
+        ? Object.entries(options.formResponses).map(([fieldId, value]) => ({
+            fieldId,
+            fieldLabel: fieldId, // This would ideally come from the form field definition
+            fieldType: typeof value === "string" ? "short" : "select", // Basic type inference
+            value: Array.isArray(value) ? value.join(", ") : String(value),
+          }))
+        : [],
       createdVia: openedBy?.type === "Staff" ? "command" : "dm",
       // Ensure the thread is marked as open
       isClosed: false,
