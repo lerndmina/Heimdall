@@ -6,7 +6,7 @@ import log from "../log";
 
 /**
  * Utility class for managing ticket numbering and naming conventions
- * 
+ *
  * New thread naming format: 🔸 #1234 | username | claimedStaff
  * - Priority emoji at the start for easy visual identification
  * - Auto-incrementing ticket numbers per guild
@@ -85,12 +85,7 @@ export class TicketNumbering {
     priority: TicketPriority;
     claimedStaffName?: string;
   }): string {
-    const {
-      ticketNumber,
-      username,
-      priority,
-      claimedStaffName = "unknown",
-    } = options;
+    const { ticketNumber, username, priority, claimedStaffName = "unknown" } = options;
 
     const DISCORD_MAX_THREAD_NAME = 100;
 
@@ -107,8 +102,7 @@ export class TicketNumbering {
 
     // If too long, truncate the username first
     const maxUsernameLength =
-      DISCORD_MAX_THREAD_NAME -
-      (formattedNumber.length + claimedStaffName.length + 15); // 15 for formatting chars and emoji
+      DISCORD_MAX_THREAD_NAME - (formattedNumber.length + claimedStaffName.length + 15); // 15 for formatting chars and emoji
 
     const truncatedUsername =
       username.length > maxUsernameLength
@@ -120,8 +114,7 @@ export class TicketNumbering {
     // If still too long, truncate the claimed staff name
     if (truncatedName.length > DISCORD_MAX_THREAD_NAME) {
       const maxStaffNameLength =
-        DISCORD_MAX_THREAD_NAME -
-        (formattedNumber.length + truncatedUsername.length + 15);
+        DISCORD_MAX_THREAD_NAME - (formattedNumber.length + truncatedUsername.length + 15);
 
       const truncatedStaffName =
         claimedStaffName.length > maxStaffNameLength
