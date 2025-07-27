@@ -70,19 +70,17 @@ export class TicketNumbering {
 
   /**
    * Generate a complete thread name for a modmail ticket
-   * Format: [CATEGORY] #1234 | username | 🔸 | claimedStaff
+   * Format: 🔸 #1234 | username | claimedStaff
    * @param options - The thread naming options
    * @returns The formatted thread name
    */
   generateThreadName(options: {
-    categoryName: string;
     ticketNumber: number;
     username: string;
     priority: TicketPriority;
     claimedStaffName?: string;
   }): string {
     const {
-      categoryName,
       ticketNumber,
       username,
       priority,
@@ -94,8 +92,8 @@ export class TicketNumbering {
     const formattedNumber = this.formatTicketNumber(ticketNumber);
     const priorityEmoji = this.getPriorityEmoji(priority);
 
-    // Build the base format: [CATEGORY] #1234 | username | 🔸 | claimedStaff
-    const baseName = `[${categoryName}] #${formattedNumber} | ${username} | ${priorityEmoji} | ${claimedStaffName}`;
+    // Build the base format: 🔸 #1234 | username | claimedStaff
+    const baseName = `${priorityEmoji} #${formattedNumber} | ${username} | ${claimedStaffName}`;
 
     // If it fits within Discord's limit, use it as is
     if (baseName.length <= DISCORD_MAX_THREAD_NAME) {
@@ -105,27 +103,27 @@ export class TicketNumbering {
     // If too long, truncate the username first
     const maxUsernameLength =
       DISCORD_MAX_THREAD_NAME -
-      (categoryName.length + formattedNumber.length + claimedStaffName.length + 20); // 20 for formatting chars
+      (formattedNumber.length + claimedStaffName.length + 15); // 15 for formatting chars and emoji
 
     const truncatedUsername =
       username.length > maxUsernameLength
         ? username.substring(0, Math.max(3, maxUsernameLength - 3)) + "..."
         : username;
 
-    const truncatedName = `[${categoryName}] #${formattedNumber} | ${truncatedUsername} | ${priorityEmoji} | ${claimedStaffName}`;
+    const truncatedName = `${priorityEmoji} #${formattedNumber} | ${truncatedUsername} | ${claimedStaffName}`;
 
-    // If still too long, truncate the category name
+    // If still too long, truncate the claimed staff name
     if (truncatedName.length > DISCORD_MAX_THREAD_NAME) {
-      const maxCategoryLength =
+      const maxStaffNameLength =
         DISCORD_MAX_THREAD_NAME -
-        (formattedNumber.length + truncatedUsername.length + claimedStaffName.length + 20);
+        (formattedNumber.length + truncatedUsername.length + 15);
 
-      const truncatedCategory =
-        categoryName.length > maxCategoryLength
-          ? categoryName.substring(0, Math.max(3, maxCategoryLength - 3)) + "..."
-          : categoryName;
+      const truncatedStaffName =
+        claimedStaffName.length > maxStaffNameLength
+          ? claimedStaffName.substring(0, Math.max(3, maxStaffNameLength - 3)) + "..."
+          : claimedStaffName;
 
-      return `[${truncatedCategory}] #${formattedNumber} | ${truncatedUsername} | ${priorityEmoji} | ${claimedStaffName}`;
+      return `${priorityEmoji} #${formattedNumber} | ${truncatedUsername} | ${truncatedStaffName}`;
     }
 
     return truncatedName;
@@ -138,7 +136,7 @@ export class TicketNumbering {
    * @returns The updated thread name
    */
   updateThreadNameWithClaim(currentName: string, claimedStaffName: string): string {
-    // Pattern: [CATEGORY] #1234 | username | 🔸 | unknown
+    // Pattern: 🔸 #1234 | username | unknown
     // Replace the last part (after the last |) with the claimed staff name
     const lastPipeIndex = currentName.lastIndexOf(" | ");
 
@@ -157,23 +155,45 @@ export class TicketNumbering {
    * @returns Parsed ticket information or null if parsing fails
    */
   parseThreadName(threadName: string): {
-    categoryName?: string;
     ticketNumber?: number;
     username?: string;
     claimedStaffName?: string;
+    priority?: TicketPriority;
   } | null {
-    // Pattern: [CATEGORY] #1234 | username | 🔸 | claimedStaff
-    const match = threadName.match(/^\[(.+?)\] #(\d+) \| (.+?) \| .+ \| (.+)$/);
+    // Pattern: 🔸 #1234 | username | claimedStaff
+    const match = threadName.match(/^(.+?) #(\d+) \| (.+?) \| (.+)$/);
 
     if (!match) {
       return null;
     }
 
+    const priorityEmoji = match[1];
+    const ticketNumber = parseInt(match[2], 10);
+    const username = match[3];
+    const claimedStaffName = match[4] === "unknown" ? undefined : match[4];
+
+    // Try to determine priority from emoji
+    let priority: TicketPriority = TicketPriority.MEDIUM; // Default
+    switch (priorityEmoji) {
+      case "🔹":
+        priority = TicketPriority.LOW;
+        break;
+      case "🔸":
+        priority = TicketPriority.MEDIUM;
+        break;
+      case "🔴":
+        priority = TicketPriority.HIGH;
+        break;
+      case "🚨":
+        priority = TicketPriority.URGENT;
+        break;
+    }
+
     return {
-      categoryName: match[1],
-      ticketNumber: parseInt(match[2], 10),
-      username: match[3],
-      claimedStaffName: match[4] === "unknown" ? undefined : match[4],
+      ticketNumber,
+      username,
+      claimedStaffName,
+      priority,
     };
   }
 
