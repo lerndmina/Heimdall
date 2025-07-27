@@ -187,13 +187,19 @@ export class FormBuilder {
    * @param value User input value
    */
   private static validateFieldValue(field: FormFieldSchema, value: string): void {
+    // Apply default max length if not specified
+    let maxLength = field.maxLength;
+    if (!maxLength) {
+      maxLength = field.type === FormFieldType.PARAGRAPH ? 1000 : 500;
+    }
+
     // Check min/max length
     if (field.minLength && value.length < field.minLength) {
       throw new Error(`Field "${field.label}" must be at least ${field.minLength} characters`);
     }
 
-    if (field.maxLength && value.length > field.maxLength) {
-      throw new Error(`Field "${field.label}" must be no more than ${field.maxLength} characters`);
+    if (value.length > maxLength) {
+      throw new Error(`Field "${field.label}" must be no more than ${maxLength} characters`);
     }
 
     // Validate number fields
@@ -227,9 +233,16 @@ export class FormBuilder {
       textInput.setMinLength(field.minLength);
     }
 
-    if (field.maxLength) {
-      textInput.setMaxLength(field.maxLength);
+    // Apply maxLength from field config, or default based on field type
+    let maxLength = field.maxLength;
+    if (!maxLength) {
+      // Set default limits to prevent embed overflow
+      maxLength = field.type === FormFieldType.PARAGRAPH ? 1000 : 500;
     }
+    
+    // Ensure we don't exceed Discord's limits
+    maxLength = Math.min(maxLength, 4000);
+    textInput.setMaxLength(maxLength);
 
     return new ActionRowBuilder<TextInputBuilder>().addComponents(textInput);
   }

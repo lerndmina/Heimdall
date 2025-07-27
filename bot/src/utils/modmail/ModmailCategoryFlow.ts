@@ -99,18 +99,18 @@ export class ModmailCategoryFlow {
       }
 
       // Create category selection menu
-      log.info(`[Form Debug] Starting category selection with ${categories.length} categories`);
+      log.debug(`[Form Debug] Starting category selection with ${categories.length} categories`);
 
       const categorySelectResult = await this.showCategorySelection(context, categories);
 
-      log.info(`[Form Debug] Category selection result:`, categorySelectResult);
+      log.debug(`[Form Debug] Category selection result:`, categorySelectResult);
 
       if (!categorySelectResult.success) {
         return categorySelectResult;
       }
 
       const selectedCategory = categories.find((cat) => cat.id === categorySelectResult.categoryId);
-      log.info(
+      log.debug(
         `[Form Debug] Found selected category:`,
         selectedCategory ? selectedCategory.name : "NOT FOUND"
       );
@@ -123,14 +123,14 @@ export class ModmailCategoryFlow {
       }
 
       // Check if category has form fields
-      log.info(
+      log.debug(
         `[Form Debug] Category "${selectedCategory.name}" has ${
           selectedCategory.formFields?.length || 0
         } form fields`
       );
 
       if (!selectedCategory.formFields || selectedCategory.formFields.length === 0) {
-        log.info(`[Form Debug] No form fields required for category "${selectedCategory.name}"`);
+        log.debug(`[Form Debug] No form fields required for category "${selectedCategory.name}"`);
         // No form required, proceed with just category selection
         return {
           success: true,
@@ -139,12 +139,12 @@ export class ModmailCategoryFlow {
         };
       }
 
-      log.info(`[Form Debug] Starting form collection for category "${selectedCategory.name}"`);
+      log.debug(`[Form Debug] Starting form collection for category "${selectedCategory.name}"`);
 
       // Collect form responses if required
       const formResult = await this.collectFormResponses(context, selectedCategory);
 
-      log.info(`[Form Debug] Form collection result:`, formResult);
+      log.debug(`[Form Debug] Form collection result:`, formResult);
 
       if (!formResult.success) {
         return formResult;
@@ -298,10 +298,10 @@ export class ModmailCategoryFlow {
     category: CategoryType
   ): Promise<FormCollectionResult> {
     try {
-      log.info(`[Form Debug] Starting collectFormResponses for category: ${category.name}`);
+      log.debug(`[Form Debug] Starting collectFormResponses for category: ${category.name}`);
 
       const formFields = category.formFields as FormFieldSchema[];
-      log.info(`[Form Debug] Form fields:`, formFields);
+      log.debug(`[Form Debug] Form fields:`, formFields);
 
       if (!formFields || formFields.length === 0) {
         return {
@@ -316,7 +316,7 @@ export class ModmailCategoryFlow {
       // Process each field in order
       for (let i = 0; i < formFields.length; i++) {
         const field = formFields[i];
-        log.info(
+        log.debug(
           `[Form Debug] Processing field ${i + 1}/${formFields.length}: ${field.label} (${
             field.type
           })`
@@ -762,7 +762,7 @@ export class ModmailCategoryFlow {
     responseProcessor: FormResponseProcessor
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      log.info(`[Form Debug] Showing select field: ${field.label}`);
+      log.debug(`[Form Debug] Showing select field: ${field.label}`);
 
       const formBuilder = new FormBuilder([field]);
       const selectMenuRow = formBuilder.createSelectMenu(field, `form-select-${field.id}`);
@@ -794,7 +794,7 @@ export class ModmailCategoryFlow {
           try {
             await interaction.deferUpdate();
             await responseProcessor.processSelectMenuInteraction(interaction, field.id);
-            log.info(`[Form Debug] Collected response for field: ${field.label}`);
+            log.debug(`[Form Debug] Collected response for field: ${field.label}`);
             resolve({ success: true });
           } catch (error) {
             log.error(`Error processing select interaction for field ${field.id}:`, error);
@@ -832,7 +832,7 @@ export class ModmailCategoryFlow {
     categoryName: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      log.info(`[Form Debug] Showing modal field: ${field.label}`);
+      log.debug(`[Form Debug] Showing modal field: ${field.label}`);
 
       const formBuilder = new FormBuilder([field]);
       const modals = formBuilder.createModals("ticket-form", `${categoryName} - ${field.label}`);
@@ -886,7 +886,7 @@ export class ModmailCategoryFlow {
 
             await modalSubmission.deferUpdate();
             await responseProcessor.processModalSubmission(modalSubmission, 0);
-            log.info(`[Form Debug] Collected response for field: ${field.label}`);
+            log.debug(`[Form Debug] Collected response for field: ${field.label}`);
             resolve({ success: true });
           } catch (error) {
             if (error instanceof Error && error.message?.includes("time")) {
