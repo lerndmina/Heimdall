@@ -7,6 +7,7 @@ import Database from "../../utils/data/database";
 import { CommandOptions, SlashCommandProps } from "commandkit";
 import log from "../../utils/log";
 import FetchEnvs from "../../utils/FetchEnvs";
+import ModmailConfig from "../../models/ModmailConfig";
 import closeModmail from "../../subcommands/modmail/closeModmail";
 import banModmail, { banModmailOptions } from "../../subcommands/modmail/banModmail";
 import canRunCommand from "../../utils/canRunCommand";
@@ -137,6 +138,138 @@ export const data = new SlashCommandBuilder()
       .setName("markresolved")
       .setDescription("Mark this modmail thread as resolved with user response options")
   )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("migrate")
+      .setDescription("Migrate existing modmail setup to use categories (Administrator only)")
+  )
+  .addSubcommandGroup((group) =>
+    group
+      .setName("category")
+      .setDescription("Manage modmail categories")
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("create")
+          .setDescription("Create a new modmail category")
+          .addStringOption((option) =>
+            option
+              .setName("name")
+              .setDescription("Category name")
+              .setRequired(true)
+              .setMaxLength(50)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("description")
+              .setDescription("Category description")
+              .setRequired(false)
+              .setMaxLength(200)
+          )
+          .addChannelOption((option) =>
+            option
+              .setName("forum-channel")
+              .setDescription("Forum channel for this category (optional, uses default if not set)")
+              .setRequired(false)
+              .addChannelTypes(ChannelType.GuildForum)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("priority")
+              .setDescription("Category priority level")
+              .setRequired(false)
+              .setChoices(
+                { name: "Low", value: "1" },
+                { name: "Medium", value: "2" },
+                { name: "High", value: "3" },
+                { name: "Urgent", value: "4" }
+              )
+          )
+          .addStringOption((option) =>
+            option.setName("emoji").setDescription("Category emoji").setRequired(false)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("list").setDescription("List all modmail categories")
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("edit")
+          .setDescription("Edit an existing modmail category")
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category to edit")
+              .setRequired(true)
+              .setAutocomplete(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("name")
+              .setDescription("New category name")
+              .setRequired(false)
+              .setMaxLength(50)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("description")
+              .setDescription("New category description")
+              .setRequired(false)
+              .setMaxLength(200)
+          )
+          .addChannelOption((option) =>
+            option
+              .setName("forum-channel")
+              .setDescription("New forum channel for this category")
+              .setRequired(false)
+              .addChannelTypes(ChannelType.GuildForum)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("priority")
+              .setDescription("New category priority level")
+              .setRequired(false)
+              .setChoices(
+                { name: "Low", value: "1" },
+                { name: "Medium", value: "2" },
+                { name: "High", value: "3" },
+                { name: "Urgent", value: "4" }
+              )
+          )
+          .addStringOption((option) =>
+            option.setName("emoji").setDescription("New category emoji").setRequired(false)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("delete")
+          .setDescription("Delete a modmail category")
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category to delete")
+              .setRequired(true)
+              .setAutocomplete(true)
+          )
+          .addBooleanOption((option) =>
+            option
+              .setName("force")
+              .setDescription("Force delete even if category has active tickets")
+              .setRequired(false)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("form")
+          .setDescription("Manage form fields for a category")
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category to manage forms for")
+              .setRequired(true)
+              .setAutocomplete(true)
+          )
+      )
+  )
   .setDMPermission(true);
 
 export const options: CommandOptions = {
@@ -145,8 +278,176 @@ export const options: CommandOptions = {
   // userPermissions: ["ManageMessages"],
 };
 
+export async function autocomplete({ interaction, client, handler }: any) {
+  const focusedOption = interaction.options.getFocused(true);
+
+  if (focusedOption.name === "category") {
+    try {
+      const db = new Database();
+      const config = await db.findOne(ModmailConfig, { guildId: interaction.guildId });
+
+      if (!config) {
+        return interaction.respond([]);
+      }
+
+      const categories = config.categories || [];
+      const choices = categories
+        .filter(
+          (cat) =>
+            cat.isActive && cat.name.toLowerCase().includes(focusedOption.value.toLowerCase())
+        )
+        .slice(0, 25) // Discord limit
+        .map((cat) => ({
+          name: `${cat.emoji || "📁"} ${cat.name}`,
+          value: cat.id,
+        }));
+
+      return interaction.respond(choices);
+    } catch (error) {
+      log.error("Error in category autocomplete:", error);
+      return interaction.respond([]);
+    }
+  }
+}
+
 export async function run({ interaction, client, handler }: SlashCommandProps) {
   const subcommand = interaction.options.getSubcommand();
+  const subcommandGroup = interaction.options.getSubcommandGroup();
+
+  // Handle category subcommands - Phase 4 implementation
+  if (subcommandGroup === "category") {
+    // Import dynamically to avoid module resolution issues
+    switch (subcommand) {
+      case "create":
+        try {
+          const { default: createCategory, createCategoryOptions } = await import(
+            "../../subcommands/modmail/category/createCategory"
+          );
+          const createCategoryCheck = await canRunCommand(
+            { interaction, client, handler },
+            createCategoryOptions
+          );
+          if (createCategoryCheck !== false) return createCategoryCheck;
+          return createCategory({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading createCategory:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the category creation command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "list":
+        try {
+          const { default: listCategories, listCategoriesOptions } = await import(
+            "../../subcommands/modmail/category/listCategories"
+          );
+          const listCategoriesCheck = await canRunCommand(
+            { interaction, client, handler },
+            listCategoriesOptions
+          );
+          if (listCategoriesCheck !== false) return listCategoriesCheck;
+          return listCategories({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading listCategories:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the category list command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "edit":
+        try {
+          const { default: editCategory, editCategoryOptions } = await import(
+            "../../subcommands/modmail/category/editCategory"
+          );
+          const editCategoryCheck = await canRunCommand(
+            { interaction, client, handler },
+            editCategoryOptions
+          );
+          if (editCategoryCheck !== false) return editCategoryCheck;
+          return editCategory({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading editCategory:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the category edit command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "form":
+        try {
+          const { default: manageForm, manageFormOptions } = await import(
+            "../../subcommands/modmail/category/manageForm"
+          );
+          const manageFormCheck = await canRunCommand(
+            { interaction, client, handler },
+            manageFormOptions
+          );
+          if (manageFormCheck !== false) return manageFormCheck;
+          return manageForm({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading manageForm:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the form management command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "delete":
+        try {
+          const { default: deleteCategory, deleteCategoryOptions } = await import(
+            "../../subcommands/modmail/category/deleteCategory"
+          );
+          const deleteCategoryCheck = await canRunCommand(
+            { interaction, client, handler },
+            deleteCategoryOptions
+          );
+          if (deleteCategoryCheck !== false) return deleteCategoryCheck;
+          return deleteCategory({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading deleteCategory:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the category deletion command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      default:
+        return interaction.reply({
+          embeds: [ModmailEmbeds.subcommandNotFound(client)],
+          ephemeral: true,
+        });
+    }
+    return;
+  }
+
+  // Handle regular subcommands
   switch (subcommand) {
     case "close":
       closeModmail({ interaction, client, handler });
@@ -191,6 +492,19 @@ export async function run({ interaction, client, handler }: SlashCommandProps) {
       break;
     case "markresolved":
       markresolvedModmail({ interaction, client, handler });
+      break;
+    case "migrate":
+      const migrateCheck = await canRunCommand(
+        { interaction, client, handler },
+        (
+          await import("../../subcommands/modmail/migrateCategories")
+        ).migrateCategoriesOptions
+      );
+      if (migrateCheck !== false) return migrateCheck;
+      const { default: migrateCategories } = await import(
+        "../../subcommands/modmail/migrateCategories"
+      );
+      migrateCategories({ interaction, client, handler });
       break;
     default:
       return interaction.reply({

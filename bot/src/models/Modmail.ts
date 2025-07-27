@@ -183,7 +183,7 @@ const modmailSchema = new Schema({
   },
   priority: {
     type: Number,
-    enum: Object.values(TicketPriority),
+    enum: [1, 2, 3, 4], // Only numeric values, not the string keys
     default: TicketPriority.MEDIUM,
     index: true, // Index for priority-based queries
   },

@@ -683,7 +683,23 @@ export async function createModmailThread(
       categoryId: options.categoryId || null,
       categoryName: options.categoryName || null,
       ticketNumber: options.ticketNumber || null,
-      priority: options.priority || TicketPriority.MEDIUM,
+      priority: (() => {
+        // If no priority provided at all, use numeric default
+        if (options.priority === undefined || options.priority === null) {
+          return TicketPriority.MEDIUM; // This is the number 2
+        }
+        
+        if (typeof options.priority === 'number' && [1, 2, 3, 4].includes(options.priority)) {
+          return options.priority;
+        }
+        if (typeof options.priority === 'string') {
+          const numPriority = parseInt(options.priority);
+          if (!isNaN(numPriority) && [1, 2, 3, 4].includes(numPriority)) {
+            return numPriority;
+          }
+        }
+        return TicketPriority.MEDIUM; // This is the number 2
+      })(),
       formResponses: options.formResponses
         ? Object.entries(options.formResponses).map(([fieldId, value]) => ({
             fieldId,

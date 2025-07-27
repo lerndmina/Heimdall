@@ -70,7 +70,18 @@ export class ModmailCategoryFlow {
       const categories = await this.categoryManager.getAvailableCategories(context.guild.id);
 
       if (categories.length === 0) {
-        // No categories configured, proceed with default flow
+        // No categories configured, check for default category
+        const defaultCategory = await this.categoryManager.getDefaultCategory(context.guild.id);
+        if (defaultCategory) {
+          // Use default category
+          return {
+            success: true,
+            categoryId: defaultCategory.id,
+            formResponses: {},
+          };
+        }
+        
+        // No categories or default category configured, proceed with basic flow
         return {
           success: true,
           categoryId: undefined,

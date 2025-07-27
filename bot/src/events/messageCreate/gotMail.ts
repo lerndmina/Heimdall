@@ -585,7 +585,10 @@ async function newModmail(
       }
 
       // Get category information for thread creation
-      let categoryInfo: any = {};
+      let categoryInfo: any = {
+        // Always provide a default priority if none is set via category
+        priority: TicketPriority.MEDIUM
+      };
       if (categoryResult.categoryId) {
         const { CategoryManager } = await import("../../utils/modmail/CategoryManager");
         const categoryManager = new CategoryManager();
@@ -593,10 +596,11 @@ async function newModmail(
 
         if (category) {
           const ticketNumber = await categoryManager.getNextTicketNumber(guild.id);
+          
           categoryInfo = {
             categoryId: category.id,
             categoryName: category.name,
-            priority: category.priority,
+            priority: Number(category.priority) as TicketPriority,
             ticketNumber,
             formResponses: categoryResult.formResponses,
             formMetadata: categoryResult.metadata,
