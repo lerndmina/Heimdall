@@ -724,8 +724,10 @@ export async function createModmailThread(
       formResponses: options.formResponses
         ? Object.entries(options.formResponses).map(([fieldId, value]) => ({
             fieldId,
-            fieldLabel: fieldId, // This would ideally come from the form field definition
-            fieldType: typeof value === "string" ? "short" : "select", // Basic type inference
+            fieldLabel: options.formMetadata?.[fieldId]?.label || fieldId,
+            fieldType:
+              options.formMetadata?.[fieldId]?.type ||
+              (typeof value === "string" ? "short" : "select"),
             value: Array.isArray(value) ? value.join(", ") : String(value),
           }))
         : [],
@@ -788,6 +790,50 @@ export async function createModmailThread(
         );
       } catch (error) {
         log.error(`Failed to save initial message to database: ${error}`);
+        // Don't fail the whole modmail creation if message saving fails
+      }
+    }
+
+    // Add form responses as system messages if any exist
+    if (options.formResponses && Object.keys(options.formResponses).length > 0) {
+      const messageService = new ModmailMessageService();
+
+      try {
+        // Create a formatted form responses message
+        let formResponseContent = "**Form Responses:**\n\n";
+
+        Object.entries(options.formResponses).forEach(([fieldId, value]) => {
+          const fieldLabel = options.formMetadata?.[fieldId]?.label || fieldId;
+          const displayValue = Array.isArray(value) ? value.join(", ") : String(value);
+          formResponseContent += `**${fieldLabel}:** ${displayValue}\n`;
+        });
+
+        // Add category information
+        if (options.categoryName) {
+          formResponseContent = `**Category:** ${options.categoryName}\n\n${formResponseContent}`;
+        }
+
+        const formMessageId = `form-responses-${targetUser.id}-${Date.now()}`;
+
+        await messageService.addMessage(targetUser.id, {
+          messageId: formMessageId,
+          type: "staff",
+          content: formResponseContent,
+          authorId: client.user.id,
+          authorName: "System",
+          authorAvatar: client.user.displayAvatarURL(),
+          discordMessageId: undefined,
+          discordMessageUrl: undefined,
+          webhookMessageId: undefined,
+          webhookMessageUrl: undefined,
+          dmMessageId: undefined,
+          dmMessageUrl: undefined,
+          attachments: [],
+        });
+
+        log.debug(`Saved form responses ${formMessageId} to database for user ${targetUser.id}`);
+      } catch (error) {
+        log.error(`Failed to save form responses to database: ${error}`);
         // Don't fail the whole modmail creation if message saving fails
       }
     }

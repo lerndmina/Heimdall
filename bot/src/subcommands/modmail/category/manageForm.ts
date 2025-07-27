@@ -5,6 +5,7 @@ import Database from "../../../utils/data/database";
 import log from "../../../utils/log";
 import { tryCatch } from "../../../utils/trycatch";
 import { ModmailEmbeds } from "../../../utils/modmail/ModmailEmbeds";
+import { FormFieldManager } from "../../../utils/modmail/FormFieldManager";
 import ModmailConfig from "../../../models/ModmailConfig";
 
 export const manageFormOptions: CommandOptions = {
@@ -62,22 +63,14 @@ export default async function manageForm({ interaction, client, handler }: Slash
 
     const formFieldCount = category.formFields ? category.formFields.length : 0;
 
-    return interaction.editReply({
-      content: "",
-      embeds: [
-        ModmailEmbeds.error(
-          client,
-          "Form Management Coming Soon",
-          `Form field management for category **${category.name}** will be implemented in the next update.\n\n` +
-            `**Current Form Fields:** ${formFieldCount}\n\n` +
-            `This feature will allow you to:\n` +
-            `• Add new form fields (text, select, number)\n` +
-            `• Edit existing form fields\n` +
-            `• Remove form fields\n` +
-            `• Reorder form fields\n` +
-            `• Set field requirements and validation`
-        ),
-      ],
+    // Initialize form management interface
+    const formManager = new FormFieldManager();
+
+    return await formManager.showFormManagementInterface({
+      interaction,
+      client,
+      category,
+      config,
     });
   } catch (error) {
     log.error("Error in form management:", error);

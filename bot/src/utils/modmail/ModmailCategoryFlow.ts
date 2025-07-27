@@ -19,7 +19,12 @@ import { CategoryManager } from "./CategoryManager";
 import { FormBuilder } from "../FormBuilder";
 import { FormResponseProcessor } from "../FormResponseProcessor";
 import { FormProgressTracker } from "./FormProgressTracker";
-import { CategoryType, FormFieldSchema, TicketPriority } from "../../models/ModmailConfig";
+import {
+  CategoryType,
+  FormFieldSchema,
+  FormFieldType,
+  TicketPriority,
+} from "../../models/ModmailConfig";
 import { ModmailEmbeds } from "./ModmailEmbeds";
 import log from "../log";
 import { tryCatch } from "../trycatch";
@@ -90,12 +95,22 @@ export class ModmailCategoryFlow {
       }
 
       // Create category selection menu
+      log.info(`[Form Debug] Starting category selection with ${categories.length} categories`);
+
       const categorySelectResult = await this.showCategorySelection(context, categories);
+
+      log.info(`[Form Debug] Category selection result:`, categorySelectResult);
+
       if (!categorySelectResult.success) {
         return categorySelectResult;
       }
 
       const selectedCategory = categories.find((cat) => cat.id === categorySelectResult.categoryId);
+      log.info(
+        `[Form Debug] Found selected category:`,
+        selectedCategory ? selectedCategory.name : "NOT FOUND"
+      );
+
       if (!selectedCategory) {
         return {
           success: false,
@@ -104,7 +119,14 @@ export class ModmailCategoryFlow {
       }
 
       // Check if category has form fields
+      log.info(
+        `[Form Debug] Category "${selectedCategory.name}" has ${
+          selectedCategory.formFields?.length || 0
+        } form fields`
+      );
+
       if (!selectedCategory.formFields || selectedCategory.formFields.length === 0) {
+        log.info(`[Form Debug] No form fields required for category "${selectedCategory.name}"`);
         // No form required, proceed with just category selection
         return {
           success: true,
@@ -113,8 +135,13 @@ export class ModmailCategoryFlow {
         };
       }
 
+      log.info(`[Form Debug] Starting form collection for category "${selectedCategory.name}"`);
+
       // Collect form responses if required
       const formResult = await this.collectFormResponses(context, selectedCategory);
+
+      log.info(`[Form Debug] Form collection result:`, formResult);
+
       if (!formResult.success) {
         return formResult;
       }
@@ -123,6 +150,7 @@ export class ModmailCategoryFlow {
         success: true,
         categoryId: selectedCategory.id,
         formResponses: formResult.formResponses || {},
+        metadata: formResult.metadata || {},
       };
     } catch (error) {
       log.error("Error in category selection flow:", error);
@@ -266,38 +294,97 @@ export class ModmailCategoryFlow {
     category: CategoryType
   ): Promise<FormCollectionResult> {
     try {
+      log.info(`[Form Debug] Starting collectFormResponses for category: ${category.name}`);
+
       const formFields = category.formFields as FormFieldSchema[];
+      log.info(`[Form Debug] Form fields:`, formFields);
+
       const formBuilder = new FormBuilder(formFields);
       const responseProcessor = new FormResponseProcessor(formFields, context.user.id, category.id);
       const progressTracker = new FormProgressTracker(formFields);
 
+      log.info(`[Form Debug] Has modal fields: ${formBuilder.hasModalFields()}`);
+      log.info(`[Form Debug] Has select fields: ${formBuilder.hasSelectFields()}`);
+
       // Show initial progress
       await this.showFormProgress(context, progressTracker, category.name);
 
-      // Check if form has any modal fields (text inputs)
-      if (formBuilder.hasModalFields()) {
-        const modalResult = await this.collectModalResponses(
-          context,
-          formBuilder,
-          responseProcessor,
-          category,
-          progressTracker
-        );
-        if (!modalResult.success) {
-          return modalResult;
-        }
-      }
+      // Process fields in their original order by type groups but maintaining order within types
+      const modalFields = formFields.filter(
+        (field) => field.type === FormFieldType.SHORT || field.type === FormFieldType.PARAGRAPH
+      );
+      const selectFields = formFields.filter((field) => field.type === FormFieldType.SELECT);
 
-      // Check if form has any select menu fields
-      if (formBuilder.hasSelectFields()) {
-        const selectResult = await this.collectSelectMenuResponses(
-          context,
-          formBuilder,
-          responseProcessor,
-          progressTracker
-        );
-        if (!selectResult.success) {
-          return selectResult;
+      // Determine which type comes first in the original order
+      const firstModalIndex = formFields.findIndex(
+        (field) => field.type === FormFieldType.SHORT || field.type === FormFieldType.PARAGRAPH
+      );
+      const firstSelectIndex = formFields.findIndex((field) => field.type === FormFieldType.SELECT);
+
+      const shouldProcessModalsFirst =
+        firstModalIndex !== -1 && (firstSelectIndex === -1 || firstModalIndex < firstSelectIndex);
+
+      if (shouldProcessModalsFirst) {
+        // Process modal fields first if they appear first in the order
+        if (modalFields.length > 0) {
+          log.info(`[Form Debug] Collecting modal responses (first in order)`);
+          const modalResult = await this.collectModalResponses(
+            context,
+            new FormBuilder(modalFields),
+            responseProcessor,
+            category,
+            progressTracker
+          );
+          if (!modalResult.success) {
+            log.error(`[Form Debug] Modal collection failed:`, modalResult);
+            return modalResult;
+          }
+        }
+
+        // Then process select fields
+        if (selectFields.length > 0) {
+          log.info(`[Form Debug] Collecting select menu responses (second in order)`);
+          const selectResult = await this.collectSelectMenuResponses(
+            context,
+            new FormBuilder(selectFields),
+            responseProcessor,
+            progressTracker
+          );
+          if (!selectResult.success) {
+            log.error(`[Form Debug] Select menu collection failed:`, selectResult);
+            return selectResult;
+          }
+        }
+      } else {
+        // Process select fields first if they appear first in the order
+        if (selectFields.length > 0) {
+          log.info(`[Form Debug] Collecting select menu responses (first in order)`);
+          const selectResult = await this.collectSelectMenuResponses(
+            context,
+            new FormBuilder(selectFields),
+            responseProcessor,
+            progressTracker
+          );
+          if (!selectResult.success) {
+            log.error(`[Form Debug] Select menu collection failed:`, selectResult);
+            return selectResult;
+          }
+        }
+
+        // Then process modal fields
+        if (modalFields.length > 0) {
+          log.info(`[Form Debug] Collecting modal responses (second in order)`);
+          const modalResult = await this.collectModalResponses(
+            context,
+            new FormBuilder(modalFields),
+            responseProcessor,
+            category,
+            progressTracker
+          );
+          if (!modalResult.success) {
+            log.error(`[Form Debug] Modal collection failed:`, modalResult);
+            return modalResult;
+          }
         }
       }
 
