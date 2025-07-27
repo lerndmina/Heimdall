@@ -11,6 +11,7 @@ import Modmail, { ModmailType } from "../../models/Modmail";
 import ModmailConfig from "../../models/ModmailConfig";
 import ModmailBanModel, { ModmailBanType } from "../../models/ModmailBans";
 import { ThingGetter, getDiscordDate, TimeType } from "../../utils/TinyUtils";
+import { tryCatch } from "../../utils/trycatch";
 import { handleTag } from "../messageCreate/gotMail";
 import { sendModmailCloseMessage, getModmailUserDisplayName } from "../../utils/ModmailUtils";
 import BasicEmbed from "../../utils/BasicEmbed";
@@ -37,12 +38,15 @@ export default async (interaction: ModalSubmitInteraction, client: Client<true>)
   // Handle modmail modals (require staff role)
   if (interaction.customId.startsWith("modmail_")) {
     // Require staff role permission
-    const hasStaffRole =
-      interaction.member?.roles &&
-      typeof interaction.member.roles !== "string" &&
-      "cache" in interaction.member.roles
-        ? interaction.member.roles.cache.has(env.STAFF_ROLE)
-        : false;
+    const hasStaffRole = await (async () => {
+      // Get modmail for context (for category-specific staff roles)
+      const db = new Database();
+      const { data: modmail } = await tryCatch(
+        db.findOne(Modmail, { forumThreadId: interaction.channel?.id })
+      );
+      const { hasModmailStaffPermission } = await import("../../utils/ModmailUtils");
+      return await hasModmailStaffPermission(interaction, modmail);
+    })();
 
     if (!hasStaffRole) {
       await interaction.reply({

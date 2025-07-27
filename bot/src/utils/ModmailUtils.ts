@@ -12,6 +12,7 @@ import {
   ThreadAutoArchiveDuration,
 } from "discord.js";
 import { ThingGetter } from "./TinyUtils";
+import { tryCatch } from "./trycatch";
 import log from "./log";
 import FetchEnvs, { envExists } from "./FetchEnvs";
 import Database from "./data/database";
@@ -20,6 +21,7 @@ import Modmail, { ModmailType } from "../models/Modmail";
 import { ModmailMessageService } from "../services/ModmailMessageService";
 import ModmailCache from "./ModmailCache";
 import { ModmailEmbeds } from "./modmail/ModmailEmbeds";
+import { CategoryManager } from "./modmail/CategoryManager";
 
 const env = FetchEnvs();
 
@@ -615,9 +617,28 @@ export async function createModmailThread(
     }
 
     // Send staff notification with action buttons
-    // If opened by staff, ping the staff member who opened it, otherwise ping the staff role
+    // If opened by staff, ping the staff member who opened it, otherwise ping the appropriate staff role
+    // Use category-specific staff role if available, otherwise fall back to main config staff role
+    let staffRoleIdToMention = modmailConfig.staffRoleId;
+    if (options.categoryId) {
+      const { CategoryManager } = await import("./modmail/CategoryManager");
+      staffRoleIdToMention = CategoryManager.getEffectiveStaffRoleId(
+        { id: options.categoryId, staffRoleId: undefined } as any, // We don't have the full category here
+        modmailConfig.staffRoleId
+      );
+
+      // If we have category info, get the actual category staff role
+      if (options.categoryId) {
+        const categoryManager = new CategoryManager();
+        const category = await categoryManager.getCategoryById(guild.id, options.categoryId);
+        if (category?.staffRoleId) {
+          staffRoleIdToMention = category.staffRoleId;
+        }
+      }
+    }
+
     const notificationContent =
-      openedBy?.type === "Staff" ? `<@${openedBy.userId}>` : `<@&${modmailConfig.staffRoleId}>`;
+      openedBy?.type === "Staff" ? `<@${openedBy.userId}>` : `<@&${staffRoleIdToMention}>`;
 
     const embeds = [
       ModmailEmbeds.staffNotification(
@@ -827,4 +848,48 @@ export async function createModmailThread(
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+/**
+ * Check if a user has staff permissions for modmail actions
+ * Checks both main staff role and category-specific staff roles
+ * @param interaction - The Discord interaction
+ * @param modmail - The modmail document (optional, for category-specific checks)
+ * @returns True if user has staff permissions
+ */
+export async function hasModmailStaffPermission(interaction: any, modmail?: any): Promise<boolean> {
+  // Check main staff role first
+  const hasMainStaffRole =
+    interaction.member?.roles &&
+    typeof interaction.member.roles !== "string" &&
+    "cache" in interaction.member.roles
+      ? interaction.member.roles.cache.has(env.STAFF_ROLE)
+      : false;
+
+  if (hasMainStaffRole) {
+    return true;
+  }
+
+  // If no modmail context, can't check category-specific roles
+  if (!modmail || !modmail.categoryId || !interaction.guild?.id) {
+    return false;
+  }
+
+  // Check category-specific staff role
+  try {
+    const categoryManager = new CategoryManager();
+    const category = await categoryManager.getCategoryById(
+      interaction.guild.id,
+      modmail.categoryId
+    );
+
+    if (category?.staffRoleId) {
+      const hasCategoryStaffRole = interaction.member?.roles?.cache?.has(category.staffRoleId);
+      return !!hasCategoryStaffRole;
+    }
+  } catch (error) {
+    log.warn("Failed to check category staff role:", error);
+  }
+
+  return false;
 }

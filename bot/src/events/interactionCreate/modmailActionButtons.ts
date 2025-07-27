@@ -72,13 +72,11 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
       return true;
     }
 
-    // Check if user has staff role for all actions
-    const hasStaffRole =
-      interaction.member?.roles &&
-      typeof interaction.member.roles !== "string" &&
-      "cache" in interaction.member.roles
-        ? interaction.member.roles.cache.has(env.STAFF_ROLE)
-        : false;
+    // Check if user has staff role for all actions (main staff role or category-specific staff role)
+    const hasStaffRole = await (async () => {
+      const { hasModmailStaffPermission } = await import("../../utils/ModmailUtils");
+      return await hasModmailStaffPermission(interaction, modmail);
+    })();
 
     if (!hasStaffRole) {
       await interaction.reply({

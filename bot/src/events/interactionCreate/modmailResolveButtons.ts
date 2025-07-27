@@ -84,12 +84,10 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
 
     if (customId === "modmail_claim") {
       // Handle claim button
-      const hasStaffRole =
-        interaction.member?.roles &&
-        typeof interaction.member.roles !== "string" &&
-        "cache" in interaction.member.roles
-          ? interaction.member.roles.cache.has(env.STAFF_ROLE)
-          : false;
+      const hasStaffRole = await (async () => {
+        const { hasModmailStaffPermission } = await import("../../utils/ModmailUtils");
+        return await hasModmailStaffPermission(interaction, modmail);
+      })();
 
       if (!hasStaffRole) {
         return interaction.editReply({
@@ -153,20 +151,64 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
 
       await sendMessageToBothChannels(client, modmail, claimEmbed);
 
-      // Update the thread name to include the claimed staff member
+      // Update the thread name to include the claimed staff member using new naming convention
       if (interaction.channel?.isThread()) {
-        const { updateModmailThreadName } = await import("../../utils/ModmailUtils");
-        const userDisplayName = await getModmailUserDisplayName(
-          getter,
-          await getter.getUser(modmail.userId),
-          interaction.guild
-        );
+        try {
+          const userDisplayName = await getModmailUserDisplayName(
+            getter,
+            await getter.getUser(modmail.userId),
+            interaction.guild
+          );
 
-        await updateModmailThreadName(
-          interaction.channel as ThreadChannel,
-          userDisplayName,
-          interaction.user.username
-        );
+          let updatedName: string;
+
+          // Check if this thread has ticket number and priority (new format)
+          if (modmail.ticketNumber && modmail.priority) {
+            // Use the new TicketNumbering system for new format threads
+            const { TicketNumbering } = await import("../../utils/modmail/TicketNumbering");
+            const ticketNumbering = new TicketNumbering();
+
+            // Check if the current name is already in new format
+            const isNewFormat =
+              interaction.channel.name.includes("#") &&
+              (interaction.channel.name.startsWith("🔸") ||
+                interaction.channel.name.startsWith("🔶") ||
+                interaction.channel.name.startsWith("🔺") ||
+                interaction.channel.name.startsWith("🚨"));
+
+            if (isNewFormat) {
+              // Update existing new format name
+              updatedName = ticketNumbering.updateThreadNameWithClaim(
+                interaction.channel.name,
+                interaction.user.username
+              );
+            } else {
+              // Convert old format to new format with claim
+              updatedName = ticketNumbering.generateThreadName({
+                ticketNumber: modmail.ticketNumber,
+                username: userDisplayName,
+                claimedStaffName: interaction.user.username,
+                priority: modmail.priority,
+              });
+            }
+          } else {
+            // Fallback to old naming system for threads without ticket numbers
+            const { updateModmailThreadName } = await import("../../utils/ModmailUtils");
+            await updateModmailThreadName(
+              interaction.channel as ThreadChannel,
+              userDisplayName,
+              interaction.user.username
+            );
+            return; // Exit early since updateModmailThreadName handles the actual renaming
+          }
+
+          if (updatedName !== interaction.channel.name) {
+            await interaction.channel.setName(updatedName);
+            log.debug(`Updated thread name from "${interaction.channel.name}" to "${updatedName}"`);
+          }
+        } catch (error) {
+          log.error("Failed to update thread name when claiming:", error);
+        }
       }
 
       await interaction.editReply({

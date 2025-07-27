@@ -28,26 +28,25 @@ export default async function ({ interaction, client }: SlashCommandProps) {
     });
   }
 
-  // Check if user has staff role
-  const hasStaffRole =
-    interaction.member?.roles &&
-    typeof interaction.member.roles !== "string" &&
-    "cache" in interaction.member.roles
-      ? interaction.member.roles.cache.has(env.STAFF_ROLE)
-      : false;
+  // Check if user has staff role (main staff role or category-specific staff role)
+  const hasStaffRole = await (async () => {
+    // We'll get the modmail context after finding it, so for now check main staff role
+    const hasMainStaffRole =
+      interaction.member?.roles &&
+      typeof interaction.member.roles !== "string" &&
+      "cache" in interaction.member.roles
+        ? interaction.member.roles.cache.has(env.STAFF_ROLE)
+        : false;
 
-  if (!hasStaffRole) {
-    return interaction.reply({
-      embeds: [
-        ModmailEmbeds.error(
-          client,
-          "Permission Denied",
-          "You need to be a staff member to use this command."
-        ),
-      ],
-      ephemeral: true,
-    });
-  }
+    if (hasMainStaffRole) {
+      return true;
+    }
+
+    // For category-specific staff roles, we need to check later when we have modmail context
+    return false;
+  })();
+
+  // We'll check category-specific permissions later when we have modmail context
 
   // Find the modmail thread using the utility
   let mail;
@@ -87,6 +86,25 @@ export default async function ({ interaction, client }: SlashCommandProps) {
       ],
       ephemeral: true,
     });
+  }
+
+  // Now check if user has staff permissions with modmail context (for category-specific staff roles)
+  if (!hasStaffRole) {
+    const { hasModmailStaffPermission } = await import("../../utils/ModmailUtils");
+    const hasCategoryStaffRole = await hasModmailStaffPermission(interaction, mail);
+
+    if (!hasCategoryStaffRole) {
+      return interaction.reply({
+        embeds: [
+          ModmailEmbeds.error(
+            client,
+            "Permission Denied",
+            "You need to be a staff member to use this command."
+          ),
+        ],
+        ephemeral: true,
+      });
+    }
   }
 
   // Check if already marked as resolved
