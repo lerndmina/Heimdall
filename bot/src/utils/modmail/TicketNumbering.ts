@@ -6,6 +6,11 @@ import log from "../log";
 
 /**
  * Utility class for managing ticket numbering and naming conventions
+ * 
+ * New thread naming format: 🔸 #1234 | username | claimedStaff
+ * - Priority emoji at the start for easy visual identification
+ * - Auto-incrementing ticket numbers per guild
+ * - No category name since each category has its own forum channel
  */
 export class TicketNumbering {
   private db: Database;
