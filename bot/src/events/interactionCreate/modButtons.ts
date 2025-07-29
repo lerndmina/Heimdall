@@ -17,8 +17,8 @@ import { moderationEmbeds } from "../../services/moderationEmbeds";
 import { tryCatch } from "../../utils/trycatch";
 
 export default async (
-  client: Client<true>,
   interaction: ButtonInteraction,
+  client: Client<true>,
   handler: CommandKit
 ) => {
   if (!interaction.isButton()) return false;
