@@ -16,6 +16,7 @@ import FetchEnvs from "../../utils/FetchEnvs";
 import ModmailConfig from "../../models/ModmailConfig";
 import closeModmail from "../../subcommands/modmail/closeModmail";
 import banModmail, { banModmailOptions } from "../../subcommands/modmail/banModmail";
+import unbanModmail, { unbanModmailOptions } from "../../subcommands/modmail/unbanModmail";
 import canRunCommand from "../../utils/canRunCommand";
 import sendbuttonModmail, {
   sendModmailButtonOptions,
@@ -485,7 +486,9 @@ export async function run({ interaction, client, handler }: SlashCommandProps) {
       banModmail({ interaction, client, handler });
       break;
     case "unban":
-      return interaction.reply(`Not implemented yet`);
+      const unbanCheck = await canRunCommand({ interaction, client, handler }, unbanModmailOptions);
+      if (unbanCheck !== false) return unbanCheck;
+      unbanModmail({ interaction, client, handler });
       break;
     case "sendbutton":
       const sendButtonCheck = await canRunCommand(

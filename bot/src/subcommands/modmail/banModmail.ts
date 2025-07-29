@@ -52,7 +52,8 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
   const { data: duration, error } = tryCatchSync(() => {
     if (isPermanent) return -1;
     if (!durationString) throw new Error("No duration provided and not permanent");
-    const parsed = ms(durationString);
+    // TypeScript doesn't understand that the throw above prevents durationString from being null
+    const parsed = (ms as any)(durationString);
     if (!parsed || isNaN(parsed)) throw new Error("Invalid duration");
     return parsed;
   });
