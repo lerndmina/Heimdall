@@ -1,7 +1,16 @@
 import type { UniversalValidation, CommandSpecificValidation, LegacyValidationExport } from "../types";
 import { discoverFiles, safeImport, getFileNameWithoutExtension } from "../utils/fileUtils";
+import { createLogger, LogLevel } from "@heimdall/logger";
 
 export class ValidationLoader {
+  private logger = createLogger("command-handler", {
+    minLevel: process.env.DEBUG_LOG === "true" ? LogLevel.DEBUG : LogLevel.INFO,
+    enableFileLogging: process.env.LOG_TO_FILE === "true",
+    timestampFormat: "locale",
+    showCallerInfo: true,
+    callerPathDepth: 2,
+  });
+
   /**
    * Loads all validations from the specified directory with new naming scheme
    */
@@ -12,11 +21,11 @@ export class ValidationLoader {
     const universal = new Map<string, UniversalValidation>();
     const commandSpecific = new Map<string, CommandSpecificValidation[]>();
 
-    console.log(`Loading validations from: ${validationsPath}`);
+    this.logger.debug(`Loading validations from: ${validationsPath}`);
 
     // Discover all validation files
     const files = await discoverFiles(validationsPath, [".ts", ".js"]);
-    console.log(`Found ${files.length} potential validation files`);
+    this.logger.debug(`Found ${files.length} potential validation files`);
 
     for (const file of files) {
       const filename = getFileNameWithoutExtension(file);
@@ -27,7 +36,7 @@ export class ValidationLoader {
           const validation = await this.loadUniversalValidation(file, filename);
           if (validation) {
             universal.set(validation.name, validation);
-            console.log(`Loaded universal validation: ${validation.name}`);
+            this.logger.debug(`Loaded universal validation: ${validation.name}`);
           }
         } else if (filename.startsWith("validate.")) {
           // Command-specific validation
@@ -38,19 +47,19 @@ export class ValidationLoader {
               commandSpecific.set(commandName, []);
             }
             commandSpecific.get(commandName)!.push(validation);
-            console.log(`Loaded command-specific validation for: ${commandName}`);
+            this.logger.debug(`Loaded command-specific validation for: ${commandName}`);
           }
         }
         // Ignore files that don't match either pattern
       } catch (error) {
-        console.error(`Failed to load validation from ${file}:`, error);
+        this.logger.error(`Failed to load validation from ${file}:`, error);
       }
     }
 
     const universalCount = universal.size;
     const commandSpecificCount = Array.from(commandSpecific.values()).reduce((sum, arr) => sum + arr.length, 0);
 
-    console.log(`Successfully loaded ${universalCount} universal validations and ${commandSpecificCount} command-specific validations`);
+    this.logger.debug(`Successfully loaded ${universalCount} universal validations and ${commandSpecificCount} command-specific validations`);
     return { universal, commandSpecific };
   }
 
@@ -89,7 +98,7 @@ export class ValidationLoader {
         execute: exports.execute,
       };
     } else {
-      console.warn(`Invalid validation export pattern in ${filePath}`);
+      this.logger.warn(`Invalid universal validation export pattern in ${filePath}`);
       return null;
     }
   }
@@ -127,7 +136,7 @@ export class ValidationLoader {
         execute: exports.execute,
       };
     } else {
-      console.warn(`Invalid validation export pattern in ${filePath}`);
+      this.logger.warn(`Invalid command validation export pattern in ${filePath}`);
       return null;
     }
   }

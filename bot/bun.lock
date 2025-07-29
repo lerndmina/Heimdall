@@ -4,8 +4,9 @@
     "": {
       "name": "@solace/discord-bot-base",
       "dependencies": {
-        "@heimdall/command-handler": "../command-handler",
         "@ffmpeg-installer/ffmpeg": "^1.1.0",
+        "@heimdall/command-handler": "../command-handler",
+        "@heimdall/logger": "../logger",
         "@types/diff": "^5.2.3",
         "@types/fluent-ffmpeg": "^2.1.27",
         "@types/ms": "^2.1.0",
@@ -130,6 +131,8 @@
     "@ffmpeg-installer/win32-x64": ["@ffmpeg-installer/win32-x64@4.1.0", "", { "os": "win32", "cpu": "x64" }, "sha512-Drt5u2vzDnIONf4ZEkKtFlbvwj6rI3kxw1Ck9fpudmtgaZIHD4ucsWB2lCZBXRxJgXR+2IMSti+4rtM4C4rXgg=="],
 
     "@heimdall/command-handler": ["@heimdall/command-handler@file:../command-handler", { "devDependencies": { "@types/node": "^20.0.0", "typescript": "^5.0.0" }, "peerDependencies": { "discord.js": "^14.0.0" } }],
+
+    "@heimdall/logger": ["@heimdall/logger@file:../logger", { "devDependencies": { "@types/node": "^20.19.9", "typescript": "^5.8.3" } }],
 
     "@isaacs/cliui": ["@isaacs/cliui@8.0.2", "", { "dependencies": { "string-width": "^5.1.2", "string-width-cjs": "npm:string-width@^4.2.0", "strip-ansi": "^7.0.1", "strip-ansi-cjs": "npm:strip-ansi@^6.0.1", "wrap-ansi": "^8.1.0", "wrap-ansi-cjs": "npm:wrap-ansi@^7.0.0" } }, "sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA=="],
 

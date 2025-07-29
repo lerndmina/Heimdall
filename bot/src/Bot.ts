@@ -58,8 +58,8 @@ export const Start = async () => {
     devUserIds,
   });
 
-  // Using our custom CommandHandler
-  const commandKit = new CommandHandler({
+  // Using our custom CommandHandler with factory pattern
+  const commandKit = await CommandHandler.create({
     client, // Discord.js client object | Required by default
     commandsPath, // The commands directory
     eventsPath, // The events directory

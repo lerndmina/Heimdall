@@ -14,7 +14,7 @@ const db = new Database();
 // Global scheduler instance
 let modmailScheduler: ModmailScheduler | null = null;
 
-export default async (c: Client<true>, client: Client<true>, handler: CommandKit) => {
+export default async (client: Client<true>, handler: CommandKit) => {
   log(`Logged in as ${client.user?.tag}`);
 
   const db = new Database();

@@ -4,10 +4,18 @@ import { CommandLoader } from "./loaders/CommandLoader";
 import { EventLoader } from "./loaders/EventLoader";
 import { ValidationLoader } from "./loaders/ValidationLoader";
 import { executeValidation, shouldSkipValidation } from "./utils/validation";
+import { createLogger, LogLevel } from "@heimdall/logger";
 
 export class CommandHandler {
   private client: Client<true>;
   private config: HandlerConfig;
+  private logger = createLogger("command-handler", {
+    minLevel: process.env.DEBUG_LOG === "true" ? LogLevel.DEBUG : LogLevel.INFO,
+    enableFileLogging: process.env.LOG_TO_FILE === "true",
+    timestampFormat: "locale",
+    showCallerInfo: true,
+    callerPathDepth: 2,
+  });
 
   // Storage for loaded components
   private commands = new Map<string, LoadedCommand>();
@@ -32,13 +40,34 @@ export class CommandHandler {
         ...config.options,
       },
     };
+
+    // Initialize collections
+    this.commands = new Map();
+    this.events = new Map();
+    this.universalValidations = new Map();
+    this.commandValidations = new Map();
+
+    // Initialize logger with environment-based configuration
+    this.logger = createLogger("command-handler", {
+      minLevel: process.env.DEBUG_LOG === "true" ? LogLevel.DEBUG : LogLevel.INFO,
+      enableFileLogging: process.env.LOG_TO_FILE === "true",
+    });
+  }
+
+  /**
+   * Static factory method to create and initialize CommandHandler
+   */
+  static async create(config: HandlerConfig): Promise<CommandHandler> {
+    const handler = new CommandHandler(config);
+    await handler.initialize();
+    return handler;
   }
 
   /**
    * Initialize the command handler
    */
   async initialize(): Promise<void> {
-    console.log("Initializing CommandHandler...");
+    this.logger.info("Initializing CommandHandler...");
 
     try {
       // Load all components
@@ -53,59 +82,74 @@ export class CommandHandler {
       if (this.config.options?.autoRegisterCommands && this.client.user) {
         await this.registerSlashCommands();
       } else if (this.config.options?.autoRegisterCommands) {
-        console.log("Deferring command registration until bot is logged in");
+        this.logger.debug("Deferring command registration until bot is logged in");
       }
 
-      console.log("CommandHandler initialized successfully!");
+      this.logger.info("CommandHandler initialized successfully!");
     } catch (error) {
-      console.error("Failed to initialize CommandHandler:", error);
+      this.logger.error("Failed to initialize CommandHandler:", error);
       throw error;
     }
   }
-
   /**
    * Register commands with Discord (call this after bot login)
    */
   async registerCommands(): Promise<void> {
     if (!this.client.user) {
-      console.error("Cannot register commands: bot is not logged in");
+      this.logger.error("Cannot register commands: bot is not logged in");
       return;
     }
 
     await this.registerSlashCommands();
   }
-
   /**
    * Load all commands from the commands directory
    */
   private async loadCommands(): Promise<void> {
-    console.log("Loading commands...");
+    this.logger.debug("Loading commands...");
+    this.logger.debug(`Loading commands from: ${this.config.commandsPath}`);
     this.commands = await this.commandLoader.loadFromDirectory(this.config.commandsPath);
+    this.logger.info(`Successfully loaded ${this.commands.size} commands`);
+
+    // Debug: Log command names
+    if (this.commands.size > 0) {
+      const commandNames = Array.from(this.commands.keys());
+      this.logger.debug(`Loaded commands: ${commandNames.join(", ")}`);
+    } else {
+      this.logger.warn("No commands were loaded!");
+    }
   }
 
   /**
    * Load all events from the events directory
    */
   private async loadEvents(): Promise<void> {
-    console.log("Loading events...");
+    this.logger.debug("Loading events...");
     this.events = await this.eventLoader.loadFromDirectory(this.config.eventsPath);
+    this.logger.info(`Successfully loaded ${Array.from(this.events.values()).reduce((sum, arr) => sum + arr.length, 0)} events across ${this.events.size} event types`);
   }
 
   /**
    * Load all validations from the validations directory
    */
   private async loadValidations(): Promise<void> {
-    console.log("Loading validations...");
+    this.logger.debug("Loading validations...");
     const { universal, commandSpecific } = await this.validationLoader.loadValidations(this.config.validationsPath);
     this.universalValidations = universal;
     this.commandValidations = commandSpecific;
+    this.logger.info(
+      `Successfully loaded ${this.universalValidations.size} universal validations and ${Array.from(this.commandValidations.values()).reduce(
+        (sum, arr) => sum + arr.length,
+        0
+      )} command-specific validations`
+    );
   }
 
   /**
    * Setup Discord event listeners
    */
   private setupEventListeners(): void {
-    console.log("Setting up event listeners...");
+    this.logger.debug("Setting up event listeners...");
 
     // Setup command interaction handling
     this.client.on(Events.InteractionCreate, async (interaction: any) => {
@@ -128,14 +172,14 @@ export class CommandHandler {
         } else {
           this.client.on(eventName as any, (...args: any[]) => {
             Promise.resolve(eventHandler.execute(this.client, this, ...args)).catch((error: any) => {
-              console.error(`Error in ${eventName} event handler:`, error);
+              this.logger.error(`Error in ${eventName} event handler:`, error);
             });
           });
         }
       }
     }
 
-    console.log(`Setup ${this.events.size} event types with ${Array.from(this.events.values()).reduce((sum, arr) => sum + arr.length, 0)} handlers`);
+    this.logger.info(`Setup ${this.events.size} event types with ${Array.from(this.events.values()).reduce((sum, arr) => sum + arr.length, 0)} handlers`);
   }
 
   /**
@@ -145,7 +189,7 @@ export class CommandHandler {
     const command = this.commands.get(interaction.commandName);
 
     if (!command) {
-      console.warn(`Unknown command: ${interaction.commandName}`);
+      this.logger.warn(`Unknown command: ${interaction.commandName}`);
       return;
     }
 
@@ -187,7 +231,7 @@ export class CommandHandler {
     try {
       await command.execute(interaction, this.client, this);
     } catch (error) {
-      console.error(`Error executing command ${command.name}:`, error);
+      this.logger.error(`Error executing command ${command.name}:`, error);
 
       if (this.config.options?.handleValidationErrors) {
         const errorMessage = "An error occurred while executing this command.";
@@ -201,7 +245,7 @@ export class CommandHandler {
             await interaction.followUp({ content: errorMessage, ephemeral: true });
           }
         } catch (replyError) {
-          console.error("Failed to send error message:", replyError);
+          this.logger.error("Failed to send error message:", replyError);
         }
       }
     }
@@ -220,7 +264,7 @@ export class CommandHandler {
     try {
       await command.autocomplete(interaction, this.client, this);
     } catch (error) {
-      console.error(`Error in autocomplete for ${command.name}:`, error);
+      this.logger.error(`Error in autocomplete for ${command.name}:`, error);
     }
   }
 
@@ -258,7 +302,7 @@ export class CommandHandler {
               });
             }
           } catch (error) {
-            console.error("Failed to send validation error message:", error);
+            this.logger.error("Failed to send universal validation error message:", error);
           }
         }
         return false;
@@ -285,7 +329,7 @@ export class CommandHandler {
               });
             }
           } catch (error) {
-            console.error("Failed to send validation error message:", error);
+            this.logger.error("Failed to send command validation error message:", error);
           }
         }
         return false;
@@ -299,32 +343,46 @@ export class CommandHandler {
    * Register slash commands with Discord
    */
   private async registerSlashCommands(): Promise<void> {
-    console.log("Registering slash commands...");
+    this.logger.info("Registering commands...");
 
     if (!process.env.BOT_TOKEN) {
-      console.error("BOT_TOKEN environment variable is required for command registration");
+      this.logger.error("BOT_TOKEN environment variable is required for command registration");
       return;
     }
 
+    this.logger.debug(`Total commands loaded: ${this.commands.size}`);
+
     const rest = new REST().setToken(process.env.BOT_TOKEN);
-    const commandData = Array.from(this.commands.values())
-      .filter((cmd) => !cmd.config.deleted)
-      .map((cmd) => cmd.data.toJSON());
+    const allCommands = Array.from(this.commands.values());
+    this.logger.debug(`Commands before filtering: ${allCommands.length}`);
+
+    const nonDeletedCommands = allCommands.filter((cmd) => !cmd.config.deleted);
+    this.logger.debug(`Commands after deleted filter: ${nonDeletedCommands.length}`);
+
+    const commandData = nonDeletedCommands.map((cmd) => {
+      this.logger.debug(`Processing command ${cmd.name}, type: ${cmd.type}, data: ${typeof cmd.data}`);
+      return cmd.data.toJSON();
+    });
+
+    const slashCommands = commandData.filter((cmd) => cmd.type === undefined || cmd.type === 1);
+    const contextMenuCommands = commandData.filter((cmd) => cmd.type === 2 || cmd.type === 3);
+
+    this.logger.info(`Registering ${slashCommands.length} slash commands and ${contextMenuCommands.length} context menu commands`);
 
     try {
       if (this.config.devGuildIds && this.config.devGuildIds.length > 0) {
         // Register to development guilds
         for (const guildId of this.config.devGuildIds) {
           await rest.put(Routes.applicationGuildCommands(this.client.user.id, guildId), { body: commandData });
-          console.log(`Registered ${commandData.length} commands to development guild ${guildId}`);
+          this.logger.info(`Registered ${commandData.length} commands to development guild ${guildId}`);
         }
       } else {
         // Register globally
         await rest.put(Routes.applicationCommands(this.client.user.id), { body: commandData });
-        console.log(`Registered ${commandData.length} commands globally`);
+        this.logger.info(`Registered ${commandData.length} commands globally`);
       }
     } catch (error) {
-      console.error("Failed to register slash commands:", error);
+      this.logger.error("Failed to register commands:", error);
     }
   }
 

@@ -1,19 +1,28 @@
 import type { LoadedEvent, LegacyEventData, ModernEventData } from "../types";
 import { discoverFiles, safeImport } from "../utils/fileUtils";
 import { pathToEventName } from "../utils/pathUtils";
+import { createLogger, LogLevel } from "@heimdall/logger";
 
 export class EventLoader {
+  private logger = createLogger("command-handler", {
+    minLevel: process.env.DEBUG_LOG === "true" ? LogLevel.DEBUG : LogLevel.INFO,
+    enableFileLogging: process.env.LOG_TO_FILE === "true",
+    timestampFormat: "locale",
+    showCallerInfo: true,
+    callerPathDepth: 2,
+  });
+
   /**
    * Loads all events from the specified directory
    */
   async loadFromDirectory(eventsPath: string): Promise<Map<string, LoadedEvent[]>> {
     const events = new Map<string, LoadedEvent[]>();
 
-    console.log(`Loading events from: ${eventsPath}`);
+    this.logger.debug(`Loading events from: ${eventsPath}`);
 
     // Discover all event files recursively
     const files = await discoverFiles(eventsPath, [".ts", ".js"]);
-    console.log(`Found ${files.length} potential event files`);
+    this.logger.debug(`Found ${files.length} potential event files`);
 
     for (const file of files) {
       try {
@@ -26,15 +35,15 @@ export class EventLoader {
           }
 
           events.get(eventName)!.push(event);
-          console.log(`Loaded event: ${eventName} from ${file} (${event.isLegacy ? "legacy" : "modern"})`);
+          this.logger.debug(`Loaded event: ${eventName} from ${file} (${event.isLegacy ? "legacy" : "modern"})`);
         }
       } catch (error) {
-        console.error(`Failed to load event from ${file}:`, error);
+        this.logger.error(`Failed to load event from ${file}:`, error);
       }
     }
 
     const totalEvents = Array.from(events.values()).reduce((sum, arr) => sum + arr.length, 0);
-    console.log(`Successfully loaded ${totalEvents} events across ${events.size} event types`);
+    this.logger.debug(`Successfully loaded ${totalEvents} events across ${events.size} event types`);
     return events;
   }
 
@@ -55,7 +64,7 @@ export class EventLoader {
     } else if (this.isModernPattern(exports)) {
       return this.adaptModernEvent(exports, filePath, eventName);
     } else {
-      console.warn(`Invalid event export pattern in ${filePath}`);
+      this.logger.warn(`Invalid event export pattern in ${filePath}`);
       return null;
     }
   }
@@ -84,8 +93,17 @@ export class EventLoader {
       isLegacy: true,
       once: false, // Legacy events are always recurring
       execute: async (client, handler, ...args) => {
-        // Legacy events receive (client, ...args) - pass handler as second param
-        await exports.default(client, handler, ...args);
+        // Existing event format: (discordEventArgs, ourClient, ourHandler)
+        // So for ready: (handler) since ready has no Discord args
+        // For messageCreate: (message, client, handler)
+        // For interactionCreate: (interaction, client, handler)
+        if (eventName === "ready") {
+          // Ready event has no Discord args, so just pass client and handler
+          (exports.default as any)(client, handler);
+        } else {
+          // Other events: pass Discord args first, then client, then handler
+          (exports.default as any)(...args, client, handler);
+        }
       },
     };
   }

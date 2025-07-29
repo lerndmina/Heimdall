@@ -20,6 +20,9 @@
   "peerDependencies": {
     "discord.js": "^14.0.0"
   },
+  "dependencies": {
+    "@heimdall/logger": "file:../logger"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"

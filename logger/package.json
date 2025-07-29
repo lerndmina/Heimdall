@@ -1,0 +1,22 @@
+{
+  "name": "@heimdall/logger",
+  "version": "1.0.0",
+  "description": "Shared logger for Heimdall bot and command handler",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "logging",
+    "heimdall",
+    "discord-bot"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "@types/node": "^20.19.9"
+  }
+}

@@ -2,38 +2,47 @@ import type { LoadedCommand, LegacyCommandData, LegacyContextMenuCommandData, Mo
 import { discoverFiles, safeImport } from "../utils/fileUtils";
 import { pathToName } from "../utils/pathUtils";
 import { ContextMenuCommandBuilder } from "discord.js";
+import { createLogger, LogLevel } from "@heimdall/logger";
 
 export class CommandLoader {
+  private logger = createLogger("command-handler", {
+    minLevel: process.env.DEBUG_LOG === "true" ? LogLevel.DEBUG : LogLevel.INFO,
+    enableFileLogging: process.env.LOG_TO_FILE === "true",
+    timestampFormat: "locale",
+    showCallerInfo: true,
+    callerPathDepth: 2,
+  });
+
   /**
    * Loads all commands from the specified directory
    */
   async loadFromDirectory(commandsPath: string): Promise<Map<string, LoadedCommand>> {
     const commands = new Map<string, LoadedCommand>();
 
-    console.log(`Loading commands from: ${commandsPath}`);
+    this.logger.debug(`Loading commands from: ${commandsPath}`);
 
     // Discover all command files recursively
     const files = await discoverFiles(commandsPath, [".ts", ".js"]);
-    console.log(`Found ${files.length} potential command files`);
+    this.logger.debug(`Found ${files.length} potential command files`);
 
     for (const file of files) {
       try {
         const command = await this.loadCommand(file, commandsPath);
         if (command) {
           if (commands.has(command.name)) {
-            console.warn(`Duplicate command name "${command.name}" found in ${file}. Skipping.`);
+            this.logger.warn(`Duplicate command name "${command.name}" found in ${file}. Skipping.`);
             continue;
           }
 
           commands.set(command.name, command);
-          console.log(`Loaded command: ${command.name} (${command.isLegacy ? "legacy" : "modern"})`);
+          this.logger.debug(`Loaded command: ${command.name} (${command.isLegacy ? "legacy" : "modern"})`);
         }
       } catch (error) {
-        console.error(`Failed to load command from ${file}:`, error);
+        this.logger.error(`Failed to load command from ${file}:`, error);
       }
     }
 
-    console.log(`Successfully loaded ${commands.size} commands`);
+    this.logger.debug(`Successfully loaded ${commands.size} commands`);
     return commands;
   }
 
@@ -56,7 +65,7 @@ export class CommandLoader {
     } else if (this.isModernPattern(exports)) {
       return this.adaptModernCommand(exports, filePath, commandName);
     } else {
-      console.warn(`Invalid command export pattern in ${filePath}`);
+      this.logger.warn(`Invalid command export pattern in ${filePath}`);
       return null;
     }
   }
