@@ -3,36 +3,33 @@ import type { ValidationResult, ValidationContext } from "../types";
 /**
  * Executes a validation function and normalizes the result
  */
-export async function executeValidation(
-  validationFn: Function,
-  context: ValidationContext
-): Promise<ValidationResult> {
+export async function executeValidation(validationFn: Function, context: ValidationContext): Promise<ValidationResult> {
   try {
     const result = await validationFn(context);
-    
+
     // Handle legacy boolean return (CommandKit compatibility)
     // CommandKit: true = stop command, false = continue
-    if (typeof result === 'boolean') {
+    if (typeof result === "boolean") {
       return { proceed: !result };
     }
-    
+
     // Handle modern ValidationResult return
-    if (typeof result === 'object' && result !== null) {
+    if (typeof result === "object" && result !== null) {
       return {
         proceed: result.proceed ?? true,
         error: result.error,
-        ephemeral: result.ephemeral
+        ephemeral: result.ephemeral,
       };
     }
-    
+
     // Default to proceeding if result is unclear
     return { proceed: true };
   } catch (error) {
-    console.error('Validation execution error:', error);
-    return { 
-      proceed: false, 
-      error: 'Validation failed due to an error',
-      ephemeral: true
+    console.error("Validation execution error:", error);
+    return {
+      proceed: false,
+      error: "Validation failed due to an error",
+      ephemeral: true,
     };
   }
 }
@@ -50,15 +47,15 @@ export async function executeLegacyValidation(
 ): Promise<ValidationResult> {
   try {
     const result = await validationFn(props);
-    
+
     // Legacy CommandKit: true = stop, false = continue
     return { proceed: !result };
   } catch (error) {
-    console.error('Legacy validation execution error:', error);
-    return { 
-      proceed: false, 
-      error: 'Validation failed due to an error',
-      ephemeral: true
+    console.error("Legacy validation execution error:", error);
+    return {
+      proceed: false,
+      error: "Validation failed due to an error",
+      ephemeral: true,
     };
   }
 }
@@ -66,9 +63,6 @@ export async function executeLegacyValidation(
 /**
  * Checks if a validation should be skipped for a command
  */
-export function shouldSkipValidation(
-  validationName: string,
-  command: { config?: { validations?: { skip?: string[] } } }
-): boolean {
+export function shouldSkipValidation(validationName: string, command: { config?: { validations?: { skip?: string[] } } }): boolean {
   return command.config?.validations?.skip?.includes(validationName) ?? false;
 }

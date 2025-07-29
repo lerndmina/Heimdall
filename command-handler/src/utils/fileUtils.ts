@@ -4,21 +4,18 @@ import * as path from "path";
 /**
  * Recursively discovers files with specific extensions
  */
-export async function discoverFiles(
-  directory: string,
-  extensions: string[] = ['.ts', '.js']
-): Promise<string[]> {
+export async function discoverFiles(directory: string, extensions: string[] = [".ts", ".js"]): Promise<string[]> {
   const files: string[] = [];
-  
+
   if (!fs.existsSync(directory)) {
     return files;
   }
-  
+
   const entries = fs.readdirSync(directory, { withFileTypes: true });
-  
+
   for (const entry of entries) {
     const fullPath = path.join(directory, entry.name);
-    
+
     if (entry.isDirectory()) {
       // Recursively scan subdirectories
       const subFiles = await discoverFiles(fullPath, extensions);
@@ -30,7 +27,7 @@ export async function discoverFiles(
       }
     }
   }
-  
+
   return files;
 }
 

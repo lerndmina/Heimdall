@@ -1,14 +1,14 @@
-import { 
-  ChatInputCommandInteraction, 
-  SlashCommandBuilder, 
-  PermissionResolvable, 
-  Client, 
-  RepliableInteraction, 
+import {
+  ChatInputCommandInteraction,
+  SlashCommandBuilder,
+  PermissionResolvable,
+  Client,
+  RepliableInteraction,
   AutocompleteInteraction,
   MessageContextMenuCommandInteraction,
   UserContextMenuCommandInteraction,
   ContextMenuCommandBuilder,
-  ApplicationCommandType
+  ApplicationCommandType,
 } from "discord.js";
 import type { CommandHandler } from "../CommandHandler";
 
@@ -117,7 +117,7 @@ export interface LoadedCommand {
   data: SlashCommandBuilder | ContextMenuCommandBuilder;
   filePath: string;
   isLegacy: boolean;
-  type: 'slash' | 'context-menu';
+  type: "slash" | "context-menu";
 
   // Unified configuration
   config: {

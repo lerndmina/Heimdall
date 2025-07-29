@@ -4,7 +4,7 @@ import * as path from "path";
  * Normalizes a path to use forward slashes
  */
 export function normalizePath(filePath: string): string {
-  return filePath.replace(/\\/g, '/');
+  return filePath.replace(/\\/g, "/");
 }
 
 /**
@@ -20,7 +20,7 @@ export function getRelativePath(base: string, target: string): string {
  */
 export function pathToName(filePath: string, basePath: string): string {
   const relativePath = getRelativePath(basePath, filePath);
-  const withoutExt = relativePath.replace(/\.(ts|js)$/, '');
+  const withoutExt = relativePath.replace(/\.(ts|js)$/, "");
   const parts = withoutExt.split(path.sep);
   return parts[parts.length - 1]; // Return just the filename
 }
@@ -32,14 +32,14 @@ export function pathToName(filePath: string, basePath: string): string {
 export function pathToEventName(filePath: string, basePath: string): string {
   const relativePath = getRelativePath(basePath, filePath);
   const parts = relativePath.split(path.sep);
-  
+
   // If file is in a subdirectory, use the directory name as event name
   if (parts.length > 1) {
     return parts[0];
   }
-  
+
   // Otherwise use the filename without extension
-  return parts[0].replace(/\.(ts|js)$/, '');
+  return parts[0].replace(/\.(ts|js)$/, "");
 }
 
 /**

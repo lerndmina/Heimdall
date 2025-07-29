@@ -29,9 +29,5 @@ export interface CommandSpecificValidation {
 
 // Legacy validation export (for backward compatibility)
 export interface LegacyValidationExport {
-  default: (props: {
-    interaction: RepliableInteraction;
-    commandObj: { data: any; options?: any };
-    handler: CommandHandler;
-  }) => Promise<boolean> | boolean;
+  default: (props: { interaction: RepliableInteraction; commandObj: { data: any; options?: any }; handler: CommandHandler }) => Promise<boolean> | boolean;
 }

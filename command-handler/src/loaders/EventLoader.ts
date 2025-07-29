@@ -8,36 +8,36 @@ export class EventLoader {
    */
   async loadFromDirectory(eventsPath: string): Promise<Map<string, LoadedEvent[]>> {
     const events = new Map<string, LoadedEvent[]>();
-    
+
     console.log(`Loading events from: ${eventsPath}`);
-    
+
     // Discover all event files recursively
-    const files = await discoverFiles(eventsPath, ['.ts', '.js']);
+    const files = await discoverFiles(eventsPath, [".ts", ".js"]);
     console.log(`Found ${files.length} potential event files`);
-    
+
     for (const file of files) {
       try {
         const event = await this.loadEvent(file, eventsPath);
         if (event) {
           const eventName = event.name;
-          
+
           if (!events.has(eventName)) {
             events.set(eventName, []);
           }
-          
+
           events.get(eventName)!.push(event);
-          console.log(`Loaded event: ${eventName} from ${file} (${event.isLegacy ? 'legacy' : 'modern'})`);
+          console.log(`Loaded event: ${eventName} from ${file} (${event.isLegacy ? "legacy" : "modern"})`);
         }
       } catch (error) {
         console.error(`Failed to load event from ${file}:`, error);
       }
     }
-    
+
     const totalEvents = Array.from(events.values()).reduce((sum, arr) => sum + arr.length, 0);
     console.log(`Successfully loaded ${totalEvents} events across ${events.size} event types`);
     return events;
   }
-  
+
   /**
    * Loads a single event file
    */
@@ -46,9 +46,9 @@ export class EventLoader {
     if (!exports) {
       return null;
     }
-    
+
     const eventName = pathToEventName(filePath, basePath);
-    
+
     // Detect export pattern
     if (this.isLegacyPattern(exports)) {
       return this.adaptLegacyEvent(exports, filePath, eventName);
@@ -59,29 +59,25 @@ export class EventLoader {
       return null;
     }
   }
-  
+
   /**
    * Checks if exports match legacy pattern (default export function)
    */
   private isLegacyPattern(exports: any): exports is LegacyEventData {
-    return typeof exports.default === 'function';
+    return typeof exports.default === "function";
   }
-  
+
   /**
    * Checks if exports match modern pattern
    */
   private isModernPattern(exports: any): exports is ModernEventData {
-    return exports.event && typeof exports.execute === 'function';
+    return exports.event && typeof exports.execute === "function";
   }
-  
+
   /**
    * Adapts legacy event to internal format
    */
-  private adaptLegacyEvent(
-    exports: LegacyEventData, 
-    filePath: string, 
-    eventName: string
-  ): LoadedEvent {
+  private adaptLegacyEvent(exports: LegacyEventData, filePath: string, eventName: string): LoadedEvent {
     return {
       name: eventName,
       filePath,
@@ -90,18 +86,14 @@ export class EventLoader {
       execute: async (client, handler, ...args) => {
         // Legacy events receive (client, ...args) - pass handler as second param
         await exports.default(client, handler, ...args);
-      }
+      },
     };
   }
-  
+
   /**
    * Adapts modern event to internal format
    */
-  private adaptModernEvent(
-    exports: ModernEventData, 
-    filePath: string, 
-    eventName: string
-  ): LoadedEvent {
+  private adaptModernEvent(exports: ModernEventData, filePath: string, eventName: string): LoadedEvent {
     return {
       name: exports.event,
       filePath,
@@ -109,7 +101,7 @@ export class EventLoader {
       once: exports.once ?? false,
       execute: async (client, handler, ...args) => {
         await exports.execute(client, handler, ...args);
-      }
+      },
     };
   }
 }
