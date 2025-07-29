@@ -13,24 +13,21 @@ import {
   TextInputStyle,
   ThreadChannel,
 } from "discord.js";
-import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
+import { globalCooldownKey, setCommandCooldown, waitingEmoji, redisClient } from "../../Bot";
 import ButtonWrapper from "../../utils/ButtonWrapper";
 import { ThingGetter } from "../../utils/TinyUtils";
 import Database from "../../utils/data/database";
 import ModmailCache from "../../utils/ModmailCache";
-import ModmailConfig from "../../models/ModmailConfig";
+import ModmailConfig, { TicketPriority } from "../../models/ModmailConfig";
 import Modmail from "../../models/Modmail";
 import FetchEnvs from "../../utils/FetchEnvs";
 import { createModmailThread } from "../../utils/ModmailUtils";
 import { tryCatch } from "../../utils/trycatch";
 import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import { validateModmailSetup } from "../../utils/modmail/ModmailValidation";
-import {
-  createModmailThreadSafe,
-  cleanupModmailThread,
-  checkExistingModmail,
-} from "../../utils/modmail/ModmailThreads";
 import log from "../../utils/log";
+
+const env = FetchEnvs();
 
 export const openModmailOptions: CommandOptions = {
   devOnly: false,
@@ -43,6 +40,7 @@ export const openModmailOptions: CommandOptions = {
  * - Creates a modmail thread in the forum channel
  * - Sends a DM to the user
  * - Enhanced error handling with tryCatch utility
+ * - Follows new gotMail patterns for consistency
  */
 export default async function ({ interaction, client, handler }: SlashCommandProps) {
   const guild = interaction.guild;
@@ -89,6 +87,29 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
     return;
   }
 
+  // Rate limiting check (following gotMail pattern)
+  const rateLimitKey = `modmail_creation_rate_limit:${user.id}`;
+  const isRateLimited = await redisClient.get(rateLimitKey);
+
+  if (isRateLimited) {
+    return interaction.editReply({
+      content: "",
+      embeds: [
+        ModmailEmbeds.warning(
+          client,
+          "Rate Limited",
+          "This user has had a modmail thread created recently. Please wait a moment before trying again."
+        ),
+      ],
+    });
+  }
+
+  // Set rate limit for 5 seconds
+  await redisClient.setEx(rateLimitKey, 5, "true");
+
+  // Check if user is banned from modmail - SKIPPED FOR ADMIN COMMAND
+  // Admin/staff commands bypass ban restrictions
+
   // Validate complete modmail setup
   const db = new Database();
   const { data: validation, error: validationError } = await tryCatch(
@@ -97,6 +118,7 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
 
   if (validationError) {
     log.error("Failed during modmail validation:", validationError);
+    await redisClient.del(rateLimitKey); // Clear rate limit on error
     return interaction.editReply({
       content: "",
       embeds: [ModmailEmbeds.error(client, "Validation Error", "Failed to validate modmail setup")],
@@ -104,6 +126,7 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
   }
 
   if (!validation?.success) {
+    await redisClient.del(rateLimitKey); // Clear rate limit on validation failure
     return interaction.editReply({
       content: "",
       embeds: [
@@ -116,11 +139,24 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
     });
   }
 
-  const { member: targetMember, config: modmailConfig, channel } = validation.data!;
+  const { member: targetMember, config: modmailConfig, channel: forumChannel } = validation.data!;
 
-  // Check if user already has an open modmail thread
-  const existingCheck = await checkExistingModmail(user.id);
-  if (existingCheck.exists) {
+  // Check if user already has an open modmail thread (following gotMail pattern)
+  const { data: existingModmail, error: existingError } = await tryCatch(
+    db.findOne(Modmail, { userId: user.id, isClosed: false })
+  );
+
+  if (existingError) {
+    log.error("Failed to check existing modmail:", existingError);
+    await redisClient.del(rateLimitKey); // Clear rate limit on error
+    return interaction.editReply({
+      content: "",
+      embeds: [ModmailEmbeds.error(client, "Database Error", "Failed to check existing modmail")],
+    });
+  }
+
+  if (existingModmail) {
+    await redisClient.del(rateLimitKey); // Clear rate limit
     return interaction.editReply({
       content: "",
       embeds: [
@@ -133,59 +169,118 @@ export default async function ({ interaction, client, handler }: SlashCommandPro
     });
   }
 
-  // Create the modmail thread using the safe wrapper
-  const result = await createModmailThreadSafe(client, {
-    guild,
-    targetUser: user,
-    targetMember,
-    forumChannel: channel,
-    modmailConfig,
-    reason,
-    openedBy: {
-      type: "Staff",
-      username: interaction.user.username,
-      userId: interaction.user.id,
-    },
-  });
+  // Prepare category information - use default category for admin-opened tickets
+  const getter = new ThingGetter(client);
+  let categoryInfo = {};
 
-  if (!result.success) {
+  // For admin/staff opened tickets, use the default category to ensure consistency
+  try {
+    const { CategoryManager } = await import("../../utils/modmail/CategoryManager");
+    const categoryManager = new CategoryManager();
+
+    // Get the default category (even if disabled) since this is an admin command
+    const defaultCategory = await categoryManager.getDefaultCategory(guild.id);
+
+    if (defaultCategory) {
+      // Get ticket number for the default category
+      const ticketNumber = await categoryManager.getNextTicketNumber(guild.id);
+
+      categoryInfo = {
+        categoryId: defaultCategory.id,
+        categoryName: defaultCategory.name,
+        priority: defaultCategory.priority,
+        ticketNumber,
+        formResponses: {}, // No form responses for staff-opened tickets
+        formMetadata: {},
+      };
+
+      log.debug(`Using default category ${defaultCategory.name} for admin-opened modmail`);
+    } else {
+      log.debug("No default category found, using legacy modmail format");
+    }
+  } catch (error) {
+    log.debug("Categories not available or failed to load, using legacy format:", error);
+  }
+
+  // Create the modmail thread using the main createModmailThread function
+  const { data: result, error: createError } = await tryCatch(
+    createModmailThread(client, {
+      guild,
+      targetUser: user,
+      targetMember,
+      forumChannel,
+      modmailConfig,
+      reason,
+      openedBy: {
+        type: "Staff",
+        username: interaction.user.username,
+        userId: interaction.user.id,
+      },
+      initialMessage: reason,
+      ...categoryInfo,
+    })
+  );
+
+  if (createError) {
+    log.error("Failed to create modmail thread:", createError);
+    await redisClient.del(rateLimitKey); // Clear rate limit on error
     return interaction.editReply({
       content: "",
       embeds: [
         ModmailEmbeds.error(
           client,
           "Thread Creation Failed",
-          result.error || "Failed to create modmail thread"
+          "An error occurred while creating the modmail thread"
         ),
       ],
     });
   }
 
-  // Handle DM failure
+  if (!result?.success) {
+    log.error(`Failed to create modmail thread: ${result?.error}`);
+
+    // Clear rate limit if it's not an "already open" error
+    if (!result?.error?.includes("already open")) {
+      await redisClient.del(rateLimitKey);
+    }
+
+    return interaction.editReply({
+      content: "",
+      embeds: [
+        ModmailEmbeds.error(
+          client,
+          "Thread Creation Failed",
+          result?.error || "Failed to create modmail thread"
+        ),
+      ],
+    });
+  }
+
+  // Handle DM failure (following gotMail pattern)
   if (!result.dmSuccess) {
-    await interaction.editReply({
+    await redisClient.del(rateLimitKey); // Clear rate limit since thread was created
+
+    return interaction.editReply({
       content: "",
       embeds: [
         ModmailEmbeds.warning(
           client,
-          "DM Failed",
-          `I was unable to send a DM to the user. This modmail thread will be closed. Please contact the user manually.`
+          "Thread Created - DM Failed",
+          `Modmail thread created for ${user.tag}, but I was unable to send them a DM. They may have DMs disabled.\n\nThe thread is still active and they can communicate through the server.`
         ),
       ],
+      components: ButtonWrapper([
+        new ButtonBuilder()
+          .setLabel("Goto Thread")
+          .setStyle(ButtonStyle.Link)
+          .setEmoji("🔗")
+          .setURL(result.thread!.url),
+      ]),
     });
-
-    // Clean up the created thread and database entry using the utility
-    await cleanupModmailThread({
-      thread: result.thread,
-      modmail: result.modmail,
-      reason: "DM failure cleanup",
-    });
-
-    setCommandCooldown(globalCooldownKey(interaction.commandName), 15);
-    return;
   }
 
-  // Success
+  // Success - clear rate limit and set command cooldown
+  await redisClient.del(rateLimitKey);
   setCommandCooldown(globalCooldownKey(interaction.commandName), 60);
 
   await interaction.editReply({
