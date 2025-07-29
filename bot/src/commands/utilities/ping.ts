@@ -10,11 +10,11 @@ export const data = new SlashCommandBuilder()
   .setDescription("Check the bot's latency and websocket ping.")
   .addBooleanOption((option) =>
     option.setName("public").setDescription("Whether to reply publicly or not").setRequired(false)
-  );
+  )
+  .setDMPermission(true); // Allow in DMs
 
 export const options: CommandOptions = {
   devOnly: false,
-  guildOnly: false,
   deleted: false,
 };
 

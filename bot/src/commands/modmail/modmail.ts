@@ -303,7 +303,6 @@ export const data = new SlashCommandBuilder()
 export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
-  guildOnly: false,
   // userPermissions: ["ManageMessages"],
 };
 

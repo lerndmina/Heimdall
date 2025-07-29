@@ -4,11 +4,11 @@ import { ModernCommandData } from "../../../../command-handler/dist/types";
 export default {
   data: new SlashCommandBuilder()
     .setName("testmodern")
-    .setDescription("Test modern command syntax"),
+    .setDescription("Test modern command syntax")
+    .setDMPermission(false), // This makes it guild-only
 
   config: {
     devOnly: true,
-    guildOnly: true,
     cooldown: 5000,
     userPermissions: [PermissionFlagsBits.UseApplicationCommands],
     botPermissions: [PermissionFlagsBits.SendMessages],

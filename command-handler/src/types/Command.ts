@@ -15,7 +15,6 @@ import type { CommandHandler } from "../CommandHandler";
 // Legacy CommandKit compatibility interfaces
 export interface LegacyCommandOptions {
   devOnly?: boolean;
-  guildOnly?: boolean;
   deleted?: boolean;
   userPermissions?: PermissionResolvable[];
   botPermissions?: PermissionResolvable[];
@@ -68,7 +67,6 @@ export type LegacyValidationFunction = (props: LegacyValidationProps) => Promise
 // Modern enhanced types
 export interface ModernCommandConfig {
   devOnly?: boolean;
-  guildOnly?: boolean;
   deleted?: boolean;
   cooldown?: number; // Simple cooldown in milliseconds
   userPermissions?: PermissionResolvable[];
@@ -129,7 +127,6 @@ export interface LoadedCommand {
   // Unified configuration
   config: {
     devOnly: boolean;
-    guildOnly: boolean;
     deleted: boolean;
     userPermissions: PermissionResolvable[];
     botPermissions: PermissionResolvable[];

@@ -5,6 +5,7 @@ import { EventLoader } from "./loaders/EventLoader";
 import { ValidationLoader } from "./loaders/ValidationLoader";
 import { executeValidation, shouldSkipValidation } from "./utils/validation";
 import { validateCommandOptions } from "./utils/builtinValidations";
+import { isCommandGuildOnly } from "./utils/commandUtils";
 import { createLogger, LogLevel } from "@heimdall/logger";
 
 export class CommandHandler {
@@ -206,8 +207,8 @@ export class CommandHandler {
       }
     }
 
-    // Check guild-only restrictions
-    if (command.config.guildOnly && !interaction.guild) {
+    // Check guild-only restrictions based on command builder settings
+    if (isCommandGuildOnly(command.data) && !interaction.guild) {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({
           content: "This command can only be used in servers.",
@@ -383,27 +384,45 @@ export class CommandHandler {
     const nonDeletedCommands = allCommands.filter((cmd) => !cmd.config.deleted);
     this.logger.debug(`Commands after deleted filter: ${nonDeletedCommands.length}`);
 
-    const commandData = nonDeletedCommands.map((cmd) => {
-      this.logger.debug(`Processing command ${cmd.name}, type: ${cmd.type}, data: ${typeof cmd.data}`);
-      return cmd.data.toJSON();
-    });
+    // Separate dev-only commands from regular commands
+    const devOnlyCommands = nonDeletedCommands.filter((cmd) => cmd.config.devOnly);
+    const globalCommands = nonDeletedCommands.filter((cmd) => !cmd.config.devOnly);
 
-    const slashCommands = commandData.filter((cmd) => cmd.type === undefined || cmd.type === 1);
-    const contextMenuCommands = commandData.filter((cmd) => cmd.type === 2 || cmd.type === 3);
-
-    this.logger.info(`Registering ${slashCommands.length} slash commands and ${contextMenuCommands.length} context menu commands`);
+    this.logger.debug(`Dev-only commands: ${devOnlyCommands.length}, Global commands: ${globalCommands.length}`);
 
     try {
-      if (this.config.devGuildIds && this.config.devGuildIds.length > 0) {
-        // Register to development guilds
+      // Register global commands globally (DM permissions are handled by Discord based on command builder settings)
+      if (globalCommands.length > 0) {
+        const globalCommandData = globalCommands.map((cmd) => {
+          this.logger.debug(`Processing global command ${cmd.name}, type: ${cmd.type}, data: ${typeof cmd.data}`);
+          return cmd.data.toJSON();
+        });
+
+        const globalSlashCommands = globalCommandData.filter((cmd) => cmd.type === undefined || cmd.type === 1);
+        const globalContextMenuCommands = globalCommandData.filter((cmd) => cmd.type === 2 || cmd.type === 3);
+
+        this.logger.info(`Registering ${globalSlashCommands.length} slash commands and ${globalContextMenuCommands.length} context menu commands globally`);
+
+        await rest.put(Routes.applicationCommands(this.client.user.id), { body: globalCommandData });
+        this.logger.info(`Registered ${globalCommandData.length} commands globally`);
+      }
+
+      // Register dev-only commands to development guilds
+      if (devOnlyCommands.length > 0 && this.config.devGuildIds && this.config.devGuildIds.length > 0) {
+        const devCommandData = devOnlyCommands.map((cmd) => {
+          this.logger.debug(`Processing dev command ${cmd.name}, type: ${cmd.type}, data: ${typeof cmd.data}`);
+          return cmd.data.toJSON();
+        });
+
+        const devSlashCommands = devCommandData.filter((cmd) => cmd.type === undefined || cmd.type === 1);
+        const devContextMenuCommands = devCommandData.filter((cmd) => cmd.type === 2 || cmd.type === 3);
+
+        this.logger.info(`Registering ${devSlashCommands.length} dev slash commands and ${devContextMenuCommands.length} dev context menu commands to development guilds`);
+
         for (const guildId of this.config.devGuildIds) {
-          await rest.put(Routes.applicationGuildCommands(this.client.user.id, guildId), { body: commandData });
-          this.logger.info(`Registered ${commandData.length} commands to development guild ${guildId}`);
+          await rest.put(Routes.applicationGuildCommands(this.client.user.id, guildId), { body: devCommandData });
+          this.logger.info(`Registered ${devCommandData.length} dev-only commands to development guild ${guildId}`);
         }
-      } else {
-        // Register globally
-        await rest.put(Routes.applicationCommands(this.client.user.id), { body: commandData });
-        this.logger.info(`Registered ${commandData.length} commands globally`);
       }
     } catch (error) {
       this.logger.error("Failed to register commands:", error);

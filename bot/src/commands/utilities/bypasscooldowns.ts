@@ -21,7 +21,6 @@ export const data = new SlashCommandBuilder()
 
 export const options: CommandOptions = {
   devOnly: false,
-  guildOnly: false,
   deleted: false,
 };
 

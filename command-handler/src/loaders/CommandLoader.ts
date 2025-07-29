@@ -115,7 +115,6 @@ export class CommandLoader {
       type: "slash",
       config: {
         devOnly: options.devOnly ?? false,
-        guildOnly: options.guildOnly ?? false,
         deleted: options.deleted ?? false,
         userPermissions: options.userPermissions ?? [],
         botPermissions: options.botPermissions ?? [],
@@ -148,7 +147,6 @@ export class CommandLoader {
       type: "context-menu",
       config: {
         devOnly: options.devOnly ?? false,
-        guildOnly: options.guildOnly ?? false,
         deleted: options.deleted ?? false,
         userPermissions: options.userPermissions ?? [],
         botPermissions: options.botPermissions ?? [],
@@ -176,7 +174,6 @@ export class CommandLoader {
       config: {
         // Support both flat config and CommandKit-style options
         devOnly: config.devOnly ?? false,
-        guildOnly: config.guildOnly ?? false,
         deleted: config.deleted ?? false,
         userPermissions: config.userPermissions ?? [],
         botPermissions: config.botPermissions ?? [],
