@@ -93,7 +93,12 @@ export class CommandLoader {
    * Checks if exports match modern pattern
    */
   private isModernPattern(exports: any): exports is ModernCommandData {
-    return exports.command && typeof exports.execute === "function";
+    // Check for default export modern pattern
+    if (exports.default && exports.default.data && typeof exports.default.execute === "function") {
+      return true;
+    }
+    // Check for named export modern pattern
+    return exports.data && typeof exports.execute === "function" && !exports.run;
   }
 
   /**
@@ -157,33 +162,36 @@ export class CommandLoader {
   /**
    * Adapts modern command to internal format
    */
-  private adaptModernCommand(exports: ModernCommandData, filePath: string, commandName: string): LoadedCommand {
-    const config = exports.config || {};
+  private adaptModernCommand(exports: ModernCommandData | { default: ModernCommandData }, filePath: string, commandName: string): LoadedCommand {
+    // Handle both default export and named export
+    const command = "default" in exports ? exports.default : exports;
+    const config = command.config || {};
 
     return {
       name: commandName,
-      data: exports.command,
+      data: command.data,
       filePath,
       isLegacy: false,
       type: "slash",
       config: {
-        // Map modern config to legacy format for compatibility
-        devOnly: config.restrictions?.devOnly ?? false,
-        guildOnly: config.restrictions?.guildOnly ?? false,
-        deleted: config.restrictions?.disabled ?? false,
-        userPermissions: config.permissions?.user ?? [],
-        botPermissions: config.permissions?.bot ?? [],
-        // Keep modern config for enhanced features
-        restrictions: config.restrictions,
+        // Support both flat config and CommandKit-style options
+        devOnly: config.devOnly ?? false,
+        guildOnly: config.guildOnly ?? false,
+        deleted: config.deleted ?? false,
+        userPermissions: config.userPermissions ?? [],
+        botPermissions: config.botPermissions ?? [],
         cooldown: config.cooldown,
-        validations: config.validations,
+        category: config.category,
+        nsfw: config.nsfw,
+        // Keep advanced config for enhanced features
+        advanced: config.advanced,
       },
       execute: async (interaction, client, handler) => {
-        await exports.execute({ interaction: interaction as any, client, handler });
+        await command.execute({ interaction: interaction as any, client, handler });
       },
-      autocomplete: exports.autocomplete
+      autocomplete: command.autocomplete
         ? async (interaction, client, handler) => {
-            await exports.autocomplete!({ interaction: interaction as any, client, handler });
+            await command.autocomplete!({ interaction: interaction as any, client, handler });
           }
         : undefined,
     };

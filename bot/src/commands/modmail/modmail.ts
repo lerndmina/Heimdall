@@ -10,7 +10,6 @@ import Modmail from "../../models/Modmail";
 import { waitingEmoji } from "../../Bot";
 import { ThingGetter } from "../../utils/TinyUtils";
 import Database from "../../utils/data/database";
-import { CommandOptions, SlashCommandProps } from "commandkit";
 import log from "../../utils/log";
 import FetchEnvs from "../../utils/FetchEnvs";
 import ModmailConfig from "../../models/ModmailConfig";
@@ -26,6 +25,7 @@ import openModmail, { openModmailOptions } from "../../subcommands/modmail/openM
 import neverautocloseModmail from "../../subcommands/modmail/neverautocloseModmail";
 import enableautocloseModmail from "../../subcommands/modmail/enableautocloseModmail";
 import markresolvedModmail from "../../subcommands/modmail/markresolvedModmail";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 
 const env = FetchEnvs();
 
@@ -300,9 +300,10 @@ export const data = new SlashCommandBuilder()
   )
   .setDMPermission(true);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
+  guildOnly: false,
   // userPermissions: ["ManageMessages"],
 };
 
@@ -338,7 +339,7 @@ export async function autocomplete({ interaction, client, handler }: any) {
   }
 }
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const subcommand = interaction.options.getSubcommand();
   const subcommandGroup = interaction.options.getSubcommandGroup();
 

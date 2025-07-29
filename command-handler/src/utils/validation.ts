@@ -63,6 +63,6 @@ export async function executeLegacyValidation(
 /**
  * Checks if a validation should be skipped for a command
  */
-export function shouldSkipValidation(validationName: string, command: { config?: { validations?: { skip?: string[] } } }): boolean {
-  return command.config?.validations?.skip?.includes(validationName) ?? false;
+export function shouldSkipValidation(validationName: string, command: { config?: { advanced?: { validations?: { skip?: string[] } } } }): boolean {
+  return command.config?.advanced?.validations?.skip?.includes(validationName) ?? false;
 }

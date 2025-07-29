@@ -6,6 +6,7 @@ import log from "../../../utils/log";
 import { tryCatch } from "../../../utils/trycatch";
 import { ModmailEmbeds } from "../../../utils/modmail/ModmailEmbeds";
 import ModmailConfig, { TicketPriority } from "../../../models/ModmailConfig";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 
 export const createCategoryOptions: CommandOptions = {
   devOnly: false,
@@ -16,7 +17,11 @@ export const createCategoryOptions: CommandOptions = {
 /**
  * Create a new modmail category
  */
-export default async function createCategory({ interaction, client, handler }: SlashCommandProps) {
+export default async function createCategory({
+  interaction,
+  client,
+  handler,
+}: LegacySlashCommandProps) {
   const { data: _, error: replyError } = await tryCatch(interaction.reply(waitingEmoji));
   if (replyError) {
     log.error("Failed to send initial reply:", replyError);

@@ -67,28 +67,35 @@ export type LegacyValidationFunction = (props: LegacyValidationProps) => Promise
 
 // Modern enhanced types
 export interface ModernCommandConfig {
-  permissions?: {
-    user?: PermissionResolvable[];
-    bot?: PermissionResolvable[];
-    roles?: string[];
-    users?: string[];
-  };
-  restrictions?: {
-    devOnly?: boolean;
-    guildOnly?: boolean;
-    dmOnly?: boolean;
-    ownerOnly?: boolean;
-    disabled?: boolean;
-  };
-  cooldown?: {
-    duration: number;
-    type: "user" | "guild" | "global";
-    bypassRoles?: string[];
-    bypassUsers?: string[];
-  };
-  validations?: {
-    skip?: string[]; // Skip specific universal validations
-    additional?: string[]; // Additional command-specific validations
+  devOnly?: boolean;
+  guildOnly?: boolean;
+  deleted?: boolean;
+  cooldown?: number; // Simple cooldown in milliseconds
+  userPermissions?: PermissionResolvable[];
+  botPermissions?: PermissionResolvable[];
+  category?: string;
+  nsfw?: boolean;
+  // Advanced config for future expansion
+  advanced?: {
+    permissions?: {
+      roles?: string[];
+      users?: string[];
+    };
+    restrictions?: {
+      dmOnly?: boolean;
+      ownerOnly?: boolean;
+      disabled?: boolean;
+    };
+    cooldown?: {
+      duration: number;
+      type: "user" | "guild" | "global";
+      bypassRoles?: string[];
+      bypassUsers?: string[];
+    };
+    validations?: {
+      skip?: string[]; // Skip specific universal validations
+      additional?: string[]; // Additional command-specific validations
+    };
   };
 }
 
@@ -105,7 +112,7 @@ export interface ModernAutocompleteContext {
 }
 
 export interface ModernCommandData {
-  command: SlashCommandBuilder;
+  data: SlashCommandBuilder;
   config?: ModernCommandConfig;
   execute: (ctx: ModernCommandContext) => Promise<void> | void;
   autocomplete?: (ctx: ModernAutocompleteContext) => Promise<void> | void;
@@ -126,10 +133,11 @@ export interface LoadedCommand {
     deleted: boolean;
     userPermissions: PermissionResolvable[];
     botPermissions: PermissionResolvable[];
+    cooldown?: number;
+    category?: string;
+    nsfw?: boolean;
     // Enhanced config from modern commands
-    restrictions?: ModernCommandConfig["restrictions"];
-    cooldown?: ModernCommandConfig["cooldown"];
-    validations?: ModernCommandConfig["validations"];
+    advanced?: ModernCommandConfig["advanced"];
   };
 
   // Unified execution functions

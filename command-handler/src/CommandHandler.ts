@@ -4,6 +4,7 @@ import { CommandLoader } from "./loaders/CommandLoader";
 import { EventLoader } from "./loaders/EventLoader";
 import { ValidationLoader } from "./loaders/ValidationLoader";
 import { executeValidation, shouldSkipValidation } from "./utils/validation";
+import { validateCommandOptions } from "./utils/builtinValidations";
 import { createLogger, LogLevel } from "@heimdall/logger";
 
 export class CommandHandler {
@@ -278,7 +279,30 @@ export class CommandHandler {
       handler: this,
     };
 
-    // 1. Execute universal validations first
+    // 0. Execute built-in validations first (CommandOptions validation)
+    const builtinResult = await validateCommandOptions(context);
+    if (!builtinResult.proceed) {
+      if (builtinResult.error && this.config.options?.handleValidationErrors) {
+        try {
+          if (interaction.deferred || interaction.replied) {
+            await interaction.followUp({
+              content: builtinResult.error,
+              ephemeral: builtinResult.ephemeral ?? true,
+            });
+          } else {
+            await interaction.reply({
+              content: builtinResult.error,
+              ephemeral: builtinResult.ephemeral ?? true,
+            });
+          }
+        } catch (error) {
+          this.logger.error("Failed to send built-in validation error message:", error);
+        }
+      }
+      return false;
+    }
+
+    // 1. Execute universal validations
     for (const [name, validation] of this.universalValidations) {
       // Skip if command config says to skip this validation
       if (shouldSkipValidation(name, command)) {

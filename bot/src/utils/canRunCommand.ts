@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import FetchEnvs from "./FetchEnvs";
 import BasicEmbed from "./BasicEmbed";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 
 const env = FetchEnvs();
 
@@ -19,7 +20,7 @@ enum FailReason {
 }
 
 function canRun(
-  { interaction, client, handler }: SlashCommandProps,
+  { interaction, client, handler }: LegacySlashCommandProps,
   options?: CommandOptions
 ): { canRun: false; reason: FailReason } | { canRun: true } {
   if (!options) return { canRun: true };
@@ -48,14 +49,14 @@ export function checkPerms(member: GuildMember, perms: PermissionsString[] | Per
 
 /**
  *
- * @param {SlashCommandProps} param0
+ * @param {LegacySlashCommandProps} param0
  * @param {CommandOptions} options
  * @returns {Boolean} Can continue
  * @description Check if the user has the required permissions to run the command
  */
 
 export default async function (
-  { interaction, client, handler }: SlashCommandProps,
+  { interaction, client, handler }: LegacySlashCommandProps,
   options?: CommandOptions
 ): Promise<InteractionResponse<boolean> | false> {
   const data = canRun({ interaction, client, handler }, options);
