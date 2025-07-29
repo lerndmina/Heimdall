@@ -74,31 +74,16 @@ export class ValidationLoader {
 
     const validationName = filename.substring(1); // Remove the + prefix
 
-    if (this.isLegacyValidation(exports)) {
-      // Legacy validation - adapt to new format
+    // All validations are modern - they export a default function that takes ValidationContext and returns ValidationResult
+    if (typeof exports.default === "function") {
       return {
         name: validationName,
-        execute: async (ctx) => {
-          // Convert to legacy format for backward compatibility
-          const legacyProps = {
-            interaction: ctx.interaction,
-            commandObj: { data: ctx.command.data, options: ctx.command.config },
-            handler: ctx.handler,
-          };
-
-          const result = await exports.default(legacyProps);
-          // Legacy: true = stop, false = continue
-          return { proceed: !result };
-        },
-      };
-    } else if (this.isModernValidation(exports)) {
-      // Modern validation
-      return {
-        name: validationName,
-        execute: exports.execute,
+        execute: exports.default,
       };
     } else {
-      this.logger.warn(`Invalid universal validation export pattern in ${filePath}`);
+      this.logger.error(
+        `Invalid universal validation in ${filePath}: Expected 'export default function' but found ${typeof exports.default}. Universal validations must export a default function that takes ValidationContext and returns ValidationResult.`
+      );
       return null;
     }
   }
@@ -112,46 +97,17 @@ export class ValidationLoader {
       return null;
     }
 
-    if (this.isLegacyValidation(exports)) {
-      // Legacy validation - adapt to new format
+    // All validations are modern - they export a default function that takes ValidationContext and returns ValidationResult
+    if (typeof exports.default === "function") {
       return {
         commandName,
-        execute: async (ctx) => {
-          // Convert to legacy format for backward compatibility
-          const legacyProps = {
-            interaction: ctx.interaction,
-            commandObj: { data: ctx.command.data, options: ctx.command.config },
-            handler: ctx.handler,
-          };
-
-          const result = await exports.default(legacyProps);
-          // Legacy: true = stop, false = continue
-          return { proceed: !result };
-        },
-      };
-    } else if (this.isModernValidation(exports)) {
-      // Modern validation
-      return {
-        commandName,
-        execute: exports.execute,
+        execute: exports.default,
       };
     } else {
-      this.logger.warn(`Invalid command validation export pattern in ${filePath}`);
+      this.logger.error(
+        `Invalid command-specific validation in ${filePath}: Expected 'export default function' but found ${typeof exports.default}. Command-specific validations must export a default function that takes ValidationContext and returns ValidationResult.`
+      );
       return null;
     }
-  }
-
-  /**
-   * Checks if exports match legacy validation pattern
-   */
-  private isLegacyValidation(exports: any): exports is LegacyValidationExport {
-    return typeof exports.default === "function";
-  }
-
-  /**
-   * Checks if exports match modern validation pattern
-   */
-  private isModernValidation(exports: any): boolean {
-    return typeof exports.execute === "function";
   }
 }

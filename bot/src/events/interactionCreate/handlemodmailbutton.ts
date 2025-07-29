@@ -13,7 +13,7 @@ import {
   userCooldownKey,
   waitingEmoji,
 } from "../../Bot";
-import { getCooldown, hasCooldownBypass } from "../../validations/cooldowns";
+import { getCooldown, hasCooldownBypass } from "../../validations/+cooldowns";
 import { debugMsg } from "../../utils/TinyUtils";
 import BasicEmbed from "../../utils/BasicEmbed";
 import FetchEnvs from "../../utils/FetchEnvs";

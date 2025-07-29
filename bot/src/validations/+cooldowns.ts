@@ -31,7 +31,7 @@ export default async function cooldownValidation({
     return { proceed: true };
   }
 
-  const commandName = command.name;
+  const commandName = command?.name || "unknown";
 
   // Check global cooldown
   const globalCooldown = await getCooldown(globalCooldownKey(commandName));
