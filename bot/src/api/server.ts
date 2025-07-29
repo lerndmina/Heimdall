@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 // import rateLimit from "express-rate-limit"; // Disabled rate limiting
-import { CommandKit } from "commandkit";
+import { CommandHandler } from "../../../command-handler/dist/index";
 import { Client } from "discord.js";
 import { addRequestId, logRequests } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
@@ -17,9 +17,9 @@ export class ApiServer {
   private app: express.Application;
   private server: any;
   private client: Client<true>;
-  private handler: CommandKit;
+  private handler: CommandHandler;
 
-  constructor(client: Client<true>, handler: CommandKit) {
+  constructor(client: Client<true>, handler: CommandHandler) {
     this.app = express();
     this.client = client;
     this.handler = handler;

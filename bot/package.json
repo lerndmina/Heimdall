@@ -15,6 +15,7 @@
   "license": "ISC",
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@heimdall/command-handler": "../command-handler",
     "@types/diff": "^5.2.3",
     "@types/fluent-ffmpeg": "^2.1.27",
     "@types/ms": "^2.1.0",

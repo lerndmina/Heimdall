@@ -1,0 +1,31 @@
+{
+  "name": "@heimdall/command-handler",
+  "version": "1.0.0",
+  "description": "Custom Discord.js command handler with enhanced validation system",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "discord",
+    "discord.js",
+    "command-handler",
+    "bot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "discord.js": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ]
+}

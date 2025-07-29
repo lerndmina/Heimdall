@@ -2,9 +2,9 @@
 import { config as dotenvConfig } from "dotenv";
 dotenvConfig(); // This ensures environment variables are loaded at the very beginning
 
-// Fix CommandKit before importing it
-import { fixCommandKit } from "../FixCommandKit";
-fixCommandKit();
+// Remove CommandKit imports and fix
+// import { fixCommandKit } from "../FixCommandKit";
+// fixCommandKit();
 
 import {
   BaseInteraction,
@@ -14,7 +14,8 @@ import {
   Partials,
   Snowflake,
 } from "discord.js";
-import { CommandKit } from "commandkit";
+// Import our custom command handler instead of CommandKit
+import { CommandHandler } from "../../command-handler/dist/index";
 import path from "path";
 import mongoose, { Collection } from "mongoose";
 import { createClient } from "redis";
@@ -40,13 +41,16 @@ export const Start = async () => {
     partials: [Partials.Message, Partials.Channel, Partials.Reaction],
   }) as Client<true>;
 
+  // Increase max listeners to handle all our events
+  client.setMaxListeners(20);
+
   const commandsPath = path.join(__dirname, "commands");
   const eventsPath = path.join(__dirname, "events");
   const validationsPath = path.join(__dirname, "validations");
   const devGuildIds = env.TEST_SERVERS;
   const devUserIds = env.OWNER_IDS;
 
-  log.info(`Loading commandkit with`, {
+  log.info(`Loading custom command handler with`, {
     commandsPath,
     eventsPath,
     validationsPath,
@@ -54,8 +58,8 @@ export const Start = async () => {
     devUserIds,
   });
 
-  // Using CommandKit (https://commandkit.underctrl.io)
-  const commandKit = new CommandKit({
+  // Using our custom CommandHandler
+  const commandKit = new CommandHandler({
     client, // Discord.js client object | Required by default
     commandsPath, // The commands directory
     eventsPath, // The events directory
@@ -112,6 +116,9 @@ export const Start = async () => {
       }
 
       await client.login(env.BOT_TOKEN);
+
+      // Register commands after login
+      await commandKit.registerCommands();
     });
 
   // Handle AI moderation events
