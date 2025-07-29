@@ -124,28 +124,137 @@ export class CategoryManager {
   }
 
   /**
-   * Get the next ticket number for a guild
+   * Get the next ticket number for a guild using atomic counter
    * @param guildId - The guild ID
    * @returns The next available ticket number
    */
   async getNextTicketNumber(guildId: string): Promise<number> {
-    // For now, let's use a simple approach - get all tickets and find the max
-    const { data: tickets, error } = await tryCatch(
-      this.db.find(Modmail, { guildId, ticketNumber: { $exists: true } })
-    );
+    try {
+      // First, try to increment the counter
+      const { data: updatedConfig, error } = await tryCatch(
+        this.db.findOneAndUpdate(
+          ModmailConfig,
+          { guildId },
+          { $inc: { nextTicketNumber: 1 } },
+          { upsert: true, new: true }
+        )
+      );
 
-    if (error) {
-      log.error(`Failed to get tickets for guild ${guildId}:`, error);
-      return 1; // Start from 1 if we can't determine the last number
+      if (error) {
+        log.error(`Failed to increment ticket counter for guild ${guildId}:`, error);
+        return 1; // Fallback to 1 if increment fails
+      }
+
+      // If this is the first time (counter was 0 + 1 = 1), we might need to initialize
+      // based on existing tickets for backward compatibility
+      if (updatedConfig?.nextTicketNumber === 1) {
+        // Check if there are existing tickets with higher numbers using direct Mongoose query
+        const { data: maxTicket, error: ticketsError } = await tryCatch(
+          Modmail.findOne({ guildId, ticketNumber: { $exists: true, $gt: 0 } })
+            .sort({ ticketNumber: -1 })
+            .limit(1)
+            .exec()
+        );
+
+        if (!ticketsError && maxTicket && maxTicket.ticketNumber && maxTicket.ticketNumber > 0) {
+          // There are existing tickets with higher numbers, initialize properly
+          const { error: reinitError } = await tryCatch(
+            this.db.findOneAndUpdate(
+              ModmailConfig,
+              { guildId },
+              { nextTicketNumber: maxTicket.ticketNumber + 1 },
+              { upsert: true, new: true }
+            )
+          );
+
+          if (!reinitError) {
+            log.info(
+              `Auto-initialized ticket counter for guild ${guildId} to ${
+                maxTicket.ticketNumber + 1
+              }`
+            );
+            return maxTicket.ticketNumber + 1;
+          }
+        }
+      }
+
+      // Return the incremented value
+      return updatedConfig?.nextTicketNumber || 1;
+    } catch (error) {
+      log.error(`Error getting next ticket number for guild ${guildId}:`, error);
+      return 1; // Fallback to 1 on any error
     }
+  }
 
-    if (!tickets || tickets.length === 0) {
-      return 1; // First ticket
+  /**
+   * Initialize the ticket counter for a guild based on existing tickets
+   * This should only be called once for existing guilds that don't have a counter set
+   * @param guildId - The guild ID
+   * @returns True if successful, false otherwise
+   */
+  async initializeTicketCounter(guildId: string): Promise<boolean> {
+    try {
+      // Check if counter is already initialized (> 0)
+      const { data: config, error: fetchError } = await tryCatch(
+        this.db.findOne(ModmailConfig, { guildId })
+      );
+
+      if (fetchError) {
+        log.error(
+          `Failed to fetch config for counter initialization in guild ${guildId}:`,
+          fetchError
+        );
+        return false;
+      }
+
+      // If counter is already set and > 0, don't reinitialize
+      if (config?.nextTicketNumber && config.nextTicketNumber > 0) {
+        log.debug(`Ticket counter already initialized for guild ${guildId}`);
+        return true;
+      }
+
+      // Find the highest existing ticket number using direct Mongoose query for efficiency
+      const { data: maxTicket, error: ticketsError } = await tryCatch(
+        Modmail.findOne({ guildId, ticketNumber: { $exists: true, $ne: null } })
+          .sort({ ticketNumber: -1 })
+          .limit(1)
+          .exec()
+      );
+
+      if (ticketsError) {
+        log.error(
+          `Failed to fetch tickets for counter initialization in guild ${guildId}:`,
+          ticketsError
+        );
+        return false;
+      }
+
+      let maxTicketNumber = 0;
+      if (maxTicket && maxTicket.ticketNumber) {
+        maxTicketNumber = maxTicket.ticketNumber;
+      }
+
+      // Set the counter to the max + 1 (or 0 if no tickets exist)
+      const { error: updateError } = await tryCatch(
+        this.db.findOneAndUpdate(
+          ModmailConfig,
+          { guildId },
+          { nextTicketNumber: maxTicketNumber },
+          { upsert: true, new: true }
+        )
+      );
+
+      if (updateError) {
+        log.error(`Failed to initialize ticket counter for guild ${guildId}:`, updateError);
+        return false;
+      }
+
+      log.info(`Initialized ticket counter for guild ${guildId} to ${maxTicketNumber}`);
+      return true;
+    } catch (error) {
+      log.error(`Error initializing ticket counter for guild ${guildId}:`, error);
+      return false;
     }
-
-    // Find the highest ticket number
-    const maxTicketNumber = Math.max(...tickets.map((t) => t.ticketNumber || 0));
-    return maxTicketNumber + 1;
   }
 
   /**

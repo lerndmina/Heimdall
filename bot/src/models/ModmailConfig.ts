@@ -266,6 +266,12 @@ const ModmailConfig = new Schema(
       type: Boolean,
       default: false,
     },
+    // Ticket numbering counter - starts at 0, incremented for each new ticket
+    nextTicketNumber: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt automatically
