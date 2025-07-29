@@ -3,7 +3,7 @@ import { fivemPool } from "../../../Bot";
 import BasicEmbed from "../../../utils/BasicEmbed";
 import { tryCatch } from "../../../utils/trycatch";
 import canRunCommand, { checkPerms } from "../../../utils/canRunCommand";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { PoolConnection } from "mariadb";
 import log from "../../../utils/log";
 import TawLinks from "../../../models/TawLinks";
@@ -48,11 +48,11 @@ export interface EventParticipation {
  * Check if the user has event management permissions
  */
 export async function hasEventPermission(
-  props: SlashCommandProps,
+  props: LegacySlashCommandProps,
   permissionMessage: string = "You do not have permission to manage events."
 ): Promise<boolean> {
   const { interaction, client, handler } = props;
-  const options: CommandOptions = {
+  const options: LegacyCommandOptions = {
     userPermissions: ["ManageEvents"],
   };
 
@@ -79,7 +79,7 @@ export async function hasEventPermission(
 /**
  * Get a database connection with error handling
  */
-export async function getDbConnection(props: SlashCommandProps) {
+export async function getDbConnection(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   if (!fivemPool) {

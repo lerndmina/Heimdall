@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { ChannelType, InteractionContextType, SlashCommandBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
 import generateHelpFields from "../../utils/data/static/generateHelpFields";
@@ -59,14 +59,14 @@ export const data = new SlashCommandBuilder()
       .setDescription("List all message regexes that automatically create threads.")
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: true,
   deleted: false,
 };
 
 const db = new Database();
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const subcommand = interaction.options.getSubcommand();
   const guildId = interaction.guildId;
 

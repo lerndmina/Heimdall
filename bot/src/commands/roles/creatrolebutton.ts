@@ -23,7 +23,7 @@ import { randomUUID } from "crypto";
 import RoleButtons from "../../models/RoleButtons";
 import { ROLE_BUTTON_PREFIX, globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
 import Database from "../../utils/data/database";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { ThingGetter, getValidUrl, pastebinUrlToJson } from "../../utils/TinyUtils";
 import { initialReply } from "../../utils/initialReply";
 
@@ -35,14 +35,14 @@ export const data = new SlashCommandBuilder()
   )
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: true,
   deleted: false,
   userPermissions: ["ManageRoles", "ManageMessages"],
   botPermissions: ["ManageRoles", "ManageMessages"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   if (!interaction.channel)
     interaction.reply({ content: "This command can only be used in a server", ephemeral: true });
   setCommandCooldown(globalCooldownKey(interaction.commandName), 120);

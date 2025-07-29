@@ -1,4 +1,4 @@
-import { CommandOptions, CommandProps } from "commandkit";
+import { LegacyCommandOptions, CommandProps } from "@heimdall/command-handler";
 import {
   ChannelType,
   ChatInputCommandInteraction,
@@ -51,7 +51,7 @@ export const data = new SlashCommandBuilder()
     subcommand.setName("options").setDescription("View the options for the welcome message command")
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageGuild"],

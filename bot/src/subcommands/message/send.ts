@@ -1,10 +1,10 @@
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import { ChannelType, GuildTextBasedChannel, MessageCreateOptions } from "discord.js";
 import { MessageProcessor } from "../../services/MessageProcessor";
 import CommandError from "../../utils/interactionErrors/CommandError";
 import log from "../../utils/log";
 
-export default async function ({ interaction, client }: SlashCommandProps) {
+export default async function ({ interaction, client }: LegacySlashCommandProps) {
   try {
     // Validate channel
     const channel = validateChannel(interaction.options.getChannel("channel"));

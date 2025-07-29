@@ -14,7 +14,7 @@ import {
   MessageFlags,
 } from "discord.js";
 import BasicEmbed from "../../../utils/BasicEmbed";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import {
   getDbConnection,
   hasEventPermission,
@@ -26,7 +26,7 @@ import {
 /**
  * Admin command: Creates a new event with a wizard interface
  */
-export default async function eventCreate(props: SlashCommandProps) {
+export default async function eventCreate(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   // Check permissions
@@ -93,7 +93,7 @@ export default async function eventCreate(props: SlashCommandProps) {
  */
 async function showEventCreationModal(
   buttonInteraction: ButtonInteraction,
-  props: SlashCommandProps
+  props: LegacySlashCommandProps
 ) {
   // Create the modal for event creation
   const modal = new ModalBuilder()
@@ -159,7 +159,7 @@ async function showEventCreationModal(
 /**
  * Handles the modal submission for event creation
  */
-async function handleModalSubmit(modalSubmit: ModalSubmitInteraction, props: SlashCommandProps) {
+async function handleModalSubmit(modalSubmit: ModalSubmitInteraction, props: LegacySlashCommandProps) {
   await modalSubmit.deferReply({ flags: [MessageFlags.Ephemeral] });
 
   // Get database connection
@@ -167,7 +167,7 @@ async function handleModalSubmit(modalSubmit: ModalSubmitInteraction, props: Sla
     interaction: modalSubmit as any,
     client: props.client,
     handler: props.handler,
-  } as SlashCommandProps);
+  } as LegacySlashCommandProps);
 
   if (!connection) return;
 

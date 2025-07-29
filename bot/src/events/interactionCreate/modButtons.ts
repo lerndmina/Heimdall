@@ -10,7 +10,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
-import type { CommandKit } from "commandkit";
+import type { CommandHandler } from "@heimdall/command-handler";
 import log from "../../utils/log";
 import { redisClient } from "../../Bot";
 import { moderationEmbeds } from "../../services/moderationEmbeds";
@@ -19,7 +19,7 @@ import { tryCatch } from "../../utils/trycatch";
 export default async (
   interaction: ButtonInteraction,
   client: Client<true>,
-  handler: CommandKit
+  handler: CommandHandler
 ) => {
   if (!interaction.isButton()) return false;
 

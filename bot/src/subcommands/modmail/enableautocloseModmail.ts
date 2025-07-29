@@ -3,12 +3,12 @@ import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import Modmail from "../../models/Modmail";
 import { ThingGetter } from "../../utils/TinyUtils";
 import Database from "../../utils/data/database";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import log from "../../utils/log";
 import { initialReply } from "../../utils/initialReply";
 import { sendMessageToBothChannels, getModmailUserDisplayName } from "../../utils/ModmailUtils";
 
-export default async function ({ interaction, client }: SlashCommandProps) {
+export default async function ({ interaction, client }: LegacySlashCommandProps) {
   if (!interaction.channel)
     return log.error("Request made to slash command without required values - enableautoclose.ts");
 

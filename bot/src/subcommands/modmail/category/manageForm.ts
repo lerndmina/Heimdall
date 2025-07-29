@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { waitingEmoji } from "../../../Bot";
 import Database from "../../../utils/data/database";
 import log from "../../../utils/log";
@@ -8,7 +8,7 @@ import { ModmailEmbeds } from "../../../utils/modmail/ModmailEmbeds";
 import { FormFieldManager } from "../../../utils/modmail/FormFieldManager";
 import ModmailConfig from "../../../models/ModmailConfig";
 
-export const manageFormOptions: CommandOptions = {
+export const manageFormOptions: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageGuild"],
@@ -17,7 +17,11 @@ export const manageFormOptions: CommandOptions = {
 /**
  * Manage form fields for a category
  */
-export default async function manageForm({ interaction, client, handler }: SlashCommandProps) {
+export default async function manageForm({
+  interaction,
+  client,
+  handler,
+}: LegacySlashCommandProps) {
   const { data: _, error: replyError } = await tryCatch(interaction.reply(waitingEmoji));
   if (replyError) {
     log.error("Failed to send initial reply:", replyError);

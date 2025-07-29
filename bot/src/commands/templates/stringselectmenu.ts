@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import {
   ActionRowBuilder,
   MessageComponentInteraction,
@@ -24,12 +24,12 @@ export const data = new SlashCommandBuilder()
   .setDescription("This is a template command.")
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: true,
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const reply = await interaction.reply({
     content: waitingEmoji,
     ephemeral: true,

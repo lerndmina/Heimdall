@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions, AutocompleteProps } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions, LegacyAutocompleteProps } from "@heimdall/command-handler";
 import { InteractionContextType, SlashCommandBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey } from "../../Bot";
 import { initialReply } from "../../utils/initialReply";
@@ -20,7 +20,7 @@ export function GetJobNameFromId(jobId: string) {
     .join(" ");
 }
 
-export async function GetJobAutocomplete(interaction: AutocompleteProps["interaction"]) {
+export async function GetJobAutocomplete(interaction: LegacyAutocompleteProps["interaction"]) {
   const focusedOption = interaction.options.getFocused(true);
   if (focusedOption.name == "job" || focusedOption.name == "jobname") {
     const focusedValue = interaction.options.getFocused().trim();
@@ -94,14 +94,14 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((subcommand) =>
     subcommand.setName("list").setDescription("List all jobs that the bot knows about")
   );
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: true,
   deleted: false,
   userPermissions: ["ManageGuild"],
   botPermissions: ["ManageGuild", "ManageRoles"],
 };
 
-export async function run(props: SlashCommandProps) {
+export async function run(props: LegacySlashCommandProps) {
   if (!envExists(env.ENABLE_FIVEM_SYSTEMS) || !envExists(env.FIVEM_MYSQL_URI)) {
     return props.interaction.reply({
       content: "This command is not enabled on this bot.",
@@ -189,6 +189,6 @@ export async function run(props: SlashCommandProps) {
     }
   }
 }
-export async function autocomplete({ interaction, client, handler }: AutocompleteProps) {
+export async function autocomplete({ interaction, client, handler }: LegacyAutocompleteProps) {
   return GetJobAutocomplete(interaction);
 }

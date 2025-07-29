@@ -1,12 +1,12 @@
 import { EmbedBuilder } from "discord.js";
 import BasicEmbed from "../../../utils/BasicEmbed";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import { getDbConnection, getUpcomingEvents } from "./commons";
 
 /**
  * Lists all planned in-game events, with the earliest one being at the top of the list
  */
-export default async function eventInfo(props: SlashCommandProps) {
+export default async function eventInfo(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   // Get database connection

@@ -1,6 +1,6 @@
 import { AttachmentBuilder } from "discord.js";
 import BasicEmbed from "../../../utils/BasicEmbed";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import {
   getDbConnection,
   hasEventPermission,
@@ -12,7 +12,7 @@ import log from "../../../utils/log";
 /**
  * Admin command: Uploads event participation data as a CSV
  */
-export default async function eventUpload(props: SlashCommandProps) {
+export default async function eventUpload(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   // Check permissions

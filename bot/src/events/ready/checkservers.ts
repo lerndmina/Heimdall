@@ -1,5 +1,5 @@
 import { ActivityType, type ActivityOptions, type Client, PresenceStatusData } from "discord.js";
-import type { CommandKit } from "commandkit";
+import type { CommandHandler } from "@heimdall/command-handler";
 import { redisClient } from "../../Bot";
 import Database from "../../utils/data/database";
 import Settings, { SettingsType } from "../../models/Settings";
@@ -12,7 +12,7 @@ import { createStatusEmbed } from "../../commands/minecraft/mcstatus";
 import { debug } from "console";
 const db = new Database();
 
-export default async (c: Client<true>, client: Client<true>, handler: CommandKit) => {
+export default async (c: Client<true>, client: Client<true>, handler: CommandHandler) => {
   log.info("Starting checkservers event - looking for persistent mcstatus servers");
   const guilds = c.guilds.cache;
   const getter = new ThingGetter(c);

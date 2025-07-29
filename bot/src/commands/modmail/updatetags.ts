@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import {
   ChannelType,
   ForumChannel,
@@ -20,13 +20,13 @@ export const data = new SlashCommandBuilder()
   .setDescription("Update modmail tags")
   .setContexts(InteractionContextType.Guild);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: true,
   deleted: false,
   userPermissions: ["Administrator"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   await initialReply(interaction, true);
   const db = new Database();
 

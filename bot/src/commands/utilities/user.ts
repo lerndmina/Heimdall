@@ -1,4 +1,4 @@
-import { CommandOptions, CommandProps } from "commandkit";
+import { LegacyCommandOptions, CommandProps } from "@heimdall/command-handler";
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 
 export const data = new SlashCommandBuilder()
@@ -6,7 +6,7 @@ export const data = new SlashCommandBuilder()
   .setDescription("Provides information about the user.")
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: true,
 };
 

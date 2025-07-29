@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, userMention, ForumChannel } from "discord.js";
 import ModmailConfig from "../../models/ModmailConfig";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { waitingEmoji } from "../../Bot";
 import { initialReply } from "../../utils/initialReply";
 import Database from "../../utils/data/database";
@@ -11,7 +11,7 @@ import { tryCatch } from "../../utils/trycatch";
 import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import { validateForumChannel, validateDescription } from "../../utils/modmail/ModmailValidation";
 
-export const setupModmailOptions: CommandOptions = {
+export const setupModmailOptions: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageGuild"],
@@ -24,7 +24,11 @@ export const setupModmailOptions: CommandOptions = {
  * - Stores configuration in database
  * - Enhanced error handling with tryCatch utility
  */
-export default async function setupModmail({ interaction, client, handler }: SlashCommandProps) {
+export default async function setupModmail({
+  interaction,
+  client,
+  handler,
+}: LegacySlashCommandProps) {
   const { data: _, error: replyError } = await tryCatch(interaction.reply(waitingEmoji));
   if (replyError) {
     log.error("Failed to send initial reply:", replyError);

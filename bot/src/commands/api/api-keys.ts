@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import {
   SlashCommandBuilder,
   EmbedBuilder,
@@ -8,7 +8,7 @@ import {
   EmbedField,
   MessageComponentInteraction,
 } from "discord.js";
-import { createSignal, createEffect, ButtonKit } from "commandkit";
+import { createSignal, createEffect, ButtonKit } from "@heimdall/command-handler";
 import { createApiKey, listApiKeys, revokeApiKey } from "../../utils/api/apiKeyUtils";
 import BasicEmbed from "../../utils/BasicEmbed";
 import FetchEnvs from "../../utils/FetchEnvs";
@@ -128,12 +128,12 @@ export const data = new SlashCommandBuilder()
   )
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: true,
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const subcommand = interaction.options.getSubcommand();
 
   switch (subcommand) {

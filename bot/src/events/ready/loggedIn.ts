@@ -1,5 +1,5 @@
 import { ActivityType, type ActivityOptions, type Client, PresenceStatusData } from "discord.js";
-import type { CommandKit } from "commandkit";
+import type { CommandHandler } from "@heimdall/command-handler";
 import { redisClient } from "../../Bot";
 import Database from "../../utils/data/database";
 import Settings, { SettingsType } from "../../models/Settings";
@@ -14,7 +14,7 @@ const db = new Database();
 // Global scheduler instance
 let modmailScheduler: ModmailScheduler | null = null;
 
-export default async (client: Client<true>, handler: CommandKit) => {
+export default async (client: Client<true>, handler: CommandHandler) => {
   log(`Logged in as ${client.user?.tag}`);
 
   const db = new Database();

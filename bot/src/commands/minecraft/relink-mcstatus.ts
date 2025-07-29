@@ -28,7 +28,11 @@
  * - Message must have a valid server status embed with server information
  */
 
-import type { CommandData, ContextMenuCommandProps, CommandOptions } from "commandkit";
+import type {
+  LegacyContextMenuCommandDataOnly,
+  LegacyContextMenuCommandProps,
+  LegacyCommandOptions,
+} from "@heimdall/command-handler";
 import {
   ApplicationCommandType,
   MessageFlags,
@@ -46,12 +50,12 @@ import { createStatusEmbed } from "./mcstatus";
 
 const db = new Database();
 
-export const data: CommandData = {
+export const data: LegacyContextMenuCommandDataOnly = {
   name: "Relink MC Status",
   type: ApplicationCommandType.Message,
 };
 
-export async function run({ interaction, client, handler }: ContextMenuCommandProps) {
+export async function run({ interaction, client, handler }: LegacyContextMenuCommandProps) {
   // Type guard to ensure this is a message context menu
   if (!interaction.isMessageContextMenuCommand()) {
     return;
@@ -357,7 +361,7 @@ async function relinkMcStatus(
   }
 }
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   userPermissions: ["ManageMessages"],
   botPermissions: ["SendMessages", "EmbedLinks"],

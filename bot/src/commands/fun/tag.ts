@@ -20,7 +20,7 @@ import {
   ThingGetter,
 } from "../../utils/TinyUtils";
 import TagSchema from "../../models/TagSchema";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import BasicEmbed from "../../utils/BasicEmbed";
 import { env } from "process";
 import { initialReply } from "../../utils/initialReply";
@@ -72,13 +72,13 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommand((subcommand) => subcommand.setName("list").setDescription("List all tags"));
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageMessages"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   await initialReply(interaction, true);
   const name = interaction.options.getString("name")?.toLowerCase();
   const content = interaction.options.getString("content");

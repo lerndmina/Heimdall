@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import {
   SlashCommandBuilder,
   ModalBuilder,
@@ -36,7 +36,7 @@ export const data = new SlashCommandBuilder()
   .setDescription("Suggest a feature or improvement")
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
@@ -44,7 +44,7 @@ export const options: CommandOptions = {
 const db = new Database();
 const env = FetchEnvs();
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const suggestionConfig = await db.findOne(
     SuggestionConfigModel,
     {

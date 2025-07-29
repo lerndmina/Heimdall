@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions, AutocompleteProps } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions, LegacyAutocompleteProps } from "@heimdall/command-handler";
 import {
   ChannelType,
   Client,
@@ -80,13 +80,13 @@ export const data = new SlashCommandBuilder()
   )
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageMessages"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   await initialReply(interaction, true);
 
   const subcommand = interaction.options.getSubcommand();

@@ -1,4 +1,4 @@
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import { validateAndGetMessage } from "../../utils/MessageUtils";
 import { MessageProcessor } from "../../services/MessageProcessor";
 import CommandError from "../../utils/interactionErrors/CommandError";
@@ -10,7 +10,7 @@ import log from "../../utils/log";
  * Edit message subcommand
  * Allows editing existing bot messages using Discohook data
  */
-export default async function ({ interaction, client }: SlashCommandProps) {
+export default async function ({ interaction, client }: LegacySlashCommandProps) {
   try {
     await interaction.editReply("Finding message...");
 

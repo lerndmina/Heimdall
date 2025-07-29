@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
 import { initialReply } from "../../utils/initialReply";
@@ -58,13 +58,13 @@ export const data = new SlashCommandBuilder()
     option.setName("illicit_violent").setDescription("Moderate violent illegal activities")
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["Administrator"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   await initialReply(interaction, true);
 
   const enabled = interaction.options.getBoolean("enabled") ?? true;

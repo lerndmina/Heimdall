@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ForumChannel, ChannelType } from "discord.js";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { waitingEmoji } from "../../../Bot";
 import Database from "../../../utils/data/database";
 import log from "../../../utils/log";
@@ -7,7 +7,7 @@ import { tryCatch } from "../../../utils/trycatch";
 import { ModmailEmbeds } from "../../../utils/modmail/ModmailEmbeds";
 import ModmailConfig, { TicketPriority } from "../../../models/ModmailConfig";
 
-export const editCategoryOptions: CommandOptions = {
+export const editCategoryOptions: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageGuild"],
@@ -16,7 +16,11 @@ export const editCategoryOptions: CommandOptions = {
 /**
  * Edit an existing modmail category
  */
-export default async function editCategory({ interaction, client, handler }: SlashCommandProps) {
+export default async function editCategory({
+  interaction,
+  client,
+  handler,
+}: LegacySlashCommandProps) {
   const { data: _, error: replyError } = await tryCatch(interaction.reply(waitingEmoji));
   if (replyError) {
     log.error("Failed to send initial reply:", replyError);

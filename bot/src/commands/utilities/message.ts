@@ -1,4 +1,4 @@
-import { CommandData, CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandData, LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { Attachment, ClientUser, InteractionReplyOptions, SlashCommandBuilder } from "discord.js";
 import CommandError from "../../utils/interactionErrors/CommandError";
 import edit from "../../subcommands/message/edit";
@@ -83,14 +83,14 @@ export const data = new SlashCommandBuilder()
       )
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   deleted: false,
   devOnly: false,
   userPermissions: ["ManageMessages"],
   botPermissions: ["ManageMessages"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const getter = new ThingGetter(client);
   if (!interaction.guild) {
     return new CommandError("Command must be run in a guild.", interaction, client).send();

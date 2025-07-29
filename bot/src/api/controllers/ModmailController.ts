@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { CommandKit } from "commandkit";
+import { CommandKit } from "@heimdall/command-handler";
 import { Client } from "discord.js";
 import Modmail, { ModmailType, ModmailMessageType } from "../../models/Modmail";
 import ModmailConfig, { ModmailConfigType } from "../../models/ModmailConfig";

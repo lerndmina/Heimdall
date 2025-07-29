@@ -1,4 +1,4 @@
-import type { CommandData, SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacyCommandData, LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { globalCooldownKey, redisClient, setCommandCooldown, waitingEmoji } from "../../Bot";
 import ParseTimeFromMessage from "../../utils/ParseTimeFromMessage";
@@ -11,12 +11,12 @@ export const data = new SlashCommandBuilder()
   .setDescription("Get the uptime of the bot.")
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const lastRestart = parseInt((await redisClient.get(`${client.user.id}-lastRestart`)) ?? "0");
   const now = Date.now();
   const uptime = prettyMilliseconds(now - lastRestart, {

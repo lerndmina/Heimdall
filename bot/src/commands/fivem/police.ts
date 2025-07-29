@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions, AutocompleteProps } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions, LegacyAutocompleteProps } from "@heimdall/command-handler";
 import { InteractionContextType, SlashCommandBuilder, ChannelType, GuildMember } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey } from "../../Bot";
 import { initialReply } from "../../utils/initialReply";
@@ -83,7 +83,7 @@ if (envExists(env.ENABLE_FIVEM_SYSTEMS) && envExists(env.FIVEM_MYSQL_URI)) {
       deleted: false,
     },
 
-    async run(props: SlashCommandProps) {
+    async run(props: LegacySlashCommandProps) {
       const { interaction } = props;
 
       if (!interaction.guild) {
@@ -123,7 +123,7 @@ if (envExists(env.ENABLE_FIVEM_SYSTEMS) && envExists(env.FIVEM_MYSQL_URI)) {
       }
     },
 
-    async autocomplete({ interaction, client, handler }: AutocompleteProps) {
+    async autocomplete({ interaction, client, handler }: LegacyAutocompleteProps) {
       if (!interaction.guild) return;
 
       const focusedOption = interaction.options.getFocused(true);
@@ -153,7 +153,7 @@ async function preFlightCheck(interaction: any) {
 }
 
 // Checklist command handlers
-async function handleChecklistEnable(props: SlashCommandProps) {
+async function handleChecklistEnable(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   if (!interaction.guild) return;
@@ -213,7 +213,7 @@ async function handleChecklistEnable(props: SlashCommandProps) {
   }
 }
 
-async function handleChecklistCreate(props: SlashCommandProps) {
+async function handleChecklistCreate(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   if (!interaction.guild) return;
@@ -236,7 +236,7 @@ async function handleChecklistCreate(props: SlashCommandProps) {
   }
 }
 
-async function handleChecklistStart(props: SlashCommandProps) {
+async function handleChecklistStart(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   if (!interaction.guild) return;
@@ -263,7 +263,7 @@ async function handleChecklistStart(props: SlashCommandProps) {
   }
 }
 
-async function handleChecklistList(props: SlashCommandProps) {
+async function handleChecklistList(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   if (!interaction.guild) return;
@@ -304,7 +304,7 @@ async function handleChecklistList(props: SlashCommandProps) {
   }
 }
 
-async function handleChecklistDelete(props: SlashCommandProps) {
+async function handleChecklistDelete(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   if (!interaction.guild) return;
@@ -352,7 +352,7 @@ async function handleChecklistDelete(props: SlashCommandProps) {
   }
 }
 
-async function handleChecklistConfig(props: SlashCommandProps) {
+async function handleChecklistConfig(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   if (!interaction.guild) return;
@@ -414,7 +414,7 @@ async function handleChecklistConfig(props: SlashCommandProps) {
   }
 }
 
-async function handleChecklistMigrate(props: SlashCommandProps) {
+async function handleChecklistMigrate(props: LegacySlashCommandProps) {
   const { interaction, client } = props;
 
   // Check if user is administrator

@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { EmbedField, SlashCommandBuilder } from "discord.js";
 import { getDiscordDate, ThingGetter, TimeType } from "../../utils/TinyUtils";
 import { tryCatch, tryCatchSync } from "../../utils/trycatch";
@@ -10,13 +10,13 @@ import Database from "../../utils/data/database";
 import BasicEmbed from "../../utils/BasicEmbed";
 import { initialReply } from "../../utils/initialReply";
 
-export const banModmailOptions: CommandOptions = {
+export const banModmailOptions: LegacyCommandOptions = {
   devOnly: true,
   deleted: true,
   userPermissions: ["ManageMessages", "KickMembers", "BanMembers"], // This is a mod command
 };
 
-export default async function ({ interaction, client, handler }: SlashCommandProps) {
+export default async function ({ interaction, client, handler }: LegacySlashCommandProps) {
   const guild = interaction.guild;
   const user = interaction.options.getUser("user");
   const durationString = interaction.options.getString("duration");

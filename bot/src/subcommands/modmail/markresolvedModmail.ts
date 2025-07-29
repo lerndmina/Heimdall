@@ -1,6 +1,6 @@
 import { ChannelType } from "discord.js";
 import Modmail from "../../models/Modmail";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import log from "../../utils/log";
 import FetchEnvs from "../../utils/FetchEnvs";
 import { initialReply } from "../../utils/initialReply";
@@ -17,7 +17,7 @@ const env = FetchEnvs();
  * - Enhanced error handling and validation
  * - Uses centralized modmail utilities for consistency
  */
-export default async function ({ interaction, client }: SlashCommandProps) {
+export default async function ({ interaction, client }: LegacySlashCommandProps) {
   if (!interaction.channel) {
     log.error("Request made to slash command without required values - markresolved.ts");
     return interaction.reply({

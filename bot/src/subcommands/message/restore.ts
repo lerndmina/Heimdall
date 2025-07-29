@@ -1,4 +1,4 @@
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import { ActionRowBuilder, ButtonBuilder, Client, EmbedBuilder, Message } from "discord.js";
 import { ThingGetter } from "../../utils/TinyUtils";
 import { MessageProcessor } from "../../services/MessageProcessor";
@@ -6,7 +6,7 @@ import BasicEmbed from "../../utils/BasicEmbed";
 import CommandError from "../../utils/interactionErrors/CommandError";
 import ButtonWrapper from "../../utils/ButtonWrapper";
 
-export default async function ({ interaction, client }: SlashCommandProps) {
+export default async function ({ interaction, client }: LegacySlashCommandProps) {
   try {
     const messageUrl = interaction.options.getString("url", true);
     const url = new URL(messageUrl);

@@ -1,13 +1,13 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction } from "discord.js";
 import BasicEmbed from "../../../utils/BasicEmbed";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import { getDbConnection, hasEventPermission, getEventById } from "./commons";
 import { tryCatch } from "../../../utils/trycatch";
 
 /**
  * Admin command: Deletes an event with the given ID after confirmation
  */
-export default async function eventDelete(props: SlashCommandProps, eventId: number | null) {
+export default async function eventDelete(props: LegacySlashCommandProps, eventId: number | null) {
   const { interaction } = props;
 
   // Check permissions

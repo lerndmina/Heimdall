@@ -1,4 +1,4 @@
-import type { CommandData, SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacyCommandData, LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { globalCooldownKey, redisClient, setCommandCooldown, waitingEmoji } from "../../Bot";
 import ms from "ms";
@@ -19,12 +19,12 @@ export const data = new SlashCommandBuilder()
       .setRequired(true)
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   await initialReply(interaction, true);
 
   if (!env.OWNER_IDS.includes(interaction.user.id)) {

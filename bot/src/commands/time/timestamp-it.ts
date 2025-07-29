@@ -1,7 +1,7 @@
 import { ContextMenuCommandBuilder, ApplicationCommandType } from "discord.js";
 import BasicEmbed from "../../utils/BasicEmbed";
 import FetchEnvs from "../../utils/FetchEnvs";
-import { MessageContextMenuCommandProps } from "commandkit";
+import { LegacyContextMenuCommandProps } from "@heimdall/command-handler";
 import ParseTimeFromMessage from "../../utils/ParseTimeFromMessage";
 import { ThingGetter, getTimeMessage } from "../../utils/TinyUtils";
 const env = FetchEnvs();
@@ -15,7 +15,15 @@ export const options = {
   devOnly: false,
 };
 
-export async function run({ interaction, client, handler }: MessageContextMenuCommandProps) {
+export async function run({ interaction, client, handler }: LegacyContextMenuCommandProps) {
+  // Type guard to ensure this is a message context menu command
+  if (!interaction.isMessageContextMenuCommand()) {
+    return interaction.reply({
+      content: "This command can only be used on messages.",
+      ephemeral: true,
+    });
+  }
+
   const data = await ParseTimeFromMessage(interaction.targetMessage);
 
   if (!data.success) {

@@ -1,4 +1,4 @@
-import { CommandKit } from "commandkit";
+import { CommandHandler } from "@heimdall/command-handler";
 import { Client } from "discord.js";
 import mongoose from "mongoose";
 import { redisClient } from "../../Bot";
@@ -7,7 +7,7 @@ import type { HealthStatus, HealthComponent } from "../types/api";
 /**
  * Get comprehensive health status for the API
  */
-export function getHealthStatus(client: Client<true>, handler: CommandKit): HealthStatus {
+export function getHealthStatus(client: Client<true>, handler: CommandHandler): HealthStatus {
   const components = {
     discord: testDiscordConnection(client),
     database: testDatabaseConnection(),
@@ -84,8 +84,8 @@ function testRedisConnection(): HealthComponent {
 /**
  * Test the command system status
  */
-function testCommandsStatus(handler: CommandKit): HealthComponent {
-  const commandCount = handler.commands.length;
+function testCommandsStatus(handler: CommandHandler): HealthComponent {
+  const commandCount = handler.getCommands().size;
   return {
     status: commandCount > 0 ? "healthy" : "unhealthy",
     details: `${commandCount} commands loaded`,

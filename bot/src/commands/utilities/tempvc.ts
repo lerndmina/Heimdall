@@ -10,7 +10,7 @@ import { Channel } from "diagnostics_channel";
 
 import { GuildNewVC } from "../../models/GuildNewVC";
 import { ThingGetter } from "../../utils/TinyUtils";
-import { CommandData, CommandOptions, CommandProps, SlashCommandProps } from "commandkit";
+import { LegacyCommandData, LegacyCommandOptions, CommandProps, LegacySlashCommandProps } from "@heimdall/command-handler";
 import log from "../../utils/log";
 import Database from "../../utils/data/database";
 
@@ -60,12 +60,12 @@ export const data = new SlashCommandBuilder()
       .setDescription("Delete all temporary voice channels for this guild.");
   });
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const i = interaction as ChatInputCommandInteraction;
   const getter = new ThingGetter(client);
   const subcommand = i.options.getSubcommand();

@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import {
   ButtonBuilder,
   ButtonStyle,
@@ -11,7 +11,7 @@ import ButtonWrapper from "../../utils/ButtonWrapper";
 import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import { initialReply } from "../../utils/initialReply";
 
-export const sendModmailButtonOptions: CommandOptions = {
+export const sendModmailButtonOptions: LegacyCommandOptions = {
   devOnly: false,
   deleted: true,
   userPermissions: ["ManageMessages"],
@@ -19,7 +19,7 @@ export const sendModmailButtonOptions: CommandOptions = {
 
 export const MODMAIL_BUTTON_ID = "modmail-button-";
 
-export default async function ({ interaction, client, handler }: SlashCommandProps) {
+export default async function ({ interaction, client, handler }: LegacySlashCommandProps) {
   await initialReply(interaction, true);
 
   if (!interaction.guild) {

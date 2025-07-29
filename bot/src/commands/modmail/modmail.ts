@@ -5,6 +5,11 @@ import {
   SlashCommandBuilder,
   ThreadChannel,
 } from "discord.js";
+import {
+  LegacyCommandOptions,
+  LegacySlashCommandProps,
+  LegacyAutocompleteProps,
+} from "@heimdall/command-handler";
 import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import Modmail from "../../models/Modmail";
 import { waitingEmoji } from "../../Bot";
@@ -25,7 +30,6 @@ import openModmail, { openModmailOptions } from "../../subcommands/modmail/openM
 import neverautocloseModmail from "../../subcommands/modmail/neverautocloseModmail";
 import enableautocloseModmail from "../../subcommands/modmail/enableautocloseModmail";
 import markresolvedModmail from "../../subcommands/modmail/markresolvedModmail";
-import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 
 const env = FetchEnvs();
 
@@ -306,7 +310,7 @@ export const options: LegacyCommandOptions = {
   // userPermissions: ["ManageMessages"],
 };
 
-export async function autocomplete({ interaction, client, handler }: any) {
+export async function autocomplete({ interaction, client, handler }: LegacyAutocompleteProps) {
   const focusedOption = interaction.options.getFocused(true);
 
   if (focusedOption.name === "category") {

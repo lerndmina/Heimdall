@@ -19,7 +19,7 @@ import {
 } from "discord.js";
 import BasicEmbed from "../../utils/BasicEmbed";
 import { ThingGetter, debugMsg, sleep } from "../../utils/TinyUtils";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import ms from "ms";
 import Database from "../../utils/data/database";
 import PollsSchema, { PollsType } from "../../models/PollsSchema";
@@ -65,13 +65,13 @@ export const data = new SlashCommandBuilder()
       .setRequired(false)
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageMessages"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const question = interaction.options.getString("question")!;
   const options = interaction.options.getString("options")!.replace(/;+$/, "").split(";");
   const timeString = interaction.options.getString("time");

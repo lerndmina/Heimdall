@@ -10,7 +10,7 @@ import {
 import BasicEmbed from "../../utils/BasicEmbed";
 import { ThingGetter } from "../../utils/TinyUtils";
 import { StringSelectMenuBuilder, ActionRowBuilder } from "discord.js";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import log from "../../utils/log";
 
 export const data = new SlashCommandBuilder()
@@ -22,7 +22,7 @@ export const options = {
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const getter = new ThingGetter(client);
   //code to fetch mutual servers
   const guilds: Guild[] = [];

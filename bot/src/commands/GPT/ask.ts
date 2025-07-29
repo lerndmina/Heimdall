@@ -2,7 +2,7 @@ import { SlashCommandBuilder, Client } from "discord.js";
 import OpenAI from "openai";
 import BasicEmbed from "../../utils/BasicEmbed";
 import FetchEnvs, { isOptionalUnset } from "../../utils/FetchEnvs";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import systemPrompt from "../../utils/SystemPrompt";
 import ResponsePlugins from "../../utils/ResponsePlugins";
 import { returnMessage } from "../../utils/TinyUtils";
@@ -25,7 +25,7 @@ export const options = {
   devOnly: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   if (isOptionalUnset(env.OPENAI_API_KEY)) {
     return returnMessage(
       interaction,

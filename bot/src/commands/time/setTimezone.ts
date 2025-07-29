@@ -1,4 +1,4 @@
-import type { CommandData, SlashCommandProps, CommandOptions, AutocompleteProps } from "commandkit";
+import type { LegacyCommandData, LegacySlashCommandProps, LegacyCommandOptions, LegacyAutocompleteProps } from "@heimdall/command-handler";
 import {
   SlashCommandBuilder,
   EmbedBuilder,
@@ -32,14 +32,14 @@ export const data = new SlashCommandBuilder()
       .setRequired(false)
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
 
 const TIMEZONE_NAMES = moment.tz.names();
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const timezone = interaction.options.getString("timezone");
   if (!timezone) {
     await interaction.reply({ content: "You need to enter a timezone!", ephemeral: true });
@@ -102,7 +102,7 @@ export async function run({ interaction, client, handler }: SlashCommandProps) {
   await interaction.reply({ embeds: [postEmbed], ephemeral: true });
 }
 
-export async function autocomplete({ interaction, client, handler }: AutocompleteProps) {
+export async function autocomplete({ interaction, client, handler }: LegacyAutocompleteProps) {
   const focusedTzOption = interaction.options.getFocused(true).value.toLowerCase();
   const filteredChoices = TIMEZONE_NAMES.filter((tz) => tz.toLowerCase().includes(focusedTzOption));
   const choices = filteredChoices.map((tz) => ({ name: tz, value: tz }));

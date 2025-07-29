@@ -2,7 +2,7 @@ import { SlashCommandBuilder, Client } from "discord.js";
 import OpenAI from "openai";
 import BasicEmbed from "../../utils/BasicEmbed";
 import FetchEnvs, { isOptionalUnset } from "../../utils/FetchEnvs";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey } from "../../Bot";
 import { returnMessage } from "../../utils/TinyUtils";
 import log from "../../utils/log";
@@ -19,14 +19,14 @@ export const data = new SlashCommandBuilder()
       .setMaxLength(30)
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
 
 const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   if (isOptionalUnset(env.OPENAI_API_KEY)) {
     return returnMessage(
       interaction,

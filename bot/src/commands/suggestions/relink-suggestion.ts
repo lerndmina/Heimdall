@@ -29,7 +29,11 @@
  * - Message must have a valid suggestion embed with title and "Submitted by" field
  */
 
-import type { CommandData, ContextMenuCommandProps, CommandOptions } from "commandkit";
+import type {
+  LegacyContextMenuCommandDataOnly,
+  LegacyContextMenuCommandProps,
+  LegacyCommandOptions,
+} from "@heimdall/command-handler";
 import {
   ApplicationCommandType,
   ModalBuilder,
@@ -52,12 +56,12 @@ import { VoteType } from "../../models/Suggestions";
 
 const db = new Database();
 
-export const data: CommandData = {
+export const data: LegacyContextMenuCommandDataOnly = {
   name: "Relink Suggestion",
   type: ApplicationCommandType.Message,
 };
 
-export async function run({ interaction, client, handler }: ContextMenuCommandProps) {
+export async function run({ interaction, client, handler }: LegacyContextMenuCommandProps) {
   // Type guard to ensure this is a message context menu
   if (!interaction.isMessageContextMenuCommand()) {
     return;
@@ -275,7 +279,7 @@ async function relinkSuggestion(
   }
 }
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   userPermissions: ["ManageMessages"],
   botPermissions: ["SendMessages", "EmbedLinks"],

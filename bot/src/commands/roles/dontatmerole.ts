@@ -9,7 +9,7 @@ import Database from "../../utils/data/database";
 import DontAtMeRole from "../../models/DontAtMeRole";
 import { waitingEmoji } from "../../Bot";
 import BasicEmbed from "../../utils/BasicEmbed";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { initialReply } from "../../utils/initialReply";
 
 export const data = new SlashCommandBuilder()
@@ -26,13 +26,13 @@ export const data = new SlashCommandBuilder()
     option.setName("remove").setDescription("Remove the Don't @ Me role").setRequired(false)
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["Administrator"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const role = interaction.options.getRole("role") as Role;
   const remove = interaction.options.getBoolean("remove") as boolean;
   if (!role && !remove) {

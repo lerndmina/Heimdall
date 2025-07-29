@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -29,7 +29,7 @@ import log from "../../utils/log";
 
 const env = FetchEnvs();
 
-export const openModmailOptions: CommandOptions = {
+export const openModmailOptions: LegacyCommandOptions = {
   devOnly: false,
   deleted: true,
   userPermissions: ["ManageMessages", "KickMembers", "BanMembers"], // This is a mod command
@@ -42,7 +42,7 @@ export const openModmailOptions: CommandOptions = {
  * - Enhanced error handling with tryCatch utility
  * - Follows new gotMail patterns for consistency
  */
-export default async function ({ interaction, client, handler }: SlashCommandProps) {
+export default async function ({ interaction, client, handler }: LegacySlashCommandProps) {
   const guild = interaction.guild;
   if (!guild) {
     return interaction.reply({

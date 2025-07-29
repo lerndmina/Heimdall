@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import BasicEmbed from "../../utils/BasicEmbed";
 import log from "../../utils/log";
 import FetchEnvs, { isOptionalUnset } from "../../utils/FetchEnvs";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey } from "../../Bot";
 import { ObjectExpressionOperatorReturningObject } from "mongoose";
 import { returnMessage } from "../../utils/TinyUtils";
@@ -19,12 +19,12 @@ export const data = new SlashCommandBuilder()
     option.setName("message").setDescription("The message to send to the AI.").setRequired(true)
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   userPermissions: ["Administrator"], // Only for testing
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   if (isOptionalUnset(env.OPENAI_API_KEY)) {
     return returnMessage(
       interaction,

@@ -8,7 +8,7 @@ import {
 import Database from "../../utils/data/database";
 import ModeratedChannel, { ModerationCategory } from "../../models/ModeratedChannels";
 import log from "../../utils/log";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { initialReply } from "../../utils/initialReply";
 
 export const data = new SlashCommandBuilder()
@@ -17,13 +17,13 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageMessages"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   await initialReply(interaction, true);
 
   try {

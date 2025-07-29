@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions, CommandKit } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions, CommandKit } from "@heimdall/command-handler";
 import { ActivityType, ChatInputCommandInteraction, Client, SlashCommandBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
 import FetchEnvs from "../../utils/FetchEnvs";
@@ -49,12 +49,12 @@ export const data = new SlashCommandBuilder()
   )
   .setDMPermission(true);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   let hasErrored: any;
   if (!env.OWNER_IDS.includes(interaction.user.id)) {
     return interaction.reply({

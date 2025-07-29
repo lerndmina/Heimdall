@@ -5,7 +5,7 @@ import {
   SlashCommandBuilder,
   TextChannel,
 } from "discord.js";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import AttachmentBlocker, {
   AttachmentType,
   AttachmentBlockerType,
@@ -46,14 +46,14 @@ export const data = new SlashCommandBuilder()
   )
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   botPermissions: ["ManageMessages"],
   userPermissions: ["ManageChannels", "ManageMessages"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const interactionMessage = await initialReply(interaction, false);
 
   try {

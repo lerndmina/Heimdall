@@ -1,14 +1,13 @@
 import { SlashCommandBuilder, ForumChannel, ChannelType } from "discord.js";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { waitingEmoji } from "../../../Bot";
 import Database from "../../../utils/data/database";
 import log from "../../../utils/log";
 import { tryCatch } from "../../../utils/trycatch";
 import { ModmailEmbeds } from "../../../utils/modmail/ModmailEmbeds";
 import ModmailConfig, { TicketPriority } from "../../../models/ModmailConfig";
-import { LegacySlashCommandProps } from "@heimdall/command-handler";
 
-export const createCategoryOptions: CommandOptions = {
+export const createCategoryOptions: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageGuild"],

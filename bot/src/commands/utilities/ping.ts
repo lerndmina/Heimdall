@@ -1,4 +1,8 @@
-import type { CommandData, SlashCommandProps, CommandOptions } from "commandkit";
+import type {
+  LegacyCommandData,
+  LegacySlashCommandProps,
+  LegacyCommandOptions,
+} from "@heimdall/command-handler";
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
 import { sleep } from "../../utils/TinyUtils";
@@ -13,12 +17,12 @@ export const data = new SlashCommandBuilder()
   )
   .setDMPermission(true); // Allow in DMs
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   setCommandCooldown(globalCooldownKey(interaction.commandName), 15);
 
   var publicReply = interaction.options.getBoolean("public") == true;

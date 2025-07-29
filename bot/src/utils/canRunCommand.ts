@@ -1,4 +1,4 @@
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { ThingGetter } from "./TinyUtils";
 import {
   GuildMember,
@@ -8,7 +8,6 @@ import {
 } from "discord.js";
 import FetchEnvs from "./FetchEnvs";
 import BasicEmbed from "./BasicEmbed";
-import { LegacySlashCommandProps } from "@heimdall/command-handler";
 
 const env = FetchEnvs();
 
@@ -21,7 +20,7 @@ enum FailReason {
 
 function canRun(
   { interaction, client, handler }: LegacySlashCommandProps,
-  options?: CommandOptions
+  options?: LegacyCommandOptions
 ): { canRun: false; reason: FailReason } | { canRun: true } {
   if (!options) return { canRun: true };
   if (options.devOnly && !env.OWNER_IDS.includes(interaction.user.id))
@@ -42,7 +41,10 @@ function canRun(
   }
   return { canRun: true };
 }
-export function checkPerms(member: GuildMember, perms: PermissionsString[] | PermissionsString) {
+export function checkPerms(
+  member: GuildMember,
+  perms: PermissionResolvable[] | PermissionResolvable
+) {
   if (!Array.isArray(perms)) perms = [perms];
   return perms.every((perm) => member.permissions.has(perm));
 }
@@ -57,7 +59,7 @@ export function checkPerms(member: GuildMember, perms: PermissionsString[] | Per
 
 export default async function (
   { interaction, client, handler }: LegacySlashCommandProps,
-  options?: CommandOptions
+  options?: LegacyCommandOptions
 ): Promise<InteractionResponse<boolean> | false> {
   const data = canRun({ interaction, client, handler }, options);
   let message = "";

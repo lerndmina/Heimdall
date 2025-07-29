@@ -40,8 +40,22 @@ export interface LegacyCommandData {
 }
 
 // Legacy context menu command support (CommandKit compatibility)
+// Generic type that can handle both Message and User context menus
 export interface LegacyContextMenuCommandProps {
   interaction: MessageContextMenuCommandInteraction | UserContextMenuCommandInteraction;
+  client: Client<true>;
+  handler: CommandHandler;
+}
+
+// Specific types for Message and User context menu commands
+export interface LegacyMessageContextMenuCommandProps {
+  interaction: MessageContextMenuCommandInteraction;
+  client: Client<true>;
+  handler: CommandHandler;
+}
+
+export interface LegacyUserContextMenuCommandProps {
+  interaction: UserContextMenuCommandInteraction;
   client: Client<true>;
   handler: CommandHandler;
 }
@@ -53,6 +67,12 @@ export interface LegacyContextMenuCommandData {
   };
   options?: LegacyCommandOptions;
   run: (props: LegacyContextMenuCommandProps) => Promise<void> | void;
+}
+
+// For context menu commands that export data and run separately
+export interface LegacyContextMenuCommandDataOnly {
+  name: string;
+  type: ApplicationCommandType.Message | ApplicationCommandType.User;
 }
 
 // Legacy validation interface (exactly like CommandKit)

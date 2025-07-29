@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import BasicEmbed from "../../utils/BasicEmbed";
 import { userMention } from "discord.js";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { returnMessage } from "../../utils/TinyUtils";
 import { setCommandCooldown, userCooldownKey } from "../../Bot";
 
@@ -16,12 +16,12 @@ export const data = new SlashCommandBuilder()
     option.setName("message").setDescription("The message to send").setRequired(false)
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   setCommandCooldown(userCooldownKey(interaction.user.id, interaction.commandName), 600);
   const user = interaction.options.getUser("user");
   const text = interaction.options.getString("message");

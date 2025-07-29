@@ -1,4 +1,4 @@
-import { SlashCommandProps, CommandOptions, ButtonKit } from "commandkit";
+import { LegacySlashCommandProps, LegacyCommandOptions, ButtonKit } from "@heimdall/command-handler";
 import {
   ActionRow,
   ActionRowBuilder,
@@ -34,7 +34,7 @@ export const data = new SlashCommandBuilder()
   )
   .setDMPermission(false);
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageMessages"], // For now so only moderators can initiate games.
@@ -44,7 +44,7 @@ export const options: CommandOptions = {
 const MIN_SIZE = 3;
 const MAX_SIZE = 5;
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const commandName = interaction.commandName;
 
   const size = interaction.options.getInteger("size", false) || 3;

@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { ChannelType, SlashCommandBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey, waitingEmoji } from "../../Bot";
 import generateHelpFields from "../../utils/data/static/generateHelpFields";
@@ -27,14 +27,14 @@ export const data = new SlashCommandBuilder()
 
 const db = new Database();
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: true,
   deleted: false,
   userPermissions: ["ManageGuild"],
   botPermissions: ["SendMessages", "EmbedLinks"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   await initialReply(interaction, true);
 
   const channel = interaction.options.getChannel("channel", false);

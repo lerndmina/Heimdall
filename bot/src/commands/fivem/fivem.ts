@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { InteractionContextType, SlashCommandBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey } from "../../Bot";
 import { initialReply } from "../../utils/initialReply";
@@ -161,7 +161,7 @@ if (
       deleted: false,
     },
 
-    async run(props: SlashCommandProps) {
+    async run(props: LegacySlashCommandProps) {
       const { interaction, client, handler } = props;
 
       // Default to private responses

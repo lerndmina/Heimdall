@@ -1,6 +1,6 @@
 import { ChannelType, SlashCommandBuilder } from "discord.js";
 import FetchEnvs from "../../utils/FetchEnvs";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { report } from "process";
 import Database from "../../utils/data/database";
 import FivemReportListener from "../../models/FivemReportListener";
@@ -43,8 +43,8 @@ if (env.ENABLE_FIVEM_SYSTEMS) {
       devOnly: true,
       deleted: false,
       userPermissions: ["Administrator"],
-    } as CommandOptions,
-    async run({ interaction, client, handler }: SlashCommandProps) {
+    } as LegacyCommandOptions,
+    async run({ interaction, client, handler }: LegacySlashCommandProps) {
       const listenChannel = interaction.options.getChannel("listenchannel");
       let reportChannel = interaction.options.getChannel("reportchannel") || listenChannel;
       const prefix = interaction.options.getString("prefix") || "ZeroBugReportSystem:";

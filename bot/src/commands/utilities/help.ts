@@ -1,11 +1,11 @@
 import {
-  type SlashCommandProps,
+  type LegacySlashCommandProps,
   createSignal,
   createEffect,
   ButtonKit,
-  CommandData,
-  CommandOptions,
-} from "commandkit";
+  LegacyCommandData,
+  LegacyCommandOptions,
+} from "@heimdall/command-handler";
 import {
   ButtonStyle,
   ActionRowBuilder,
@@ -20,7 +20,7 @@ import generateHelpFields from "../../utils/data/static/generateHelpFields";
 
 export const data = new SlashCommandBuilder().setName("help").setDescription("Help menu.");
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
@@ -60,7 +60,7 @@ const INLINE_BOOL = true;
 
 let pages: EmbedField[][] = [];
 
-export const run = async ({ interaction, client }: SlashCommandProps) => {
+export const run = async ({ interaction, client }: LegacySlashCommandProps) => {
   setCommandCooldown(userCooldownKey(interaction.user.id, interaction.commandName), 60);
   pages = await generateHelpFields(client);
 

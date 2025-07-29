@@ -1,5 +1,5 @@
 import { ChannelType, Message, type Client } from "discord.js";
-import type { CommandKit } from "commandkit";
+import type { CommandHandler } from "@heimdall/command-handler";
 import PollsSchema, { PollsType } from "../../models/PollsSchema";
 import Database from "../../utils/data/database";
 import { ThingGetter, debugMsg, sleep } from "../../utils/TinyUtils";
@@ -14,7 +14,7 @@ import FetchEnvs from "../../utils/FetchEnvs";
 
 const env = FetchEnvs();
 
-export default async (c: Client<true>, client: Client<true>, handler: CommandKit) => {
+export default async (c: Client<true>, client: Client<true>, handler: CommandHandler) => {
   await sleep(500);
 
   const db = new Database();

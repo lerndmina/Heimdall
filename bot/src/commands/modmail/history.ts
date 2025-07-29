@@ -4,7 +4,7 @@ import {
   PermissionFlagsBits,
   EmbedBuilder,
 } from "discord.js";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import ModmailMessageService from "../../services/ModmailMessageService";
 import BasicEmbed from "../../utils/BasicEmbed";
 import Database from "../../utils/data/database";
@@ -40,7 +40,7 @@ export const data = new SlashCommandBuilder()
   )
   .setDefaultMemberPermissions(PermissionFlagsBits.ViewChannel);
 
-export async function run({ interaction, client }: SlashCommandProps) {
+export async function run({ interaction, client }: LegacySlashCommandProps) {
   const targetUser = interaction.options.getUser("user");
   const limit = interaction.options.getInteger("limit") || 10;
   const type = interaction.options.getString("type") || "all";

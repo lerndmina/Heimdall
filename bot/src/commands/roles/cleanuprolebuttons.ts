@@ -4,7 +4,7 @@ import RoleButtons from "../../models/RoleButtons";
 import BasicEmbed from "../../utils/BasicEmbed";
 import Database from "../../utils/data/database";
 import { debugMsg } from "../../utils/TinyUtils";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import { UUID } from "crypto";
 import { Channel } from "diagnostics_channel";
 import log from "../../utils/log";
@@ -23,13 +23,13 @@ export const data = new SlashCommandBuilder()
       .setRequired(false)
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
   userPermissions: ["ManageRoles"],
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   await initialReply(interaction, true);
   var cleaned = 0;
 

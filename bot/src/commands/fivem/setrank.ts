@@ -1,4 +1,4 @@
-import type { SlashCommandProps, CommandOptions, AutocompleteProps } from "commandkit";
+import type { LegacySlashCommandProps, LegacyCommandOptions, LegacyAutocompleteProps } from "@heimdall/command-handler";
 import { InteractionContextType, SlashCommandBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey } from "../../Bot";
 import { initialReply } from "../../utils/initialReply";
@@ -47,7 +47,7 @@ if (envExists(env.ENABLE_FIVEM_SYSTEMS) && envExists(env.FIVEM_MYSQL_URI)) {
       botPermissions: ["ManageGuild", "ManageMembers", "ManageRoles"],
     },
 
-    async run(props: SlashCommandProps) {
+    async run(props: LegacySlashCommandProps) {
       const { interaction, client, handler } = props;
       const user = interaction.options.getUser("user");
       const jobInput = interaction.options.getString("job");
@@ -106,7 +106,7 @@ if (envExists(env.ENABLE_FIVEM_SYSTEMS) && envExists(env.FIVEM_MYSQL_URI)) {
         embeds: [embed],
       });
     },
-    async autocomplete({ interaction, client, handler }: AutocompleteProps) {
+    async autocomplete({ interaction, client, handler }: LegacyAutocompleteProps) {
       return GetJobAutocomplete(interaction);
     },
   };

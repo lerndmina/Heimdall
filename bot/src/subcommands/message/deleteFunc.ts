@@ -1,8 +1,8 @@
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import { ThingGetter } from "../../utils/TinyUtils";
 import CommandError from "../../utils/interactionErrors/CommandError";
 
-export default async function ({ interaction, client }: SlashCommandProps) {
+export default async function ({ interaction, client }: LegacySlashCommandProps) {
   try {
     const messageUrl = interaction.options.getString("url", true);
     const url = new URL(messageUrl);

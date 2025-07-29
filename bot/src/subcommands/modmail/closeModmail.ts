@@ -3,7 +3,7 @@ import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import Modmail from "../../models/Modmail";
 import { waitingEmoji } from "../../Bot";
 import { ThingGetter } from "../../utils/TinyUtils";
-import { CommandOptions, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, LegacySlashCommandProps } from "@heimdall/command-handler";
 import log from "../../utils/log";
 import { initialReply } from "../../utils/initialReply";
 import { closeModmailThreadSafe } from "../../utils/modmail/ModmailThreads";
@@ -15,7 +15,7 @@ import { tryCatch } from "../../utils/trycatch";
  * - Improved error handling and user feedback
  * - Consistent behavior across all close operations
  */
-export default async function ({ interaction, client, handler }: SlashCommandProps) {
+export default async function ({ interaction, client, handler }: LegacySlashCommandProps) {
   if (!interaction.channel) {
     log.error("Request made to slash command without required values - close.ts");
     return interaction.reply({

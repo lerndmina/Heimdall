@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import BasicEmbed from "../../utils/BasicEmbed";
-import { CommandOptions, CommandProps, SlashCommandProps } from "commandkit";
+import { LegacyCommandOptions, CommandProps, LegacySlashCommandProps } from "@heimdall/command-handler";
 
 export const data = new SlashCommandBuilder()
   .setName("emojify")
@@ -10,12 +10,12 @@ export const data = new SlashCommandBuilder()
     option.setName("text").setDescription("The text to convert").setRequired(true)
   );
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: false,
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: SlashCommandProps) {
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   const text = interaction.options.getString("text")?.toLocaleLowerCase()!; // Won't be null because it's required
 
   const emojified = text

@@ -1,6 +1,6 @@
 import { EmbedBuilder } from "discord.js";
 import BasicEmbed from "../../../utils/BasicEmbed";
-import { SlashCommandProps } from "commandkit";
+import { LegacySlashCommandProps } from "@heimdall/command-handler";
 import {
   getDbConnection,
   getPlayerLicenseFromDiscord,
@@ -12,7 +12,7 @@ import log from "../../../utils/log";
 /**
  * Lists the current user's events with their participation start and end times with total time calculated
  */
-export default async function eventHistory(props: SlashCommandProps) {
+export default async function eventHistory(props: LegacySlashCommandProps) {
   const { interaction } = props;
 
   // Get database connection

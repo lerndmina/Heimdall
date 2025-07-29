@@ -1,11 +1,11 @@
 import {
-  type SlashCommandProps,
+  type LegacySlashCommandProps,
   createSignal,
   createEffect,
   ButtonKit,
-  CommandData,
-  CommandOptions,
-} from "commandkit";
+  LegacyCommandData,
+  LegacyCommandOptions,
+} from "@heimdall/command-handler";
 import {
   ButtonStyle,
   ActionRowBuilder,
@@ -22,7 +22,7 @@ export const data = new SlashCommandBuilder()
   .setName("pagination")
   .setDescription("A simple pagination example.");
 
-export const options: CommandOptions = {
+export const options: LegacyCommandOptions = {
   devOnly: true,
   deleted: false,
 };
@@ -56,7 +56,7 @@ const INLINE_BOOL = true;
 
 let pages: EmbedField[][] = [];
 
-export const run = async ({ interaction, client }: SlashCommandProps) => {
+export const run = async ({ interaction, client }: LegacySlashCommandProps) => {
   setCommandCooldown(userCooldownKey(interaction.user.id, interaction.commandName), 60);
   pages = [
     [{ name: "Page 1", value: "This is page 1", inline: INLINE_BOOL }],
