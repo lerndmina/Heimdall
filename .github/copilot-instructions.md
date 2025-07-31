@@ -1,12 +1,42 @@
 # Copilot Instructions for Heimdall
 
-This is a monorepo containing a Discord bot and web dashboard for modmail management and bot administration.
+This is a monorepo containing a Discord bot, web dashboard for modmail management, and a custom command handler package.
 
 ## Project Structure
 
+### Command Handler (`./command-handler/`)
+
+- **Custom Package**: Drop-in replacement for CommandKit with enhanced features
+- **ButtonKit**: Reactive button system with onClick handlers and state management
+- **Type Safety**: Enhanced TypeScript support with legacy compatibility
+- **Local Package**: Self-contained package ready for npm publishing
+
+#### Command Handler Directory Structure
+
+```
+command-handler/src/
+├── index.ts              # Main exports and public API
+├── CommandHandler.ts     # Core handler class
+├── ButtonKit.ts          # ButtonKit implementation with reactive state
+├── loaders/              # File discovery and loading systems
+│   ├── CommandLoader.ts  # Command discovery & loading
+│   ├── EventLoader.ts    # Event discovery & loading
+│   └── ValidationLoader.ts # Validation discovery & loading
+├── types/                # TypeScript type definitions
+│   ├── index.ts         # Re-export all types
+│   ├── Command.ts       # Command interfaces (Legacy + Modern)
+│   ├── Event.ts         # Event interfaces
+│   ├── Validation.ts    # Validation interfaces
+│   └── Handler.ts       # Handler configuration
+└── utils/               # Utility functions
+    ├── fileUtils.ts     # File discovery utilities
+    ├── pathUtils.ts     # Path manipulation
+    └── validation.ts    # Validation utilities
+```
+
 ### Bot (`./bot/`)
 
-- **Discord Bot**: Built with Discord.js 14+ and CommandKit framework
+- **Discord Bot**: Built with Discord.js 14+ and custom @heimdall/command-handler
 - **API Server**: Express.js REST API for dashboard integration
 - **Database**: MongoDB with Mongoose ODM, Redis for caching
 - **Architecture**: Event-driven with modular command/event system
@@ -65,10 +95,17 @@ dashboard/
 
 ## Tech Stack
 
+### Command Handler
+
+- **Runtime**: TypeScript/Node.js
+- **Framework**: Custom command handler built for Discord.js 14+
+- **Features**: ButtonKit with reactive state, enhanced validations, type safety
+- **Compatibility**: 100% backward compatible with CommandKit API
+
 ### Bot
 
 - **Runtime**: Node.js/Bun
-- **Framework**: Discord.js 14+, CommandKit
+- **Framework**: Discord.js 14+, @heimdall/command-handler
 - **Database**: MongoDB (Mongoose), Redis
 - **API**: Express.js with TypeScript
 - **Additional**: FFmpeg, MariaDB (FiveM integration)
@@ -93,7 +130,8 @@ dashboard/
 
 ### Bot Development
 
-- **CommandKit Patterns**: Follow CommandKit conventions for commands/events
+- **Command Handler Patterns**: Follow @heimdall/command-handler conventions for commands/events
+- **ButtonKit**: Use ButtonKit for reactive button interactions with onClick handlers
 - **Modular Architecture**: Organize code by feature (commands, events, services)
 - **Database Operations**: Use the Database utility class for consistency
 - **Logging**: Use the custom log utility instead of console.log
@@ -115,11 +153,35 @@ dashboard/
 #### Bot Commands Structure
 
 ```typescript
-// Export pattern for commands
+// Legacy pattern (CommandKit compatible)
 export const data = new SlashCommandBuilder()...
-export const options: CommandOptions = {...}
-export async function run({ interaction, client, handler }: SlashCommandProps) {...}
-export async function autocomplete({ interaction, client, handler }: AutocompleteProps) {...}
+export const options: LegacyCommandOptions = {...}
+export async function run({ interaction, client, handler }: LegacySlashCommandProps) {...}
+export async function autocomplete({ interaction, client, handler }: LegacyAutocompleteProps) {...}
+
+// Modern pattern (enhanced features)
+export const command = new SlashCommandBuilder()...
+export const config: ModernCommandConfig = {...}
+export async function execute({ interaction, client, handler }: ModernCommandContext) {...}
+
+// Context Menu Commands
+export const data: LegacyContextMenuCommandDataOnly = {
+  name: "Command Name",
+  type: ApplicationCommandType.Message | ApplicationCommandType.User,
+}
+export async function run({ interaction, client, handler }: LegacyMessageContextMenuCommandProps | LegacyUserContextMenuCommandProps) {...}
+
+// ButtonKit Usage
+import { ButtonKit, createSignal, createEffect } from "@heimdall/command-handler";
+
+const button = new ButtonKit()
+  .setLabel("Click me")
+  .setCustomId("my-button")
+  .setStyle(ButtonStyle.Primary);
+
+button.onClick(async (interaction) => {
+  await interaction.reply("Button clicked!");
+}, { message });
 ```
 
 #### Dashboard Component Patterns
