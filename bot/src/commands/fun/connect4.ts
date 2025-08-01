@@ -191,11 +191,17 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
           createdAt: new Date(),
         };
 
-        const columnButtons = getColumnButtons(width, interaction.id);
+        const makeMoveButton = new ButtonKit()
+          .setEmoji("🎯")
+          .setLabel("Make Move")
+          .setStyle(ButtonStyle.Primary)
+          .setCustomId(`connect4_move_${interaction.id}`);
+
+        const makeMoveRow = new ActionRowBuilder<ButtonKit>().addComponents(makeMoveButton);
 
         await message.edit({
           content: ``,
-          components: columnButtons,
+          components: [makeMoveRow],
           embeds: [getConnect4Embed(data, client)],
         });
 
@@ -239,34 +245,6 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
   );
 }
 
-export function getColumnButtons(
-  width: number,
-  gameId: string,
-  disabled: boolean = false
-): ActionRowBuilder<ButtonKit>[] {
-  const buttons: ButtonKit[] = [];
-
-  // Create a button for each column
-  for (let col = 1; col <= width; col++) {
-    const button = new ButtonKit()
-      .setLabel(col.toString())
-      .setStyle(ButtonStyle.Primary)
-      .setCustomId(`connect4_column_${col - 1}_${gameId}`)
-      .setDisabled(disabled);
-
-    buttons.push(button);
-  }
-
-  // Distribute buttons across rows (5 buttons per row max)
-  const rows: ActionRowBuilder<ButtonKit>[] = [];
-  for (let i = 0; i < buttons.length; i += 5) {
-    const rowButtons = buttons.slice(i, i + 5);
-    rows.push(new ActionRowBuilder<ButtonKit>().addComponents(rowButtons));
-  }
-
-  return rows;
-}
-
 function initiateGameState(width: number, height: number) {
   const gameState: Record<`${number}${number}`, string> = {};
   for (let row = 0; row < height; row++) {
@@ -284,34 +262,30 @@ export function getConnect4Embed(
   isDraw?: boolean,
   { winnerId, looserId }: { winnerId?: string; looserId?: string } = {}
 ) {
-  if (isDraw) {
-    return BasicEmbed(
-      client,
-      "Connect 4",
-      `The game between <@${game.initiatorId}> and <@${game.opponentId}> resulted in a draw! GG!`
-    );
-  }
-
-  if (winnerId) {
-    const possibleWinnerMessages = [
-      `The game between <@${game.initiatorId}> and <@${game.opponentId}> resulted in a win for <@${winnerId}>! GG!`,
-      `<@${winnerId}> won the game against <@${looserId}>! GG!`,
-      `<@${winnerId}> destroyed <@${looserId}>!`,
-      `What a fine display of skill <@${winnerId}>! GG!`,
-    ];
-    const winnerMessage =
-      possibleWinnerMessages[Math.floor(Math.random() * possibleWinnerMessages.length)];
-    return BasicEmbed(client, "Connect 4", winnerMessage);
-  }
-
   const boardDisplay = generateConnect4Board(game.gameState, game.width, game.height);
   const player1Piece = C4_RED;
   const player2Piece = C4_BLUE;
 
+  let statusText = "";
+
+  if (isDraw) {
+    statusText = "**Game ended in a draw! GG!**";
+  } else if (winnerId) {
+    const possibleWinnerMessages = [
+      `**🎉 <@${winnerId}> wins! GG!**`,
+      `**🏆 <@${winnerId}> destroyed <@${looserId}>!**`,
+      `**🎊 What a fine display of skill <@${winnerId}>! GG!**`,
+      `**🥇 <@${winnerId}> is victorious!**`,
+    ];
+    statusText = possibleWinnerMessages[Math.floor(Math.random() * possibleWinnerMessages.length)];
+  } else {
+    statusText = `Turn: <@${game.turn}>`;
+  }
+
   return BasicEmbed(
     client,
     "Connect 4",
-    `${boardDisplay}\n\n${player1Piece} <@${game.initiatorId}> | ${player2Piece} <@${game.opponentId}>\n\nTurn: <@${game.turn}>`
+    `${boardDisplay}\n\n${player1Piece} <@${game.initiatorId}> | ${player2Piece} <@${game.opponentId}>\n\n${statusText}`
   );
 }
 
@@ -323,13 +297,15 @@ function generateConnect4Board(
   let board = "";
 
   // Column indicators with # prefix for larger emojis
+  board += "";
   for (let col = 1; col <= width; col++) {
-    board += `# ${getNumberEmoji(col)}`;
+    board += getNumberEmoji(col);
   }
   board += "\n";
 
-  // Board grid (display top to bottom)
+  // Board grid (display top to bottom) - each row gets # prefix for larger emojis
   for (let row = height - 1; row >= 0; row--) {
+    board += "";
     for (let col = 0; col < width; col++) {
       board += gameState[`${row}${col}`] || C4_BLANK;
     }
