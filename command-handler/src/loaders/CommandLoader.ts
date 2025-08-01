@@ -57,29 +57,10 @@ export class CommandLoader {
 
     const commandName = pathToName(filePath, basePath);
 
-    // Special debug for game-admin
-    if (commandName === "game-admin") {
-      this.logger.debug(`[DEBUG] game-admin exports:`, {
-        hasData: !!exports.data,
-        hasRun: !!exports.run,
-        dataType: typeof exports.data,
-        dataConstructor: exports.data?.constructor?.name,
-        isContextMenuBuilder: exports.data?.constructor?.name === "ContextMenuCommandBuilder",
-      });
-    }
-
     // Detect export pattern
     const isLegacySlash = this.isLegacySlashPattern(exports);
     const isLegacyContext = this.isLegacyContextMenuPattern(exports);
     const isModern = this.isModernPattern(exports);
-
-    if (commandName === "game-admin") {
-      this.logger.debug(`[DEBUG] game-admin pattern results:`, {
-        isLegacySlash,
-        isLegacyContext,
-        isModern,
-      });
-    }
 
     if (isLegacySlash) {
       return this.adaptLegacySlashCommand(exports, filePath, commandName);
@@ -89,13 +70,6 @@ export class CommandLoader {
       return this.adaptModernCommand(exports, filePath, commandName);
     } else {
       this.logger.warn(`Invalid command export pattern in ${filePath}`);
-      if (commandName === "game-admin") {
-        this.logger.debug(`[DEBUG] game-admin pattern detection failed:`, {
-          isLegacySlash,
-          isLegacyContext,
-          isModern,
-        });
-      }
       return null;
     }
   }
@@ -104,20 +78,6 @@ export class CommandLoader {
    * Checks if exports match legacy CommandKit slash command pattern
    */
   private isLegacySlashPattern(exports: any): exports is LegacyCommandData {
-    const commandName = exports.data?.name;
-    if (commandName === "Game Admin") {
-      this.logger.debug(`[DEBUG] game-admin slash pattern check:`, {
-        hasData: !!exports.data,
-        hasRun: !!exports.run,
-        runType: typeof exports.run,
-        hasToJSON: typeof exports.data.toJSON === "function",
-        isContextMenuBuilder: exports.data instanceof ContextMenuCommandBuilder,
-        constructorName: exports.data?.constructor?.name,
-        toJSONResult: exports.data?.toJSON ? exports.data.toJSON() : null,
-        finalResult: exports.data && typeof exports.run === "function" && typeof exports.data.toJSON === "function" && !this.isContextMenuCommand(exports.data),
-      });
-    }
-
     return (
       exports.data &&
       typeof exports.run === "function" &&
@@ -162,21 +122,6 @@ export class CommandLoader {
    * Checks if exports match legacy CommandKit context menu command pattern
    */
   private isLegacyContextMenuPattern(exports: any): exports is LegacyContextMenuCommandData {
-    // Debug for game-admin
-    const commandName = exports.data?.name;
-    if (commandName === "Game Admin") {
-      this.logger.debug(`[DEBUG] game-admin context menu pattern check:`, {
-        hasData: !!exports.data,
-        hasRun: !!exports.run,
-        runType: typeof exports.run,
-        dataConstructor: exports.data?.constructor?.name,
-        isInstanceOf: exports.data instanceof ContextMenuCommandBuilder,
-        ContextMenuCommandBuilderName: ContextMenuCommandBuilder.name,
-        hasToJSON: typeof exports.data?.toJSON === "function",
-        toJSONResult: exports.data?.toJSON ? exports.data.toJSON() : null,
-      });
-    }
-
     // Check for ContextMenuCommandBuilder using more reliable methods
     if (exports.data && typeof exports.run === "function") {
       // Method 1: instanceof check (might fail due to module boundaries)
