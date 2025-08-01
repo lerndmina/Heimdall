@@ -48,7 +48,8 @@ export const Start = async () => {
   const eventsPath = path.join(__dirname, "events");
   const validationsPath = path.join(__dirname, "validations");
   const devGuildIds = env.TEST_SERVERS;
-  const devUserIds = env.OWNER_IDS;
+  const devUserIds = env.OWNER_IDS; // Users who can access dev commands
+  const ownerIds = env.OWNER_IDS; // Users who can access management commands
 
   log.info(`Loading custom command handler with`, {
     commandsPath,
@@ -65,7 +66,29 @@ export const Start = async () => {
     eventsPath, // The events directory
     validationsPath, // Only works if commandsPath is provided
     devGuildIds,
-    devUserIds,
+    devUserIds, // For development-only commands
+    // Enable Phase 2 Management Features
+    options: {
+      enableManagementCommands: true,
+      enableCommandManager: true,
+      enableHotReload: true,
+      enableAnalytics: false, // Can enable later if needed
+    },
+    management: {
+      enabled: true,
+      ownerIds: ownerIds, // For management commands (cmd-reload, etc.)
+      allowDMs: true,
+      allowGuild: true,
+      enableHotReload: true,
+      enableAnalytics: false,
+    },
+    hotReload: {
+      enabled: true,
+      watchMode: "development",
+      watchDelay: 500,
+      enableEventEmission: true,
+      enableRollback: true,
+    },
   });
 
   log.info(`Logging in to Discord with ${Object.keys(env).length} enviroment variables.`);

@@ -3,6 +3,12 @@ export * from "./Command";
 export * from "./Event";
 export * from "./Validation";
 export * from "./Handler";
+export * from "./Errors";
+export * from "./Middleware";
+export * from "./Permissions";
+export * from "./Management";
+export * from "./HotReload";
+export * from "./Analytics";
 
 // CommandKit compatibility exports - these are deprecated but provided for migration
 import type { CommandHandler } from "../CommandHandler";
