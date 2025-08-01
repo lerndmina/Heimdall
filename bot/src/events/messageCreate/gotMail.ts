@@ -590,8 +590,8 @@ async function newModmail(
         ...categoryInfo,
       });
 
-      if (!result.success) {
-        log.error(`Failed to create modmail thread: ${result.error}`);
+      if (!result || !result.success) {
+        log.error(`Failed to create modmail thread: ${result?.error}`);
 
         // Clear rate limit even if creation failed
         if (!result?.error?.includes("already open")) {
@@ -617,19 +617,31 @@ async function newModmail(
       const attachmentResult = await processAttachmentsForModmail(message.attachments, message);
 
       // Send attachment webhook if needed
-      if (result.webhook && attachmentResult.discordAttachments.length > 0) {
-        const { error: webhookSendError } = await tryCatch(
-          result.webhook.send({
-            content: "The original message had attachments, see below:",
-            files: attachmentResult.discordAttachments,
-            threadId: result.thread!.id,
-            username: i.user.displayName,
-            avatarURL: i.user.displayAvatarURL(),
-          })
+      if (
+        modmailConfig.webhookId &&
+        modmailConfig.webhookToken &&
+        attachmentResult.discordAttachments.length > 0
+      ) {
+        const { data: webhook, error: webhookFetchError } = await tryCatch(
+          client.fetchWebhook(modmailConfig.webhookId, modmailConfig.webhookToken)
         );
 
-        if (webhookSendError) {
-          log.error("Failed to send attachment webhook message:", webhookSendError);
+        if (webhookFetchError) {
+          log.error("Failed to fetch webhook for attachments:", webhookFetchError);
+        } else if (webhook) {
+          const { error: webhookSendError } = await tryCatch(
+            webhook.send({
+              content: "The original message had attachments, see below:",
+              files: attachmentResult.discordAttachments,
+              threadId: result.thread!.id,
+              username: i.user.displayName,
+              avatarURL: i.user.displayAvatarURL(),
+            })
+          );
+
+          if (webhookSendError) {
+            log.error("Failed to send attachment webhook message:", webhookSendError);
+          }
         }
       }
 
@@ -1653,6 +1665,30 @@ async function handleReply(message: Message, client: Client<true>, staffUser: Us
     log.debug(
       `Tracked staff message ${trackingMessageId} for user ${mail.userId} from staff ${staffUser.id}`
     );
+  }
+
+  // Update last activity for staff message to reset resolved status and prevent autoclose
+  const { error: activityUpdateError } = await tryCatch(
+    db.findOneAndUpdate(
+      Modmail,
+      { forumThreadId: thread.id, isClosed: false },
+      {
+        lastUserActivityAt: new Date(), // Use same field as user messages for consistency
+        // Reset resolved status when staff sends a message
+        markedResolved: false,
+        resolvedAt: null,
+        // Reset inactivity tracking
+        inactivityNotificationSent: null,
+        autoCloseScheduledAt: null,
+      },
+      { upsert: false, new: true }
+    )
+  );
+
+  if (activityUpdateError) {
+    log.warn("Failed to update staff activity:", activityUpdateError);
+  } else {
+    log.debug(`Updated activity timestamp for modmail ${mail.forumThreadId} due to staff message`);
   }
 
   debugMsg("Sent message to user" + mail.userId + " in guild " + mail.guildId);

@@ -45,6 +45,14 @@ WORKDIR /app
 COPY package.json ./
 COPY bun.lock ./
 
+# Copy command-handler package files
+COPY command-handler/package.json ./command-handler/
+COPY command-handler/bun.lock ./command-handler/
+
+# Copy logger package files
+COPY logger/package.json ./logger/
+COPY logger/bun.lock ./logger/
+
 # Copy bot package files
 COPY bot/package.json ./bot/
 COPY bot/bun.lock ./bot/
@@ -56,26 +64,23 @@ COPY dashboard/bun.lock ./dashboard/
 # Verify bun installation and show version
 RUN bun --version
 
-# Install root dependencies
+# Install all dependencies from root (this will handle local file dependencies properly)
 RUN bun install --frozen-lockfile
-
-# Install bot dependencies
-WORKDIR /app/bot
-RUN bun install --frozen-lockfile
-
-# Install dashboard dependencies
-WORKDIR /app/dashboard
-RUN bun install --frozen-lockfile
-
-# Go back to root
-WORKDIR /app
 
 # Copy TypeScript configs
+COPY command-handler/tsconfig.json ./command-handler/
+COPY logger/tsconfig.json ./logger/
 COPY bot/tsconfig.json ./bot/
 COPY dashboard/tsconfig.json ./dashboard/
 COPY dashboard/next.config.js ./dashboard/
 COPY dashboard/tailwind.config.js ./dashboard/
 COPY dashboard/postcss.config.js ./dashboard/
+
+# Copy source files for command-handler
+COPY command-handler/src/ ./command-handler/src/
+
+# Copy source files for logger
+COPY logger/src/ ./logger/src/
 
 # Copy source files for bot
 COPY bot/src/ ./bot/src/
@@ -87,8 +92,9 @@ COPY dashboard/components/ ./dashboard/components/
 COPY dashboard/hooks/ ./dashboard/hooks/
 COPY dashboard/lib/ ./dashboard/lib/
 COPY dashboard/types/ ./dashboard/types/
-COPY dashboard/prisma/ ./dashboard/prisma/
-COPY dashboard/scripts/ ./dashboard/scripts/
+# Prisma files not needed (using JWT-only sessions)
+# COPY dashboard/prisma/ ./dashboard/prisma/
+# COPY dashboard/scripts/ ./dashboard/scripts/
 
 # Copy additional required files (specific files only, not entire directories)
 COPY bot/FixCommandKit.ts ./bot/
@@ -97,10 +103,38 @@ COPY bot/fixedcommandkit.js ./bot/
 # Install tsx globally for bot execution
 RUN npm install -g tsx
 
-# Build dashboard preparation - generate Prisma client and build Next.js
+# Install TypeScript globally for building packages
+RUN npm install -g typescript
+
+# Build logger first (required by command-handler)
+WORKDIR /app/logger
+# Ensure logger dependencies are installed (including @types/node)
+RUN bun install --frozen-lockfile
+RUN bun run build
+
+# Manually create symlink for logger in command-handler node_modules
+WORKDIR /app/command-handler
+RUN mkdir -p node_modules/@heimdall
+RUN ln -sf /app/logger node_modules/@heimdall/logger
+
+# Install command-handler dependencies
+RUN bun install --frozen-lockfile
+
+# Debug: Check if logger package is properly linked
+RUN ls -la node_modules/@heimdall/ || echo "No @heimdall directory found"
+RUN ls -la node_modules/@heimdall/logger/dist/ || echo "No logger dist directory found"
+
+# Build command-handler (depends on logger and required by bot)
+RUN bun run build
+
+# Ensure bot dependencies are installed (including dotenv)
+WORKDIR /app/bot
+RUN bun install --frozen-lockfile
+
+# Build dashboard preparation - build Next.js
 WORKDIR /app/dashboard
-# Generate Prisma client (this doesn't need env vars)
-RUN bunx prisma generate
+# Ensure dashboard dependencies are installed (including Next.js)
+RUN bun install --frozen-lockfile
 # Clean any existing build
 RUN rm -rf .next
 # Build Next.js app (no longer needs environment variables at build time)

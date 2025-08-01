@@ -1,34 +1,14 @@
-import { prisma } from "./prisma";
-
+// Database health check - disabled since we use JWT-only sessions
 export async function checkDatabaseHealth(): Promise<{
   connected: boolean;
   error?: string;
 }> {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    return { connected: true };
-  } catch (error) {
-    console.error("Database health check failed:", error);
-    return {
-      connected: false,
-      error: error instanceof Error ? error.message : "Unknown database error",
-    };
-  }
+  // Since we're using JWT sessions and no database, always return "not required"
+  return { connected: false, error: "Database not required (JWT-only sessions)" };
 }
 
 export async function waitForDatabase(maxAttempts: number = 30, delayMs: number = 2000): Promise<boolean> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const { connected } = await checkDatabaseHealth();
-
-    if (connected) {
-      console.log(`✅ Database connected on attempt ${attempt}`);
-      return true;
-    }
-
-    console.log(`⏳ Database connection attempt ${attempt}/${maxAttempts} failed, retrying in ${delayMs}ms...`);
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-  }
-
-  console.error(`❌ Failed to connect to database after ${maxAttempts} attempts`);
-  return false;
+  // Database not required for JWT-only setup
+  console.log("ℹ️ Database not required (using JWT-only sessions)");
+  return true;
 }
