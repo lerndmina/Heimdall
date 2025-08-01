@@ -11,18 +11,7 @@ import FetchEnvs from "../../utils/FetchEnvs";
 const db = new Database();
 const env = FetchEnvs();
 
-export const data = {
-  name: Events.InteractionCreate,
-  once: false,
-};
-
-interface EventProps {
-  interaction: any;
-  client: Client;
-  handler: any;
-}
-
-export async function run({ interaction, client, handler }: EventProps) {
+export default async (interaction: any, client: Client, handler: any) => {
   if (!interaction.isModalSubmit()) return;
 
   const customId = interaction.customId;
@@ -44,7 +33,7 @@ export async function run({ interaction, client, handler }: EventProps) {
 
     try {
       if (gameType === "connect4") {
-        const game = await db.findOne(Connect4Schema, { messageId }) as Connect4SchemaType;
+        const game = (await db.findOne(Connect4Schema, { messageId })) as Connect4SchemaType;
         if (!game) {
           return interaction.reply({
             content: "Game not found in database.",
@@ -63,7 +52,8 @@ export async function run({ interaction, client, handler }: EventProps) {
           // Validate user ID
           if (!/^\d{17,20}$/.test(winnerId)) {
             return interaction.reply({
-              content: "Invalid user ID format. Please enter a valid Discord user ID (17-20 digits).",
+              content:
+                "Invalid user ID format. Please enter a valid Discord user ID (17-20 digits).",
               ephemeral: true,
             });
           }
@@ -84,13 +74,9 @@ export async function run({ interaction, client, handler }: EventProps) {
         const channel = await interaction.client.channels.fetch(game.channelId);
         if (channel?.isTextBased()) {
           const gameMessage = await channel.messages.fetch(messageId);
-          
-          const embed = BasicEmbed(
-            interaction.client,
-            embedTitle,
-            embedDescription
-          );
-          
+
+          const embed = BasicEmbed(interaction.client, embedTitle, embedDescription);
+
           await gameMessage.edit({
             embeds: [embed],
             components: [], // Disable buttons
@@ -101,10 +87,9 @@ export async function run({ interaction, client, handler }: EventProps) {
           content: `✅ Winner declared successfully!`,
           ephemeral: true,
         });
-
       } else {
         // TicTacToe game
-        const game = await db.findOne(TicTacToeSchema, { messageId }) as TicTacToeSchemaType;
+        const game = (await db.findOne(TicTacToeSchema, { messageId })) as TicTacToeSchemaType;
         if (!game) {
           return interaction.reply({
             content: "Game not found in database.",
@@ -123,7 +108,8 @@ export async function run({ interaction, client, handler }: EventProps) {
           // Validate user ID
           if (!/^\d{17,20}$/.test(winnerId)) {
             return interaction.reply({
-              content: "Invalid user ID format. Please enter a valid Discord user ID (17-20 digits).",
+              content:
+                "Invalid user ID format. Please enter a valid Discord user ID (17-20 digits).",
               ephemeral: true,
             });
           }
@@ -144,13 +130,9 @@ export async function run({ interaction, client, handler }: EventProps) {
         const channel = await interaction.client.channels.fetch(game.channelId);
         if (channel?.isTextBased()) {
           const gameMessage = await channel.messages.fetch(messageId);
-          
-          const embed = BasicEmbed(
-            interaction.client,
-            embedTitle,
-            embedDescription
-          );
-          
+
+          const embed = BasicEmbed(interaction.client, embedTitle, embedDescription);
+
           await gameMessage.edit({
             embeds: [embed],
             components: [], // Disable buttons
@@ -162,7 +144,6 @@ export async function run({ interaction, client, handler }: EventProps) {
           ephemeral: true,
         });
       }
-
     } catch (error) {
       log.error("Error declaring winner:", error);
       await interaction.reply({
@@ -171,4 +152,4 @@ export async function run({ interaction, client, handler }: EventProps) {
       });
     }
   }
-}
+};

@@ -1,14 +1,14 @@
-import { 
-  ApplicationCommandType, 
-  ContextMenuCommandBuilder, 
-  ActionRowBuilder, 
-  ModalBuilder, 
-  TextInputBuilder, 
+import {
+  ApplicationCommandType,
+  ContextMenuCommandBuilder,
+  ActionRowBuilder,
+  ModalBuilder,
+  TextInputBuilder,
   TextInputStyle,
   ButtonStyle,
   MessageContextMenuCommandInteraction,
   ModalSubmitInteraction,
-  MessageComponentInteraction
+  MessageComponentInteraction,
 } from "discord.js";
 import { LegacyContextMenuCommandProps, ButtonKit } from "@heimdall/command-handler";
 import Database from "../../utils/data/database";
@@ -49,18 +49,22 @@ export async function run({ interaction, client, handler }: LegacyContextMenuCom
   }
 
   const targetMessage = interaction.targetMessage;
-  
+
   // Try to find the game in both databases
   let connect4Game: Connect4SchemaType | null = null;
   let tictactoeGame: TicTacToeSchemaType | null = null;
   let gameType: "connect4" | "tictactoe" | null = null;
 
   try {
-    connect4Game = await db.findOne(Connect4Schema, { messageId: targetMessage.id }) as Connect4SchemaType;
+    connect4Game = (await db.findOne(Connect4Schema, {
+      messageId: targetMessage.id,
+    })) as Connect4SchemaType;
     if (connect4Game) {
       gameType = "connect4";
     } else {
-      tictactoeGame = await db.findOne(TicTacToeSchema, { messageId: targetMessage.id }) as TicTacToeSchemaType;
+      tictactoeGame = (await db.findOne(TicTacToeSchema, {
+        messageId: targetMessage.id,
+      })) as TicTacToeSchemaType;
       if (tictactoeGame) {
         gameType = "tictactoe";
       }
@@ -77,7 +81,7 @@ export async function run({ interaction, client, handler }: LegacyContextMenuCom
   }
 
   const game = gameType === "connect4" ? connect4Game! : tictactoeGame!;
-  
+
   // Create admin panel
   const restartGameBtn = new ButtonKit()
     .setEmoji("🔄")
@@ -103,15 +107,9 @@ export async function run({ interaction, client, handler }: LegacyContextMenuCom
     .setStyle(ButtonStyle.Secondary)
     .setCustomId(`gameadmin_force_draw_${targetMessage.id}`);
 
-  const row1 = new ActionRowBuilder<ButtonKit>().addComponents(
-    restartGameBtn,
-    endGameBtn
-  );
+  const row1 = new ActionRowBuilder<ButtonKit>().addComponents(restartGameBtn, endGameBtn);
 
-  const row2 = new ActionRowBuilder<ButtonKit>().addComponents(
-    declareWinnerBtn,
-    forceDrawBtn
-  );
+  const row2 = new ActionRowBuilder<ButtonKit>().addComponents(declareWinnerBtn, forceDrawBtn);
 
   const embed = BasicEmbed(
     client,
@@ -135,21 +133,33 @@ export async function run({ interaction, client, handler }: LegacyContextMenuCom
   const interactionMessage = await interaction.fetchReply();
 
   // Set up button interactions
-  restartGameBtn.onClick(async (btnInteraction) => {
-    await showConfirmationDialog(btnInteraction, "restart", targetMessage.id, gameType!);
-  }, { message: interactionMessage });
+  restartGameBtn.onClick(
+    async (btnInteraction) => {
+      await showConfirmationDialog(btnInteraction, "restart", targetMessage.id, gameType!);
+    },
+    { message: interactionMessage }
+  );
 
-  endGameBtn.onClick(async (btnInteraction) => {
-    await showConfirmationDialog(btnInteraction, "end", targetMessage.id, gameType!);
-  }, { message: interactionMessage });
+  endGameBtn.onClick(
+    async (btnInteraction) => {
+      await showConfirmationDialog(btnInteraction, "end", targetMessage.id, gameType!);
+    },
+    { message: interactionMessage }
+  );
 
-  declareWinnerBtn.onClick(async (btnInteraction) => {
-    await showDeclareWinnerModal(btnInteraction, targetMessage.id, gameType!);
-  }, { message: interactionMessage });
+  declareWinnerBtn.onClick(
+    async (btnInteraction) => {
+      await showDeclareWinnerModal(btnInteraction, targetMessage.id, gameType!);
+    },
+    { message: interactionMessage }
+  );
 
-  forceDrawBtn.onClick(async (btnInteraction) => {
-    await showConfirmationDialog(btnInteraction, "draw", targetMessage.id, gameType!);
-  }, { message: interactionMessage });
+  forceDrawBtn.onClick(
+    async (btnInteraction) => {
+      await showConfirmationDialog(btnInteraction, "draw", targetMessage.id, gameType!);
+    },
+    { message: interactionMessage }
+  );
 }
 
 async function showDeclareWinnerModal(
@@ -202,7 +212,9 @@ async function showConfirmationDialog(
   const embed = BasicEmbed(
     interaction.client,
     "Confirm Action",
-    `${emoji} Are you sure you want to **${actionText}** this ${gameType === "connect4" ? "Connect 4" : "TicTacToe"} game?
+    `${emoji} Are you sure you want to **${actionText}** this ${
+      gameType === "connect4" ? "Connect 4" : "TicTacToe"
+    } game?
     
     This action cannot be undone.`
   );
@@ -215,17 +227,23 @@ async function showConfirmationDialog(
 
   const confirmMessage = await interaction.fetchReply();
 
-  confirmBtn.onClick(async (btnInteraction) => {
-    await executeAction(btnInteraction, action, messageId, gameType);
-  }, { message: confirmMessage });
+  confirmBtn.onClick(
+    async (btnInteraction) => {
+      await executeAction(btnInteraction, action, messageId, gameType);
+    },
+    { message: confirmMessage }
+  );
 
-  cancelBtn.onClick(async (btnInteraction) => {
-    await btnInteraction.update({
-      content: "Action cancelled.",
-      embeds: [],
-      components: [],
-    });
-  }, { message: confirmMessage });
+  cancelBtn.onClick(
+    async (btnInteraction) => {
+      await btnInteraction.update({
+        content: "Action cancelled.",
+        embeds: [],
+        components: [],
+      });
+    },
+    { message: confirmMessage }
+  );
 }
 
 async function executeAction(
@@ -236,7 +254,7 @@ async function executeAction(
 ) {
   try {
     if (gameType === "connect4") {
-      const game = await db.findOne(Connect4Schema, { messageId }) as Connect4SchemaType;
+      const game = (await db.findOne(Connect4Schema, { messageId })) as Connect4SchemaType;
       if (!game) {
         return interaction.update({
           content: "Game not found in database.",
@@ -264,7 +282,7 @@ async function executeAction(
       const channel = await interaction.client.channels.fetch(game.channelId);
       if (channel?.isTextBased()) {
         const gameMessage = await channel.messages.fetch(messageId);
-        
+
         if (action === "draw") {
           const embed = getConnect4Embed(game, interaction.client, true);
           await gameMessage.edit({
@@ -277,7 +295,7 @@ async function executeAction(
           });
         } else if (action === "restart") {
           const embed = getConnect4Embed(game, interaction.client);
-          
+
           // Re-enable the appropriate buttons
           const makeMoveButton = new ButtonKit()
             .setEmoji("🎯")
@@ -295,7 +313,7 @@ async function executeAction(
       }
     } else {
       // TicTacToe game
-      const game = await db.findOne(TicTacToeSchema, { messageId }) as TicTacToeSchemaType;
+      const game = (await db.findOne(TicTacToeSchema, { messageId })) as TicTacToeSchemaType;
       if (!game) {
         return interaction.update({
           content: "Game not found in database.",
@@ -323,7 +341,7 @@ async function executeAction(
       const channel = await interaction.client.channels.fetch(game.channelId);
       if (channel?.isTextBased()) {
         const gameMessage = await channel.messages.fetch(messageId);
-        
+
         if (action === "draw") {
           const embed = getTicTacToeEmbed(game, interaction.client, true);
           await gameMessage.edit({
@@ -336,7 +354,7 @@ async function executeAction(
           });
         } else if (action === "restart") {
           const embed = getTicTacToeEmbed(game, interaction.client);
-          
+
           // Re-enable the appropriate buttons
           const makeMoveButton = new ButtonKit()
             .setEmoji("🎯")
@@ -354,13 +372,13 @@ async function executeAction(
       }
     }
 
-    const actionText = action === "restart" ? "restarted" : action === "end" ? "ended" : "set to draw";
+    const actionText =
+      action === "restart" ? "restarted" : action === "end" ? "ended" : "set to draw";
     await interaction.update({
       content: `✅ Game has been ${actionText} successfully!`,
       embeds: [],
       components: [],
     });
-
   } catch (error) {
     log.error("Error executing admin action:", error);
     await interaction.update({
