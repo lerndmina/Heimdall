@@ -336,7 +336,6 @@ export async function closeModmailThreadSafe(
         Modmail,
         query,
         {
-          isOpen: false,
           isClosed: true,
           closedAt: new Date(),
           closeReason: reason,
@@ -397,7 +396,7 @@ export async function closeModmailThreadSafeLegacy(
       Modmail,
       { forumThreadId: threadId },
       {
-        isOpen: false,
+        isClosed: true,
         closedAt: new Date(),
         closeReason: reason,
         closedBy: closedBy?.userId,
