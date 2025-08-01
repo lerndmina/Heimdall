@@ -159,6 +159,8 @@ export class CommandHandler {
         await this.handleSlashCommand(interaction);
       } else if (interaction.isAutocomplete()) {
         await this.handleAutocomplete(interaction);
+      } else if (interaction.isContextMenuCommand()) {
+        await this.handleContextMenuCommand(interaction);
       }
     });
 
@@ -267,6 +269,53 @@ export class CommandHandler {
       await command.autocomplete(interaction, this.client, this);
     } catch (error) {
       this.logger.error(`Error in autocomplete for ${command.name}:`, error);
+    }
+  }
+
+  /**
+   * Handle context menu command execution
+   */
+  private async handleContextMenuCommand(interaction: any): Promise<void> {
+    const command = this.commands.get(interaction.commandName);
+
+    if (!command) {
+      this.logger.warn(`Unknown context menu command: ${interaction.commandName}`);
+      return;
+    }
+
+    // Check if command should be ignored
+    if (command.config.deleted) {
+      return;
+    }
+
+    try {
+      // Execute validations
+      const validationResult = await this.executeValidations(interaction, command);
+      if (!validationResult) {
+        return;
+      }
+
+      this.logger.debug(`Executing context menu command: ${command.name}`);
+      await command.execute(interaction, this.client, this);
+    } catch (error) {
+      this.logger.error(`Error executing context menu command ${command.name}:`, error);
+
+      // Send error message if configured
+      if (this.config.options?.handleValidationErrors) {
+        const errorMessage = "An error occurred while executing this command.";
+
+        try {
+          if (interaction.deferred) {
+            await interaction.editReply({ content: errorMessage });
+          } else if (!interaction.replied) {
+            await interaction.reply({ content: errorMessage, ephemeral: true });
+          } else {
+            await interaction.followUp({ content: errorMessage, ephemeral: true });
+          }
+        } catch (replyError) {
+          this.logger.error("Failed to send error message:", replyError);
+        }
+      }
     }
   }
 
