@@ -19,6 +19,7 @@ import { ErrorCategory } from "./types/Errors";
 // Phase 2: Management Features imports
 import { CommandManager } from "./services/CommandManager";
 import { ManagementCommands } from "./builtin/ManagementCommands";
+import { HelpCommand } from "./builtin/HelpCommand";
 import { HotReloadSystem } from "./services/HotReloadSystem";
 import { AnalyticsCollector } from "./services/AnalyticsCollector";
 
@@ -52,6 +53,7 @@ export class CommandHandler {
   // Phase 2: Management Features
   private commandManager?: CommandManager;
   private managementCommands?: ManagementCommands;
+  private helpCommand?: HelpCommand;
   private hotReloadSystem?: HotReloadSystem;
   private analyticsCollector?: AnalyticsCollector;
 
@@ -150,6 +152,10 @@ export class CommandHandler {
       this.managementCommands = new ManagementCommands(this, managementConfig);
       this.logger.debug("Management commands initialized");
     }
+
+    // Initialize Help Command (always available)
+    this.helpCommand = new HelpCommand(this, this.client);
+    this.logger.debug("Help command initialized");
 
     // Initialize Hot Reload System
     if (this.config.options?.enableHotReload || this.config.hotReload?.enabled) {
@@ -299,6 +305,15 @@ export class CommandHandler {
         this.commands.set(cmd.name, loadedCommand);
         this.logger.debug(`Loaded management command: ${cmd.name}`);
       }
+    }
+
+    // Load built-in help command (always available)
+    if (this.helpCommand) {
+      this.logger.debug("Loading built-in help command...");
+      const helpCommandData = this.helpCommand.getHelpCommand();
+
+      this.commands.set(helpCommandData.name, helpCommandData);
+      this.logger.debug(`Loaded help command: ${helpCommandData.name}`);
     }
 
     this.logger.info(`Successfully loaded ${this.commands.size} commands`);
@@ -901,6 +916,13 @@ export class CommandHandler {
   }
 
   /**
+   * Get the help command instance
+   */
+  getHelpCommand(): HelpCommand | undefined {
+    return this.helpCommand;
+  }
+
+  /**
    * Get the hot reload system instance
    */
   getHotReloadSystem(): HotReloadSystem | undefined {
@@ -924,6 +946,7 @@ export class CommandHandler {
     // Phase 2 status
     commandManager: boolean;
     managementCommands: boolean;
+    helpCommand: boolean;
     hotReload: boolean;
     analytics: boolean;
   } {
@@ -934,6 +957,7 @@ export class CommandHandler {
       // Phase 2 status
       commandManager: Boolean(this.config.options?.enableCommandManager !== false && this.commandManager),
       managementCommands: Boolean(this.config.options?.enableManagementCommands && this.managementCommands),
+      helpCommand: Boolean(this.helpCommand),
       hotReload: Boolean(this.config.options?.enableHotReload && this.hotReloadSystem),
       analytics: Boolean(this.config.options?.enableAnalytics && this.analyticsCollector),
     };

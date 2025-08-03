@@ -29,6 +29,7 @@ export { RateLimitMiddleware } from "./middleware/builtin/RateLimitMiddleware";
 // Phase 2: Export management features
 export { CommandManager } from "./services/CommandManager";
 export { ManagementCommands } from "./builtin/ManagementCommands";
+export { HelpCommand } from "./builtin/HelpCommand";
 export { HotReloadSystem } from "./services/HotReloadSystem";
 export { AnalyticsCollector } from "./services/AnalyticsCollector";
 
