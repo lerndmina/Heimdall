@@ -1,6 +1,6 @@
 # @heimdall/command-handler
 
-A powerful, extensible Discord.js command handler with enhanced validation system and full CommandKit compatibility.
+A powerful, extensible Discord.js command handler with enhanced validation system, built-in management commands, and full CommandKit compatibility.
 
 ## Features
 
@@ -10,7 +10,10 @@ A powerful, extensible Discord.js command handler with enhanced validation syste
 - 📁 **Flexible File Structure** - Organize commands and events however you want
 - 🔧 **Easy Migration** - Supports both legacy and modern command patterns
 - 🚀 **Built-in Logging** - Integrated with @heimdall/logger
-- 🔥 **Hot Reload Support** - Development-friendly (coming soon)
+- 🛠️ **Built-in Management Commands** - Runtime command management with autocomplete
+- � **Standardized Help System** - Automatic category detection with pagination
+- �🔥 **Hot Reload Support** - Development-friendly command reloading
+- 🎛️ **Enhanced ButtonKit** - Reactive button system with state management
 
 ## Installation
 
@@ -545,6 +548,10 @@ interface HandlerConfig {
   eventsPath?: string;
   validationsPath?: string;
   devGuildIds?: string[];
+  management?: {
+    enabled: boolean;        // Enable built-in management commands
+    ownerIds: string[];      // Discord user IDs with management access
+  };
   options?: {
     autoRegisterCommands?: boolean; // Auto-register slash commands (default: true)
     handleValidationErrors?: boolean; // Handle validation errors automatically (default: true)
@@ -561,8 +568,84 @@ interface HandlerConfig {
 DEBUG_LOG=true              # Enable debug logging
 LOG_TO_FILE=true            # Enable file logging
 
-# Development features
+# Development features  
 HOT_RELOAD=true             # Enable hot reload (coming soon)
+
+# Management commands
+OWNER_IDS=123456789012345678,987654321098765432  # Comma-separated owner IDs
+```
+
+## Built-in Management Commands
+
+The command handler includes powerful built-in management commands for runtime command management. These are owner-only commands that can be used from both guilds and DMs.
+
+### Enabling Management Commands
+
+```typescript
+const handler = await CommandHandler.create({
+  client,
+  commandsPath: "./src/commands",
+  // Enable management commands with owner IDs
+  management: {
+    enabled: true,
+    ownerIds: ["123456789012345678"], // Your Discord user ID(s)
+  },
+});
+```
+
+### Available Commands
+
+- **`/cmd-reload [command-name]`** - Reload specific command or all commands
+- **`/cmd-disable <command-name>`** - Temporarily disable a command  
+- **`/cmd-enable <command-name>`** - Re-enable a disabled command
+
+All management commands include smart autocomplete that shows relevant commands based on their current state.
+
+### Command Reloading System
+
+The hot reload system automatically handles:
+- Module cache invalidation for TypeScript/JavaScript files
+- Graceful handling of reload failures with rollback
+- Preserving command state during reloads where possible
+- Automatic command registration updates
+
+## Built-in Help System
+
+The command handler includes a standardized help system that automatically detects your command structure and provides an organized, paginated interface.
+
+### Features
+
+- **Automatic Category Detection** - Detects categories from your folder structure
+- **Pagination Support** - Handles large command lists with pagination
+- **Category Filtering** - `/help [category]` to show specific categories
+- **Consistent Styling** - Professional embed formatting
+- **Works Everywhere** - Available in both guilds and DMs
+
+### Usage
+
+The help command is automatically available as `/help` and requires no configuration:
+
+```
+/help                    # Shows all commands with pagination
+/help utilities         # Shows only commands in the utilities category
+/help modmail           # Shows only commands in the modmail category
+```
+
+### Category Structure
+
+Categories are automatically detected from your folder structure:
+
+```
+commands/
+├── utilities/          # "utilities" category
+│   ├── ping.ts
+│   └── info.ts
+├── moderation/         # "moderation" category  
+│   ├── ban.ts
+│   └── kick.ts
+└── fun/               # "fun" category
+    ├── meme.ts
+    └── joke.ts
 ```
 
 ## Advanced Features
