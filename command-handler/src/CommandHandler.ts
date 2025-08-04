@@ -1,5 +1,5 @@
 import { Client, ChatInputCommandInteraction, AutocompleteInteraction, RepliableInteraction, Events, REST, Routes, SlashCommandBuilder } from "discord.js";
-import type { HandlerConfig, LoadedCommand, LoadedEvent, UniversalValidation, CommandSpecificValidation, ValidationContext, MiddlewareContext } from "./types";
+import type { HandlerConfig, LoadedCommand, LoadedEvent, UniversalValidation, CommandSpecificValidation, ValidationContext } from "./types";
 import { CommandLoader } from "./loaders/CommandLoader";
 import { EventLoader } from "./loaders/EventLoader";
 import { ValidationLoader } from "./loaders/ValidationLoader";
@@ -8,20 +8,12 @@ import { validateCommandOptions } from "./utils/builtinValidations";
 import { isCommandGuildOnly } from "./utils/commandUtils";
 import { createLogger, LogLevel } from "@heimdall/logger";
 
-// Phase 1: Core Infrastructure imports
-import { ErrorHandler } from "./utils/errorHandling";
-import { MiddlewareManager } from "./middleware/MiddlewareManager";
-import { PermissionManager } from "./services/PermissionManager";
-import { LoggingMiddleware, PostLoggingMiddleware } from "./middleware/builtin/LoggingMiddleware";
-import { RateLimitMiddleware } from "./middleware/builtin/RateLimitMiddleware";
-import { ErrorCategory } from "./types/Errors";
-
 // Phase 2: Management Features imports
 import { CommandManager } from "./services/CommandManager";
 import { ManagementCommands } from "./builtin/ManagementCommands";
 import { HelpCommand } from "./builtin/HelpCommand";
 import { HotReloadSystem } from "./services/HotReloadSystem";
-import { AnalyticsCollector } from "./services/AnalyticsCollector";
+import { PermissionManager } from "./services/PermissionManager";
 
 export class CommandHandler {
   private client: Client<true>;
@@ -45,17 +37,12 @@ export class CommandHandler {
   private eventLoader = new EventLoader();
   private validationLoader = new ValidationLoader();
 
-  // Phase 1: Core Infrastructure services
-  private errorHandler?: ErrorHandler;
-  private middlewareManager?: MiddlewareManager;
-  private permissionManager?: PermissionManager;
-
   // Phase 2: Management Features
   private commandManager?: CommandManager;
   private managementCommands?: ManagementCommands;
   private helpCommand?: HelpCommand;
   private hotReloadSystem?: HotReloadSystem;
-  private analyticsCollector?: AnalyticsCollector;
+  private permissionManager?: PermissionManager;
 
   constructor(config: HandlerConfig) {
     this.client = config.client;
@@ -66,10 +53,6 @@ export class CommandHandler {
         handleValidationErrors: true,
         logLevel: "info",
         enableHotReload: false,
-        enableErrorHandling: true,
-        enableMiddleware: true,
-        enableAdvancedPermissions: true,
-        enableAnalytics: false,
         ...config.options,
       },
     };
@@ -86,41 +69,18 @@ export class CommandHandler {
       enableFileLogging: process.env.LOG_TO_FILE === "true",
     });
 
-    // Phase 1: Initialize core infrastructure services
-    this.initializeCoreServices();
-
     // Phase 2: Initialize management features
     this.initializeManagementFeatures();
-  }
-
-  /**
-   * Initialize Phase 1 core infrastructure services
-   */
-  private initializeCoreServices(): void {
-    // Initialize Error Handler
-    if (this.config.options?.enableErrorHandling !== false) {
-      this.errorHandler = new ErrorHandler(this.config.errorHandling);
-      this.logger.debug("Error handling service initialized");
-    }
-
-    // Initialize Middleware Manager
-    if (this.config.options?.enableMiddleware !== false) {
-      this.middlewareManager = new MiddlewareManager(this.config.middleware);
-      this.setupBuiltinMiddleware();
-      this.logger.debug("Middleware service initialized");
-    }
-
-    // Initialize Permission Manager
-    if (this.config.options?.enableAdvancedPermissions !== false) {
-      this.permissionManager = new PermissionManager(this.config.permissions);
-      this.logger.debug("Permission service initialized");
-    }
   }
 
   /**
    * Initialize Phase 2 management features
    */
   private initializeManagementFeatures(): void {
+    // Initialize Permission Manager
+    this.permissionManager = new PermissionManager(this.config.permissions);
+    this.logger.debug("Permission manager initialized");
+
     // Initialize Command Manager
     if (this.config.options?.enableCommandManager !== false) {
       const managementConfig = {
@@ -180,47 +140,6 @@ export class CommandHandler {
         });
       }
     }
-
-    // Initialize Analytics Collector
-    if (this.config.options?.enableAnalytics || this.config.analytics?.enabled) {
-      const analyticsConfig = {
-        enabled: true,
-        collectUsageStats: true,
-        collectPerformanceMetrics: true,
-        collectErrorStats: true,
-        retentionDays: 30,
-        exportFormat: "json" as const,
-        enableRealTimeStats: false,
-        aggregationInterval: 60,
-        ...this.config.analytics,
-      };
-
-      this.analyticsCollector = new AnalyticsCollector(this, analyticsConfig);
-      this.logger.debug("Analytics collector initialized");
-    }
-  }
-
-  /**
-   * Setup built-in middleware
-   */
-  private setupBuiltinMiddleware(): void {
-    if (!this.middlewareManager) return;
-
-    // Register logging middleware
-    const loggingMiddleware = new LoggingMiddleware();
-    const postLoggingMiddleware = new PostLoggingMiddleware();
-    this.middlewareManager.register(loggingMiddleware);
-    this.middlewareManager.register(postLoggingMiddleware);
-
-    // Register rate limiting middleware with default config
-    const rateLimitMiddleware = new RateLimitMiddleware({
-      windowMs: 60000, // 1 minute
-      maxRequests: 10, // 10 requests per minute
-      perUser: true,
-    });
-    this.middlewareManager.register(rateLimitMiddleware);
-
-    this.logger.debug("Built-in middleware registered");
   }
 
   /**
@@ -430,218 +349,77 @@ export class CommandHandler {
       return;
     }
 
-    // Create execution context for middleware and error handling
-    const executionContext = this.createExecutionContext(interaction, command);
-
-    // Execute command with Phase 1 infrastructure
-    await this.executeCommandWithInfrastructure(executionContext);
+    // Execute the command
+    await this.executeCommand(interaction, command);
   }
 
   /**
-   * Create execution context for middleware and error handling
+   * Execute a command with validation and error handling
    */
-  private createExecutionContext(interaction: RepliableInteraction, command: LoadedCommand): MiddlewareContext {
-    const member = interaction.guild?.members.cache.get(interaction.user.id);
-
-    return {
-      interaction,
-      command,
-      client: this.client,
-      handler: this,
-      metadata: new Map(),
-      startTime: Date.now(),
-      userId: interaction.user.id,
-      guildId: interaction.guild?.id,
-      channelId: interaction.channel?.id || interaction.channelId || "",
-    };
-  }
-
-  /**
-   * Execute command with Phase 1 infrastructure (middleware, permissions, error handling)
-   */
-  private async executeCommandWithInfrastructure(context: MiddlewareContext): Promise<void> {
-    const startTime = Date.now();
-    let success = false;
-    let errorType: string | undefined;
-
+  private async executeCommand(interaction: RepliableInteraction, command: LoadedCommand): Promise<void> {
     try {
-      // Phase 1: Permission checking
-      if (this.config.options?.enableAdvancedPermissions && this.permissionManager) {
-        const permissionContext = {
-          userId: context.userId,
-          guildId: context.guildId,
-          channelId: context.channelId,
-          memberRoles: context.interaction.guild?.members.cache.get(context.userId)?.roles.cache.map((r) => r.id),
-          member: context.interaction.guild?.members.cache.get(context.userId),
-          guild: context.interaction.guild || undefined,
-          command: context.command,
-          interaction: context.interaction,
-          timestamp: new Date(),
-        };
+      // Run validations
+      const validationStartTime = Date.now();
+      const isValid = await this.executeValidations(interaction, command);
+      this.logger.debug(`Validations took ${Date.now() - validationStartTime}ms for command ${command.name}`);
 
-        const permissionResult = await this.permissionManager.checkPermissions(permissionContext);
-
-        if (!permissionResult.allowed) {
-          this.logger.debug(`Permission denied for user ${context.userId} on command ${context.command.name}: ${permissionResult.reason}`);
-
-          // Record analytics for permission denial
-          if (this.analyticsCollector) {
-            this.analyticsCollector.recordError("PERMISSION_DENIED", permissionResult.reason || "Permission denied", context.command.name, context.userId, context.guildId);
-          }
-
-          try {
-            if (!context.interaction.replied && !context.interaction.deferred) {
-              await context.interaction.reply({
-                content: permissionResult.reason || "You don't have permission to use this command.",
-                ephemeral: true,
-              });
-            }
-          } catch (error) {
-            this.logger.debug("Could not send permission denied message:", error);
-          }
-
-          return;
-        }
-      }
-
-      // Phase 1: Execute pre-middleware
-      let shouldContinue = true;
-      if (this.config.options?.enableMiddleware && this.middlewareManager) {
-        const middlewareStart = Date.now();
-        shouldContinue = await this.middlewareManager.executePreMiddleware(context);
-
-        // Record middleware performance
-        if (this.analyticsCollector) {
-          this.analyticsCollector.recordPerformanceMetric("middleware_execution", `pre-middleware-${context.command.name}`, Date.now() - middlewareStart);
-        }
-
-        if (!shouldContinue) {
-          this.logger.debug(`Pre-middleware stopped execution for command ${context.command.name}`);
-          return;
-        }
-      }
-
-      // Execute validations (existing validation system)
-      const validationStart = Date.now();
-      const validationsPassed = await this.executeValidations(context.interaction, context.command);
-
-      // Record validation performance
-      if (this.analyticsCollector) {
-        this.analyticsCollector.recordPerformanceMetric("validation_execution", `validation-${context.command.name}`, Date.now() - validationStart);
-      }
-
-      if (!validationsPassed) {
-        // Record analytics for validation failure
-        if (this.analyticsCollector) {
-          this.analyticsCollector.recordError("VALIDATION_FAILED", "Command validation failed", context.command.name, context.userId, context.guildId);
-        }
+      if (!isValid) {
+        this.logger.debug(`Validation failed for command ${command.name}`);
         return;
       }
 
-      // Execute the actual command
-      const commandStart = Date.now();
-      await context.command.execute(context.interaction as any, this.client, this);
-      const commandDuration = Date.now() - commandStart;
-
-      // Record command performance
-      if (this.analyticsCollector) {
-        this.analyticsCollector.recordPerformanceMetric("command_execution", context.command.name, commandDuration);
-      }
-
-      success = true;
-
-      // Phase 1: Execute post-middleware
-      if (this.config.options?.enableMiddleware && this.middlewareManager) {
-        const postMiddlewareStart = Date.now();
-        await this.middlewareManager.executePostMiddleware(context);
-
-        // Record post-middleware performance
-        if (this.analyticsCollector) {
-          this.analyticsCollector.recordPerformanceMetric("middleware_execution", `post-middleware-${context.command.name}`, Date.now() - postMiddlewareStart);
-        }
-      }
-    } catch (error) {
-      success = false;
-      errorType = error instanceof Error ? error.constructor.name : "UNKNOWN_ERROR";
-
-      // Phase 1: Enhanced error handling
-      if (this.config.options?.enableErrorHandling && this.errorHandler) {
-        const errorContext = {
-          commandName: context.command.name,
-          userId: context.userId,
-          guildId: context.guildId,
-          channelId: context.channelId,
-          interaction: context.interaction,
-          timestamp: new Date(),
-          category: ErrorCategory.SYSTEM_ERROR, // Will be determined by error handler
-          recoverable: false, // Will be determined by error handler
+      // Check permissions
+      if (this.permissionManager && command.config.permissions) {
+        const permissionContext = {
+          userId: interaction.user.id,
+          guildId: interaction.guild?.id,
+          channelId: interaction.channel?.id || interaction.channelId || "",
+          member: interaction.guild?.members.cache.get(interaction.user.id),
+          guild: interaction.guild,
+          command,
+          interaction,
         };
 
-        const errorResult = await this.errorHandler.handleError(error as Error, errorContext);
+        const permissionResult = await this.permissionManager.checkPermissions(permissionContext, command.config.permissions);
 
-        // Record error analytics
-        if (this.analyticsCollector) {
-          this.analyticsCollector.recordError(
-            errorType,
-            error instanceof Error ? error.message : "Unknown error",
-            context.command.name,
-            context.userId,
-            context.guildId,
-            error instanceof Error ? error.stack : undefined,
-            { handled: errorResult.handled, shouldReply: errorResult.shouldReply }
-          );
-        }
+        if (!permissionResult.allowed) {
+          this.logger.debug(`Permission denied for command ${command.name}: ${permissionResult.reason}`);
 
-        if (errorResult.shouldReply && errorResult.userMessage) {
-          try {
-            if (context.interaction.deferred) {
-              await context.interaction.editReply({ content: errorResult.userMessage });
-            } else if (!context.interaction.replied) {
-              await context.interaction.reply({ content: errorResult.userMessage, ephemeral: true });
-            } else {
-              await context.interaction.followUp({ content: errorResult.userMessage, ephemeral: true });
-            }
-          } catch (replyError) {
-            this.logger.error("Failed to send error message:", replyError);
+          if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({
+              content: `❌ ${permissionResult.reason}`,
+            });
+          } else {
+            await interaction.reply({
+              content: `❌ ${permissionResult.reason}`,
+              ephemeral: true,
+            });
           }
-        }
-      } else {
-        // Fallback to original error handling
-        this.logger.error(`Error executing command ${context.command.name}:`, error);
-
-        // Record error analytics (fallback)
-        if (this.analyticsCollector) {
-          this.analyticsCollector.recordError(
-            errorType,
-            error instanceof Error ? error.message : "Unknown error",
-            context.command.name,
-            context.userId,
-            context.guildId,
-            error instanceof Error ? error.stack : undefined
-          );
-        }
-
-        if (this.config.options?.handleValidationErrors) {
-          const errorMessage = "An error occurred while executing this command.";
-
-          try {
-            if (context.interaction.deferred) {
-              await context.interaction.editReply({ content: errorMessage });
-            } else if (!context.interaction.replied) {
-              await context.interaction.reply({ content: errorMessage, ephemeral: true });
-            } else {
-              await context.interaction.followUp({ content: errorMessage, ephemeral: true });
-            }
-          } catch (replyError) {
-            this.logger.error("Failed to send error message:", replyError);
-          }
+          return;
         }
       }
-    } finally {
-      // Record usage analytics
-      const totalExecutionTime = Date.now() - startTime;
-      if (this.analyticsCollector) {
-        this.analyticsCollector.recordCommandUsage(context.command.name, context.userId, context.guildId, totalExecutionTime, success, errorType);
+
+      // Execute the command
+      const startTime = Date.now();
+
+      if (command.execute) {
+        await command.execute(interaction as any, this.client, this);
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.debug(`Command ${command.name} executed successfully in ${duration}ms`);
+    } catch (error) {
+      this.logger.error(`Error executing command ${command.name}:`, error);
+
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({
+          content: "❌ An error occurred while executing this command.",
+        });
+      } else {
+        await interaction.reply({
+          content: "❌ An error occurred while executing this command.",
+          ephemeral: true,
+        });
       }
     }
   }
@@ -876,29 +654,6 @@ export class CommandHandler {
     return new Map(this.events);
   }
 
-  // Phase 1: Public accessors for core infrastructure services
-
-  /**
-   * Get the error handler instance
-   */
-  getErrorHandler(): ErrorHandler | undefined {
-    return this.errorHandler;
-  }
-
-  /**
-   * Get the middleware manager instance
-   */
-  getMiddlewareManager(): MiddlewareManager | undefined {
-    return this.middlewareManager;
-  }
-
-  /**
-   * Get the permission manager instance
-   */
-  getPermissionManager(): PermissionManager | undefined {
-    return this.permissionManager;
-  }
-
   // Phase 2: Public accessors for management features
 
   /**
@@ -930,36 +685,28 @@ export class CommandHandler {
   }
 
   /**
-   * Get the analytics collector instance
+   * Get the permission manager instance
    */
-  getAnalyticsCollector(): AnalyticsCollector | undefined {
-    return this.analyticsCollector;
+  getPermissionManager(): PermissionManager | undefined {
+    return this.permissionManager;
   }
 
   /**
-   * Check if Phase 1 services are enabled and available
+   * Check service availability
    */
   getInfrastructureStatus(): {
-    errorHandling: boolean;
-    middleware: boolean;
-    permissions: boolean;
-    // Phase 2 status
     commandManager: boolean;
     managementCommands: boolean;
     helpCommand: boolean;
     hotReload: boolean;
-    analytics: boolean;
+    permissions: boolean;
   } {
     return {
-      errorHandling: Boolean(this.config.options?.enableErrorHandling !== false && this.errorHandler),
-      middleware: Boolean(this.config.options?.enableMiddleware !== false && this.middlewareManager),
-      permissions: Boolean(this.config.options?.enableAdvancedPermissions !== false && this.permissionManager),
-      // Phase 2 status
-      commandManager: Boolean(this.config.options?.enableCommandManager !== false && this.commandManager),
-      managementCommands: Boolean(this.config.options?.enableManagementCommands && this.managementCommands),
+      commandManager: Boolean(this.commandManager),
+      managementCommands: Boolean(this.managementCommands),
       helpCommand: Boolean(this.helpCommand),
-      hotReload: Boolean(this.config.options?.enableHotReload && this.hotReloadSystem),
-      analytics: Boolean(this.config.options?.enableAnalytics && this.analyticsCollector),
+      hotReload: Boolean(this.hotReloadSystem),
+      permissions: Boolean(this.permissionManager),
     };
   }
 

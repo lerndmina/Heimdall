@@ -549,8 +549,8 @@ interface HandlerConfig {
   validationsPath?: string;
   devGuildIds?: string[];
   management?: {
-    enabled: boolean;        // Enable built-in management commands
-    ownerIds: string[];      // Discord user IDs with management access
+    enabled: boolean; // Enable built-in management commands
+    ownerIds: string[]; // Discord user IDs with management access
   };
   options?: {
     autoRegisterCommands?: boolean; // Auto-register slash commands (default: true)
@@ -568,7 +568,7 @@ interface HandlerConfig {
 DEBUG_LOG=true              # Enable debug logging
 LOG_TO_FILE=true            # Enable file logging
 
-# Development features  
+# Development features
 HOT_RELOAD=true             # Enable hot reload (coming soon)
 
 # Management commands
@@ -596,7 +596,7 @@ const handler = await CommandHandler.create({
 ### Available Commands
 
 - **`/cmd-reload [command-name]`** - Reload specific command or all commands
-- **`/cmd-disable <command-name>`** - Temporarily disable a command  
+- **`/cmd-disable <command-name>`** - Temporarily disable a command
 - **`/cmd-enable <command-name>`** - Re-enable a disabled command
 
 All management commands include smart autocomplete that shows relevant commands based on their current state.
@@ -604,10 +604,91 @@ All management commands include smart autocomplete that shows relevant commands 
 ### Command Reloading System
 
 The hot reload system automatically handles:
+
 - Module cache invalidation for TypeScript/JavaScript files
 - Graceful handling of reload failures with rollback
 - Preserving command state during reloads where possible
 - Automatic command registration updates
+
+### Enhanced Permission System
+
+The command handler includes a robust permission system that goes beyond Discord's basic permissions:
+
+```typescript
+// src/commands/admin/ban.ts
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
+
+export const data = new SlashCommandBuilder().setName("ban").setDescription("Ban a user from the server");
+
+export const options: LegacyCommandOptions = {
+  // Enhanced permission system
+  permissions: {
+    // Discord permissions required by the user
+    user: ["BanMembers", "ManageMessages"],
+    // Discord permissions required by the bot
+    bot: ["BanMembers"],
+    // Only users with these roles can use this command
+    allowedRoles: ["123456789012345678"], // Moderator role ID
+    // Deny specific users
+    deniedUsers: ["987654321098765432"],
+    // Only allow in specific channels
+    allowedChannels: ["555666777888999000"], // Mod channel ID
+    // Custom permission check
+    custom: async (context) => {
+      // Only allow if user has been a member for more than 30 days
+      if (!context.member?.joinedAt) return false;
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      return context.member.joinedAt.getTime() < thirtyDaysAgo;
+    },
+  },
+};
+
+export async function run({ interaction }: LegacySlashCommandProps) {
+  // Command logic here - permissions are already checked
+  await interaction.reply("Ban command executed!");
+}
+```
+
+### Permission Configuration
+
+Configure the permission system when initializing the handler:
+
+```typescript
+const handler = await CommandHandler.create({
+  client,
+  commandsPath: "./src/commands",
+  // Permission system configuration
+  permissions: {
+    enabled: true, // Enable permission checking (default: true)
+    defaultAllow: true, // Allow commands with no permissions specified (default: true)
+    logChecks: false, // Log all permission checks for debugging (default: false)
+  },
+});
+```
+
+### Permission Types
+
+The permission system supports multiple layers of access control:
+
+- **Discord Permissions**: `user` and `bot` arrays using Discord permission flag names
+- **Role-based Access**: `allowedRoles` and `deniedRoles` arrays with role IDs
+- **User-based Access**: `allowedUsers` and `deniedUsers` arrays with user IDs
+- **Channel Restrictions**: `allowedChannels` and `deniedChannels` arrays with channel IDs
+- **Custom Logic**: `custom` function for complex permission requirements
+
+### Permission Priority
+
+Permissions are checked in priority order:
+
+1. **Denied Users** (highest priority - blocks everything)
+2. **Denied Roles**
+3. **Denied Channels**
+4. **Allowed Users** (overrides other restrictions)
+5. **Allowed Channels**
+6. **Allowed Roles**
+7. **Discord Permissions** (user and bot)
+8. **Custom Checks** (lowest priority)
 
 ## Built-in Help System
 
@@ -640,7 +721,7 @@ commands/
 ├── utilities/          # "utilities" category
 │   ├── ping.ts
 │   └── info.ts
-├── moderation/         # "moderation" category  
+├── moderation/         # "moderation" category
 │   ├── ban.ts
 │   └── kick.ts
 └── fun/               # "fun" category

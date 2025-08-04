@@ -11,6 +11,7 @@ import {
   ApplicationCommandType,
 } from "discord.js";
 import type { CommandHandler } from "../CommandHandler";
+import type { BotPermissions } from "./Permissions";
 
 // Legacy CommandKit compatibility interfaces
 export interface LegacyCommandOptions {
@@ -18,6 +19,8 @@ export interface LegacyCommandOptions {
   deleted?: boolean;
   userPermissions?: PermissionResolvable[];
   botPermissions?: PermissionResolvable[];
+  // Enhanced permissions system
+  permissions?: BotPermissions;
 }
 
 export interface LegacySlashCommandProps {
@@ -153,6 +156,8 @@ export interface LoadedCommand {
     cooldown?: number;
     category?: string;
     nsfw?: boolean;
+    // Enhanced permissions system
+    permissions?: BotPermissions;
     // Enhanced config from modern commands
     advanced?: ModernCommandConfig["advanced"];
   };

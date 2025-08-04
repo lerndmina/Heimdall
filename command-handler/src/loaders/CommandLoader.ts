@@ -181,6 +181,7 @@ export class CommandLoader {
         deleted: options.deleted ?? false,
         userPermissions: options.userPermissions ?? [],
         botPermissions: options.botPermissions ?? [],
+        permissions: options.permissions,
       },
       execute: async (interaction, client, handler) => {
         await exports.run({ interaction: interaction as any, client, handler });
@@ -224,6 +225,7 @@ export class CommandLoader {
         deleted: options.deleted ?? false,
         userPermissions: options.userPermissions ?? [],
         botPermissions: options.botPermissions ?? [],
+        permissions: options.permissions,
       },
       execute: async (interaction, client, handler) => {
         await exports.run({ interaction: interaction as any, client, handler });

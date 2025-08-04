@@ -17,22 +17,9 @@ export * from "./utils/validation";
 // Export ButtonKit and reactive utilities
 export { ButtonKit, createSignal, createEffect } from "./ButtonKit";
 
-// Phase 1: Export core infrastructure services
-export { ErrorHandler } from "./utils/errorHandling";
-export { MiddlewareManager } from "./middleware/MiddlewareManager";
-export { PermissionManager } from "./services/PermissionManager";
-
-// Phase 1: Export built-in middleware
-export { LoggingMiddleware, PostLoggingMiddleware } from "./middleware/builtin/LoggingMiddleware";
-export { RateLimitMiddleware } from "./middleware/builtin/RateLimitMiddleware";
-
 // Phase 2: Export management features
 export { CommandManager } from "./services/CommandManager";
 export { ManagementCommands } from "./builtin/ManagementCommands";
 export { HelpCommand } from "./builtin/HelpCommand";
 export { HotReloadSystem } from "./services/HotReloadSystem";
-export { AnalyticsCollector } from "./services/AnalyticsCollector";
-
-// Phase 1: Export enums that may be used as values
-export { ErrorCategory } from "./types/Errors";
-export { PermissionType } from "./types/Permissions";
+export { PermissionManager } from "./services/PermissionManager";
