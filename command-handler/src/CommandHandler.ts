@@ -294,7 +294,7 @@ export class CommandHandler {
         if (eventHandler.once) {
           this.client.once(eventName as any, (...args: any[]) => {
             Promise.resolve(eventHandler.execute(this.client, this, ...args)).catch((error: any) => {
-              console.error(`Error in ${eventName} event handler:`, error);
+              this.logger.error(`Error in ${eventName} event handler:`, error);
             });
           });
         } else {

@@ -1,4 +1,10 @@
 import type { ValidationResult, ValidationContext } from "../types";
+import { createLogger, LogLevel } from "@heimdall/logger";
+
+const logger = createLogger("validation-utils", {
+  minLevel: process.env.DEBUG_LOG === "true" ? LogLevel.DEBUG : LogLevel.INFO,
+  enableFileLogging: process.env.LOG_TO_FILE === "true",
+});
 
 /**
  * Executes a validation function and normalizes the result
@@ -25,7 +31,7 @@ export async function executeValidation(validationFn: Function, context: Validat
     // Default to proceeding if result is unclear
     return { proceed: true };
   } catch (error) {
-    console.error("Validation execution error:", error);
+    logger.error("Validation execution error:", error);
     return {
       proceed: false,
       error: "Validation failed due to an error",
@@ -51,10 +57,10 @@ export async function executeLegacyValidation(
     // Legacy CommandKit: true = stop, false = continue
     return { proceed: !result };
   } catch (error) {
-    console.error("Legacy validation execution error:", error);
+    logger.error("Legacy validation execution error:", error);
     return {
       proceed: false,
-      error: "Validation failed due to an error",
+      error: "Legacy validation failed due to an error",
       ephemeral: true,
     };
   }

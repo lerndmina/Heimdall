@@ -1,5 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
+import { createLogger, LogLevel } from "@heimdall/logger";
+
+const logger = createLogger("file-utils", {
+  minLevel: process.env.DEBUG_LOG === "true" ? LogLevel.DEBUG : LogLevel.INFO,
+  enableFileLogging: process.env.LOG_TO_FILE === "true",
+});
 
 /**
  * Recursively discovers files with specific extensions
@@ -40,7 +46,7 @@ export async function safeImport(filePath: string): Promise<any | null> {
     delete require.cache[require.resolve(filePath)];
     return await import(filePath);
   } catch (error) {
-    console.error(`Failed to import ${filePath}:`, error);
+    logger.error(`Failed to import ${filePath}:`, error);
     return null;
   }
 }

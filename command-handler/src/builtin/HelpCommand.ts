@@ -2,6 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, AutocompleteInteracti
 import type { CommandHandler } from "../CommandHandler";
 import type { LoadedCommand } from "../types/Command";
 import { ButtonKit, createSignal, createEffect } from "../ButtonKit";
+import { Logger } from "@heimdall/logger";
 
 export interface HelpCommandConfig {
   enabled: boolean;
@@ -38,10 +39,12 @@ export class HelpCommand {
   private handler: CommandHandler;
   private config: HelpCommandConfig;
   private client: Client;
+  private logger: Logger;
 
   constructor(handler: CommandHandler, client: Client, config?: Partial<HelpCommandConfig>) {
     this.handler = handler;
     this.client = client;
+    this.logger = new Logger("HelpCommand");
     this.config = {
       enabled: true,
       showHidden: false,
@@ -121,7 +124,7 @@ export class HelpCommand {
       // Show paginated help menu
       await this.showPaginatedHelp(interaction, categories);
     } catch (error) {
-      console.error("Error in help command:", error);
+      this.logger.error("Error in help command:", error);
       await interaction.editReply({
         embeds: [this.createErrorEmbed("Help Error", "An error occurred while loading help information.")],
       });
@@ -153,7 +156,7 @@ export class HelpCommand {
         await interaction.respond(filtered);
       }
     } catch (error) {
-      console.error("Error in help autocomplete:", error);
+      this.logger.error("Error in help autocomplete:", error);
       await interaction.respond([]);
     }
   }
@@ -186,7 +189,7 @@ export class HelpCommand {
       const appCommands = await this.client.application!.commands.fetch();
       applicationCommand = appCommands.find((cmd) => cmd.name === commandName);
     } catch (error) {
-      console.error("Failed to fetch application commands:", error);
+      this.logger.error("Failed to fetch application commands:", error);
     }
 
     const embed = new EmbedBuilder().setTitle(`📖 Command: ${commandName}`).setColor(Colors.Blue).setTimestamp();
@@ -328,7 +331,7 @@ export class HelpCommand {
             embeds: [embed],
             components: [row],
           })
-          .catch(console.error);
+          .catch((error) => this.logger.error("Failed to edit help message:", error));
       }
     });
 
@@ -336,7 +339,7 @@ export class HelpCommand {
     prevButton.onClick(
       (btnInteraction) => {
         setCurrentPage((prev) => Math.max(0, prev - 1));
-        btnInteraction.deferUpdate().catch(console.error);
+        btnInteraction.deferUpdate().catch((error) => this.logger.error("Failed to defer button update:", error));
       },
       { message }
     );
@@ -344,7 +347,7 @@ export class HelpCommand {
     homeButton.onClick(
       (btnInteraction) => {
         setCurrentPage(0);
-        btnInteraction.deferUpdate().catch(console.error);
+        btnInteraction.deferUpdate().catch((error) => this.logger.error("Failed to defer button update:", error));
       },
       { message }
     );
@@ -352,7 +355,7 @@ export class HelpCommand {
     nextButton.onClick(
       (btnInteraction) => {
         setCurrentPage((prev) => Math.min(pages.length - 1, prev + 1));
-        btnInteraction.deferUpdate().catch(console.error);
+        btnInteraction.deferUpdate().catch((error) => this.logger.error("Failed to defer button update:", error));
       },
       { message }
     );
@@ -375,7 +378,7 @@ export class HelpCommand {
       const appCommands = await this.client.application!.commands.fetch();
       appCommands.forEach((cmd) => applicationCommands.set(cmd.name, cmd));
     } catch (error) {
-      console.error("Failed to fetch application commands:", error);
+      this.logger.error("Failed to fetch application commands:", error);
     }
 
     const commands = this.handler.getCommands();
