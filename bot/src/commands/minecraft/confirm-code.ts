@@ -163,9 +163,9 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
           "You must try joining the Minecraft server first to receive your code.\n\n" +
             "**Steps:**\n" +
             "1. Join: `" +
-            config.minecraftServerIp +
+            config.serverHost +
             ":" +
-            config.minecraftServerPort +
+            config.serverPort +
             "`\n" +
             "2. Get kicked with your code\n" +
             "3. Come back and use `/confirm-code <code>`"
@@ -198,7 +198,7 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
   }
 
   // Success response
-  const approvalMessage = config.requireApproval
+  const approvalMessage = !config.autoWhitelist
     ? "Your request is now **pending staff approval**. Staff will review your request manually and approve it when they're available. This process may take some time - please be patient!"
     : "Your account will be automatically approved shortly.";
 
