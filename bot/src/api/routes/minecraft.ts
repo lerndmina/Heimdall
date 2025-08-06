@@ -1,5 +1,4 @@
 import { Router } from "express";
-import Database from "../../utils/data/database";
 import MinecraftConfig from "../../models/MinecraftConfig";
 import MinecraftAuthPending from "../../models/MinecraftAuthPending";
 import MinecraftPlayer from "../../models/MinecraftPlayer";
@@ -11,7 +10,6 @@ import { asyncHandler } from "../middleware/errorHandler";
 
 export function createMinecraftRoutes(client?: any, handler?: any): Router {
   const router = Router();
-  const db = new Database();
 
   // Middleware to inject client and handler into res.locals
   if (client && handler) {
@@ -58,10 +56,10 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         let guildId: string | null = null;
         if (serverIp) {
           const { data: config } = await tryCatch(
-            db.findOne(MinecraftConfig, {
+            MinecraftConfig.findOne({
               serverHost: serverIp,
               enabled: true,
-            })
+            }).lean()
           );
           if (config) {
             guildId = config.guildId;
@@ -86,9 +84,9 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         // If still no guild found, check if we have any player record for this username
         if (!guildId) {
           const { data: existingPlayer } = await tryCatch(
-            db.findOne(MinecraftPlayer, {
+            MinecraftPlayer.findOne({
               minecraftUsername: username,
-            })
+            }).lean()
           );
           if (existingPlayer) {
             guildId = existingPlayer.guildId;
@@ -115,7 +113,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
         // Get the guild config
         const { data: config, error: configError } = await tryCatch(
-          db.findOne(MinecraftConfig, { guildId, enabled: true })
+          MinecraftConfig.findOne({ guildId, enabled: true }).lean()
         );
 
         if (configError || !config) {
@@ -135,8 +133,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
         // Clean up any expired pending auth records for this username
         await tryCatch(
-          db.updateMany(
-            MinecraftAuthPending,
+          MinecraftAuthPending.updateMany(
             {
               guildId,
               minecraftUsername: username,
@@ -149,10 +146,10 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
         // Check if player should be whitelisted (check player record first)
         const { data: player, error: playerError } = await tryCatch(
-          db.findOne(MinecraftPlayer, {
+          MinecraftPlayer.findOne({
             guildId,
             minecraftUsername: username,
-          })
+          }).lean()
         );
 
         if (playerError) {
@@ -176,8 +173,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
           // Update last connection attempt
           const { error: updateError } = await tryCatch(
-            db.findOneAndUpdate(
-              MinecraftPlayer,
+            MinecraftPlayer.findOneAndUpdate(
               { _id: player._id },
               { lastConnectionAttempt: new Date() },
               { upsert: false, new: false }
@@ -263,8 +259,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
           // Update the pending auth to mark that we showed them the code
           const { error: updateError } = await tryCatch(
-            db.findOneAndUpdate(
-              MinecraftAuthPending,
+            MinecraftAuthPending.findOneAndUpdate(
               { _id: pendingAuth._id },
               {
                 status: "code_shown",
@@ -343,7 +338,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
     asyncHandler(async (req, res) => {
       const { guildId } = req.params;
 
-      const { data: config, error } = await tryCatch(db.findOne(MinecraftConfig, { guildId }));
+      const { data: config, error } = await tryCatch(MinecraftConfig.findOne({ guildId }).lean());
 
       if (error) {
         log.error("Failed to fetch minecraft config:", error);
@@ -369,8 +364,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const configData = req.body;
 
       const { data: updatedConfig, error } = await tryCatch(
-        db.findOneAndUpdate(
-          MinecraftConfig,
+        MinecraftConfig.findOneAndUpdate(
           { guildId },
           { ...configData, guildId },
           { upsert: true, new: true }
@@ -413,7 +407,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         ];
       }
 
-      const { data: players, error } = await tryCatch(db.find(MinecraftPlayer, query));
+      const { data: players, error } = await tryCatch(MinecraftPlayer.find(query).lean());
 
       if (error) {
         log.error("Failed to fetch minecraft players:", error);
@@ -438,11 +432,11 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const { guildId } = req.params;
 
       const { data: pending, error } = await tryCatch(
-        db.find(MinecraftAuthPending, {
+        MinecraftAuthPending.find({
           guildId,
           status: { $in: ["code_confirmed"] }, // Only show confirmed codes waiting for approval
-          expiresAt: { $gt: new Date() },
-        })
+          // No expiration check - once confirmed, expiration is irrelevant
+        }).lean()
       );
 
       if (error) {
@@ -469,13 +463,12 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const { notes } = req.body;
       const staffMemberId = req.body.staffMemberId; // Should be provided by dashboard
 
-      // Find the pending auth
+      // Find the pending auth - force database lookup to avoid stale cache
       const { data: pendingAuth, error: authError } = await tryCatch(
-        db.findOne(MinecraftAuthPending, {
+        MinecraftAuthPending.findOne({
           _id: authId,
           guildId,
-          status: "code_confirmed",
-        })
+        }).lean()
       );
 
       if (authError) {
@@ -489,6 +482,20 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         return res
           .status(404)
           .json(createErrorResponse("Authentication request not found", 404, req.requestId));
+      }
+
+      // Check if the status allows approval
+      if (pendingAuth.status !== "code_confirmed") {
+        log.warn(`Auth request ${authId} has status ${pendingAuth.status}, cannot approve`);
+        return res
+          .status(400)
+          .json(
+            createErrorResponse(
+              `Authentication request cannot be approved (current status: ${pendingAuth.status})`,
+              400,
+              req.requestId
+            )
+          );
       }
 
       // Create the player record
@@ -518,7 +525,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
       // Clean up the pending auth
       const { error: cleanupError } = await tryCatch(
-        db.deleteOne(MinecraftAuthPending, { _id: authId })
+        MinecraftAuthPending.deleteOne({ _id: authId })
       );
 
       if (cleanupError) {
@@ -558,27 +565,78 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const { reason } = req.body;
       const staffMemberId = req.body.staffMemberId;
 
-      // Find and delete the pending auth
-      const { data: pendingAuth, error: deleteError } = await tryCatch(
-        db.findOneAndUpdate(
-          MinecraftAuthPending,
+      log.debug(`Attempting to reject auth: ${authId} for guild: ${guildId}`);
+
+      // First, check if the record exists and get its current status
+      const { data: existingAuth, error: findError } = await tryCatch(
+        MinecraftAuthPending.findOne({ _id: authId, guildId }).lean()
+      );
+
+      if (findError) {
+        log.error("Error finding pending auth:", findError);
+        return res
+          .status(500)
+          .json(
+            createErrorResponse(
+              "Database error while finding authentication request",
+              500,
+              req.requestId
+            )
+          );
+      }
+
+      if (!existingAuth) {
+        log.warn(`Auth request not found: ${authId} in guild: ${guildId}`);
+        return res
+          .status(404)
+          .json(createErrorResponse("Authentication request not found", 404, req.requestId));
+      }
+
+      log.debug(`Found auth with current status: ${existingAuth.status}`);
+
+      if (existingAuth.status !== "code_confirmed") {
+        log.warn(`Auth request ${authId} has status ${existingAuth.status}, cannot reject`);
+        return res
+          .status(400)
+          .json(
+            createErrorResponse(
+              `Authentication request cannot be rejected (current status: ${existingAuth.status})`,
+              400,
+              req.requestId
+            )
+          );
+      }
+
+      // Update the status to rejected
+      const { data: pendingAuth, error: updateError } = await tryCatch(
+        MinecraftAuthPending.findOneAndUpdate(
           { _id: authId, guildId, status: "code_confirmed" },
-          { status: "rejected", rejectedBy: staffMemberId, rejectionReason: reason }
+          { status: "rejected", rejectedBy: staffMemberId, rejectionReason: reason },
+          { new: true, upsert: false } // Return the updated document
         )
       );
 
-      if (deleteError) {
-        log.error("Failed to reject pending auth:", deleteError);
+      if (updateError) {
+        log.error("Failed to reject pending auth:", updateError);
         return res
           .status(500)
           .json(createErrorResponse("Failed to reject authentication request", 500, req.requestId));
       }
 
       if (!pendingAuth) {
+        log.error(`Update operation returned null for auth ${authId}`);
         return res
           .status(404)
-          .json(createErrorResponse("Authentication request not found", 404, req.requestId));
+          .json(
+            createErrorResponse(
+              "Authentication request not found or already processed",
+              404,
+              req.requestId
+            )
+          );
       }
+
+      log.debug(`Successfully updated auth ${authId} to status: ${pendingAuth.status}`);
 
       // TODO: Send DM to user notifying them of rejection
 
@@ -614,8 +672,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
       // Update the player record
       const { data: player, error } = await tryCatch(
-        db.findOneAndUpdate(
-          MinecraftPlayer,
+        MinecraftPlayer.findOneAndUpdate(
           { _id: playerId, guildId },
           {
             whitelistStatus: "not_whitelisted",
@@ -669,8 +726,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const staffMemberId = req.body.staffMemberId;
 
       const { data: player, error } = await tryCatch(
-        db.findOneAndUpdate(
-          MinecraftPlayer,
+        MinecraftPlayer.findOneAndUpdate(
           { _id: playerId, guildId },
           {
             whitelistStatus: "whitelisted",
@@ -713,8 +769,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const staffMemberId = req.body.staffMemberId;
 
       const { data: player, error } = await tryCatch(
-        db.findOneAndUpdate(
-          MinecraftPlayer,
+        MinecraftPlayer.findOneAndUpdate(
           { _id: playerId, guildId },
           {
             whitelistStatus: "unwhitelisted",
@@ -757,8 +812,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const staffMemberId = req.body.staffMemberId;
 
       const { data: player, error } = await tryCatch(
-        db.findOneAndUpdate(
-          MinecraftPlayer,
+        MinecraftPlayer.findOneAndUpdate(
           { _id: playerId, guildId },
           {
             whitelistStatus: "banned",
@@ -818,6 +872,423 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             message: "RCON test successful",
             host,
             port: port || 25575,
+          },
+          req.requestId
+        )
+      );
+    })
+  );
+
+  /**
+   * POST /api/minecraft/:guildId/bulk-approve
+   * Approve the oldest X whitelist requests (queue processing)
+   */
+  router.post(
+    "/:guildId/bulk-approve",
+    authenticateApiKey,
+    requireScope("minecraft:admin"),
+    asyncHandler(async (req, res) => {
+      const { guildId } = req.params;
+      const { count = 10, staffMemberId } = req.body;
+
+      if (!staffMemberId) {
+        return res
+          .status(400)
+          .json(createErrorResponse("staffMemberId is required", 400, req.requestId));
+      }
+
+      if (typeof count !== "number" || count < 1 || count > 50) {
+        return res
+          .status(400)
+          .json(createErrorResponse("count must be a number between 1 and 50", 400, req.requestId));
+      }
+
+      log.info(
+        `[Minecraft Bulk Approve] Processing bulk approval for guild ${guildId}, approving oldest ${count} requests`
+      );
+
+      // Find the oldest pending approval requests
+      const { data: pendingPlayers, error: findError } = await tryCatch(
+        MinecraftPlayer.find({
+          guildId,
+          whitelistStatus: "pending_approval",
+        })
+          .sort({ createdAt: 1 }) // Oldest first
+          .limit(count)
+          .lean()
+      );
+
+      if (findError) {
+        log.error("[Minecraft Bulk Approve] Failed to find pending players:", findError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to find pending players", 500, req.requestId));
+      }
+
+      if (!pendingPlayers || pendingPlayers.length === 0) {
+        return res.json(
+          createSuccessResponse(
+            {
+              message: "No pending approval requests found",
+              approved: 0,
+              errors: [],
+            },
+            req.requestId
+          )
+        );
+      }
+
+      let approvedCount = 0;
+      const errors: string[] = [];
+
+      // Process each player approval
+      for (const player of pendingPlayers) {
+        try {
+          const { error: updateError } = await tryCatch(
+            MinecraftPlayer.findOneAndUpdate(
+              { _id: player._id },
+              {
+                whitelistStatus: "whitelisted",
+                isWhitelisted: true,
+                approvedBy: staffMemberId,
+                whitelistedAt: new Date(),
+                updatedAt: new Date(),
+              },
+              { new: false }
+            )
+          );
+
+          if (updateError) {
+            errors.push(`Failed to approve ${player.minecraftUsername}: ${updateError.message}`);
+          } else {
+            approvedCount++;
+            log.info(
+              `[Minecraft Bulk Approve] Approved ${player.minecraftUsername} (${player._id}) by staff ${staffMemberId}`
+            );
+          }
+        } catch (error) {
+          errors.push(
+            `Error approving ${player.minecraftUsername}: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          );
+        }
+      }
+
+      const summary = {
+        message: `Bulk approval completed`,
+        totalRequested: count,
+        totalFound: pendingPlayers.length,
+        approved: approvedCount,
+        errors: errors.length,
+        errorDetails: errors,
+      };
+
+      log.info(`[Minecraft Bulk Approve] Completed for guild ${guildId}:`, summary);
+
+      return res.json(createSuccessResponse(summary, req.requestId));
+    })
+  );
+
+  /**
+   * POST /api/minecraft/:guildId/import-whitelist
+   * Import players from a Minecraft whitelist JSON file
+   */
+  router.post(
+    "/:guildId/import-whitelist",
+    authenticateApiKey,
+    requireScope("minecraft:admin"),
+    asyncHandler(async (req, res) => {
+      const { guildId } = req.params;
+      const whitelistData = req.body;
+
+      if (!Array.isArray(whitelistData)) {
+        return res
+          .status(400)
+          .json(
+            createErrorResponse(
+              "Invalid whitelist format. Expected array of player objects.",
+              400,
+              req.requestId
+            )
+          );
+      }
+
+      log.info(
+        `[Minecraft Import] Starting optimized whitelist import for guild ${guildId}, ${whitelistData.length} players`
+      );
+
+      // Validate and prepare data in batch
+      const validPlayers: Array<{
+        username: string;
+        uuid: string;
+        originalEntry: any;
+      }> = [];
+      const errors: string[] = [];
+
+      // First pass: validate all entries
+      for (const playerEntry of whitelistData) {
+        if (!playerEntry.name || !playerEntry.uuid) {
+          errors.push(
+            `Invalid player entry: missing name or uuid - ${JSON.stringify(playerEntry)}`
+          );
+          continue;
+        }
+        validPlayers.push({
+          username: playerEntry.name.toLowerCase(),
+          uuid: playerEntry.uuid,
+          originalEntry: playerEntry,
+        });
+      }
+
+      if (validPlayers.length === 0) {
+        return res.json(
+          createSuccessResponse(
+            {
+              totalProcessed: whitelistData.length,
+              imported: 0,
+              updated: 0,
+              errors: errors.length,
+              errorDetails: errors,
+            },
+            req.requestId
+          )
+        );
+      }
+
+      // Extract usernames and UUIDs for bulk query
+      const usernames = validPlayers.map((p) => p.username);
+      const uuids = validPlayers.map((p) => p.uuid);
+
+      // Bulk find existing players
+      const { data: existingPlayers, error: findError } = await tryCatch(
+        MinecraftPlayer.find({
+          guildId,
+          $or: [{ minecraftUsername: { $in: usernames } }, { minecraftUuid: { $in: uuids } }],
+        }).lean()
+      );
+
+      if (findError) {
+        log.error("[Minecraft Import] Failed to query existing players:", findError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to query existing players", 500, req.requestId));
+      }
+
+      // Create lookup maps for efficient checking
+      const existingByUsername = new Map<string, any>();
+      const existingByUuid = new Map<string, any>();
+
+      (existingPlayers || []).forEach((player) => {
+        if (player.minecraftUsername) {
+          existingByUsername.set(player.minecraftUsername, player);
+        }
+        if (player.minecraftUuid) {
+          existingByUuid.set(player.minecraftUuid, player);
+        }
+      });
+
+      // Prepare bulk operations
+      const playersToUpdate: Array<{
+        filter: any;
+        update: any;
+      }> = [];
+
+      const playersToCreate: Array<any> = [];
+
+      // Process each valid player
+      for (const { username, uuid } of validPlayers) {
+        const existingPlayer = existingByUsername.get(username) || existingByUuid.get(uuid);
+
+        if (existingPlayer) {
+          // Prepare update operation
+          playersToUpdate.push({
+            filter: { _id: existingPlayer._id },
+            update: {
+              isWhitelisted: true,
+              whitelistStatus: "whitelisted",
+              minecraftUsername: username,
+              minecraftUuid: uuid,
+              updatedAt: new Date(),
+            },
+          });
+        } else {
+          // Prepare create operation
+          playersToCreate.push({
+            guildId,
+            minecraftUsername: username,
+            minecraftUuid: uuid,
+            isWhitelisted: true,
+            whitelistStatus: "whitelisted",
+            isBanned: false,
+            source: "imported",
+            whitelistedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+      }
+
+      let updatedCount = 0;
+      let importedCount = 0;
+
+      // Perform bulk updates
+      if (playersToUpdate.length > 0) {
+        try {
+          const bulkUpdateOps = playersToUpdate.map(({ filter, update }) => ({
+            updateOne: {
+              filter,
+              update,
+            },
+          }));
+
+          const { data: updateResult, error: updateError } = await tryCatch(
+            MinecraftPlayer.bulkWrite(bulkUpdateOps)
+          );
+
+          if (updateError) {
+            log.error("[Minecraft Import] Bulk update failed:", updateError);
+            errors.push(`Bulk update failed: ${updateError.message}`);
+          } else {
+            updatedCount = updateResult?.modifiedCount || 0;
+            log.info(`[Minecraft Import] Bulk updated ${updatedCount} players`);
+          }
+        } catch (error) {
+          errors.push(
+            `Bulk update error: ${error instanceof Error ? error.message : "Unknown error"}`
+          );
+        }
+      }
+
+      // Perform bulk inserts
+      if (playersToCreate.length > 0) {
+        try {
+          const { data: insertResult, error: insertError } = await tryCatch(
+            MinecraftPlayer.insertMany(playersToCreate, { ordered: false })
+          );
+
+          if (insertError) {
+            log.error("[Minecraft Import] Bulk insert failed:", insertError);
+            errors.push(`Bulk insert failed: ${insertError.message}`);
+          } else {
+            importedCount = Array.isArray(insertResult) ? insertResult.length : 0;
+            log.info(`[Minecraft Import] Bulk inserted ${importedCount} players`);
+          }
+        } catch (error) {
+          errors.push(
+            `Bulk insert error: ${error instanceof Error ? error.message : "Unknown error"}`
+          );
+        }
+      }
+
+      const summary = {
+        totalProcessed: whitelistData.length,
+        validated: validPlayers.length,
+        imported: importedCount,
+        updated: updatedCount,
+        errors: errors.length,
+        errorDetails: errors,
+        performance: {
+          bulkUpdates: playersToUpdate.length,
+          bulkInserts: playersToCreate.length,
+          optimized: true,
+        },
+      };
+
+      log.info(`[Minecraft Import] Optimized import completed for guild ${guildId}:`, summary);
+
+      return res.json(createSuccessResponse(summary, req.requestId));
+    })
+  );
+
+  /**
+   * POST /api/minecraft/:guildId/players/:playerId/link
+   * Manually link a Discord account to a Minecraft player
+   */
+  router.post(
+    "/:guildId/players/:playerId/link",
+    authenticateApiKey,
+    requireScope("minecraft:admin"),
+    asyncHandler(async (req, res) => {
+      const { guildId, playerId } = req.params;
+      const { discordId } = req.body;
+
+      if (!discordId) {
+        return res
+          .status(400)
+          .json(createErrorResponse("Discord ID is required", 400, req.requestId));
+      }
+
+      // Validate Discord ID format (should be a snowflake)
+      if (!/^\d{17,19}$/.test(discordId)) {
+        return res
+          .status(400)
+          .json(createErrorResponse("Invalid Discord ID format", 400, req.requestId));
+      }
+
+      // Find the player and verify guild ownership
+      const { data: player, error: findError } = await tryCatch(
+        MinecraftPlayer.findOne({ _id: playerId, guildId }).lean()
+      );
+
+      if (findError || !player) {
+        return res.status(404).json(createErrorResponse("Player not found", 404, req.requestId));
+      }
+
+      // Check if Discord user is already linked to another player in this guild
+      const { data: existingLink } = await tryCatch(
+        MinecraftPlayer.findOne({
+          guildId,
+          discordUserId: discordId,
+          _id: { $ne: playerId },
+        })
+      );
+
+      if (existingLink) {
+        return res
+          .status(409)
+          .json(
+            createErrorResponse(
+              `Discord user is already linked to player: ${existingLink.minecraftUsername}`,
+              409,
+              req.requestId
+            )
+          );
+      }
+
+      // Update the player with Discord link
+      const { data: updatedPlayer, error: updateError } = await tryCatch(
+        MinecraftPlayer.findOneAndUpdate(
+          { _id: playerId, guildId },
+          {
+            discordUserId: discordId,
+            isLinked: true,
+            discordId: discordId,
+            updatedAt: new Date(),
+          },
+          { upsert: false, new: true }
+        )
+      );
+
+      if (updateError) {
+        log.error(
+          `[Minecraft Link] Failed to link Discord user ${discordId} to player ${playerId}:`,
+          updateError
+        );
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to link Discord account", 500, req.requestId));
+      }
+
+      log.info(
+        `[Minecraft Link] Successfully linked Discord user ${discordId} to player ${player.minecraftUsername} in guild ${guildId}`
+      );
+
+      return res.json(
+        createSuccessResponse(
+          {
+            message: "Discord account linked successfully",
+            player: updatedPlayer,
           },
           req.requestId
         )

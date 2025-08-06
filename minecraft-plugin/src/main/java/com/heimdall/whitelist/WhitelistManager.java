@@ -43,9 +43,19 @@ public class WhitelistManager {
           plugin.getConfig().getInt("api.timeout", 5000) + 1000, // Add 1 second buffer
           TimeUnit.MILLISECONDS);
 
-      // Cache the response
-      long cacheTimeout = plugin.getConfig().getInt("performance.cacheTimeout", 30) * 1000L;
-      cache.put(cacheKey, new CachedResponse(response, System.currentTimeMillis() + cacheTimeout));
+      // Cache only successful responses (when player is allowed)
+      if (response.shouldBeWhitelisted()) {
+        long cacheTimeout = plugin.getConfig().getInt("performance.cacheTimeout", 30) * 1000L;
+        cache.put(cacheKey, new CachedResponse(response, System.currentTimeMillis() + cacheTimeout));
+
+        if (plugin.getConfig().getBoolean("logging.debug", false)) {
+          plugin.getLogger().info("Cached successful whitelist result for " + username);
+        }
+      } else {
+        if (plugin.getConfig().getBoolean("logging.debug", false)) {
+          plugin.getLogger().info("Not caching failed whitelist result for " + username);
+        }
+      }
 
       // Update last check time
       lastCheckTime = dateFormat.format(new Date());

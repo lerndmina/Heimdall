@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { User, Users, Search, Filter, CheckCircle, XCircle, AlertCircle, Shield, Clock, MoreVertical, Ban, UserPlus } from "lucide-react";
+import { User, Users, Search, Filter, CheckCircle, XCircle, AlertCircle, Shield, Clock, MoreVertical, Ban, UserPlus, Upload, FileText, Link } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireGuild } from "../use-require-guild";
 
@@ -37,6 +39,11 @@ export function MinecraftPlayersList() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
+  const [linkDiscordId, setLinkDiscordId] = useState("");
 
   // Fetch all players
   const {
@@ -95,6 +102,106 @@ export function MinecraftPlayersList() {
     onError: (error) => {
       toast({
         title: "Action Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Whitelist import mutation
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      if (!selectedGuild) throw new Error("No guild selected");
+
+      // Read and parse the JSON file
+      const text = await file.text();
+      let whitelistData;
+
+      try {
+        whitelistData = JSON.parse(text);
+      } catch (parseError) {
+        throw new Error("Invalid JSON file format");
+      }
+
+      // Validate the whitelist format
+      if (!Array.isArray(whitelistData)) {
+        throw new Error("Invalid whitelist format. Expected array of player objects.");
+      }
+
+      for (const player of whitelistData) {
+        if (!player.name || !player.uuid) {
+          throw new Error(`Invalid player entry: missing name or uuid`);
+        }
+      }
+
+      const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/import-whitelist`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(whitelistData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to import whitelist");
+      }
+
+      return result;
+    },
+    onSuccess: (data) => {
+      const summary = data.data;
+      toast({
+        title: "Import Complete",
+        description: `Imported: ${summary.imported}, Updated: ${summary.updated}${summary.errors > 0 ? `, Errors: ${summary.errors}` : ""}`,
+        variant: summary.errors > 0 ? "destructive" : "default",
+      });
+      queryClient.invalidateQueries({ queryKey: ["minecraft-players"] });
+      setShowImportDialog(false);
+      setImportFile(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Import Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Manual link mutation
+  const linkMutation = useMutation({
+    mutationFn: async ({ playerId, discordId }: { playerId: string; discordId: string }) => {
+      if (!selectedGuild) throw new Error("No guild selected");
+
+      const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/players/${playerId}/link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discordId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to link player");
+      }
+
+      return result;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Player Linked",
+        description: `Successfully linked ${data.data.minecraftUsername} to Discord user.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["minecraft-players"] });
+      setShowLinkDialog(false);
+      setLinkDiscordId("");
+      setSelectedPlayerId("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Link Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -211,6 +318,24 @@ export function MinecraftPlayersList() {
       );
     }
 
+    // Add link button for players without Discord ID
+    if (!player.discordId) {
+      actions.push(
+        <Button
+          key="link"
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            setSelectedPlayerId(player._id);
+            setShowLinkDialog(true);
+          }}
+          className="flex items-center gap-2">
+          <Link className="h-4 w-4" />
+          Link Discord
+        </Button>
+      );
+    }
+
     return actions;
   };
 
@@ -220,11 +345,17 @@ export function MinecraftPlayersList() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Minecraft Players</h1>
-          <p className="text-muted-foreground">Manage player whitelist and linking status for {selectedGuild.guildName}</p>
+          <p className="text-muted-foreground">Manage player whitelist and linking status for {selectedGuild?.guildName}</p>
         </div>
-        <Button asChild>
-          <a href="/dashboard/minecraft">← Back to Overview</a>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowImportDialog(true)} className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Import Whitelist
+          </Button>
+          <Button asChild>
+            <a href="/minecraft">← Back to Overview</a>
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -257,7 +388,7 @@ export function MinecraftPlayersList() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
+            <Users className="h-5 w-5 text-primary" />
             Players ({filteredPlayers.length})
           </CardTitle>
           <CardDescription>{statusFilter === "all" ? "All registered players" : `Players with status: ${statusFilter}`}</CardDescription>
@@ -265,20 +396,20 @@ export function MinecraftPlayersList() {
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Clock className="h-8 w-8 animate-spin" />
+              <Clock className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : filteredPlayers.length === 0 ? (
             <div className="text-center py-8">
-              <Users className="mx-auto h-12 w-12 text-gray-400" />
+              <Users className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 text-lg font-medium">{searchQuery || statusFilter !== "all" ? "No players match your filters" : "No players found"}</h3>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {searchQuery || statusFilter !== "all" ? "Try adjusting your search or filter criteria." : "Players will appear here once they start linking their accounts."}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
               {filteredPlayers.map((player: MinecraftPlayer) => (
-                <div key={player._id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div key={player._id} className="flex items-center justify-between p-4 border rounded-lg bg-card">
                   <div className="flex items-center space-x-4">
                     {/* Player Avatar */}
                     <div className="flex items-center space-x-3">
@@ -292,7 +423,7 @@ export function MinecraftPlayersList() {
 
                       {/* Discord avatar if linked */}
                       {player.discordId && (
-                        <Avatar className="border-2 border-blue-200">
+                        <Avatar className="border-2 border-discord-primary">
                           <AvatarImage src={`https://cdn.discordapp.com/avatars/${player.discordId}/avatar.png`} alt="Discord Avatar" />
                           <AvatarFallback>
                             <User className="h-4 w-4" />
@@ -304,7 +435,7 @@ export function MinecraftPlayersList() {
                     {/* Player Info */}
                     <div>
                       <div className="flex items-center gap-3">
-                        <span className="font-medium">{player.minecraftUsername}</span>
+                        <span className="font-medium text-white">{player.minecraftUsername}</span>
                         {getStatusBadge(player.whitelistStatus)}
                         {player.discordId && (
                           <Badge variant="outline" className="text-xs">
@@ -313,7 +444,7 @@ export function MinecraftPlayersList() {
                           </Badge>
                         )}
                       </div>
-                      <div className="text-sm text-muted-foreground space-x-2">
+                      <div className="text-sm text-discord-muted space-x-2">
                         {player.discordId && <span>Discord: {player.discordId}</span>}
                         {player.linkedAt && <span>• Linked: {new Date(player.linkedAt).toLocaleDateString()}</span>}
                         {player.approvedAt && <span>• Approved: {new Date(player.approvedAt).toLocaleDateString()}</span>}
@@ -329,6 +460,78 @@ export function MinecraftPlayersList() {
           )}
         </CardContent>
       </Card>
+
+      {/* Import Whitelist Dialog */}
+      {showImportDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-card rounded-lg p-6 w-96 max-w-90vw">
+            <h3 className="text-lg font-semibold mb-4">Import Whitelist</h3>
+            <p className="text-muted-foreground mb-4">Upload a Minecraft whitelist.json file to import players. Players will be marked as whitelisted but not linked to Discord accounts.</p>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="whitelist-file">Whitelist File</Label>
+                <Input id="whitelist-file" type="file" accept=".json" onChange={(e) => setImportFile(e.target.files?.[0] || null)} className="mt-1" />
+              </div>
+              {importFile && <div className="text-sm text-muted-foreground">Selected: {importFile.name}</div>}
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowImportDialog(false);
+                  setImportFile(null);
+                }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (importFile) {
+                    importMutation.mutate(importFile);
+                  }
+                }}
+                disabled={!importFile || importMutation.isPending}>
+                {importMutation.isPending ? "Importing..." : "Import"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Link Discord Dialog */}
+      {showLinkDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-card rounded-lg p-6 w-96 max-w-90vw">
+            <h3 className="text-lg font-semibold mb-4">Link Discord Account</h3>
+            <p className="text-muted-foreground mb-4">Enter the Discord user ID to manually link this Minecraft player to a Discord account.</p>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="discord-id">Discord User ID</Label>
+                <Input id="discord-id" type="text" placeholder="123456789012345678" value={linkDiscordId} onChange={(e) => setLinkDiscordId(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowLinkDialog(false);
+                  setLinkDiscordId("");
+                  setSelectedPlayerId("");
+                }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (linkDiscordId && selectedPlayerId) {
+                    linkMutation.mutate({ playerId: selectedPlayerId, discordId: linkDiscordId });
+                  }
+                }}
+                disabled={!linkDiscordId || !selectedPlayerId || linkMutation.isPending}>
+                {linkMutation.isPending ? "Linking..." : "Link Account"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

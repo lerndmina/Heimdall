@@ -322,12 +322,12 @@ export class CommandHandler {
     }
 
     // Check if command should be ignored
-    if (command.config.deleted) {
+    if (command.config?.deleted) {
       return;
     }
 
     // Check dev-only restrictions
-    if (command.config.devOnly && this.config.devUserIds) {
+    if (command.config?.devOnly && this.config.devUserIds) {
       if (!this.config.devUserIds.includes(interaction.user.id)) {
         return;
       }
@@ -369,7 +369,7 @@ export class CommandHandler {
       }
 
       // Check permissions
-      if (this.permissionManager && command.config.permissions) {
+      if (this.permissionManager && command.config?.permissions) {
         const permissionContext = {
           userId: interaction.user.id,
           guildId: interaction.guild?.id,
@@ -453,7 +453,7 @@ export class CommandHandler {
     }
 
     // Check if command should be ignored
-    if (command.config.deleted) {
+    if (command.config?.deleted) {
       return;
     }
 
@@ -599,12 +599,15 @@ export class CommandHandler {
     const allCommands = Array.from(this.commands.values());
     this.logger.debug(`Commands before filtering: ${allCommands.length}`);
 
-    const nonDeletedCommands = allCommands.filter((cmd) => !cmd.config.deleted);
+    const nonDeletedCommands = allCommands.filter((cmd) => {
+      // Safety check: ensure config exists before accessing properties
+      return !cmd.config?.deleted;
+    });
     this.logger.debug(`Commands after deleted filter: ${nonDeletedCommands.length}`);
 
     // Separate dev-only commands from regular commands
-    const devOnlyCommands = nonDeletedCommands.filter((cmd) => cmd.config.devOnly);
-    const globalCommands = nonDeletedCommands.filter((cmd) => !cmd.config.devOnly);
+    const devOnlyCommands = nonDeletedCommands.filter((cmd) => cmd.config?.devOnly);
+    const globalCommands = nonDeletedCommands.filter((cmd) => !cmd.config?.devOnly);
 
     this.logger.debug(`Dev-only commands: ${devOnlyCommands.length}, Global commands: ${globalCommands.length}`);
 

@@ -269,6 +269,12 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
   // Create pending auth record
   const expiresAt = new Date(Date.now() + config.authCodeExpiry * 1000);
 
+  // Get user data for storage
+  const member = await interaction.guild?.members.fetch(discordId).catch(() => null);
+  const discordUsername = interaction.user.username;
+  const discordDisplayName =
+    member?.displayName || interaction.user.globalName || interaction.user.username;
+
   const { error: createError } = await tryCatch(
     (async () => {
       const pendingAuth = new MinecraftAuthPending({
@@ -278,6 +284,8 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
         authCode: authCode!,
         expiresAt,
         status: "awaiting_connection",
+        discordUsername,
+        discordDisplayName,
       });
       await pendingAuth.save();
     })()
@@ -306,10 +314,12 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
           `**Next Steps:**\n` +
           `1. Try joining the Minecraft server: \`${config.serverHost}:${config.serverPort}\`\n` +
           `2. You'll be kicked with your authentication code\n` +
-          `3. Come back here and use \`/confirm-code <your-code>\`\n\n` +
+          `3. Come back here and use \`/confirm-code <your-code>\`\n` +
+          `4. **Wait for staff approval** - This may take some time\n\n` +
+          `⏰ **Important:** Staff must manually approve your whitelist request before you can join the server.\n\n` +
           `**Your request expires:** <t:${Math.floor(expiresAt.getTime() / 1000)}:R>`
       )
-        .setColor("Green")
+        .setColor("Yellow")
         .setFooter({ text: "Your authentication code will be shown when you try to join" }),
     ],
   });

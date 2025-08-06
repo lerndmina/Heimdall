@@ -6,6 +6,10 @@ export interface MinecraftAuthPendingType extends Document {
   minecraftUsername: string;
   authCode: string; // 6-digit code
 
+  // Discord user data (captured at submission time)
+  discordUsername?: string; // Discord username
+  discordDisplayName?: string; // Server nickname or global display name
+
   // Status tracking
   status: "awaiting_connection" | "code_shown" | "code_confirmed" | "expired" | "rejected";
   createdAt: Date;
@@ -48,6 +52,16 @@ const MinecraftAuthPendingSchema = new Schema<MinecraftAuthPendingType>(
       required: true,
       unique: true,
       index: true,
+    },
+
+    // Discord user data (captured at submission time)
+    discordUsername: {
+      type: String,
+      required: false,
+    },
+    discordDisplayName: {
+      type: String,
+      required: false,
     },
 
     // Status tracking

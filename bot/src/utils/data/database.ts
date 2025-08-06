@@ -6,6 +6,9 @@ const env = FetchEnvs();
 
 const ONE_HOUR = 1 * 60 * 60; // Redis uses seconds.
 
+// Toggle to disable cache globally for testing
+const DISABLE_CACHE = true; // Set to true to disable cache, false to enable
+
 // Helper function to properly serialize cache key values
 function serializeCacheKeyValue(value: any): string {
   if (typeof value === "object" && value !== null) {
@@ -42,16 +45,22 @@ export default class Database {
     debugMsg(`Fetching from cache: ${redisKey}`);
     var data = await redisClient.get(redisKey);
 
-    if (!data) {
-      debugMsg(`Cache miss fetching db:`);
+    if (!data || DISABLE_CACHE) {
+      if (DISABLE_CACHE) {
+        debugMsg(`Cache disabled - fetching directly from database`);
+      } else {
+        debugMsg(`Cache miss fetching db:`);
+      }
       debugMsg(model);
       data = await schema.findOne(model);
       if (!data) {
         debugMsg(`Database miss no data found`);
         if (!saveNull) return null;
       }
-      await redisClient.set(redisKey, JSON.stringify(data));
-      await redisClient.expire(redisKey, cacheTime);
+      if (!DISABLE_CACHE) {
+        await redisClient.set(redisKey, JSON.stringify(data));
+        await redisClient.expire(redisKey, cacheTime);
+      }
       if (env.DEBUG_LOG) debugMsg(`DB - findOne - Time taken: ${Date.now() - start!}ms`);
       return data as T;
     }
@@ -86,15 +95,22 @@ export default class Database {
 
     debugMsg(`Fetching from cache: ${redisKey}`);
     var data = await redisClient.get(redisKey);
-    if (!data || data.length == 0) {
+    if (!data || data.length == 0 || DISABLE_CACHE) {
+      if (DISABLE_CACHE) {
+        debugMsg(`Cache disabled - fetching directly from database`);
+      } else {
+        debugMsg(`Cache miss fetching db:`);
+      }
       debugMsg(model);
       const dbResult = await schema.find(model);
       if (!dbResult || dbResult.length == 0) {
         debugMsg(`Database miss no data found`);
         if (!saveNull) return null;
       }
-      await redisClient.set(redisKey, JSON.stringify(dbResult));
-      await redisClient.expire(redisKey, cacheTime);
+      if (!DISABLE_CACHE) {
+        await redisClient.set(redisKey, JSON.stringify(dbResult));
+        await redisClient.expire(redisKey, cacheTime);
+      }
       if (env.DEBUG_LOG) debugMsg(`DB - find - Time taken: ${Date.now() - start!}ms`);
       // Ensure we always return an array
       return Array.isArray(dbResult) ? (dbResult as T[]) : [dbResult as T];
@@ -135,11 +151,16 @@ export default class Database {
     const redisKey = `${env.MONGODB_DATABASE}:${schema.modelName}:${keyParts}`;
 
     const result = await schema.findOneAndUpdate(model, object, options);
-    await redisClient.set(redisKey, JSON.stringify(result));
-    await redisClient.expire(redisKey, cacheTime);
+
+    if (!DISABLE_CACHE) {
+      await redisClient.set(redisKey, JSON.stringify(result));
+      await redisClient.expire(redisKey, cacheTime);
+      debugMsg(`Updated keys: ${queryKeys.join(", ")} -> ${redisKey}`);
+    } else {
+      debugMsg(`Cache disabled - skipping cache update for: ${queryKeys.join(", ")}`);
+    }
 
     if (env.DEBUG_LOG) debugMsg(`DB - update - Time taken: ${Date.now() - start!}ms`);
-    debugMsg(`Updated keys: ${queryKeys.join(", ")} -> ${redisKey}`);
     return result as T;
   }
 
@@ -455,8 +476,12 @@ export default class Database {
     debugMsg(`Fetching filtered from cache: ${redisKey}`);
     var data = await redisClient.get(redisKey);
 
-    if (!data) {
-      debugMsg(`Cache miss, fetching from db with array filter`);
+    if (!data || DISABLE_CACHE) {
+      if (DISABLE_CACHE) {
+        debugMsg(`Cache disabled - fetching filtered data directly from database`);
+      } else {
+        debugMsg(`Cache miss, fetching from db with array filter`);
+      }
 
       const aggregatePipeline: any[] = [
         { $match: query },
@@ -479,7 +504,7 @@ export default class Database {
       const results = await schema.aggregate(aggregatePipeline);
       data = results.length > 0 ? results[0] : null;
 
-      if (data) {
+      if (data && !DISABLE_CACHE) {
         await redisClient.set(redisKey, JSON.stringify(data));
         await redisClient.expire(redisKey, cacheTime);
       }
@@ -560,8 +585,12 @@ export default class Database {
     debugMsg(`Fetching last ${limit} elements from cache: ${redisKey}`);
     var data = await redisClient.get(redisKey);
 
-    if (!data) {
-      debugMsg(`Cache miss, fetching last ${limit} elements from db`);
+    if (!data || DISABLE_CACHE) {
+      if (DISABLE_CACHE) {
+        debugMsg(`Cache disabled - fetching last ${limit} elements directly from database`);
+      } else {
+        debugMsg(`Cache miss, fetching last ${limit} elements from db`);
+      }
 
       const projection = {
         [arrayField]: { $slice: -limit },
@@ -569,7 +598,7 @@ export default class Database {
 
       const result = await schema.findOne(query, projection);
 
-      if (result) {
+      if (result && !DISABLE_CACHE) {
         await redisClient.set(redisKey, JSON.stringify(result));
         await redisClient.expire(redisKey, cacheTime);
       }
@@ -611,8 +640,12 @@ export default class Database {
     debugMsg(`Fetching array count from cache: ${redisKey}`);
     var data = await redisClient.get(redisKey);
 
-    if (!data) {
-      debugMsg(`Cache miss, fetching array count from db`);
+    if (!data || DISABLE_CACHE) {
+      if (DISABLE_CACHE) {
+        debugMsg(`Cache disabled - fetching array count directly from database`);
+      } else {
+        debugMsg(`Cache miss, fetching array count from db`);
+      }
 
       const aggregation = [
         { $match: query },
@@ -626,8 +659,10 @@ export default class Database {
       const results = await schema.aggregate(aggregation);
       const count = results.length > 0 ? results[0].count : 0;
 
-      await redisClient.set(redisKey, count.toString());
-      await redisClient.expire(redisKey, cacheTime);
+      if (!DISABLE_CACHE) {
+        await redisClient.set(redisKey, count.toString());
+        await redisClient.expire(redisKey, cacheTime);
+      }
 
       if (env.DEBUG_LOG)
         debugMsg(`DB - getArrayElementCount - Time taken: ${Date.now() - start!}ms`);

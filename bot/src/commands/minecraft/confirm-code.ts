@@ -199,7 +199,7 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
 
   // Success response
   const approvalMessage = config.requireApproval
-    ? "Your request is now **pending staff approval**. You'll be notified when a staff member reviews your request."
+    ? "Your request is now **pending staff approval**. Staff will review your request manually and approve it when they're available. This process may take some time - please be patient!"
     : "Your account will be automatically approved shortly.";
 
   return interaction.editReply({
@@ -209,12 +209,15 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
         "✅ Code Confirmed",
         `**Authentication Successful!**\n\n` +
           `Your Discord account is now linked to **${pendingAuth.minecraftUsername}**.\n\n` +
-          approvalMessage +
-          `\n\n` +
+          `⏳ ${approvalMessage}\n\n` +
+          `**What happens next:**\n` +
+          `• Staff will review your request in the queue\n` +
+          `• You'll get a DM notification when approved\n` +
+          `• Then you can join the Minecraft server!\n\n` +
           `Use \`/minecraft-status\` to check your current status.`
       )
-        .setColor("Green")
-        .setFooter({ text: "You'll receive a DM when your status changes" }),
+        .setColor("Yellow")
+        .setFooter({ text: "Please wait patiently for staff approval" }),
     ],
   });
 }
