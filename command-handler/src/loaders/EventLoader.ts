@@ -98,8 +98,8 @@ export class EventLoader {
         // For messageCreate: (message, client, handler)
         // For interactionCreate: (interaction, client, handler)
         if (eventName === "ready") {
-          // Ready event has no Discord args, so just pass client and handler
-          (exports.default as any)(client, handler);
+          // Ready event: pass client twice (for compatibility) and handler
+          (exports.default as any)(client, client, handler);
         } else {
           // Other events: pass Discord args first, then client, then handler
           (exports.default as any)(...args, client, handler);

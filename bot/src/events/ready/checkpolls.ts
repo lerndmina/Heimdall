@@ -15,10 +15,17 @@ import FetchEnvs from "../../utils/FetchEnvs";
 const env = FetchEnvs();
 
 export default async (c: Client<true>, client: Client<true>, handler: CommandHandler) => {
-  await sleep(500);
+  await sleep(2000); // Increase delay to ensure client is fully ready
 
   const db = new Database();
   db.cleanCache(db.getCacheKeys(PollsSchema, `*`));
+
+  // Ensure client is ready before creating ThingGetter
+  if (!client.isReady()) {
+    log.error("Client is not ready, skipping checkpolls");
+    return;
+  }
+
   const getter = new ThingGetter(client);
   const polls = await PollsSchema.find();
   if (!polls) return log.info("No polls found in the database.");
@@ -32,7 +39,13 @@ export default async (c: Client<true>, client: Client<true>, handler: CommandHan
     if (new Date(poll.endsAt).getTime() < Date.now()) {
       poll.hasFinished = true;
       await db.findOneAndUpdate(PollsSchema, { pollId: poll.pollId }, poll);
-    } else waitForPollEnd(poll, db, client, getter);
+    } else {
+      try {
+        await waitForPollEnd(poll, db, client, getter);
+      } catch (error) {
+        log.error(`Failed to setup poll end watcher for ${poll.pollId}:`, error);
+      }
+    }
   }
   return;
 };
@@ -58,21 +71,29 @@ export async function waitForPollEnd(
     // prettier-ignore
     `Starting timeout for poll: "${poll.question.substring(0, 20)}..." -> "pollId:${poll.pollId}"`
   );
-  const channel = await getter.getChannel(poll.channelId);
-  if (!channel || channel.isTextBased() === false)
-    return log.error(`Channel not found: ${poll.channelId}, unable to end poll.`);
 
-  let message: Message;
   try {
-    message = await channel.messages.fetch(poll.messageId);
+    const channel = await getter.getChannel(poll.channelId);
+    if (!channel || channel.isTextBased() === false) {
+      log.error(`Channel not found or not text-based: ${poll.channelId}, unable to end poll.`);
+      return;
+    }
+
+    let message: Message;
+    try {
+      message = await channel.messages.fetch(poll.messageId);
+    } catch (error) {
+      log.error(`Message not found: ${poll.messageId}, unable to end poll.`);
+      return;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(async () => {
+        endPoll(client, poll.pollId, message, db);
+        resolve(true);
+      }, pollEndTime - Date.now());
+    });
   } catch (error) {
-    log.error(`Message not found: ${poll.messageId}, unable to end poll.`);
-    return;
+    log.error(`Error in waitForPollEnd for poll ${poll.pollId}:`, error);
   }
-  await new Promise((resolve) => {
-    setTimeout(async () => {
-      endPoll(client, poll.pollId, message, db);
-      resolve(true);
-    }, pollEndTime - Date.now());
-  });
 }

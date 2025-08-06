@@ -41,6 +41,9 @@ ENV DEBIAN_FRONTEND=
 # Set the working directory
 WORKDIR /app
 
+# Set production environment
+ENV NODE_ENV=production
+
 # Copy root package files
 COPY package.json ./
 COPY bun.lock ./

@@ -179,9 +179,15 @@ export class ThingGetter {
       throw new Error(`Invalid type: ${type}`);
     }
 
-    let thing = (this.client as any)[property].cache.get(id);
+    // Ensure the client property exists before accessing cache
+    const clientProperty = (this.client as any)[property];
+    if (!clientProperty) {
+      throw new Error(`Client property '${property}' is not available. Client may not be ready.`);
+    }
+
+    let thing = clientProperty.cache.get(id);
     if (!thing) {
-      thing = await (this.client as any)[property].fetch(id);
+      thing = await clientProperty.fetch(id);
     }
     if (env.DEBUG_LOG) debugMsg(`ThingGetter - Time taken: ${Date.now() - start!}ms`);
     return thing;

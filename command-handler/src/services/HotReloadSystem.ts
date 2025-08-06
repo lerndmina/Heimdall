@@ -40,6 +40,16 @@ export class HotReloadSystem extends EventEmitter {
     }
 
     try {
+      // Check if recursive watching is supported on this platform
+      if (!this.isRecursiveWatchSupported()) {
+        this.emitEvent({
+          type: "reload_failure",
+          error: "Recursive file watching is not supported on this platform. Hot reload disabled.",
+          timestamp: new Date(),
+        });
+        return;
+      }
+
       const commandsPath = this.handler.getCommandsPath();
       const eventsPath = this.handler.getEventsPath();
 
@@ -190,6 +200,22 @@ export class HotReloadSystem extends EventEmitter {
         return process.env.NODE_ENV !== "production";
       default:
         return false;
+    }
+  }
+
+  private isRecursiveWatchSupported(): boolean {
+    try {
+      // Try to create a test watcher to see if recursive watching is supported
+      const testWatcher = watch(".", { recursive: true }, () => {});
+      testWatcher.close();
+      return true;
+    } catch (error) {
+      // If we get ERR_FEATURE_UNAVAILABLE_ON_PLATFORM, recursive watching is not supported
+      if (error instanceof Error && (error as any).code === "ERR_FEATURE_UNAVAILABLE_ON_PLATFORM") {
+        return false;
+      }
+      // For other errors, assume it's supported but the path doesn't exist
+      return true;
     }
   }
 

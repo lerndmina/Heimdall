@@ -71,7 +71,7 @@ export const Start = async () => {
     options: {
       enableManagementCommands: true,
       enableCommandManager: true,
-      enableHotReload: true,
+      enableHotReload: process.env.NODE_ENV !== "production",
       enableAnalytics: false, // Can enable later if needed
     },
     management: {
@@ -79,11 +79,11 @@ export const Start = async () => {
       ownerIds: ownerIds, // For management commands (cmd-reload, etc.)
       allowDMs: true,
       allowGuild: true,
-      enableHotReload: true,
+      enableHotReload: process.env.NODE_ENV !== "production",
       enableAnalytics: false,
     },
     hotReload: {
-      enabled: true,
+      enabled: process.env.NODE_ENV !== "production",
       watchMode: "development",
       watchDelay: 500,
       enableEventEmission: true,
