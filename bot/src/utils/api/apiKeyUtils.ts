@@ -57,7 +57,15 @@ export async function createApiKey(
     const db = new Database();
 
     // Validate scopes
-    const validScopes = ["modmail:read", "modmail:write", "modmail:admin", "full"];
+    const validScopes = [
+      "modmail:read",
+      "modmail:write",
+      "modmail:admin",
+      "minecraft:connection",
+      "minecraft:read",
+      "minecraft:write",
+      "full",
+    ];
     const invalidScopes = scopes.filter((scope) => !validScopes.includes(scope));
 
     if (invalidScopes.length > 0) {

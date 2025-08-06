@@ -6,6 +6,14 @@ const env = FetchEnvs();
 
 const ONE_HOUR = 1 * 60 * 60; // Redis uses seconds.
 
+// Helper function to properly serialize cache key values
+function serializeCacheKeyValue(value: any): string {
+  if (typeof value === "object" && value !== null) {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
 export default class Database {
   // TODO This needs work to find & add the correct types
   /**

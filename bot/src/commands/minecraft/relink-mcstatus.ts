@@ -43,6 +43,9 @@ import Database from "../../utils/data/database";
 import McServerStatus, { McServerStatusType } from "../../models/McServerStatus";
 import { tryCatch } from "../../utils/trycatch";
 import log from "../../utils/log";
+import FetchEnvs from "../../utils/FetchEnvs";
+
+const env = FetchEnvs();
 import BasicEmbed from "../../utils/BasicEmbed";
 import { beginPersistantLoop, pingMcServer } from "../../events/ready/checkservers";
 import { ThingGetter } from "../../utils/TinyUtils";
@@ -365,5 +368,5 @@ export const options: LegacyCommandOptions = {
   devOnly: false,
   userPermissions: ["ManageMessages"],
   botPermissions: ["SendMessages", "EmbedLinks"],
-  deleted: false,
+  deleted: !env.ENABLE_MINECRAFT_SYSTEMS,
 };

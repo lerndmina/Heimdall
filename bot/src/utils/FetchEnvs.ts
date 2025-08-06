@@ -36,6 +36,7 @@ function getter() {
     GITHUB_PROJECT_FIELD: string;
     ENABLE_FIVEM_SYSTEMS: boolean;
     ENABLE_TAW_COMMAND: boolean;
+    ENABLE_MINECRAFT_SYSTEMS: boolean;
     FIVEM_MYSQL_URI: string;
     TAW_API_URL: string;
     TAW_API_KEY: string;
@@ -75,6 +76,7 @@ function getter() {
     GITHUB_PROJECT_FIELD: process.env.GITHUB_PROJECT_FIELD || DEFAULT_OPTIONAL_STRING,
     ENABLE_FIVEM_SYSTEMS: process.env.ENABLE_FIVEM_SYSTEMS === "true",
     ENABLE_TAW_COMMAND: process.env.ENABLE_TAW_COMMAND === "true",
+    ENABLE_MINECRAFT_SYSTEMS: process.env.ENABLE_MINECRAFT_SYSTEMS === "true",
     FIVEM_MYSQL_URI: process.env.FIVEM_MYSQL_URI || DEFAULT_OPTIONAL_STRING,
     TAW_API_URL: process.env.TAW_API_URL || DEFAULT_OPTIONAL_STRING,
     TAW_API_KEY: process.env.TAW_API_KEY || DEFAULT_OPTIONAL_STRING,

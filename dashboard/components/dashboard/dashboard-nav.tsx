@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, MessageSquare, BarChart3, FileText, Settings, LogOut, ArrowLeft } from "lucide-react";
+import { Shield, MessageSquare, BarChart3, FileText, Settings, LogOut, ArrowLeft, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGuild } from "./guild-provider";
@@ -10,8 +10,13 @@ import { GuildSelector } from "./guild-selector";
 import { useRole } from "../auth/role-provider";
 import { signOut } from "next-auth/react";
 import { useBotName } from "@/hooks/use-bot-info";
+import { useState, useEffect } from "react";
 
-const navigation = [
+interface FeatureFlags {
+  minecraft: boolean;
+}
+
+const baseNavigation = [
   {
     name: "Dashboard",
     href: "/dashboard",
@@ -34,6 +39,12 @@ const navigation = [
   },
 ];
 
+const minecraftNavItem = {
+  name: "Minecraft",
+  href: "/minecraft",
+  icon: Server,
+};
+
 interface User {
   id: string;
   name?: string | null;
@@ -47,6 +58,36 @@ export function DashboardNav({ user }: { user: User }) {
   const { selectedGuild, isLoading } = useGuild();
   const { clearRole } = useRole();
   const botName = useBotName();
+  const [navigation, setNavigation] = useState(baseNavigation);
+
+  // Fetch feature flags and build navigation
+  useEffect(() => {
+    async function fetchFeatureFlags() {
+      try {
+        const response = await fetch("/api/features");
+        if (response.ok) {
+          const features: FeatureFlags = await response.json();
+
+          // Build navigation based on feature flags
+          const nav = [...baseNavigation];
+
+          // Add Minecraft tab if enabled
+          if (features.minecraft) {
+            // Insert Minecraft after Modmail (index 1)
+            nav.splice(2, 0, minecraftNavItem);
+          }
+
+          setNavigation(nav);
+        }
+      } catch (error) {
+        console.error("Failed to fetch feature flags:", error);
+        // Fallback to base navigation without Minecraft
+        setNavigation(baseNavigation);
+      }
+    }
+
+    fetchFeatureFlags();
+  }, []);
 
   const handleBackToRoleSelection = () => {
     clearRole();

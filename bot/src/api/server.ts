@@ -8,6 +8,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { createHealthRoutes } from "./routes/health";
 import { createModmailRoutes } from "./routes/modmail";
 import { createBotInfoRoutes } from "./routes/bot-info";
+import { createMinecraftRoutes } from "./routes/minecraft";
 import log from "../utils/log";
 import FetchEnvs from "../utils/FetchEnvs";
 
@@ -100,6 +101,9 @@ export class ApiServer {
             config: "/api/modmail/{guildId}/config",
             "user-tickets": "/api/modmail/user/{userId}/tickets",
           },
+          minecraft: {
+            "connection-attempt": "/api/minecraft/connection-attempt",
+          },
         },
         authentication: {
           type: "API Key",
@@ -109,6 +113,7 @@ export class ApiServer {
             "modmail:read": "Read modmail data",
             "modmail:write": "Read and write modmail data",
             "modmail:admin": "Full modmail administration",
+            "minecraft:connection": "Minecraft plugin connection attempts",
             full: "All permissions",
           },
         },
@@ -123,6 +128,9 @@ export class ApiServer {
 
     // Modmail API routes (requires authentication)
     this.app.use("/api/modmail", createModmailRoutes(this.client, this.handler));
+
+    // Minecraft API routes (requires authentication)
+    this.app.use("/api/minecraft", createMinecraftRoutes(this.client, this.handler));
   }
 
   private setupErrorHandling() {

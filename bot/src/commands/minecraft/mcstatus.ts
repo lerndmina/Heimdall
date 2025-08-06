@@ -1,4 +1,8 @@
-import type { LegacySlashCommandProps, LegacyCommandOptions, LegacyAutocompleteProps } from "@heimdall/command-handler";
+import type {
+  LegacySlashCommandProps,
+  LegacyCommandOptions,
+  LegacyAutocompleteProps,
+} from "@heimdall/command-handler";
 import {
   ChannelType,
   Client,
@@ -21,6 +25,9 @@ import log from "../../utils/log";
 import { debugMsg, stripMotdColor, ThingGetter } from "../../utils/TinyUtils";
 import { connect } from "http2";
 import { initialReply } from "../../utils/initialReply";
+import FetchEnvs from "../../utils/FetchEnvs";
+
+const env = FetchEnvs();
 
 export const data = new SlashCommandBuilder()
   .setName("mcstatus")
@@ -82,7 +89,7 @@ export const data = new SlashCommandBuilder()
 
 export const options: LegacyCommandOptions = {
   devOnly: false,
-  deleted: false,
+  deleted: !env.ENABLE_MINECRAFT_SYSTEMS,
   userPermissions: ["ManageMessages"],
 };
 

@@ -1,0 +1,102 @@
+import { Schema, model, Document } from "mongoose";
+
+export interface MinecraftPlayerType extends Document {
+  guildId: string;
+
+  // Player information
+  minecraftUuid?: string; // Optional for imported players
+  minecraftUsername: string;
+
+  // Discord information (null if imported from existing whitelist)
+  discordId?: string;
+
+  // Status tracking
+  whitelistStatus: "whitelisted" | "unwhitelisted" | "banned";
+
+  // Timestamps
+  linkedAt?: Date;
+  whitelistedAt?: Date;
+  lastConnectionAttempt?: Date;
+
+  // Audit trail
+  approvedBy?: string; // Staff Discord ID
+  revokedBy?: string;
+  revokedAt?: Date;
+  bannedBy?: string;
+  bannedAt?: Date;
+
+  // Metadata
+  source: "imported" | "linked" | "manual"; // How they got added
+  notes?: string; // Staff notes
+
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const MinecraftPlayerSchema = new Schema<MinecraftPlayerType>(
+  {
+    guildId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+
+    // Player information
+    minecraftUuid: {
+      type: String,
+      sparse: true,
+    },
+    minecraftUsername: {
+      type: String,
+      required: true,
+    },
+
+    // Discord information
+    discordId: {
+      type: String,
+      sparse: true,
+    },
+
+    // Status tracking
+    whitelistStatus: {
+      type: String,
+      enum: ["whitelisted", "unwhitelisted", "banned"],
+      default: "unwhitelisted",
+      index: true,
+    },
+
+    // Timestamps
+    linkedAt: { type: Date },
+    whitelistedAt: { type: Date },
+    lastConnectionAttempt: { type: Date },
+
+    // Audit trail
+    approvedBy: { type: String },
+    revokedBy: { type: String },
+    revokedAt: { type: Date },
+    bannedBy: { type: String },
+    bannedAt: { type: Date },
+
+    // Metadata
+    source: {
+      type: String,
+      enum: ["imported", "linked", "manual"],
+      default: "linked",
+    },
+    notes: { type: String },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Compound indexes for efficient queries
+MinecraftPlayerSchema.index({ guildId: 1, minecraftUuid: 1 }, { unique: true, sparse: true });
+MinecraftPlayerSchema.index({ guildId: 1, minecraftUsername: 1 }, { unique: true });
+MinecraftPlayerSchema.index({ guildId: 1, discordId: 1 }, { sparse: true });
+MinecraftPlayerSchema.index({ guildId: 1, whitelistStatus: 1 });
+
+const MinecraftPlayer = model<MinecraftPlayerType>("MinecraftPlayer", MinecraftPlayerSchema);
+
+export default MinecraftPlayer;
