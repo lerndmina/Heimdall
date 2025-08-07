@@ -162,6 +162,14 @@ export class ModmailInactivityService {
           ...modmail,
           _id: modmail._id.toString(),
         };
+
+        // Add specific logging for resolved modmails
+        if (modmailDoc.markedResolved) {
+          log.info(
+            `Processing resolved modmail ${modmailDoc._id} - resolved at ${modmailDoc.resolvedAt}, scheduled close at ${modmailDoc.autoCloseScheduledAt}`
+          );
+        }
+
         await this.processModmailInactivity(modmailDoc);
       }
     } catch (error) {
@@ -216,30 +224,68 @@ export class ModmailInactivityService {
         log.debug(
           `Modmail ${modmail._id} is marked as resolved, checking for 24-hour auto-close only`
         );
-        // If marked as resolved, only handle auto-closing after 24 hours
-        // Skip all other inactivity processing (warnings, regular auto-close)
-        const hoursSinceResolved =
-          (now.getTime() - new Date(modmail.resolvedAt).getTime()) / (1000 * 60 * 60);
 
-        // Check if there has been any activity since the resolution
-        // If there's activity after resolution, don't auto-close
         const resolvedTime = new Date(modmail.resolvedAt);
-        const lastActivityTime = new Date(modmail.lastUserActivityAt || modmail.createdAt || now);
+        const hoursSinceResolved = (now.getTime() - resolvedTime.getTime()) / (1000 * 60 * 60);
 
-        // Also check if there are any messages (user or staff) sent after resolution
-        const messagesAfterResolution =
-          modmail.messages?.filter((msg) => new Date(msg.createdAt || 0) > resolvedTime) || [];
+        // Check if there has been any USER activity since the resolution
+        // Staff activity doesn't prevent auto-close, only user activity does
+        const userActivityAfterResolution =
+          modmail.messages?.some((msg) => {
+            const messageTime = new Date(msg.createdAt);
+            return messageTime > resolvedTime && msg.type === "user";
+          }) || false;
 
-        if (lastActivityTime > resolvedTime || messagesAfterResolution.length > 0) {
+        // Also check if lastUserActivityAt is after resolution time
+        const lastUserActivityTime = new Date(
+          modmail.lastUserActivityAt || modmail.createdAt || now
+        );
+        const userActivityTimeAfterResolution = lastUserActivityTime > resolvedTime;
+
+        if (userActivityAfterResolution || userActivityTimeAfterResolution) {
           log.debug(
-            `Modmail ${modmail._id} has activity after resolution (${messagesAfterResolution.length} messages), skipping auto-close`
+            `Modmail ${modmail._id} has user activity after resolution (messages: ${userActivityAfterResolution}, activity time: ${userActivityTimeAfterResolution}), skipping auto-close`
           );
           return;
         }
 
-        if (hoursSinceResolved >= 24) {
-          await this.autoCloseResolvedModmail(modmail);
+        // Check if auto-close is scheduled and past due
+        if (modmail.autoCloseScheduledAt) {
+          const scheduledCloseTime = new Date(modmail.autoCloseScheduledAt);
+          if (now >= scheduledCloseTime) {
+            log.info(
+              `Modmail ${
+                modmail._id
+              } is past scheduled auto-close time (${scheduledCloseTime.toISOString()}), proceeding with auto-close`
+            );
+            await this.autoCloseResolvedModmail(modmail);
+            return;
+          } else {
+            log.debug(
+              `Modmail ${
+                modmail._id
+              } has scheduled auto-close at ${scheduledCloseTime.toISOString()}, waiting`
+            );
+            return;
+          }
         }
+
+        // Fallback: If no scheduled time but resolved for 24+ hours, auto-close
+        if (hoursSinceResolved >= 24) {
+          log.info(
+            `Modmail ${modmail._id} resolved for ${hoursSinceResolved.toFixed(
+              2
+            )} hours, auto-closing`
+          );
+          await this.autoCloseResolvedModmail(modmail);
+        } else {
+          log.debug(
+            `Modmail ${modmail._id} resolved for ${hoursSinceResolved.toFixed(
+              2
+            )} hours, waiting for 24 hour mark`
+          );
+        }
+
         // Exit early - don't process any other inactivity logic for resolved threads
         return;
       }

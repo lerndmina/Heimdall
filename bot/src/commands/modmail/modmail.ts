@@ -302,6 +302,32 @@ export const data = new SlashCommandBuilder()
           )
       )
   )
+  .addSubcommandGroup((group) =>
+    group
+      .setName("debug")
+      .setDescription("Debug modmail system issues (Administrator only)")
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("run-scheduler")
+          .setDescription("Manually run the modmail inactivity scheduler")
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("check-resolved")
+          .setDescription("Check all resolved modmails that should be auto-closed")
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("check-ticket")
+          .setDescription("Check a specific ticket's auto-close status")
+          .addIntegerOption((option) =>
+            option
+              .setName("ticket-number")
+              .setDescription("The ticket number to check")
+              .setRequired(true)
+          )
+      )
+  )
   .setDMPermission(true);
 
 export const options: LegacyCommandOptions = {
@@ -465,6 +491,104 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
                 client,
                 "Command Error",
                 "Failed to load the category deletion command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      default:
+        return interaction.reply({
+          embeds: [ModmailEmbeds.subcommandNotFound(client)],
+          ephemeral: true,
+        });
+    }
+    return;
+  }
+
+  // Handle debug subcommands - Administrator only
+  if (subcommandGroup === "debug") {
+    // Check for administrator permissions
+    if (!interaction.memberPermissions?.has("Administrator")) {
+      return interaction.reply({
+        embeds: [
+          ModmailEmbeds.error(
+            client,
+            "Permission Denied",
+            "You need Administrator permissions to use debug commands."
+          ),
+        ],
+        ephemeral: true,
+      });
+    }
+
+    switch (subcommand) {
+      case "run-scheduler":
+        try {
+          const { default: runScheduler, runSchedulerOptions } = await import(
+            "../../subcommands/modmail/debug/runScheduler"
+          );
+          const runSchedulerCheck = await canRunCommand(
+            { interaction, client, handler },
+            runSchedulerOptions
+          );
+          if (runSchedulerCheck !== false) return runSchedulerCheck;
+          return runScheduler({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading runScheduler:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the scheduler debug command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "check-resolved":
+        try {
+          const { default: checkResolved, checkResolvedOptions } = await import(
+            "../../subcommands/modmail/debug/checkResolved"
+          );
+          const checkResolvedCheck = await canRunCommand(
+            { interaction, client, handler },
+            checkResolvedOptions
+          );
+          if (checkResolvedCheck !== false) return checkResolvedCheck;
+          return checkResolved({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading checkResolved:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the resolved tickets debug command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "check-ticket":
+        try {
+          const { default: checkTicket, checkTicketOptions } = await import(
+            "../../subcommands/modmail/debug/checkTicket"
+          );
+          const checkTicketCheck = await canRunCommand(
+            { interaction, client, handler },
+            checkTicketOptions
+          );
+          if (checkTicketCheck !== false) return checkTicketCheck;
+          return checkTicket({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading checkTicket:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the ticket debug command."
               ),
             ],
             ephemeral: true,
