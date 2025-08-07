@@ -61,7 +61,7 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
   // Send the message to OpenAI to be processed
   const response = await openai.chat.completions
     .create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini	",
       messages: conversation as any,
       // max_tokens: 256, // limit token usage
     })

@@ -100,6 +100,7 @@ export default async (message: Message, client: Client<true>) => {
 
     try {
       const textResponse = await openai.moderations.create({
+        model: "omni-moderation-latest",
         input: textContent,
       });
 
