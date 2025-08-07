@@ -149,17 +149,17 @@ WORKDIR /app
 # Install concurrently for process management (much simpler than PM2)
 RUN bun add concurrently
 
-# Copy startup script
+# Copy startup and health check scripts
 COPY scripts/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+COPY scripts/health-check.sh /app/health-check.sh
+RUN chmod +x /app/start.sh /app/health-check.sh
 
 # Expose ports (3000 for dashboard, 3001 for bot API)
 EXPOSE 3000 3001
 
-# Add health check for both services
-HEALTHCHECK --interval=60s --timeout=15s --start-period=90s --retries=3 \
-  CMD (wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1) && \
-  (wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1)
+# Add health check for both services with more lenient timing
+HEALTHCHECK --interval=60s --timeout=30s --start-period=120s --retries=5 \
+  CMD /app/health-check.sh
 
 # Start both services with concurrently
 CMD ["/app/start.sh"]

@@ -106,7 +106,13 @@ export const Start = async () => {
         log.error("Failed to initialize ModmailMessageService:", error);
       }
 
-      await redisClient.connect();
+      try {
+        await redisClient.connect();
+        log.info("Redis connected successfully");
+      } catch (error) {
+        log.error("Failed to connect to Redis:", error);
+        log.warn("Bot will continue without Redis caching");
+      }
 
       // Run categories migration after Redis is connected
       try {
@@ -142,6 +148,10 @@ export const Start = async () => {
 
       // Register commands after login
       await commandKit.registerCommands();
+    })
+    .catch((error) => {
+      log.error("Failed to connect to MongoDB:", error);
+      process.exit(1);
     });
 
   // Handle AI moderation events
@@ -267,8 +277,42 @@ export const redisClient = createClient({
 })
   .on("error", (err) => {
     log.error("Redis Client Error", err);
-    process.exit(1);
+    // Don't exit immediately, allow graceful shutdown
+    log.warn("Redis connection failed, but continuing...");
   })
   .on("ready", () => log.info("Redis Client Ready"));
+
+// Graceful shutdown handling
+process.on("SIGTERM", async () => {
+  log.info("Received SIGTERM, shutting down gracefully...");
+  try {
+    if (redisClient.isReady) {
+      await redisClient.quit();
+      log.info("Redis client closed");
+    }
+    await mongoose.connection.close();
+    log.info("MongoDB connection closed");
+    process.exit(0);
+  } catch (error) {
+    log.error("Error during graceful shutdown:", error);
+    process.exit(1);
+  }
+});
+
+process.on("SIGINT", async () => {
+  log.info("Received SIGINT, shutting down gracefully...");
+  try {
+    if (redisClient.isReady) {
+      await redisClient.quit();
+      log.info("Redis client closed");
+    }
+    await mongoose.connection.close();
+    log.info("MongoDB connection closed");
+    process.exit(0);
+  } catch (error) {
+    log.error("Error during graceful shutdown:", error);
+    process.exit(1);
+  }
+});
 
 Start();

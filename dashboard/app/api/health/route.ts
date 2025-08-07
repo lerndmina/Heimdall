@@ -15,71 +15,48 @@ export async function GET() {
     databaseError = error;
   }
 
-  // Check environment variables
-  if (!botApiUrl || !internalApiKey) {
-    return NextResponse.json(
-      {
-        status: "error",
-        message: "Missing bot API configuration",
-        timestamp: new Date().toISOString(),
-        database: { status: databaseStatus, error: databaseError },
-        environment: {
-          BOT_API_URL: botApiUrl ? "configured" : "missing",
-          INTERNAL_API_KEY: internalApiKey ? "configured" : "missing",
-          DATABASE_URL: process.env.DATABASE_URL ? "configured" : "missing",
-        },
-      },
-      { status: 500 }
-    );
-  }
+  // Dashboard is always healthy if it can respond
+  // Bot API connectivity is informational only, not a health requirement
+  let botApiStatus = "unknown";
+  let botApiData: any = null;
 
-  // Try to connect to bot API
-  try {
-    const response = await fetch(`${botApiUrl}/api/health`, {
-      headers: {
-        Authorization: `Bearer ${internalApiKey}`,
-      },
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (response.ok) {
-      const botHealth = await response.json();
-      return NextResponse.json({
-        status: "healthy", // Dashboard is healthy since we don't depend on database
-        timestamp: new Date().toISOString(),
-        dashboard: "operational",
-        database: { status: databaseStatus, error: databaseError },
-        botApi: botHealth,
-        environment: {
-          BOT_API_URL: new URL(botApiUrl).origin, // Only show origin for security
-          NODE_ENV: process.env.NODE_ENV,
+  if (botApiUrl && internalApiKey) {
+    try {
+      const response = await fetch(`${botApiUrl}/api/health`, {
+        headers: {
+          Authorization: `Bearer ${internalApiKey}`,
         },
+        signal: AbortSignal.timeout(3000), // Shorter timeout for optional check
       });
-    } else {
-      return NextResponse.json(
-        {
-          status: "degraded",
-          message: `Bot API returned ${response.status}`,
-          timestamp: new Date().toISOString(),
-          dashboard: "operational",
-          database: { status: databaseStatus, error: databaseError },
-          botApi: "unreachable",
-        },
-        { status: 503 }
-      );
+
+      if (response.ok) {
+        botApiStatus = "healthy";
+        botApiData = await response.json();
+      } else {
+        botApiStatus = "unhealthy";
+      }
+    } catch (error) {
+      botApiStatus = "unreachable";
     }
-  } catch (error) {
-    return NextResponse.json(
-      {
-        status: "degraded",
-        message: "Cannot connect to bot API",
-        timestamp: new Date().toISOString(),
-        dashboard: "operational",
-        database: { status: databaseStatus, error: databaseError },
-        botApi: "unreachable",
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 503 }
-    );
+  } else {
+    botApiStatus = "not-configured";
   }
+
+  // Always return healthy if dashboard itself is running
+  return NextResponse.json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    dashboard: "operational",
+    database: { status: databaseStatus, error: databaseError },
+    botApi: {
+      status: botApiStatus,
+      data: botApiData,
+    },
+    environment: {
+      BOT_API_URL: botApiUrl ? "configured" : "missing",
+      INTERNAL_API_KEY: internalApiKey ? "configured" : "missing",
+      DATABASE_URL: process.env.DATABASE_URL ? "configured" : "missing",
+      NODE_ENV: process.env.NODE_ENV,
+    },
+  });
 }

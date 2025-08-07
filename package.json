@@ -10,7 +10,7 @@
     "build": "cd bot && bun run build && cd ../dashboard && bun run build",
     "build:bot": "cd bot && bun run build",
     "build:dashboard": "cd dashboard && bun run build",
-    "start": "concurrently --kill-others --kill-others-on-fail --prefix \"[{name}]\" --prefix-colors \"cyan,magenta\" --names \"bot,dashboard\" \"cd bot && bun run start\" \"cd dashboard && bun run start\"",
+    "start": "concurrently --prefix \"[{name}]\" --prefix-colors \"cyan,magenta\" --names \"bot,dashboard\" \"cd bot && bun run start\" \"cd dashboard && bun run start\"",
     "start:bot": "cd bot && bun run start",
     "start:dashboard": "cd dashboard && bun run start",
     "install:all": "cd bot && bun install && cd ../dashboard && bun install && cd .. && bun install",
