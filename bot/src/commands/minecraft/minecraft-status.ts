@@ -105,15 +105,15 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
     const statusEmoji =
       {
         whitelisted: "✅",
-        not_whitelisted: "❌",
-        pending_approval: "⏳",
+        unwhitelisted: "❌",
+        banned: "🔨",
       }[existingPlayer.whitelistStatus] || "❓";
 
     const statusText =
       {
         whitelisted: "Whitelisted",
-        not_whitelisted: "Not Whitelisted",
-        pending_approval: "Pending Approval",
+        unwhitelisted: "Not Whitelisted",
+        banned: "Banned",
       }[existingPlayer.whitelistStatus] || "Unknown";
 
     const description =
@@ -126,8 +126,8 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
     let additionalInfo = "";
     if (existingPlayer.whitelistStatus === "whitelisted") {
       additionalInfo = `\n**Server:** \`${config.serverHost}:${config.serverPort}\`\n✅ You can join the server!`;
-    } else if (existingPlayer.whitelistStatus === "pending_approval") {
-      additionalInfo = "\n⏳ Your request is waiting for staff approval.";
+    } else if (existingPlayer.whitelistStatus === "banned") {
+      additionalInfo = "\n🔨 You are banned from the server.";
     } else {
       additionalInfo = "\n❌ You are not currently whitelisted.";
     }
@@ -137,9 +137,9 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
         BasicEmbed(client, "🎮 Your Minecraft Status", description + additionalInfo).setColor(
           existingPlayer.whitelistStatus === "whitelisted"
             ? "Green"
-            : existingPlayer.whitelistStatus === "pending_approval"
-            ? "Yellow"
-            : "Red"
+            : existingPlayer.whitelistStatus === "banned"
+            ? "Red"
+            : "Orange"
         ),
       ],
     });

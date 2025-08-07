@@ -279,10 +279,10 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
           // Return the auth code and kick message
           const kickMessage = config.authSuccessMessage
-            .replace("{code}", pendingAuth.authCode)
-            .replace("{username}", username)
-            .replace("{serverHost}", config.serverHost)
-            .replace("{serverPort}", config.serverPort.toString());
+            .replace(/{code}/g, pendingAuth.authCode)
+            .replace(/{username}/g, username)
+            .replace(/{serverHost}/g, config.serverHost)
+            .replace(/{serverPort}/g, config.serverPort.toString());
 
           log.info(`Provided auth code to ${username}: ${pendingAuth.authCode}`);
 
@@ -301,9 +301,9 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
         // No pending auth and not whitelisted - tell them to link account
         const kickMessage = config.authRejectionMessage
-          .replace("{username}", username)
-          .replace("{serverHost}", config.serverHost)
-          .replace("{serverPort}", config.serverPort.toString());
+          .replace(/{username}/g, username)
+          .replace(/{serverHost}/g, config.serverHost)
+          .replace(/{serverPort}/g, config.serverPort.toString());
 
         return res.json(
           createSuccessResponse(

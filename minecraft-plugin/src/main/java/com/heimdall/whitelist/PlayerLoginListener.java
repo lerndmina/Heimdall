@@ -74,16 +74,48 @@ public class PlayerLoginListener implements Listener {
     } catch (Exception e) {
       plugin.getLogger().log(Level.SEVERE, "Failed to check whitelist for " + username, e);
 
-      // On API failure, fall back to local whitelist
-      if (isPlayerWhitelisted(username)) {
-        plugin.getLogger().warning("API failed for " + username + ", allowing based on local whitelist");
-        event.allow();
-      } else {
-        // Use fallback error message
-        String errorMessage = plugin.getConfig().getString("messages.apiError",
-            "§cWhitelist system is temporarily unavailable. Please try again later.");
-        event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST,
-            ChatColor.translateAlternateColorCodes('&', errorMessage));
+      // Handle API failure based on configured fallback mode
+      String fallbackMode = plugin.getConfig().getString("advanced.apiFallbackMode", "deny");
+
+      switch (fallbackMode.toLowerCase()) {
+        case "allow":
+          plugin.getLogger().warning("API failed for " + username + ", allowing connection (fail-open mode)");
+          event.allow();
+
+          // Schedule a task to send a message to the player after they join
+          plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            Player player = plugin.getServer().getPlayer(username);
+            if (player != null && player.isOnline()) {
+              String message = plugin.getConfig().getString("messages.apiUnavailableAllowed",
+                  "§eAPI temporarily unavailable - access granted.\n§7Please link your Discord account when possible.");
+              player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
+            }
+          }, 20L); // Delay 1 second (20 ticks) to ensure player is fully connected
+          break;
+
+        case "whitelist-only":
+          // Fall back to local whitelist
+          if (isPlayerWhitelisted(username)) {
+            plugin.getLogger().warning("API failed for " + username + ", allowing based on local whitelist");
+            event.allow();
+          } else {
+            plugin.getLogger().warning("API failed for " + username + ", denying (not on local whitelist)");
+            String errorMessage = plugin.getConfig().getString("messages.apiUnavailable",
+                "§cWhitelist system is temporarily unavailable. Please try again later.");
+            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST,
+                ChatColor.translateAlternateColorCodes('&', errorMessage));
+          }
+          break;
+
+        case "deny":
+        default:
+          // Deny all connections when API is down
+          plugin.getLogger().warning("API failed for " + username + ", denying connection (fail-closed mode)");
+          String errorMessage = plugin.getConfig().getString("messages.apiUnavailable",
+              "§cWhitelist system is temporarily unavailable. Please try again later.");
+          event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST,
+              ChatColor.translateAlternateColorCodes('&', errorMessage));
+          break;
       }
     }
   }

@@ -43,6 +43,9 @@ messages:
   # Message shown when API is unavailable
   apiUnavailable: "§cWhitelist check failed - API unavailable.\n§7Please try again later or contact an administrator."
   
+  # Message shown when API is unavailable but player is allowed due to fail-open mode
+  apiUnavailableAllowed: "§eAPI temporarily unavailable - access granted.\n§7Please link your Discord account when possible.\n§eJoin our Discord: discord.gg/yourserver"
+  
   # Message shown for internal errors
   internalError: "§cAn internal error occurred.\n§7Please contact an administrator if this persists."
 
@@ -70,6 +73,9 @@ advanced:
   # How long to allow temporary access (in seconds)
   temporaryAccessDuration: 300
   
-  # Fallback behavior when API is completely unavailable
-  # Options: "allow", "deny", "whitelist-only"
-  apiFallbackMode: "deny"
+  # Fallback behavior when API is completely unavailable after all retries
+  # Options: 
+  #   "allow" - Allow all players to join (fail open - recommended for production)
+  #   "deny" - Deny all players (fail closed)  
+  #   "whitelist-only" - Only allow players already on local whitelist
+  apiFallbackMode: "allow"

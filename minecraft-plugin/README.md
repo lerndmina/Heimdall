@@ -148,6 +148,59 @@ logging:
 
 This will log detailed information about API requests and whitelist decisions.
 
+## Error Handling & Fail-Open Behavior
+
+The plugin implements a robust error handling system with configurable fallback behavior when the Heimdall bot API is unavailable.
+
+### API Retry Logic
+
+When the API is unreachable or returns errors, the plugin will:
+
+1. **Retry 3 times** (configurable via `api.retries`)
+2. **Wait between retries** (configurable via `api.retryDelay`)
+3. **Fall back** to the configured `apiFallbackMode` after all retries fail
+
+### Fallback Modes
+
+Configure the fallback behavior in `config.yml` under `advanced.apiFallbackMode`:
+
+```yaml
+advanced:
+  # Fallback behavior when API is completely unavailable after all retries
+  apiFallbackMode: "allow" # Recommended for production
+```
+
+**Available modes:**
+
+- **`"allow"`** (Recommended): **Fail-open** - Allow all players to join when API is down
+
+  - ✅ Ensures server availability during API outages
+  - ⚠️ Temporarily bypasses whitelist security
+  - 📝 Players receive a message explaining the situation
+  - 💡 Best for production servers where uptime is critical
+
+- **`"whitelist-only"`**: Fall back to local Minecraft whitelist only
+
+  - ✅ Maintains some security during outages
+  - ❌ Only previously whitelisted players can join
+  - 📝 New players cannot join during API downtime
+
+- **`"deny"`**: **Fail-closed** - Deny all connections when API is down
+  - ✅ Maximum security (no unauthorized access)
+  - ❌ Server becomes inaccessible during API outages
+  - 📝 All players see "API unavailable" message
+
+### Production Recommendation
+
+For production servers, use `apiFallbackMode: "allow"` to ensure your server remains accessible even during:
+
+- Network connectivity issues
+- Bot maintenance/updates
+- API server downtime
+- Database connectivity problems
+
+Players connecting during fail-open mode will receive a message encouraging them to link their Discord account when the system is restored.
+
 ### Performance Issues
 
 If you're experiencing lag:
