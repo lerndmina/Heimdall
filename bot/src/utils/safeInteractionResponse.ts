@@ -62,7 +62,9 @@ export async function safeInteractionResponse(
   } catch (error: any) {
     // Log the specific error code for debugging
     if (error.code === 10062) {
-      log.warn(`Unknown interaction error for interaction ${interaction.id} - likely expired or already handled`);
+      log.warn(
+        `Unknown interaction error for interaction ${interaction.id} - likely expired or already handled`
+      );
     } else if (error.code === 40060) {
       log.warn(`Interaction already acknowledged for interaction ${interaction.id}`);
     } else {

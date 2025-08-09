@@ -16,6 +16,7 @@ import { redisClient } from "../../Bot";
 import { moderationEmbeds } from "../../services/moderationEmbeds";
 import { tryCatch } from "../../utils/trycatch";
 import { safeErrorResponse } from "../../utils/safeInteractionResponse";
+import { shouldProcessInteraction } from "../../utils/interactionGuard";
 
 export default async (
   interaction: ButtonInteraction,
@@ -26,6 +27,12 @@ export default async (
 
   // Handle moderation buttons
   if (interaction.customId.startsWith("mod_")) {
+    // Check for rapid duplicate interactions to prevent crashes
+    if (!shouldProcessInteraction(interaction, interaction.customId)) {
+      log.debug(`Ignoring rapid duplicate moderation interaction: ${interaction.customId}`);
+      return true; // Mark as handled to prevent other handlers from processing
+    }
+
     // Require manage messages permission
     if (!interaction.memberPermissions?.has("ManageMessages")) {
       await interaction.reply({
@@ -37,7 +44,9 @@ export default async (
 
     const [action, ...args] = interaction.customId.split(":");
 
-    switch (action) {
+    // Wrap the entire moderation handler in try-catch to prevent bot crashes
+    try {
+      switch (action) {
       case "mod_accept": {
         // Show confirmation buttons
         const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -795,6 +804,17 @@ export default async (
         }
         return true;
       }
+    }
+
+    } catch (error: any) {
+      log.error("Error in moderation button handler:", error);
+      
+      // Use the safe error response utility to handle expired/unknown interactions gracefully
+      await safeErrorResponse(
+        interaction,
+        "An error occurred while processing your request. This may be due to an expired interaction. Please try again."
+      );
+      return true;
     }
 
     // If we get here, we handled a mod_ button but didn't have a specific case for it
