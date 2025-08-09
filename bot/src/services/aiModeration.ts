@@ -194,7 +194,7 @@ export default async (message: Message, client: Client<true>) => {
                       type: 2, // Button
                       style: 4, // Danger (red)
                       label: "Ignore (Report invalid)",
-                      custom_id: `mod_ignore:${message.id}`,
+                      custom_id: `mod_ignore:${message.id}:${message.channelId}:${Date.now()}`,
                     },
                   ],
                 },
@@ -205,25 +205,25 @@ export default async (message: Message, client: Client<true>) => {
                       type: 2, // Button
                       style: 2, // Secondary (grey)
                       label: "Delete Message",
-                      custom_id: `mod_delete:${message.id}:${message.channelId}`,
+                      custom_id: `mod_delete:${message.id}:${message.channelId}:${Date.now()}`,
                     },
                     {
                       type: 2, // Button
                       style: 2, // Secondary (grey)
                       label: "Warn User",
-                      custom_id: `mod_warn:${message.author.id}`,
+                      custom_id: `mod_warn:${message.author.id}:${Date.now()}`,
                     },
                     {
                       type: 2, // Button
                       style: 2, // Secondary (grey)
                       label: "Timeout User",
-                      custom_id: `mod_timeout:${message.author.id}`,
+                      custom_id: `mod_timeout:${message.author.id}:${Date.now()}`,
                     },
                     {
                       type: 2, // Button
                       style: 2, // Secondary (grey)
                       label: "View Details",
-                      custom_id: `mod_details:${message.id}:${message.channelId}`,
+                      custom_id: `mod_details:${message.id}:${message.channelId}:${Date.now()}`,
                     },
                   ],
                 },

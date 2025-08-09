@@ -15,6 +15,7 @@ import log from "../../utils/log";
 import { redisClient } from "../../Bot";
 import { moderationEmbeds } from "../../services/moderationEmbeds";
 import { tryCatch } from "../../utils/trycatch";
+import { safeErrorResponse } from "../../utils/safeInteractionResponse";
 
 export default async (
   interaction: ButtonInteraction,
@@ -138,11 +139,10 @@ export default async (
           }
         } catch (error) {
           log.error("Error in mod_accept_confirm:", error);
-          await interaction.update({
-            content:
-              "An error occurred while processing this report. The message may have been deleted already.",
-            components: [],
-          });
+          await safeErrorResponse(
+            interaction,
+            "An error occurred while processing this report. The message may have been deleted already."
+          );
         }
         return true;
       }
@@ -227,11 +227,10 @@ export default async (
           });
         } catch (error) {
           log.error("Error in mod_ignore_confirm:", error);
-          await interaction.update({
-            content:
-              "An error occurred while processing this report. The message may have been deleted already.",
-            components: [],
-          });
+          await safeErrorResponse(
+            interaction,
+            "An error occurred while processing this report. The message may have been deleted already."
+          );
         }
         return true;
       }
