@@ -413,323 +413,107 @@ async function newModmail(
       return;
     }
 
-    // Create button clicked
-    // Look up which servers the user and bot are in that both have modmail enabled
-    const sharedGuilds: Guild[] = [];
-    const cachedGuilds = client.guilds.cache;
-    for (const [, guild] of cachedGuilds) {
-      const { data: member, error: memberError } = await tryCatch(guild.members.fetch(i.user));
-
-      if (member) {
-        sharedGuilds.push(guild);
-      } else if (memberError) {
-        log.debug(`User ${i.user.id} not found in guild ${guild.id}:`, memberError);
-      }
-    }
-
-    // Collect guilds with modmail configured
-    const guildsWithModmail: Array<{ guild: Guild; config: any }> = [];
-    const db = new Database();
-    for (var guild of sharedGuilds) {
-      const { data: config, error: configError } = await tryCatch(
-        db.findOne(ModmailConfig, { guildId: guild.id })
+    // Create button clicked - Use hook-based system
+    try {
+      const { HookBasedModmailCreator } = await import(
+        "../../utils/modmail/HookBasedModmailCreator"
       );
+      const creator = new HookBasedModmailCreator(client);
 
-      if (configError) {
-        log.warn(`Failed to fetch modmail config for guild ${guild.id}:`, configError);
-        continue;
-      }
+      log.debug(`Using hook-based modmail creation for user ${i.user.id}`);
 
-      if (config) {
-        guildsWithModmail.push({ guild, config });
-      }
-    }
+      const result = await creator.createModmail(i.user, message, messageContent);
 
-    // Check if no servers have modmail configured
-    if (guildsWithModmail.length === 0) {
-      await orignalMsg.edit({
-        content: "",
-        components: [],
-        embeds: [ModmailEmbeds.noServersAvailable(client)],
-      });
-      return;
-    }
+      if (!result.success) {
+        log.error(`Hook-based modmail creation failed: ${result.error}`);
 
-    // If only one server has modmail, skip selection and proceed directly
-    if (guildsWithModmail.length === 1) {
-      const { guild, config } = guildsWithModmail[0];
+        // Clear rate limit on failure to allow retry
+        await redisClient.del(rateLimitKey);
 
-      // Proceed directly to modmail creation for the single server
-      await orignalMsg.edit({
-        content: waitingEmoji,
-        components: [],
-        embeds: [],
-      });
-
-      // Extract the values we need
-      const guildId = config.guildId;
-      const channelId = config.forumChannelId;
-      const staffRoleId = config.staffRoleId;
-
-      // Proceed with modmail creation (inline the logic from serverSelectedOpenModmailThread)
-      const getter = new ThingGetter(client);
-      const targetGuild = await getter.getGuild(guildId);
-      const member = await getter.getMember(targetGuild, i.user.id);
-
-      if (!member) {
-        return orignalMsg.edit({
-          content: "",
-          embeds: [ModmailEmbeds.notMember(client, targetGuild.name)],
-          components: [],
-        });
-      }
-
-      let forumChannel = (await getter.getChannel(channelId)) as unknown as ForumChannel;
-      const noMentionsMessage = removeMentions(messageContent);
-
-      // Get the modmail config
-      const modmailConfig = await db.findOne(ModmailConfig, { guildId: guildId });
-      if (!modmailConfig) {
-        return orignalMsg.edit({
-          content: "",
-          embeds: [ModmailEmbeds.configNotFound(client)],
-          components: [],
-        });
-      }
-
-      // Start category selection flow
-      const { ModmailCategoryFlow } = await import("../../utils/modmail/ModmailCategoryFlow");
-      const categoryFlow = new ModmailCategoryFlow();
-
-      // Create a proxy for the reply interface
-      const replyProxy = {
-        edit: (options: any) => orignalMsg.edit(options),
-        createMessageComponentCollector: (options: any) => {
-          return orignalMsg.createMessageComponentCollector(options);
-        },
-      } as InteractionResponse;
-
-      const categoryResult = await categoryFlow.startCategorySelection({
-        client,
-        user: i.user,
-        guild: targetGuild,
-        originalMessage: message,
-        initialMessage: noMentionsMessage,
-        reply: replyProxy,
-      });
-
-      if (!categoryResult.success) {
-        log.error(`Category selection failed: ${categoryResult.error}`);
-        return orignalMsg.edit({
+        await orignalMsg.edit({
           content: "",
           embeds: [
             ModmailEmbeds.error(
               client,
-              "Category Selection Failed",
-              categoryResult.error || "Unknown error"
+              "Modmail Creation Failed",
+              result.userMessage || "Failed to create modmail thread. Please try again."
             ),
           ],
           components: [],
         });
-      }
 
-      // Get category information for thread creation
-      let categoryInfo: any = {
-        priority: TicketPriority.MEDIUM,
-      };
-
-      if (categoryResult.categoryId) {
-        const { CategoryManager } = await import("../../utils/modmail/CategoryManager");
-        const categoryManager = new CategoryManager();
-        const category = await categoryManager.getCategoryById(
-          targetGuild.id,
-          categoryResult.categoryId
-        );
-
-        if (category) {
-          const ticketNumber = await categoryManager.getNextTicketNumber(targetGuild.id);
-
-          categoryInfo = {
-            categoryId: category.id,
-            categoryName: category.name,
-            priority: Number(category.priority) as TicketPriority,
-            ticketNumber,
-            formResponses: categoryResult.formResponses,
-            formMetadata: categoryResult.metadata,
-          };
-
-          // Use category-specific forum channel if configured
-          if (category.forumChannelId && category.forumChannelId !== forumChannel.id) {
-            const categoryForumChannel = (await getter.getChannel(
-              category.forumChannelId
-            )) as ForumChannel;
-            if (categoryForumChannel) {
-              forumChannel = categoryForumChannel;
-            }
-          }
-        }
-      }
-
-      // Create the modmail thread
-      const result = await createModmailThread(client, {
-        guild: targetGuild,
-        targetUser: i.user,
-        targetMember: member,
-        forumChannel,
-        modmailConfig,
-        reason:
-          noMentionsMessage.length >= 50
-            ? noMentionsMessage.substring(0, 50) + "..."
-            : noMentionsMessage,
-        openedBy: {
-          type: "User",
-          username: i.user.username,
-          userId: i.user.id,
-        },
-        initialMessage: noMentionsMessage,
-        ...categoryInfo,
-      });
-
-      if (!result || !result.success) {
-        log.error(`Failed to create modmail thread: ${result?.error}`);
-
-        // Clear rate limit even if creation failed
-        if (!result?.error?.includes("already open")) {
-          const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
-          await redisClient.del(rateLimitKey);
-        }
-
-        return orignalMsg.edit({
-          content: "",
-          embeds: [
-            ModmailEmbeds.threadCreationFailed(
-              client,
-              `An error occurred while trying to create a modmail thread. Please contact the bot developer. I've logged the error for them.\n\nHere's the error: \`\`\`${
-                result?.error || "Unknown error"
-              }\`\`\``
-            ),
-          ],
-          components: [],
-        });
-      }
-
-      // Process attachments
-      const attachmentResult = await processAttachmentsForModmail(message.attachments, message);
-
-      // Send attachment webhook if needed
-      if (
-        modmailConfig.webhookId &&
-        modmailConfig.webhookToken &&
-        attachmentResult.discordAttachments.length > 0
-      ) {
-        const { data: webhook, error: webhookFetchError } = await tryCatch(
-          client.fetchWebhook(modmailConfig.webhookId, modmailConfig.webhookToken)
-        );
-
-        if (webhookFetchError) {
-          log.error("Failed to fetch webhook for attachments:", webhookFetchError);
-        } else if (webhook) {
-          const { error: webhookSendError } = await tryCatch(
-            webhook.send({
-              content: "The original message had attachments, see below:",
-              files: attachmentResult.discordAttachments,
-              threadId: result.thread!.id,
-              username: i.user.displayName,
-              avatarURL: i.user.displayAvatarURL(),
-            })
-          );
-
-          if (webhookSendError) {
-            log.error("Failed to send attachment webhook message:", webhookSendError);
-          }
-        }
-      }
-
-      // Handle DM failure case
-      if (!result.dmSuccess) {
-        // Clear rate limit even if DM failed, since thread was created successfully
-        const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
-        await redisClient.del(rateLimitKey);
-
-        // Add success reaction since the thread was still created successfully
-        const { error: reactionError } = await tryCatch(message.react("📨"));
+        // Add error reaction to original message
+        const { error: reactionError } = await tryCatch(message.react("❌"));
         if (reactionError) {
-          log.warn("Failed to add success reaction for DM-failed case:", reactionError);
+          log.warn("Failed to add error reaction:", reactionError);
         }
 
-        return orignalMsg.edit({
-          content: "",
-          embeds: [
-            ModmailEmbeds.warning(
-              client,
-              "DM Failed",
-              `Successfully opened a modmail in **${targetGuild.name}**!\n\nHowever, I was unable to send you a DM. Please check your privacy settings and ensure you can receive DMs from server members.\n\nYou can communicate with staff by going to the thread in the server.`
-            ),
-          ],
-          components: [],
-        });
+        return;
       }
 
-      // Success - clear rate limit and update reply
-      const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
+      // Success handling
+      log.info(
+        `Hook-based modmail created successfully for user ${i.user.id} in guild ${result.guild?.id}`
+      );
+
+      // Clear rate limit on success
       await redisClient.del(rateLimitKey);
 
-      // Add success reaction to the original user message
+      // Add success reaction to original message
       const { error: reactionError } = await tryCatch(message.react("📨"));
       if (reactionError) {
         log.warn("Failed to add success reaction:", reactionError);
       }
 
-      return orignalMsg.edit({
+      // Handle attachment forwarding if present
+      if (message.attachments.size > 0 && result.thread && result.guild?.id) {
+        await handleAttachmentForwarding(message, result.thread, result.guild.id, client, i.user);
+      }
+
+      // Update the reply based on DM success
+      if (!result.dmSuccess) {
+        await orignalMsg.edit({
+          content: "",
+          embeds: [
+            ModmailEmbeds.warning(
+              client,
+              "DM Failed",
+              `Successfully opened a modmail in **${result.guild?.name}**!\n\nHowever, I was unable to send you a DM. Please check your privacy settings and ensure you can receive DMs from server members.\n\nYou can communicate with staff by going to the thread in the server.`
+            ),
+          ],
+          components: [],
+        });
+      } else {
+        await orignalMsg.edit({
+          content: "✅ Done! Modmail thread created successfully.",
+          embeds: [],
+          components: [],
+        });
+      }
+    } catch (error) {
+      log.error("Unexpected error in hook-based modmail creation:", error);
+
+      // Clear rate limit on error
+      await redisClient.del(rateLimitKey);
+
+      await orignalMsg.edit({
         content: "",
         embeds: [
-          ModmailEmbeds.success(
+          ModmailEmbeds.error(
             client,
-            "Modmail Created",
-            `Successfully opened a modmail in **${targetGuild.name}**! Check your DMs for further communication.`
+            "System Error",
+            "An unexpected error occurred while creating your modmail. Please try again."
           ),
         ],
         components: [],
       });
+
+      // Add error reaction
+      const { error: reactionError } = await tryCatch(message.react("❌"));
+      if (reactionError) {
+        log.warn("Failed to add error reaction:", reactionError);
+      }
     }
-
-    // Multiple servers - show selection menu
-    const stringSelectMenuID = `guildList-${i.id}`;
-    var guildList = new StringSelectMenuBuilder()
-      .setCustomId(stringSelectMenuID)
-      .setPlaceholder("Select a server")
-      .setMinValues(1)
-      .setMaxValues(1);
-
-    // Add all servers with modmail to the selection
-    for (const { guild, config } of guildsWithModmail) {
-      guildList.addOptions({
-        label: guild.name,
-        value: JSON.stringify({
-          guild: config.guildId,
-          channel: config.forumChannelId,
-          staffRoleId: config.staffRoleId,
-        }),
-        description: config.guildDescription,
-      });
-    }
-
-    const cancelListEntryId = `cancel-${i.id}`;
-    guildList.addOptions({
-      label: "Cancel",
-      value: cancelListEntryId,
-      description: "Cancel the modmail thread creation.",
-      emoji: "❌",
-    });
-
-    const row = new ActionRowBuilder().addComponents(guildList);
-    await orignalMsg.edit({
-      embeds: [ModmailEmbeds.selectServer(client)],
-      content: "",
-      components: [row as any],
-    });
-
-    await serverSelectedOpenModmailThread(orignalMsg, stringSelectMenuID, message, messageContent);
     return;
   });
 
@@ -747,309 +531,89 @@ async function newModmail(
       }
     }
   });
+}
 
-  async function serverSelectedOpenModmailThread(
-    reply: InteractionResponse,
-    stringSelectMenuID: string,
-    message: Message,
-    messageContnent: string = messageContent
-  ) {
-    const selectMenuFilter = (i: MessageComponentInteraction) => i.customId === stringSelectMenuID;
-    const collector = reply.createMessageComponentCollector({
-      filter: selectMenuFilter,
-      time: ms("5min"),
-    });
+/**
+ * Handle attachment forwarding for created modmail threads
+ */
+async function handleAttachmentForwarding(
+  originalMessage: Message,
+  thread: any,
+  guildId: string,
+  client: Client<true>,
+  user: User
+) {
+  try {
+    // Get modmail config to access webhook
+    const db = new Database();
+    const config = await db.findOne(ModmailConfig, { guildId });
 
-    let lastInteraction: StringSelectMenuInteraction | null = null;
+    if (!config?.webhookId || !config?.webhookToken) {
+      log.warn("No webhook found for attachment forwarding");
+      return;
+    }
 
-    collector.on("collect", async (collectedInteraction) => {
-      const i = collectedInteraction as StringSelectMenuInteraction;
-      lastInteraction = i;
+    const { data: webhook, error: webhookError } = await tryCatch(
+      client.fetchWebhook(config.webhookId, config.webhookToken)
+    );
 
-      if (i.values[0].startsWith("cancel-")) {
-        await i.update({
-          content: "",
-          embeds: [ModmailEmbeds.cancelled(client)],
-          components: [],
-        });
-        return;
-      }
-      const value = JSON.parse(i.values[0]);
-      const guildId = value.guild as Snowflake;
-      const channelId = value.channel as Snowflake;
-      const staffRoleId = value.staffRoleId as Snowflake;
+    if (webhookError) {
+      log.error("Failed to fetch webhook for attachments:", webhookError);
+      return;
+    }
 
-      // Acknowledge the server selection interaction first
-      await i.update({ content: waitingEmoji, components: [], embeds: [] });
+    if (webhook) {
+      const attachmentResult = await processAttachmentsForModmail(
+        originalMessage.attachments,
+        originalMessage
+      );
 
-      const getter = new ThingGetter(client);
-      const guild = await getter.getGuild(guildId);
-      const member = await getter.getMember(guild, i.user.id);
-      if (!member) {
-        return i.editReply({
-          content: "",
-          embeds: [ModmailEmbeds.notMember(client, guild.name)],
-          components: [],
-        });
-      }
-      let forumChannel = (await getter.getChannel(channelId)) as unknown as ForumChannel;
-      const noMentionsMessage = removeMentions(messageContent);
-
-      // Prepare the initial message without attachment URLs since we'll forward actual files
-      let initialMessage = noMentionsMessage;
-
-      // Get the modmail config
-      const db = new Database();
-      const config = await db.findOne(ModmailConfig, { guildId: guildId });
-      if (!config) {
-        return i.editReply({
-          content: "",
-          embeds: [ModmailEmbeds.configNotFound(client)],
-          components: [],
-        });
-      }
-
-      // Start category selection flow
-      const { ModmailCategoryFlow } = await import("../../utils/modmail/ModmailCategoryFlow");
-      const categoryFlow = new ModmailCategoryFlow();
-
-      // Create a proxy object that provides the same interface as InteractionResponse
-      // but uses the interaction's editReply method
-      const replyProxy = {
-        edit: (options: any) => i.editReply(options),
-        createMessageComponentCollector: (options: any) => {
-          // Get the message from the interaction
-          const message = i.message;
-          if (!message) throw new Error("No message found on interaction");
-          return message.createMessageComponentCollector(options);
-        },
-      } as InteractionResponse;
-
-      const categoryResult = await categoryFlow.startCategorySelection({
-        client,
-        user: i.user,
-        guild,
-        originalMessage: message,
-        initialMessage: noMentionsMessage,
-        reply: replyProxy,
-      });
-
-      if (!categoryResult.success) {
-        log.error(`Category selection failed: ${categoryResult.error}`);
-        return i.editReply({
-          content: "",
-          embeds: [
-            ModmailEmbeds.error(
-              client,
-              "Category Selection Failed",
-              categoryResult.error || "Unknown error"
-            ),
-          ],
-          components: [],
-        });
-      }
-
-      // Get category information for thread creation
-      let categoryInfo: any = {
-        // Always provide a default priority if none is set via category
-        priority: TicketPriority.MEDIUM,
-      };
-      if (categoryResult.categoryId) {
-        const { CategoryManager } = await import("../../utils/modmail/CategoryManager");
-        const categoryManager = new CategoryManager();
-        const category = await categoryManager.getCategoryById(guild.id, categoryResult.categoryId);
-
-        if (category) {
-          const ticketNumber = await categoryManager.getNextTicketNumber(guild.id);
-
-          categoryInfo = {
-            categoryId: category.id,
-            categoryName: category.name,
-            priority: Number(category.priority) as TicketPriority,
-            ticketNumber,
-            formResponses: categoryResult.formResponses,
-            formMetadata: categoryResult.metadata,
-          };
-
-          // Use category-specific forum channel if configured
-          if (category.forumChannelId && category.forumChannelId !== forumChannel.id) {
-            const categoryForumChannel = (await getter.getChannel(
-              category.forumChannelId
-            )) as ForumChannel;
-            if (categoryForumChannel) {
-              forumChannel = categoryForumChannel;
-            }
-          }
-        }
-      }
-
-      // Use the centralized function to create the modmail thread with category info
-      const result = await createModmailThread(client, {
-        guild,
-        targetUser: i.user,
-        targetMember: member,
-        forumChannel,
-        modmailConfig: config,
-        reason:
-          noMentionsMessage.length >= 50
-            ? noMentionsMessage.substring(0, 50) + "..."
-            : noMentionsMessage,
-        openedBy: {
-          type: "User",
-          username: i.user.username,
-          userId: i.user.id,
-        },
-        initialMessage,
-        ...categoryInfo, // Spread category information
-      });
-      if (!result?.success) {
-        log.error(`Failed to create modmail thread: ${result?.error}`);
-
-        // Add error reaction to indicate failure
-        const { error: reactionError } = await tryCatch(message.react("❌"));
-        if (reactionError) {
-          log.warn("Failed to add error reaction for thread creation failure:", reactionError);
-        }
-
-        // Clear rate limit if thread creation failed, allowing user to try again
-        // But only if it's not an "already exists" error
-        if (!result?.error?.includes("already open")) {
-          const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
-          await redisClient.del(rateLimitKey);
-        }
-
-        return i.editReply({
-          content: "",
-          embeds: [
-            ModmailEmbeds.threadCreationFailed(
-              client,
-              `An error occurred while trying to create a modmail thread. Please contact the bot developer. I've logged the error for them.\n\nHere's the error: \`\`\`${
-                result?.error || "Unknown error"
-              }\`\`\``
-            ),
-          ],
-          components: [],
-        });
-      } // Send only attachments via webhook if there are any (don't repeat the text content)
-      if (message.attachments.size > 0) {
-        const { data: webhook, error: webhookError } = await tryCatch(
-          client.fetchWebhook(config.webhookId!, config.webhookToken!)
+      // Send attachments via webhook if processing was successful
+      if (attachmentResult.discordAttachments.length > 0) {
+        const { error: webhookSendError } = await tryCatch(
+          webhook.send({
+            content: "The original message had attachments, see below:",
+            files: attachmentResult.discordAttachments,
+            threadId: thread.id,
+            username: user.displayName,
+            avatarURL: user.displayAvatarURL(),
+          })
         );
 
-        if (webhookError) {
-          log.error("Failed to fetch webhook for attachments:", webhookError);
-        } else if (webhook) {
-          const attachmentResult = await processAttachmentsForModmail(message.attachments, message);
-
-          // Only send webhook messages if there are successful attachments
-          if (attachmentResult.discordAttachments.length > 0) {
-            const { error: webhookSendError } = await tryCatch(
-              webhook.send({
-                content: "The original message had attachments, see below:",
-                files: attachmentResult.discordAttachments,
-                threadId: result.thread!.id,
-                username: i.user.displayName,
-                avatarURL: i.user.displayAvatarURL(),
-              })
-            );
-
-            if (webhookSendError) {
-              log.error("Failed to send attachment webhook message:", webhookSendError);
-            }
-          }
-
-          // Send large file summary if needed
-          const fileUploadSummary = createFileUploadSummary(attachmentResult);
-          if (fileUploadSummary) {
-            const { error: summarySendError } = await tryCatch(
-              webhook.send({
-                content: `📁 **File Upload Summary:**\n${fileUploadSummary}`,
-                threadId: result.thread!.id,
-                username: i.user.displayName,
-                avatarURL: i.user.displayAvatarURL(),
-              })
-            );
-
-            if (summarySendError) {
-              log.error("Failed to send file upload summary:", summarySendError);
-            }
-          }
-
-          // Always send feedback to user about file processing (including failures)
-          const userFeedback = createUserFileUploadFeedback(attachmentResult);
-          if (userFeedback) {
-            const { data: user, error: userError } = await tryCatch(getter.getUser(i.user.id));
-            if (user) {
-              const { error: feedbackError } = await tryCatch(user.send({ content: userFeedback }));
-              if (feedbackError) {
-                log.warn("Failed to send file feedback to user:", feedbackError);
-              }
-            } else {
-              log.warn("Failed to get user for file feedback:", userError);
-            }
-          }
+        if (webhookSendError) {
+          log.error("Failed to send attachment webhook message:", webhookSendError);
         }
       }
 
-      // Check if DM was successful, if not notify user
-      if (!result.dmSuccess) {
-        // Clear rate limit even if DM failed, since thread was created successfully
-        const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
-        await redisClient.del(rateLimitKey);
+      // Send file upload summary if needed
+      const fileUploadSummary = createFileUploadSummary(attachmentResult);
+      if (fileUploadSummary) {
+        const { error: summarySendError } = await tryCatch(
+          webhook.send({
+            content: `📁 **File Upload Summary:**\n${fileUploadSummary}`,
+            threadId: thread.id,
+            username: user.displayName,
+            avatarURL: user.displayAvatarURL(),
+          })
+        );
 
-        // Add success reaction since the thread was still created successfully
-        const { error: reactionError } = await tryCatch(message.react("📨"));
-        if (reactionError) {
-          log.warn("Failed to add success reaction for DM-failed case:", reactionError);
-        }
-
-        return i.editReply({
-          content: "",
-          embeds: [
-            ModmailEmbeds.warning(
-              client,
-              "DM Failed",
-              `Successfully opened a modmail in **${guild.name}**!\n\nHowever, I was unable to send you a DM. Please check your privacy settings and ensure you can receive DMs from server members.\n\nYou can communicate with staff by going to the thread in the server.`
-            ),
-          ],
-          components: [],
-        });
-      }
-
-      // Success - clear rate limit and update reply
-      const rateLimitKey = `modmail_creation_rate_limit:${i.user.id}`;
-      await redisClient.del(rateLimitKey);
-
-      // Add success reaction to the original user message
-      const { error: reactionError } = await tryCatch(message.react("📨"));
-      if (reactionError) {
-        log.warn("Failed to add success reaction to original message:", reactionError);
-      }
-
-      i.editReply({
-        content: "✅ Done! Modmail thread created successfully.",
-        embeds: [],
-        components: [],
-      });
-    });
-
-    collector.on("end", async (collected) => {
-      if (collected.size === 0) {
-        // Use the original reply if no interaction was captured
-        const messageEditor = lastInteraction || reply;
-        const editMethod = lastInteraction ? "editReply" : "edit";
-        const failedReply = await (messageEditor as any)[editMethod]({
-          content: "",
-          embeds: [ModmailEmbeds.timeout(client)],
-          components: [],
-        });
-
-        await sleep(ms("15s"));
-        if (failedReply) {
-          tryCatch(failedReply.delete());
+        if (summarySendError) {
+          log.error("Failed to send file upload summary:", summarySendError);
         }
       }
-    });
+
+      // Send user feedback about file processing
+      const userFeedback = createUserFileUploadFeedback(attachmentResult);
+      if (userFeedback) {
+        const { error: feedbackError } = await tryCatch(user.send({ content: userFeedback }));
+
+        if (feedbackError) {
+          log.warn("Failed to send file feedback to user:", feedbackError);
+        }
+      }
+    }
+  } catch (error) {
+    log.error("Error handling attachment forwarding:", error);
   }
 }
 

@@ -3,7 +3,7 @@ import {
   escapeHtml,
   getDisplayContent,
   getStaticAvatarUrl,
-} from "./transcript-utils.ts";
+} from "./transcript-utils";
 import { generateTranscriptCSS } from "./transcript-css-generator";
 
 /**

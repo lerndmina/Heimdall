@@ -1,13 +1,19 @@
 {
   "compilerOptions": {
-    "target": "ES2015",
+    "target": "ES2020",
     "module": "commonjs",
+    "lib": ["ES2020", "DOM"],
     "strict": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "downlevelIteration": true,
     "outDir": "dist",
     "skipLibCheck": true,
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": false,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts", "declarations.d.ts", "bot/FixCommandKit.ts"],
+  "include": ["src/**/*.ts", "declarations.d.ts"],
   "exclude": ["node_modules"]
 }

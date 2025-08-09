@@ -122,6 +122,15 @@ export const Start = async () => {
         log.error("Failed to run categories migration:", error);
       }
 
+      // Initialize modmail hook system
+      try {
+        const { initializeModmailHooks } = await import("./utils/hooks/HookInitializer");
+        initializeModmailHooks();
+        log.info("Modmail hook system initialized successfully");
+      } catch (error) {
+        log.error("Failed to initialize modmail hook system:", error);
+      }
+
       await createFivemPool();
       updateAprilFoolsStatus();
       scheduleNextMidnight();
