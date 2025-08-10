@@ -228,6 +228,12 @@ export class ModmailInactivityService {
         const resolvedTime = new Date(modmail.resolvedAt);
         const hoursSinceResolved = (now.getTime() - resolvedTime.getTime()) / (1000 * 60 * 60);
 
+        log.debug(
+          `Modmail ${modmail._id}: Resolved ${hoursSinceResolved.toFixed(
+            2
+          )} hours ago at ${resolvedTime.toISOString()}`
+        );
+
         // Check if there has been any USER activity since the resolution
         // Staff activity doesn't prevent auto-close, only user activity does
         const userActivityAfterResolution =
@@ -241,6 +247,12 @@ export class ModmailInactivityService {
           modmail.lastUserActivityAt || modmail.createdAt || now
         );
         const userActivityTimeAfterResolution = lastUserActivityTime > resolvedTime;
+
+        log.debug(
+          `Modmail ${
+            modmail._id
+          }: User activity check - messages after resolution: ${userActivityAfterResolution}, lastUserActivityAt after resolution: ${userActivityTimeAfterResolution} (${lastUserActivityTime.toISOString()} vs ${resolvedTime.toISOString()})`
+        );
 
         if (userActivityAfterResolution || userActivityTimeAfterResolution) {
           log.debug(
@@ -279,10 +291,12 @@ export class ModmailInactivityService {
           );
           await this.autoCloseResolvedModmail(modmail);
         } else {
-          log.debug(
+          log.info(
             `Modmail ${modmail._id} resolved for ${hoursSinceResolved.toFixed(
               2
-            )} hours, waiting for 24 hour mark`
+            )} hours, waiting for 24 hour mark (need ${(24 - hoursSinceResolved).toFixed(
+              2
+            )} more hours)`
           );
         }
 
