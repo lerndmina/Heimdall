@@ -29,7 +29,8 @@ export class HookBasedModmailCreator {
   public async createModmail(
     user: User,
     originalMessage: Message,
-    messageContent: string
+    messageContent: string,
+    sharedBotMessage?: Message
   ): Promise<ModmailCreationResult> {
     log.debug(`HookBasedModmailCreator: Starting modmail creation for user ${user.id}`);
 
@@ -56,6 +57,7 @@ export class HookBasedModmailCreator {
         hookType: HookType.BEFORE_CREATION,
         requestId,
         availableGuilds,
+        sharedBotMessage, // Pass the shared bot message for hooks to edit
       };
 
       // Step 3: Execute beforeCreation hooks

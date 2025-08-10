@@ -130,6 +130,37 @@ const defaultCategorySchema = new Schema(
         message: "Maximum 5 form fields allowed per category",
       },
     },
+    // AI Configuration for default category
+    aiConfig: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      systemPrompt: {
+        type: String,
+        required: false,
+        maxlength: 2000,
+      },
+      preventModmailCreation: {
+        type: Boolean,
+        default: false,
+      },
+      includeFormData: {
+        type: Boolean,
+        default: true,
+      },
+      responseStyle: {
+        type: String,
+        enum: ["helpful", "formal", "casual"],
+        default: "helpful",
+      },
+      maxTokens: {
+        type: Number,
+        default: 500,
+        min: 50,
+        max: 2000,
+      },
+    },
   },
   { _id: false }
 );
@@ -183,6 +214,37 @@ const categorySchema = new Schema(
           return value.length <= 5;
         },
         message: "Maximum 5 form fields allowed per category",
+      },
+    },
+    // AI Configuration for additional categories
+    aiConfig: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      systemPrompt: {
+        type: String,
+        required: false,
+        maxlength: 2000,
+      },
+      preventModmailCreation: {
+        type: Boolean,
+        default: false,
+      },
+      includeFormData: {
+        type: Boolean,
+        default: true,
+      },
+      responseStyle: {
+        type: String,
+        enum: ["helpful", "formal", "casual"],
+        default: "helpful",
+      },
+      maxTokens: {
+        type: Number,
+        default: 500,
+        min: 50,
+        max: 2000,
       },
     },
   },
@@ -271,6 +333,42 @@ const ModmailConfig = new Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+
+    // Global AI Configuration for the server
+    globalAIConfig: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      fallbackToGlobal: {
+        type: Boolean,
+        default: true,
+      },
+      systemPrompt: {
+        type: String,
+        required: false,
+        maxlength: 2000,
+      },
+      preventModmailCreation: {
+        type: Boolean,
+        default: false,
+      },
+      includeFormData: {
+        type: Boolean,
+        default: true,
+      },
+      responseStyle: {
+        type: String,
+        enum: ["helpful", "formal", "casual"],
+        default: "helpful",
+      },
+      maxTokens: {
+        type: Number,
+        default: 500,
+        min: 50,
+        max: 2000,
+      },
     },
   },
   {

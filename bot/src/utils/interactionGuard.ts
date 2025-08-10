@@ -11,14 +11,14 @@ const CLEANUP_INTERVAL = 30000; // 30 seconds
 // Cleanup old entries periodically
 setInterval(() => {
   const now = Date.now();
-  
+
   // Clean up rate limiting entries
   for (const [key, timestamp] of recentInteractions.entries()) {
     if (now - timestamp > INTERACTION_COOLDOWN) {
       recentInteractions.delete(key);
     }
   }
-  
+
   // Note: We keep interaction IDs for longer to prevent duplicate processing
   // They'll be cleaned up when Discord interactions naturally expire
 }, CLEANUP_INTERVAL);
@@ -43,7 +43,7 @@ export function shouldProcessInteractionOnce(interaction: BaseInteraction): bool
     log.debug(`Preventing duplicate processing of interaction ${interaction.id}`);
     return false;
   }
-  
+
   processedInteractionIds.add(interaction.id);
   return true;
 }
@@ -54,15 +54,12 @@ export function shouldProcessInteractionOnce(interaction: BaseInteraction): bool
  * @param customId Optional custom ID to include in the guard key
  * @returns true if interaction should be processed, false if it should be ignored
  */
-export function shouldProcessInteraction(
-  interaction: BaseInteraction,
-  customId?: string
-): boolean {
+export function shouldProcessInteraction(interaction: BaseInteraction, customId?: string): boolean {
   // First check if this exact interaction was already processed
   if (!shouldProcessInteractionOnce(interaction)) {
     return false;
   }
-  
+
   // Then check for rapid duplicates from same user
   const key = `${interaction.user.id}-${interaction.type}-${customId || interaction.id}`;
   const now = Date.now();
@@ -87,7 +84,7 @@ export function createButtonGuard(baseCustomId: string) {
     if (!interaction.isButton() || !interaction.customId.startsWith(baseCustomId)) {
       return true;
     }
-    
+
     return shouldProcessInteraction(interaction, baseCustomId);
   };
 }

@@ -304,6 +304,113 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommandGroup((group) =>
     group
+      .setName("ai")
+      .setDescription("Configure AI responses for modmail")
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("enable")
+          .setDescription("Enable AI responses for a category or globally")
+          .addStringOption((option) =>
+            option
+              .setName("scope")
+              .setDescription("Where to enable AI")
+              .setRequired(true)
+              .addChoices(
+                { name: "Global (all categories)", value: "global" },
+                { name: "Specific Category", value: "category" }
+              )
+          )
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category ID (required if scope is 'category')")
+              .setRequired(false)
+              .setAutocomplete(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("disable")
+          .setDescription("Disable AI responses for a category or globally")
+          .addStringOption((option) =>
+            option
+              .setName("scope")
+              .setDescription("Where to disable AI")
+              .setRequired(true)
+              .addChoices(
+                { name: "Global (all categories)", value: "global" },
+                { name: "Specific Category", value: "category" }
+              )
+          )
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category ID (required if scope is 'category')")
+              .setRequired(false)
+              .setAutocomplete(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("configure")
+          .setDescription("Configure AI settings for a category or globally")
+          .addStringOption((option) =>
+            option
+              .setName("scope")
+              .setDescription("What to configure")
+              .setRequired(true)
+              .addChoices(
+                { name: "Global (all categories)", value: "global" },
+                { name: "Specific Category", value: "category" }
+              )
+          )
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category ID (required if scope is 'category')")
+              .setRequired(false)
+              .setAutocomplete(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("prompt")
+              .setDescription("Custom system prompt for AI responses")
+              .setRequired(false)
+          )
+          .addBooleanOption((option) =>
+            option
+              .setName("prevent-modmail")
+              .setDescription(
+                "AI answers first, user clicks button to continue with modmail if needed"
+              )
+              .setRequired(false)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("style")
+              .setDescription("AI response style")
+              .setRequired(false)
+              .addChoices(
+                { name: "Helpful", value: "helpful" },
+                { name: "Formal", value: "formal" },
+                { name: "Casual", value: "casual" }
+              )
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("max-tokens")
+              .setDescription("Maximum tokens for AI response (50-2000)")
+              .setRequired(false)
+              .setMinValue(50)
+              .setMaxValue(2000)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("status").setDescription("View current AI configuration")
+      )
+  )
+  .addSubcommandGroup((group) =>
+    group
       .setName("debug")
       .setDescription("Debug modmail system issues (Administrator only)")
       .addSubcommand((subcommand) =>
@@ -501,6 +608,101 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
           embeds: [ModmailEmbeds.subcommandNotFound(client)],
           ephemeral: true,
         });
+    }
+    return;
+  }
+
+  // Handle AI subcommands
+  if (subcommandGroup === "ai") {
+    switch (subcommand) {
+      case "enable":
+        try {
+          const { default: enableAI, enableAIOptions } = await import(
+            "../../subcommands/modmail/ai/enableAI"
+          );
+          const enableAICheck = await canRunCommand(
+            { interaction, client, handler },
+            enableAIOptions
+          );
+          if (enableAICheck !== false) return enableAICheck;
+          return enableAI({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading enableAI:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(client, "Command Error", "Failed to load the AI enable command."),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "disable":
+        try {
+          const { default: disableAI, disableAIOptions } = await import(
+            "../../subcommands/modmail/ai/disableAI"
+          );
+          const disableAICheck = await canRunCommand(
+            { interaction, client, handler },
+            disableAIOptions
+          );
+          if (disableAICheck !== false) return disableAICheck;
+          return disableAI({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading disableAI:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the AI disable command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "configure":
+        try {
+          const { default: configureAI, configureAIOptions } = await import(
+            "../../subcommands/modmail/ai/configureAI"
+          );
+          const configureAICheck = await canRunCommand(
+            { interaction, client, handler },
+            configureAIOptions
+          );
+          if (configureAICheck !== false) return configureAICheck;
+          return configureAI({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading configureAI:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the AI configure command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "status":
+        try {
+          const { default: statusAI, statusAIOptions } = await import(
+            "../../subcommands/modmail/ai/statusAI"
+          );
+          const statusAICheck = await canRunCommand(
+            { interaction, client, handler },
+            statusAIOptions
+          );
+          if (statusAICheck !== false) return statusAICheck;
+          return statusAI({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading statusAI:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(client, "Command Error", "Failed to load the AI status command."),
+            ],
+            ephemeral: true,
+          });
+        }
     }
     return;
   }

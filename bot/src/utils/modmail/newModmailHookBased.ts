@@ -111,11 +111,14 @@ async function newModmailHookBased(
   });
 
   collector.on("collect", async (i) => {
-    const originalMsg = await i.update({ content: waitingEmoji, components: [], embeds: [] });
+    await i.update({ content: waitingEmoji, components: [], embeds: [] });
+
+    // Get the actual message from the interaction
+    const sharedBotMessage = await i.fetchReply();
 
     if (i.customId === customIds[1]) {
       // Cancel button clicked
-      await originalMsg.delete();
+      await sharedBotMessage.delete();
       return;
     }
 
@@ -128,7 +131,7 @@ async function newModmailHookBased(
 
       log.debug(`Using hook-based modmail creation for user ${i.user.id}`);
 
-      const result = await creator.createModmail(i.user, message, messageContent);
+      const result = await creator.createModmail(i.user, message, messageContent, sharedBotMessage);
 
       if (!result.success) {
         log.error(`Hook-based modmail creation failed: ${result.error}`);
@@ -136,7 +139,7 @@ async function newModmailHookBased(
         // Clear rate limit on failure to allow retry
         await redisClient.del(rateLimitKey);
 
-        await originalMsg.edit({
+        await sharedBotMessage.edit({
           content: "",
           embeds: [
             ModmailEmbeds.error(
@@ -178,7 +181,7 @@ async function newModmailHookBased(
 
       // Update the reply based on DM success
       if (!result.dmSuccess) {
-        await originalMsg.edit({
+        await sharedBotMessage.edit({
           content: "",
           embeds: [
             ModmailEmbeds.warning(
@@ -190,7 +193,7 @@ async function newModmailHookBased(
           components: [],
         });
       } else {
-        await originalMsg.edit({
+        await sharedBotMessage.edit({
           content: "✅ Done! Modmail thread created successfully.",
           embeds: [],
           components: [],
@@ -202,7 +205,7 @@ async function newModmailHookBased(
       // Clear rate limit on error
       await redisClient.del(rateLimitKey);
 
-      await originalMsg.edit({
+      await sharedBotMessage.edit({
         content: "",
         embeds: [
           ModmailEmbeds.error(

@@ -493,6 +493,7 @@ export async function createModmailThread(
     ticketNumber?: number;
     formResponses?: Record<string, any>;
     formMetadata?: Record<string, { label: string; type: string }>;
+    aiResponse?: string; // AI response to forward to staff
   }
 ): Promise<
   | {
@@ -685,6 +686,22 @@ export async function createModmailThread(
       embeds.push(formEmbed);
     }
 
+    // Add AI response embed if an AI response was provided before ticket creation
+    if (options.aiResponse) {
+      const aiEmbed = new EmbedBuilder()
+        .setTitle("🤖 AI Response Provided")
+        .setDescription(
+          `**The user received this AI response before deciding to continue with a support ticket:**\n\n${options.aiResponse}`
+        )
+        .setColor(0x00ff88)
+        .setTimestamp()
+        .setFooter({
+          text: "The user chose to continue with human support after this AI response",
+        });
+
+      embeds.push(aiEmbed);
+    }
+
     await thread.send({
       content: notificationContent,
       embeds,
@@ -835,6 +852,38 @@ export async function createModmailThread(
       } catch (error) {
         log.error(`Failed to save form responses to database: ${error}`);
         // Don't fail the whole modmail creation if message saving fails
+      }
+    }
+
+    // Add AI response as system message if provided
+    if (options.aiResponse) {
+      const messageService = new ModmailMessageService();
+
+      try {
+        const aiResponseContent = `**🤖 AI Response Provided:**\n\nThe user received the following AI response before choosing to continue with human support:\n\n${options.aiResponse}\n\n*The user decided this didn't fully resolve their issue and requested human assistance.*`;
+
+        const aiMessageId = `ai-response-${targetUser.id}-${Date.now()}`;
+
+        await messageService.addMessage(targetUser.id, {
+          messageId: aiMessageId,
+          type: "staff",
+          content: aiResponseContent,
+          authorId: client.user.id,
+          authorName: "AI Assistant",
+          authorAvatar: client.user.displayAvatarURL(),
+          discordMessageId: undefined,
+          discordMessageUrl: undefined,
+          webhookMessageId: undefined,
+          webhookMessageUrl: undefined,
+          dmMessageId: undefined,
+          dmMessageUrl: undefined,
+          attachments: [],
+        });
+
+        log.debug(`Saved AI response ${aiMessageId} to database for user ${targetUser.id}`);
+      } catch (error) {
+        log.error(`Failed to save AI response to database: ${error}`);
+        // Don't fail the whole modmail creation if AI response saving fails
       }
     }
 
