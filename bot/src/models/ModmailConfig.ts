@@ -160,6 +160,10 @@ const defaultCategorySchema = new Schema(
         min: 50,
         max: 2000,
       },
+      allowLearningPrompts: {
+        type: Boolean,
+        default: true,
+      },
     },
   },
   { _id: false }
@@ -245,6 +249,10 @@ const categorySchema = new Schema(
         default: 500,
         min: 50,
         max: 2000,
+      },
+      allowLearningPrompts: {
+        type: Boolean,
+        default: true,
       },
     },
   },
@@ -368,6 +376,10 @@ const ModmailConfig = new Schema(
         default: 500,
         min: 50,
         max: 2000,
+      },
+      allowLearningPrompts: {
+        type: Boolean,
+        default: true,
       },
     },
   },

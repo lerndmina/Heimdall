@@ -50,8 +50,17 @@ export class LearningHook extends BaseHook {
     const afterContext = context as AfterClosingHookContext;
 
     try {
-      // Check if learning is enabled for this guild (you might want to add a config for this)
-      if (!this.isLearningEnabledForGuild(afterContext.guild.id)) {
+      // Check if learning is enabled for this guild and category
+      const learningEnabled = await this.isLearningEnabledForGuild(
+        afterContext.guild.id,
+        afterContext.categoryId
+      );
+
+      if (!learningEnabled) {
+        log.debug("Learning prompts disabled for this guild/category", {
+          guildId: afterContext.guild.id,
+          categoryId: afterContext.categoryId,
+        });
         return this.createSuccessResult({ learningSkipped: "disabled" });
       }
 
@@ -137,13 +146,73 @@ export class LearningHook extends BaseHook {
   }
 
   /**
-   * Check if learning is enabled for a guild
-   * This could be expanded to check a database config in the future
+   * Check if learning is enabled for a guild and category
+   * Logic hierarchy:
+   * 1. If global allowLearningPrompts is false, learning is disabled everywhere
+   * 2. If global allowLearningPrompts is true/undefined:
+   *    - If category setting is explicitly false, learning is disabled for that category
+   *    - If category setting is explicitly true or undefined, learning is enabled for that category
    */
-  private isLearningEnabledForGuild(guildId: string): boolean {
-    // For now, learning is enabled by default
-    // You could add a database check here to allow guilds to opt out
-    return true;
+  private async isLearningEnabledForGuild(guildId: string, categoryId?: string): Promise<boolean> {
+    try {
+      const Database = (await import("../../data/database")).default;
+      const ModmailConfig = (await import("../../../models/ModmailConfig")).default;
+
+      const db = new Database();
+      const config = await db.findOne(ModmailConfig, { guildId }, true);
+
+      if (!config) {
+        log.debug("No modmail config found for learning check", { guildId });
+        return false;
+      }
+
+      // Step 1: Check global setting first - if global is false, everything is disabled
+      const globalLearningEnabled = config.globalAIConfig?.allowLearningPrompts;
+      if (globalLearningEnabled === false) {
+        log.debug("Learning disabled globally", { guildId });
+        return false;
+      }
+
+      // Step 2: Global is true/undefined, check category-specific setting
+      if (categoryId) {
+        // Check if it's the default category
+        if (categoryId === config.defaultCategory?.id) {
+          const categoryLearningEnabled = config.defaultCategory?.aiConfig?.allowLearningPrompts;
+          // If category setting is explicitly false, disable for this category
+          if (categoryLearningEnabled === false) {
+            log.debug("Learning disabled for default category", { guildId, categoryId });
+            return false;
+          }
+          // If category setting is true or undefined, inherit from global (which is true/undefined = enabled)
+          return true;
+        }
+
+        // Check specific additional category
+        const category = config.categories?.find((cat) => cat.id === categoryId);
+        if (category) {
+          const categoryLearningEnabled = category.aiConfig?.allowLearningPrompts;
+          // If category setting is explicitly false, disable for this category
+          if (categoryLearningEnabled === false) {
+            log.debug("Learning disabled for specific category", {
+              guildId,
+              categoryId,
+              categoryName: category.name,
+            });
+            return false;
+          }
+          // If category setting is true or undefined, inherit from global (which is true/undefined = enabled)
+          return true;
+        }
+      }
+
+      // Step 3: No specific category or category not found, use global setting
+      // Global is true/undefined (we already checked false above), so learning is enabled
+      return true;
+    } catch (error) {
+      log.error("Error checking learning enabled status:", error);
+      // Default to enabled if we can't check the setting
+      return true;
+    }
   }
 
   /**

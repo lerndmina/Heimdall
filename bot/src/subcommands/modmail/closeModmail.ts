@@ -124,3 +124,7 @@ export default async function ({ interaction, client, handler }: LegacySlashComm
     log.error("Failed to send success message:", successError);
   }
 }
+
+export const closeModmailOptions: LegacyCommandOptions = {
+  userPermissions: ["ManageMessages"], // Staff permission to close tickets
+};

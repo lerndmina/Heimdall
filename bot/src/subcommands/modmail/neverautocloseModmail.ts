@@ -3,17 +3,23 @@ import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import Modmail from "../../models/Modmail";
 import { ThingGetter } from "../../utils/TinyUtils";
 import Database from "../../utils/data/database";
-import { LegacySlashCommandProps } from "@heimdall/command-handler";
+import { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import log from "../../utils/log";
 import { initialReply } from "../../utils/initialReply";
 import { sendMessageToBothChannels, getModmailUserDisplayName } from "../../utils/ModmailUtils";
+
+export const neverautocloseModmailOptions: LegacyCommandOptions = {
+  devOnly: false,
+  deleted: false,
+  userPermissions: ["ManageMessages"],
+};
 
 export default async function ({ interaction, client }: LegacySlashCommandProps) {
   if (!interaction.channel)
     return log.error("Request made to slash command without required values - neverautoclose.ts");
 
-  // Check if user has Manage Server permission
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+  // Check if user has Manage Messages permission (moderator command)
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
     return interaction.reply({
       embeds: [ModmailEmbeds.noPermission(client)],
       ephemeral: true,

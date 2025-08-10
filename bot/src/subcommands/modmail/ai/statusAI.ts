@@ -12,6 +12,29 @@ export const statusAIOptions: LegacyCommandOptions = {
 };
 
 /**
+ * Helper function to determine effective learning status with hierarchy
+ */
+function getEffectiveLearningStatus(
+  globalEnabled: boolean,
+  categoryValue: boolean | undefined
+): string {
+  if (!globalEnabled) {
+    return "❌ Disabled (global override)";
+  }
+
+  if (categoryValue === false) {
+    return "❌ Disabled (category setting)";
+  }
+
+  if (categoryValue === true) {
+    return "✅ Enabled (explicitly set)";
+  }
+
+  // categoryValue is undefined - inherits from global
+  return "✅ Enabled (inherited from global)";
+}
+
+/**
  * View current AI configuration for modmail
  */
 export default async function statusAI({ interaction, client, handler }: LegacySlashCommandProps) {
@@ -34,6 +57,8 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
 
     // Global config
     const globalAI = config.globalAIConfig || {};
+    const globalLearningEnabled = (globalAI as any).allowLearningPrompts !== false;
+
     embed.addFields({
       name: "🌐 Global Configuration",
       value:
@@ -45,6 +70,11 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
         `**Prevent Modmail Creation:** ${
           (globalAI as any).preventModmailCreation ? "✅ Yes" : "❌ No"
         }\n` +
+        `**Learning Prompts:** ${
+          globalLearningEnabled
+            ? "✅ Enabled (allows per-category control)"
+            : "❌ Disabled (overrides all categories)"
+        }\n` +
         `**Response Style:** ${(globalAI as any).responseStyle || "helpful"}\n` +
         `**Max Tokens:** ${(globalAI as any).maxTokens || 500}\n` +
         `**Custom Prompt:** ${(globalAI as any).systemPrompt ? "✅ Set" : "❌ Not set"}`,
@@ -54,6 +84,9 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
     // Default category
     if (config.defaultCategory?.aiConfig) {
       const defaultAI = config.defaultCategory.aiConfig as any;
+      const categoryLearningEnabled = defaultAI.allowLearningPrompts !== false;
+      const effectiveLearningStatus = globalLearningEnabled && categoryLearningEnabled;
+
       embed.addFields({
         name: `📂 Default Category: ${config.defaultCategory.name}`,
         value:
@@ -65,6 +98,10 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
           `**Prevent Modmail Creation:** ${
             defaultAI.preventModmailCreation ? "✅ Yes" : "❌ No"
           }\n` +
+          `**Learning Prompts:** ${getEffectiveLearningStatus(
+            globalLearningEnabled,
+            defaultAI.allowLearningPrompts
+          )}\n` +
           `**Response Style:** ${defaultAI.responseStyle || "helpful"}\n` +
           `**Max Tokens:** ${defaultAI.maxTokens || 500}\n` +
           `**Custom Prompt:** ${defaultAI.systemPrompt ? "✅ Set" : "❌ Not set"}`,
@@ -96,6 +133,10 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
             `**Documentation URL:** ${ai?.documentationUrl ? "✅ Set" : "❌ Not set"}\n` +
             `**Use Global Docs:** ${ai?.useGlobalDocumentation !== false ? "✅ Yes" : "❌ No"}\n` +
             `**Prevent Modmail Creation:** ${ai?.preventModmailCreation ? "✅ Yes" : "❌ No"}\n` +
+            `**Learning Prompts:** ${getEffectiveLearningStatus(
+              globalLearningEnabled,
+              ai?.allowLearningPrompts
+            )}\n` +
             `**Response Style:** ${ai?.responseStyle || "helpful"}\n` +
             `**Max Tokens:** ${ai?.maxTokens || 500}\n` +
             `**Custom Prompt:** ${ai?.systemPrompt ? "✅ Set" : "❌ Not set"}`,
@@ -146,7 +187,11 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
         "**Next Steps:**\n" +
         "• Use `/modmail ai enable` to enable AI\n" +
         "• Use `/modmail ai configure` to customize settings and add documentation URLs\n" +
+        "• Use `/modmail ai toggle-learning` to control learning prompts\n" +
         "• Use `/modmail ai disable` to disable AI\n" +
+        "\n**Learning Prompts Hierarchy:**\n" +
+        "• If global learning is disabled, no categories will show learning prompts\n" +
+        "• If global learning is enabled, categories inherit this unless explicitly disabled\n" +
         "\n**Documentation URLs:** Provide links to Pastebin raw, GitHub raw, or Gist raw text files for AI context.",
       inline: false,
     });

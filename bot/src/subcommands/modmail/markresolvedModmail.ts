@@ -1,6 +1,6 @@
 import { ChannelType } from "discord.js";
 import Modmail from "../../models/Modmail";
-import { LegacySlashCommandProps } from "@heimdall/command-handler";
+import { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import log from "../../utils/log";
 import FetchEnvs from "../../utils/FetchEnvs";
 import { initialReply } from "../../utils/initialReply";
@@ -191,3 +191,7 @@ export default async function ({ interaction, client }: LegacySlashCommandProps)
     ],
   });
 }
+
+export const markresolvedModmailOptions: LegacyCommandOptions = {
+  userPermissions: ["ManageMessages"], // Staff permission to mark tickets as resolved
+};

@@ -3,7 +3,7 @@ import { ModmailEmbeds } from "../../utils/modmail/ModmailEmbeds";
 import Modmail from "../../models/Modmail";
 import { ThingGetter } from "../../utils/TinyUtils";
 import Database from "../../utils/data/database";
-import { LegacySlashCommandProps } from "@heimdall/command-handler";
+import { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import log from "../../utils/log";
 import { initialReply } from "../../utils/initialReply";
 import { sendMessageToBothChannels, getModmailUserDisplayName } from "../../utils/ModmailUtils";
@@ -96,3 +96,7 @@ export default async function ({ interaction, client }: LegacySlashCommandProps)
     });
   }
 }
+
+export const enableautocloseModmailOptions: LegacyCommandOptions = {
+  userPermissions: ["ManageGuild"], // Server management permission for auto-close configuration
+};

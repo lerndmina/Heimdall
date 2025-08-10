@@ -18,7 +18,7 @@ import Database from "../../utils/data/database";
 import log from "../../utils/log";
 import FetchEnvs from "../../utils/FetchEnvs";
 import ModmailConfig from "../../models/ModmailConfig";
-import closeModmail from "../../subcommands/modmail/closeModmail";
+import closeModmail, { closeModmailOptions } from "../../subcommands/modmail/closeModmail";
 import banModmail, { banModmailOptions } from "../../subcommands/modmail/banModmail";
 import unbanModmail, { unbanModmailOptions } from "../../subcommands/modmail/unbanModmail";
 import canRunCommand from "../../utils/canRunCommand";
@@ -27,9 +27,15 @@ import sendbuttonModmail, {
 } from "../../subcommands/modmail/sendbuttonModmail";
 import setupModmail, { setupModmailOptions } from "../../subcommands/modmail/setupModmail";
 import openModmail, { openModmailOptions } from "../../subcommands/modmail/openModmail";
-import neverautocloseModmail from "../../subcommands/modmail/neverautocloseModmail";
-import enableautocloseModmail from "../../subcommands/modmail/enableautocloseModmail";
-import markresolvedModmail from "../../subcommands/modmail/markresolvedModmail";
+import neverautocloseModmail, {
+  neverautocloseModmailOptions,
+} from "../../subcommands/modmail/neverautocloseModmail";
+import enableautocloseModmail, {
+  enableautocloseModmailOptions,
+} from "../../subcommands/modmail/enableautocloseModmail";
+import markresolvedModmail, {
+  markresolvedModmailOptions,
+} from "../../subcommands/modmail/markresolvedModmail";
 
 const env = FetchEnvs();
 
@@ -415,6 +421,34 @@ export const data = new SlashCommandBuilder()
               .setRequired(false)
               .setMinValue(50)
               .setMaxValue(2000)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("toggle-learning")
+          .setDescription("Toggle whether AI asks to learn from closed tickets")
+          .addStringOption((option) =>
+            option
+              .setName("scope")
+              .setDescription("Where to toggle learning prompts")
+              .setRequired(true)
+              .addChoices(
+                { name: "Global (all categories)", value: "global" },
+                { name: "Specific Category", value: "category" }
+              )
+          )
+          .addBooleanOption((option) =>
+            option
+              .setName("enabled")
+              .setDescription("Whether to allow AI learning prompts")
+              .setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category ID (required if scope is 'category')")
+              .setRequired(false)
+              .setAutocomplete(true)
           )
       )
       .addSubcommand((subcommand) =>
@@ -810,6 +844,30 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
             ephemeral: true,
           });
         }
+      case "toggle-learning":
+        try {
+          const { default: toggleLearningAI, toggleLearningAIOptions } = await import(
+            "../../subcommands/modmail/ai/toggleLearningAI"
+          );
+          const toggleLearningAICheck = await canRunCommand(
+            { interaction, client, handler },
+            toggleLearningAIOptions
+          );
+          if (toggleLearningAICheck !== false) return toggleLearningAICheck;
+          return toggleLearningAI({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading toggleLearningAI:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the AI toggle learning command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
       case "status":
         try {
           const { default: statusAI, statusAIOptions } = await import(
@@ -1062,6 +1120,8 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
   // Handle regular subcommands
   switch (subcommand) {
     case "close":
+      const closeCheck = await canRunCommand({ interaction, client, handler }, closeModmailOptions);
+      if (closeCheck !== false) return closeCheck;
       closeModmail({ interaction, client, handler });
       break;
     case "ban":
@@ -1099,12 +1159,27 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
       openModmail({ interaction, client, handler });
       break;
     case "neverautoclose":
+      const neverautocloseCheck = await canRunCommand(
+        { interaction, client, handler },
+        neverautocloseModmailOptions
+      );
+      if (neverautocloseCheck !== false) return neverautocloseCheck;
       neverautocloseModmail({ interaction, client, handler });
       break;
     case "enableautoclose":
+      const enableautocloseCheck = await canRunCommand(
+        { interaction, client, handler },
+        enableautocloseModmailOptions
+      );
+      if (enableautocloseCheck !== false) return enableautocloseCheck;
       enableautocloseModmail({ interaction, client, handler });
       break;
     case "markresolved":
+      const markresolvedCheck = await canRunCommand(
+        { interaction, client, handler },
+        markresolvedModmailOptions
+      );
+      if (markresolvedCheck !== false) return markresolvedCheck;
       markresolvedModmail({ interaction, client, handler });
       break;
     case "migrate":
