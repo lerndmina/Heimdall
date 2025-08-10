@@ -112,10 +112,12 @@ export class AIResponseHook extends BaseHook {
 
         // Optionally prevent modmail creation if AI fully resolved the issue
         if (aiConfig.preventModmailCreation) {
-          return this.createStopResult(
-            { aiResponseSent: true },
-            "AI response provided, modmail creation prevented"
-          );
+          // Return success=true, continue=false (cancel-ok state)
+          // This means AI successfully handled the request and modmail creation is not needed
+          return this.createStopResult({
+            aiResponseSent: true,
+            preventModmailCreation: true,
+          });
         }
       }
 

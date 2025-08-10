@@ -452,6 +452,22 @@ async function newModmail(
         return;
       }
 
+      // Check if modmail creation was prevented (cancel-ok state)
+      if (result.prevented) {
+        log.info(`Modmail creation prevented for user ${i.user.id} - handled by AI`);
+
+        // The AI has already sent its response via the shared bot message
+        // No need to edit the reply or show error - the AI response is the final state
+
+        // Add success reaction to original message
+        const { error: reactionError } = await tryCatch(message.react("✅"));
+        if (reactionError) {
+          log.warn("Failed to add success reaction:", reactionError);
+        }
+
+        return;
+      }
+
       // Success handling
       log.info(
         `Hook-based modmail created successfully for user ${i.user.id} in guild ${result.guild?.id}`

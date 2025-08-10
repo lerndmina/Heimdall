@@ -73,6 +73,17 @@ export class HookBasedModmailCreator {
         };
       }
 
+      // Check if modmail creation was intentionally prevented (cancel-ok state)
+      // This happens when AI successfully handles the request and no modmail is needed
+      if (hookResult.aggregatedData.preventModmailCreation) {
+        log.debug(`HookBasedModmailCreator: Modmail creation prevented by AI response (success)`);
+        return {
+          success: true, // This is a successful outcome - AI handled the request
+          prevented: true,
+          message: "Your request has been handled by our AI assistant.",
+        };
+      }
+
       // Step 4: Extract data from hook results
       const {
         selectedGuildId,
@@ -295,4 +306,6 @@ export interface ModmailCreationResult {
   config?: ModmailConfigType;
   error?: string;
   userMessage?: string;
+  prevented?: boolean; // True when modmail creation was intentionally prevented (e.g., by AI)
+  message?: string; // Success message when prevented=true
 }
