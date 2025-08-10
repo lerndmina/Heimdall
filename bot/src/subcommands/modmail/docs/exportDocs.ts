@@ -62,11 +62,7 @@ export default async function exportDocs({
         interaction.guild!.id,
         "global"
       );
-      const globalLearned = await documentationService.getDocumentation(
-        interaction.guild!.id,
-        "learned"
-      );
-      docs = [globalDoc, globalLearned].filter((doc) => doc !== null);
+      docs = [globalDoc].filter((doc) => doc !== null);
     } else if (scope === "category" && categoryId) {
       // Export category-specific documentation
       const categoryDoc = await documentationService.getDocumentation(
@@ -74,12 +70,7 @@ export default async function exportDocs({
         "category",
         categoryId
       );
-      const categoryLearned = await documentationService.getDocumentation(
-        interaction.guild!.id,
-        "learned",
-        categoryId
-      );
-      docs = [categoryDoc, categoryLearned].filter((doc) => doc !== null);
+      docs = [categoryDoc].filter((doc) => doc !== null);
     } else {
       return returnMessage(
         interaction,

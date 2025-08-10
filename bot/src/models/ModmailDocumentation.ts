@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from "mongoose";
 export interface IModmailDocumentation extends Document {
   guildId: string;
   categoryId?: string; // undefined for global docs
-  type: "global" | "category" | "learned";
+  type: "global" | "category";
   documentation: string;
   sourceUrl?: string; // original URL if imported from URL
   lastUpdated: Date;
@@ -11,6 +11,10 @@ export interface IModmailDocumentation extends Document {
   learnedFrom?: {
     threadCount: number; // how many threads contributed to learned docs
     lastLearnedAt: Date;
+  };
+  uploadedBy?: {
+    userId: string; // who uploaded/last modified the docs
+    uploadedAt: Date;
   };
   metadata?: {
     characterCount: number;
@@ -33,7 +37,7 @@ const ModmailDocumentationSchema = new Schema<IModmailDocumentation>(
     },
     type: {
       type: String,
-      enum: ["global", "category", "learned"],
+      enum: ["global", "category"],
       required: true,
     },
     documentation: {
@@ -59,6 +63,16 @@ const ModmailDocumentationSchema = new Schema<IModmailDocumentation>(
         default: 0,
       },
       lastLearnedAt: {
+        type: Date,
+        required: false,
+      },
+    },
+    uploadedBy: {
+      userId: {
+        type: String,
+        required: false,
+      },
+      uploadedAt: {
         type: Date,
         required: false,
       },

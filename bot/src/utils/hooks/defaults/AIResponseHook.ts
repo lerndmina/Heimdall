@@ -365,9 +365,10 @@ You have access to server-specific documentation. Reference this information to 
 
 DOCUMENTATION USAGE RULES:
 1. ONLY ANSWER what is explicitly documented - do not extrapolate or assume
-2. PRIMARY SOURCE: Use server documentation as your baseline knowledge
-3. CATEGORY SPECIFICS: Use category-specific documentation for detailed, specialized information  
-4. CONFLICT RESOLUTION: If information conflicts, prioritize category-specific over general documentation
+2. PRIORITY SYSTEM: Category documentation (marked "PRIORITY") takes precedence over server documentation (marked "FALLBACK")
+3. CATEGORY FIRST: If both category and server docs address the same topic, ALWAYS use the category-specific information
+4. FALLBACK USAGE: Only use server/global documentation when category docs don't cover the specific topic
+5. CONSISTENCY: Follow the documented approach exactly as written
 5. STRICT BOUNDARIES: If the documentation doesn't explicitly address the user's specific question, recommend human support
 
 RESPONSE REQUIREMENTS:

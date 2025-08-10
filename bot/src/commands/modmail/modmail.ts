@@ -515,9 +515,7 @@ export const data = new SlashCommandBuilder()
               .setRequired(true)
               .addChoices(
                 { name: "Global Documentation", value: "global" },
-                { name: "Global Learnings", value: "global-learned" },
-                { name: "Category Documentation", value: "category" },
-                { name: "Category Learnings", value: "category-learned" }
+                { name: "Category Documentation", value: "category" }
               )
           )
           .addBooleanOption((option) =>

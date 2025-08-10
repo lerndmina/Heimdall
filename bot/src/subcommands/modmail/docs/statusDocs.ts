@@ -55,9 +55,7 @@ export default async function statusDocs({ interaction, client }: LegacySlashCom
 
     // Organize documentation by type
     const globalDocs = allDocs.filter((doc) => doc.type === "global" && !doc.categoryId);
-    const globalLearned = allDocs.filter((doc) => doc.type === "learned" && !doc.categoryId);
     const categoryDocs = allDocs.filter((doc) => doc.type === "category" && doc.categoryId);
-    const categoryLearned = allDocs.filter((doc) => doc.type === "learned" && doc.categoryId);
 
     // Create status embed
     const embed = new EmbedBuilder()

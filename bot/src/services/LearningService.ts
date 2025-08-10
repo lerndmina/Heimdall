@@ -399,7 +399,7 @@ ${newLearnings}`;
       // Step 2: Get existing documentation for this category
       const existingDoc = await this.documentationService.getDocumentation(
         transcript.guildId,
-        "learned",
+        "category",
         transcript.categoryId
       );
 
@@ -421,11 +421,11 @@ ${newLearnings}`;
         return;
       }
 
-      // Step 4: Store the merged documentation (this will replace the old documentation)
+      // Step 4: Store the merged documentation (this will replace the existing documentation)
       const result = await this.documentationService.storeDocumentation(
         transcript.guildId,
         mergedDocumentation,
-        "learned",
+        "category",
         transcript.categoryId
       );
 
@@ -659,6 +659,15 @@ Extract learnings in this format:
       components: [],
     });
 
+    // Clean up cache when learning is cancelled
+    try {
+      const cacheKey = `learning_preview:${threadId}`;
+      await redisClient.del(cacheKey);
+      log.debug(`Cleaned up cache for thread ${threadId} after cancellation`);
+    } catch (redisError) {
+      log.error("Failed to delete cache after cancelling learning:", redisError);
+    }
+
     // Close the thread after cancellation
     await this.closeThreadAfterLearning(message, { threadId });
 
@@ -715,57 +724,5 @@ Extract learnings in this format:
   private async cleanupTemporaryTranscript(threadId: string): Promise<void> {
     // Clean up the temporarily stored transcript
     // Implementation depends on your storage strategy
-  }
-
-  /**
-   * Get learning statistics for a guild
-   */
-  async getLearningStats(guildId: string): Promise<{
-    globalLearnings: number;
-    categoryLearnings: { [categoryId: string]: number };
-    totalThreadsLearned: number;
-    lastLearningDate?: Date;
-  }> {
-    try {
-      const allLearned = await ModmailDocumentation.find({
-        guildId,
-        type: "learned",
-      }).exec();
-
-      const globalLearnings = allLearned.filter((doc) => !doc.categoryId).length;
-      const categoryLearnings: { [categoryId: string]: number } = {};
-      let totalThreadsLearned = 0;
-      let lastLearningDate: Date | undefined;
-
-      for (const doc of allLearned) {
-        if (doc.categoryId) {
-          categoryLearnings[doc.categoryId] = (categoryLearnings[doc.categoryId] || 0) + 1;
-        }
-
-        if (doc.learnedFrom?.threadCount) {
-          totalThreadsLearned += doc.learnedFrom.threadCount;
-        }
-
-        if (doc.learnedFrom?.lastLearnedAt) {
-          if (!lastLearningDate || doc.learnedFrom.lastLearnedAt > lastLearningDate) {
-            lastLearningDate = doc.learnedFrom.lastLearnedAt;
-          }
-        }
-      }
-
-      return {
-        globalLearnings,
-        categoryLearnings,
-        totalThreadsLearned,
-        lastLearningDate,
-      };
-    } catch (error) {
-      log.error("Error getting learning stats:", error);
-      return {
-        globalLearnings: 0,
-        categoryLearnings: {},
-        totalThreadsLearned: 0,
-      };
-    }
   }
 }

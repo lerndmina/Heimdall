@@ -65,9 +65,19 @@ export class DocumentationService {
   async storeDocumentation(
     guildId: string,
     documentation: string,
-    type: "global" | "category" | "learned",
+    type: "global" | "category",
     categoryId?: string,
-    sourceUrl?: string
+    sourceUrl?: string,
+    metadata?: {
+      learnedFrom?: {
+        threadCount: number;
+        lastLearnedAt: Date;
+      };
+      uploadedBy?: {
+        userId: string;
+        uploadedAt: Date;
+      };
+    }
   ): Promise<{ success: boolean; error?: string; documentation?: IModmailDocumentation }> {
     try {
       // Validate inputs
@@ -77,11 +87,6 @@ export class DocumentationService {
 
       if (documentation.length > 50000) {
         return { success: false, error: "Documentation is too long (max 50,000 characters)" };
-      }
-
-      // For learned documentation, append to existing rather than replace
-      if (type === "learned") {
-        return await this.appendLearnedDocumentation(guildId, documentation, categoryId);
       }
 
       // Upsert documentation
@@ -98,6 +103,8 @@ export class DocumentationService {
         sourceUrl,
         lastUpdated: new Date(),
         ...(categoryId && { categoryId }),
+        ...(metadata?.learnedFrom && { learnedFrom: metadata.learnedFrom }),
+        ...(metadata?.uploadedBy && { uploadedBy: metadata.uploadedBy }),
       };
 
       const result = await this.db.findOneAndUpdate(
@@ -128,53 +135,6 @@ export class DocumentationService {
   }
 
   /**
-   * Append learned documentation to existing learned docs
-   */
-  private async appendLearnedDocumentation(
-    guildId: string,
-    newLearnings: string,
-    categoryId?: string
-  ): Promise<{ success: boolean; error?: string; documentation?: IModmailDocumentation }> {
-    const filter = {
-      guildId,
-      type: "learned" as const,
-      ...(categoryId && { categoryId }),
-    };
-
-    const existing = await this.db.findOne(ModmailDocumentation, filter);
-
-    let documentation: string;
-    let threadCount = 1;
-
-    if (existing) {
-      // Append new learnings with a separator
-      documentation = existing.documentation + "\n\n--- Additional Learnings ---\n" + newLearnings;
-      threadCount = (existing.learnedFrom?.threadCount || 0) + 1;
-    } else {
-      documentation = newLearnings;
-    }
-
-    const updateData = {
-      guildId,
-      type: "learned" as const,
-      documentation,
-      lastUpdated: new Date(),
-      "learnedFrom.threadCount": threadCount,
-      "learnedFrom.lastLearnedAt": new Date(),
-      ...(categoryId && { categoryId }),
-    };
-
-    const result = await this.db.findOneAndUpdate(
-      ModmailDocumentation,
-      filter,
-      { $set: updateData },
-      { upsert: true, new: true }
-    );
-
-    return { success: true, documentation: result || undefined };
-  }
-
-  /**
    * Get documentation for AI context
    */
   async getDocumentationForAI(
@@ -185,35 +145,19 @@ export class DocumentationService {
     let documentationContent = "";
 
     try {
-      // Get global documentation
-      if (includeGlobal) {
-        const globalDocs = await this.getDocumentation(guildId, "global");
-        if (globalDocs) {
-          documentationContent += `\n\n--- Server Documentation ---\n${globalDocs.documentation}`;
-        }
-
-        // Also get global learned documentation
-        const globalLearned = await this.getDocumentation(guildId, "learned");
-        if (globalLearned) {
-          documentationContent += `\n\n--- Server Learnings (from ${
-            globalLearned.learnedFrom?.threadCount || 0
-          } threads) ---\n${globalLearned.documentation}`;
-        }
-      }
-
-      // Get category-specific documentation
+      // PRIORITY ORDER: Category-specific documentation first (higher priority)
       if (categoryId) {
         const categoryDocs = await this.getDocumentation(guildId, "category", categoryId);
         if (categoryDocs) {
-          documentationContent += `\n\n--- Category Documentation ---\n${categoryDocs.documentation}`;
+          documentationContent += `\n\n--- Category Documentation (PRIORITY) ---\n${categoryDocs.documentation}`;
         }
+      }
 
-        // Also get category learned documentation
-        const categoryLearned = await this.getDocumentation(guildId, "learned", categoryId);
-        if (categoryLearned) {
-          documentationContent += `\n\n--- Category Learnings (from ${
-            categoryLearned.learnedFrom?.threadCount || 0
-          } threads) ---\n${categoryLearned.documentation}`;
+      // FALLBACK: Global documentation second (lower priority, use when category docs don't cover the topic)
+      if (includeGlobal) {
+        const globalDocs = await this.getDocumentation(guildId, "global");
+        if (globalDocs) {
+          documentationContent += `\n\n--- Server Documentation (FALLBACK) ---\n${globalDocs.documentation}`;
         }
       }
 
@@ -229,7 +173,7 @@ export class DocumentationService {
    */
   async getDocumentation(
     guildId: string,
-    type: "global" | "category" | "learned",
+    type: "global" | "category",
     categoryId?: string
   ): Promise<IModmailDocumentation | null> {
     const filter = {
@@ -246,7 +190,7 @@ export class DocumentationService {
    */
   async deleteDocumentation(
     guildId: string,
-    type: "global" | "category" | "learned",
+    type: "global" | "category",
     categoryId?: string
   ): Promise<boolean> {
     try {
