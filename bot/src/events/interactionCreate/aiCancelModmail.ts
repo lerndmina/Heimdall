@@ -9,14 +9,6 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
   // Update the existing message immediately to show the cancellation
   await interaction.update({
     content: null,
-    embeds: [
-      new EmbedBuilder()
-        .setTitle("✅ Request Completed")
-        .setDescription(
-          "Your request has been completed. If you need help in the future, feel free to send another message."
-        )
-        .setColor(0x00ff00),
-    ],
     components: [], // Remove all buttons
   });
 

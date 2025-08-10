@@ -103,7 +103,8 @@ export class AIResponseHook extends BaseHook {
         aiConfig,
         selectedGuild.guild.name,
         selectedCategory.name,
-        ctx.formResponses
+        ctx.formResponses,
+        selectedGuild.config
       );
 
       if (aiResponse) {
@@ -157,6 +158,9 @@ export class AIResponseHook extends BaseHook {
         includeFormData: category.aiConfig.includeFormData !== false,
         responseStyle: category.aiConfig.responseStyle || "helpful",
         maxTokens: category.aiConfig.maxTokens || 500,
+        documentationUrl: category.aiConfig.documentationUrl || null,
+        // Global documentation is included by default unless explicitly disabled
+        useGlobalDocumentation: category.aiConfig.useGlobalDocumentation !== false,
       };
     }
 
@@ -171,6 +175,9 @@ export class AIResponseHook extends BaseHook {
         includeFormData: config.globalAIConfig.includeFormData !== false,
         responseStyle: config.globalAIConfig.responseStyle || "helpful",
         maxTokens: config.globalAIConfig.maxTokens || 500,
+        documentationUrl: config.globalAIConfig.documentationUrl || null,
+        // When using global config, global documentation is always included
+        useGlobalDocumentation: true,
       };
     }
 
@@ -182,7 +189,80 @@ export class AIResponseHook extends BaseHook {
       includeFormData: true,
       responseStyle: "helpful",
       maxTokens: 500,
+      documentationUrl: null,
+      useGlobalDocumentation: false,
     };
+  }
+
+  /**
+   * Fetch documentation from URL with caching
+   */
+  private async fetchDocumentation(url: string, cacheKey: string): Promise<string | null> {
+    try {
+      // Check Redis cache first (cache for 1 hour)
+      if (redisClient) {
+        try {
+          const cached = await redisClient.get(cacheKey);
+          if (cached) {
+            log.debug(`Documentation cache hit for: ${url}`);
+            return cached;
+          }
+        } catch (cacheError) {
+          log.warn("Redis cache error, continuing without cache:", cacheError);
+        }
+      }
+
+      log.debug(`Fetching documentation from: ${url}`);
+
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      try {
+        // Fetch documentation from URL
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "User-Agent": "Heimdall-Discord-Bot/1.0",
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          log.warn(
+            `Failed to fetch documentation from ${url}: ${response.status} ${response.statusText}`
+          );
+          return null;
+        }
+
+        const documentation = await response.text();
+
+        // Limit documentation size to prevent token overflow (max 8000 characters)
+        const truncatedDocs =
+          documentation.length > 8000
+            ? documentation.substring(0, 8000) + "\n\n[Documentation truncated due to length...]"
+            : documentation;
+
+        // Cache the documentation
+        if (redisClient) {
+          try {
+            await redisClient.setEx(cacheKey, 3600, truncatedDocs); // Cache for 1 hour
+          } catch (cacheError) {
+            log.warn("Failed to cache documentation:", cacheError);
+          }
+        }
+
+        log.debug(`Successfully fetched documentation (${truncatedDocs.length} characters)`);
+        return truncatedDocs;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    } catch (error) {
+      log.error(`Error fetching documentation from ${url}:`, error);
+      return null;
+    }
   }
 
   /**
@@ -220,7 +300,8 @@ export class AIResponseHook extends BaseHook {
     aiConfig: any,
     guildName: string,
     categoryName: string,
-    formResponses?: Record<string, any>
+    formResponses?: Record<string, any>,
+    guildConfig?: any
   ): Promise<string | null> {
     if (!this.openai) return null;
 
@@ -234,8 +315,47 @@ export class AIResponseHook extends BaseHook {
 
       Please provide a concise, helpful response to the user's inquiry.
 
-      PLease keep your responses short and sweet while conveying enough information to solve the user's query
+      Please keep your responses short and sweet while conveying enough information to solve the user's query
     `;
+
+      // Fetch documentation if available
+      let documentationContent = "";
+
+      // Always try to get global documentation first (if available and not explicitly disabled)
+      if (aiConfig.useGlobalDocumentation && guildConfig?.globalAIConfig?.documentationUrl) {
+        const globalCacheKey = `ai_docs:global:${guildConfig.globalAIConfig.documentationUrl}`;
+        const globalDocs = await this.fetchDocumentation(
+          guildConfig.globalAIConfig.documentationUrl,
+          globalCacheKey
+        );
+        if (globalDocs) {
+          documentationContent += `\n\n--- Server Documentation ---\n${globalDocs}`;
+          log.debug(`Added global documentation to AI context`);
+        }
+      }
+
+      // Then get category-specific documentation (if available)
+      if (aiConfig.documentationUrl) {
+        const cacheKey = `ai_docs:category:${aiConfig.documentationUrl}`;
+        const docs = await this.fetchDocumentation(aiConfig.documentationUrl, cacheKey);
+        if (docs) {
+          documentationContent += `\n\n--- Category-Specific Documentation ---\n${docs}`;
+          log.debug(`Added category-specific documentation to AI context`);
+        }
+      }
+
+      // Add documentation to system prompt if available
+      if (documentationContent) {
+        systemPrompt += `\n\nYou have access to the following documentation that should be used to answer user questions:${documentationContent}
+
+IMPORTANT: When both server documentation and category-specific documentation are provided:
+1. Use the server documentation as your baseline knowledge
+2. Use the category-specific documentation for detailed, category-relevant information
+3. If there are conflicts, prioritize the category-specific documentation as it's more specific
+4. Combine information from both sources when helpful
+
+Please reference this documentation when answering questions. If the documentation contains relevant information, use it to provide accurate answers. If the user's question cannot be answered from the documentation, let them know that you'll need to connect them with human support.`;
+      }
 
       const conversation = [{ role: "system", content: systemPrompt }];
 
@@ -245,13 +365,16 @@ export class AIResponseHook extends BaseHook {
           .map(([key, value]) => `${key}: ${value}`)
           .join("\n");
 
-        systemPrompt += `\n\nAdditional context from form:\n${formContext}`;
+        conversation.push({
+          role: "user",
+          content: `Additional context from form:\n${formContext}\n\nUser message: ${userMessage}`,
+        });
+      } else {
+        conversation.push({
+          role: "user",
+          content: userMessage,
+        });
       }
-
-      conversation.push({
-        role: "user",
-        content: userMessage,
-      });
 
       const response = await this.openai.chat.completions.create({
         model: "gpt-5-mini", // Use a more capable model for modmail
@@ -290,7 +413,7 @@ export class AIResponseHook extends BaseHook {
           : "If this helps, great! If not, we'll proceed with your support request.",
       });
 
-    const messagePayload: any = { embeds: [embed] };
+    const messagePayload: any = { embeds: [embed], content: "" };
 
     // Add "Continue with Modmail" button if modmail creation is prevented
     if (aiConfig.preventModmailCreation) {
