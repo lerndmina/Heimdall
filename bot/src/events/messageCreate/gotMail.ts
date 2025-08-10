@@ -405,11 +405,11 @@ async function newModmail(
    * @param {ButtonInteraction} i
    */
   collector.on("collect", async (i) => {
-    const orignalMsg = await i.update({ content: waitingEmoji, components: [], embeds: [] });
+    await i.update({ content: waitingEmoji, components: [], embeds: [] });
 
     if (i.customId === customIds[1]) {
       // Cancel button clicked
-      await orignalMsg.delete();
+      await reply.delete();
       return;
     }
 
@@ -422,7 +422,8 @@ async function newModmail(
 
       log.debug(`Using hook-based modmail creation for user ${i.user.id}`);
 
-      const result = await creator.createModmail(i.user, message, messageContent);
+      // Pass the original reply as the shared bot message
+      const result = await creator.createModmail(i.user, message, messageContent, reply);
 
       if (!result.success) {
         log.error(`Hook-based modmail creation failed: ${result.error}`);
@@ -430,7 +431,7 @@ async function newModmail(
         // Clear rate limit on failure to allow retry
         await redisClient.del(rateLimitKey);
 
-        await orignalMsg.edit({
+        await reply.edit({
           content: "",
           embeds: [
             ModmailEmbeds.error(
@@ -472,7 +473,7 @@ async function newModmail(
 
       // Update the reply based on DM success
       if (!result.dmSuccess) {
-        await orignalMsg.edit({
+        await reply.edit({
           content: "",
           embeds: [
             ModmailEmbeds.warning(
@@ -484,7 +485,7 @@ async function newModmail(
           components: [],
         });
       } else {
-        await orignalMsg.edit({
+        await reply.edit({
           content: "✅ Done! Modmail thread created successfully.",
           embeds: [],
           components: [],
@@ -496,7 +497,7 @@ async function newModmail(
       // Clear rate limit on error
       await redisClient.del(rateLimitKey);
 
-      await orignalMsg.edit({
+      await reply.edit({
         content: "",
         embeds: [
           ModmailEmbeds.error(

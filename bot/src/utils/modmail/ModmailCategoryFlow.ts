@@ -231,6 +231,7 @@ export class ModmailCategoryFlow {
       await context.reply.edit({
         embeds: [embed],
         components: [row],
+        content: "",
       });
 
       // Wait for user selection
@@ -503,6 +504,7 @@ export class ModmailCategoryFlow {
       await context.reply.edit({
         embeds: [embed],
         components: [button],
+        content: "",
       });
 
       // Wait for button click
@@ -611,6 +613,7 @@ export class ModmailCategoryFlow {
       await context.reply.edit({
         embeds: [embed],
         components: [row],
+        content: "",
       });
 
       // Wait for selection
@@ -742,6 +745,7 @@ export class ModmailCategoryFlow {
       await context.reply.edit({
         embeds: [progressEmbed],
         components: [],
+        content: "",
       });
     } catch (error) {
       log.error("Error showing form progress:", error);
@@ -776,6 +780,7 @@ export class ModmailCategoryFlow {
       await context.reply.edit({
         embeds: [embed],
         components: [selectMenuRow],
+        content: "",
       });
 
       // Wait for select menu interaction
@@ -860,6 +865,7 @@ export class ModmailCategoryFlow {
       await context.reply.edit({
         embeds: [embed],
         components: [continueButton],
+        content: "",
       });
 
       // Wait for button click

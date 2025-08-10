@@ -148,11 +148,26 @@ export class CategorySelectionHook extends BaseHook {
       // Use shared bot message if available, otherwise create a new one
       let botMessage = context.sharedBotMessage;
 
+      console.log("CategorySelectionHook Debug:", {
+        hasSharedBotMessage: !!botMessage,
+        sharedMessageId: botMessage?.id,
+        sharedMessageUrl: botMessage?.url,
+        contextKeys: Object.keys(context),
+      });
+
       if (!botMessage) {
-        // Fallback: create a new bot message for category selection
-        botMessage = await originalMessage.author.send({
-          content: "Setting up your modmail request...",
+        console.error(
+          "CategorySelectionHook: No shared bot message available! This should not happen."
+        );
+        console.error("Context:", {
+          user: context.user.tag,
+          guild: context.guild.name,
+          requestId: context.requestId,
+          hasOriginalMessage: !!context.originalMessage,
         });
+
+        // This is the problem - we're creating a NEW message instead of using the shared one
+        throw new Error("Shared bot message not available in CategorySelectionHook");
       }
 
       return {

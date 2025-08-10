@@ -223,7 +223,19 @@ export class AIResponseHook extends BaseHook {
     if (!this.openai) return null;
 
     try {
-      const conversation = [{ role: "system", content: aiConfig.systemPrompt }];
+      let systemPrompt = `
+      You are a helpful AI assistant for the ${guildName} Discord server's modmail system.
+      The user is asking about the "${categoryName}" category.
+
+      The Discord Server Admins have provided the following system prompt to guide your responses:
+      ${aiConfig.systemPrompt || "No specific system prompt provided."}
+
+      Please provide a concise, helpful response to the user's inquiry.
+
+      PLease keep your responses short and sweet while conveying enough information to solve the user's query
+    `;
+
+      const conversation = [{ role: "system", content: systemPrompt }];
 
       // Add form responses if available and enabled
       if (aiConfig.includeFormData && formResponses) {
@@ -231,10 +243,7 @@ export class AIResponseHook extends BaseHook {
           .map(([key, value]) => `${key}: ${value}`)
           .join("\n");
 
-        conversation.push({
-          role: "system",
-          content: `Additional context from form:\n${formContext}`,
-        });
+        systemPrompt += `\n\nAdditional context from form:\n${formContext}`;
       }
 
       conversation.push({
@@ -243,10 +252,11 @@ export class AIResponseHook extends BaseHook {
       });
 
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4-turbo-preview", // Use a more capable model for modmail
+        model: "gpt-5-mini", // Use a more capable model for modmail
         messages: conversation as any,
-        max_tokens: aiConfig.maxTokens,
-        temperature: 0.7,
+        max_completion_tokens: aiConfig.maxTokens,
+        reasoning_effort: "low",
+        service_tier: "flex",
       });
 
       if (response.choices[0]?.message?.content) {
@@ -311,7 +321,15 @@ export class AIResponseHook extends BaseHook {
         .setLabel("📧 Continue with Support Ticket")
         .setStyle(ButtonStyle.Primary);
 
-      const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(continueButton);
+      const cancelButton = new ButtonBuilder()
+        .setCustomId(`ai_cancel_modmail:${contextKey}`)
+        .setLabel("❌ I Don't Need Anymore Help")
+        .setStyle(ButtonStyle.Primary);
+
+      const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        continueButton,
+        cancelButton
+      );
       messagePayload.components = [actionRow];
     }
 

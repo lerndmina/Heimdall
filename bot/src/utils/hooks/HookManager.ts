@@ -166,23 +166,28 @@ export class HookManager {
     const mutableContext = { ...context };
 
     // Create shared bot message if we're dealing with beforeCreation hooks and there are hooks to execute
+    // Only create if one wasn't already provided
     if (type === HookType.BEFORE_CREATION && hooks.some((h) => h.enabled)) {
-      try {
-        const sharedBotMessage = await context.user.send({
-          content: "Setting up your modmail request...",
-        });
-        mutableContext.sharedBotMessage = sharedBotMessage;
-        log.debug(`Created shared bot message: ${sharedBotMessage.id}`);
-      } catch (error) {
-        log.error("Failed to create shared bot message:", error);
-        return {
-          success: false,
-          executedHooks: 0,
-          results: [],
-          aggregatedData: {},
-          error: "Failed to create shared message",
-          userMessage: "Unable to start modmail process. Please try again.",
-        };
+      if (mutableContext.sharedBotMessage) {
+        log.debug(`Using existing shared bot message: ${mutableContext.sharedBotMessage.id}`);
+      } else {
+        try {
+          const sharedBotMessage = await context.user.send({
+            content: "Setting up your modmail request...",
+          });
+          mutableContext.sharedBotMessage = sharedBotMessage;
+          log.debug(`Created shared bot message: ${sharedBotMessage.id}`);
+        } catch (error) {
+          log.error("Failed to create shared bot message:", error);
+          return {
+            success: false,
+            executedHooks: 0,
+            results: [],
+            aggregatedData: {},
+            error: "Failed to create shared message",
+            userMessage: "Unable to start modmail process. Please try again.",
+          };
+        }
       }
     }
 

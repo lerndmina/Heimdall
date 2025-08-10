@@ -1,7 +1,6 @@
 import { ButtonInteraction, Client, EmbedBuilder } from "discord.js";
 import { redisClient } from "../../Bot";
 import log from "../../utils/log";
-import { initialReply } from "../../utils/initialReply";
 import { createModmailThread } from "../../utils/ModmailUtils";
 import { ThingGetter } from "../../utils/TinyUtils";
 import Database from "../../utils/data/database";
@@ -13,7 +12,17 @@ export default async (interaction: ButtonInteraction, client: Client<true>) => {
   if (!interaction.customId || !interaction.isButton()) return;
   if (!interaction.customId.startsWith("ai_continue_modmail:")) return;
 
-  await initialReply(interaction, true);
+  // Update the existing message immediately to show loading state
+  await interaction.update({
+    content: null,
+    embeds: [
+      new EmbedBuilder()
+        .setTitle("⏳ Processing...")
+        .setDescription("Please wait while we set up your support ticket...")
+        .setColor(0xffaa00),
+    ],
+    components: [], // Remove the button immediately
+  });
 
   try {
     // Extract context key from custom ID
