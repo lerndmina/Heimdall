@@ -9,6 +9,7 @@ export class ModmailScheduler {
   private inactivityService: ModmailInactivityService;
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
+  private static globalSchedulerRunning: boolean = false; // Global lock in bot memory
 
   constructor(client: Client<true>) {
     this.client = client;
@@ -19,7 +20,7 @@ export class ModmailScheduler {
    * Start the modmail inactivity scheduler
    */
   async start(): Promise<void> {
-    if (this.isRunning) {
+    if (this.isRunning || ModmailScheduler.globalSchedulerRunning) {
       log.warn("Modmail scheduler is already running");
       return;
     }
@@ -29,8 +30,9 @@ export class ModmailScheduler {
 
     log.info(`Starting modmail inactivity scheduler - checking every ${intervalMinutes} minute(s)`);
 
-    // Set scheduler as running in Redis
-    await redisClient.set("modmail_scheduler_running", "true", { EX: 300 }); // 5 minute expiry
+    // Set global scheduler lock in bot memory
+    ModmailScheduler.globalSchedulerRunning = true;
+    this.isRunning = true;
 
     // Run initial check
     await this.runCheck();
@@ -39,15 +41,6 @@ export class ModmailScheduler {
     this.intervalId = setInterval(async () => {
       await this.runCheck();
     }, intervalMs);
-
-    this.isRunning = true;
-
-    // Keep alive heartbeat every minute
-    setInterval(async () => {
-      if (this.isRunning) {
-        await redisClient.set("modmail_scheduler_running", "true", { EX: 300 });
-      }
-    }, 60 * 1000);
 
     log.debug("Modmail scheduler started successfully");
   }
@@ -68,7 +61,7 @@ export class ModmailScheduler {
     }
 
     this.isRunning = false;
-    await redisClient.del("modmail_scheduler_running");
+    ModmailScheduler.globalSchedulerRunning = false;
 
     log.debug("Modmail scheduler stopped");
   }
@@ -78,17 +71,16 @@ export class ModmailScheduler {
    */
   private async runCheck(): Promise<void> {
     try {
-      // Check if another instance is running
-      const isOtherRunning = await redisClient.get("modmail_scheduler_running");
-      if (isOtherRunning && !this.isRunning) {
-        log.debug("Another scheduler instance is running, skipping check");
+      // No need to check Redis anymore - we use bot memory
+      if (!this.isRunning || !ModmailScheduler.globalSchedulerRunning) {
+        log.debug("Scheduler not running, skipping check");
         return;
       }
 
       log.debug("Running modmail inactivity check...");
       await this.inactivityService.checkInactiveModmails();
 
-      // Update last check time
+      // Update last check time in Redis for monitoring purposes only
       await redisClient.set("modmail_last_check", Date.now().toString());
     } catch (error) {
       log.error("Error during modmail inactivity check:", error);
