@@ -22,6 +22,8 @@ export default async function configureAI({
   const scope = interaction.options.getString("scope", true);
   const categoryId = interaction.options.getString("category");
   const prompt = interaction.options.getString("prompt");
+  const documentationUrl = interaction.options.getString("documentation-url");
+  const useGlobalDocs = interaction.options.getBoolean("use-global-docs");
   const preventModmail = interaction.options.getBoolean("prevent-modmail");
   const style = interaction.options.getString("style");
   const maxTokens = interaction.options.getInteger("max-tokens");
@@ -48,6 +50,49 @@ export default async function configureAI({
     );
   }
 
+  // Validate documentation URL if provided
+  if (documentationUrl) {
+    try {
+      const url = new URL(documentationUrl);
+      const validHosts = [
+        "pastebin.com",
+        "raw.githubusercontent.com",
+        "gist.githubusercontent.com",
+      ];
+      const isValidHost = validHosts.some((host) => url.hostname.includes(host));
+
+      if (!isValidHost) {
+        return returnMessage(
+          interaction,
+          client,
+          "Invalid Documentation URL",
+          "Documentation URL must be from a supported service (Pastebin raw, GitHub raw, or Gist raw).\n" +
+            "Example: https://pastebin.com/raw/abc123",
+          { error: true, ephemeral: true, firstMsg: true }
+        );
+      }
+    } catch (error) {
+      return returnMessage(
+        interaction,
+        client,
+        "Invalid URL",
+        "Please provide a valid documentation URL.",
+        { error: true, ephemeral: true, firstMsg: true }
+      );
+    }
+  }
+
+  // Validate useGlobalDocs is only used with category scope
+  if (useGlobalDocs !== null && scope === "global") {
+    return returnMessage(
+      interaction,
+      client,
+      "Invalid Option",
+      "The 'use-global-docs' option can only be used with category scope.",
+      { error: true, ephemeral: true, firstMsg: true }
+    );
+  }
+
   // Build update object based on provided options
   const updates: any = {};
   if (prompt !== null) {
@@ -62,6 +107,8 @@ export default async function configureAI({
     }
     updates.systemPrompt = prompt;
   }
+  if (documentationUrl !== null) updates.documentationUrl = documentationUrl;
+  if (useGlobalDocs !== null) updates.useGlobalDocumentation = useGlobalDocs;
   if (preventModmail !== null) updates.preventModmailCreation = preventModmail;
   if (style !== null) updates.responseStyle = style;
   if (maxTokens !== null) updates.maxTokens = maxTokens;
@@ -173,6 +220,10 @@ function formatSettingName(key: string): string {
   switch (key) {
     case "systemPrompt":
       return "System Prompt";
+    case "documentationUrl":
+      return "Documentation URL";
+    case "useGlobalDocumentation":
+      return "Use Global Documentation";
     case "preventModmailCreation":
       return "Prevent Modmail Creation";
     case "responseStyle":
@@ -188,6 +239,10 @@ function formatSettingValue(key: string, value: any): string {
   switch (key) {
     case "systemPrompt":
       return value.length > 100 ? `${value.substring(0, 100)}...` : value;
+    case "documentationUrl":
+      return value || "Not set";
+    case "useGlobalDocumentation":
+      return value ? "Yes" : "No";
     case "preventModmailCreation":
       return value ? "Yes" : "No";
     case "responseStyle":

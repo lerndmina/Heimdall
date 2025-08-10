@@ -377,6 +377,18 @@ export const data = new SlashCommandBuilder()
               .setDescription("Custom system prompt for AI responses")
               .setRequired(false)
           )
+          .addStringOption((option) =>
+            option
+              .setName("documentation-url")
+              .setDescription("URL to text documentation (Pastebin raw, GitHub raw, etc.)")
+              .setRequired(false)
+          )
+          .addBooleanOption((option) =>
+            option
+              .setName("use-global-docs")
+              .setDescription("Whether to include global documentation (category scope only)")
+              .setRequired(false)
+          )
           .addBooleanOption((option) =>
             option
               .setName("prevent-modmail")
@@ -407,6 +419,123 @@ export const data = new SlashCommandBuilder()
       )
       .addSubcommand((subcommand) =>
         subcommand.setName("status").setDescription("View current AI configuration")
+      )
+  )
+  .addSubcommandGroup((group) =>
+    group
+      .setName("docs")
+      .setDescription("Manage AI documentation")
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("import")
+          .setDescription("Import documentation from URL")
+          .addStringOption((option) =>
+            option
+              .setName("scope")
+              .setDescription("Where to import documentation")
+              .setRequired(true)
+              .addChoices(
+                { name: "Global (all categories)", value: "global" },
+                { name: "Specific Category", value: "category" }
+              )
+          )
+          .addStringOption((option) =>
+            option
+              .setName("url")
+              .setDescription("URL to documentation (Pastebin raw, GitHub raw, etc.)")
+              .setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category ID (required if scope is 'category')")
+              .setRequired(false)
+              .setAutocomplete(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("export")
+          .setDescription("Export documentation as downloadable file")
+          .addStringOption((option) =>
+            option
+              .setName("scope")
+              .setDescription("What to export")
+              .setRequired(true)
+              .addChoices(
+                { name: "All Documentation", value: "all" },
+                { name: "Global Only", value: "global" },
+                { name: "Specific Category", value: "category" }
+              )
+          )
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category ID (required if scope is 'category')")
+              .setRequired(false)
+              .setAutocomplete(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("upload")
+          .setDescription("Upload documentation from text file")
+          .addStringOption((option) =>
+            option
+              .setName("scope")
+              .setDescription("Where to upload documentation")
+              .setRequired(true)
+              .addChoices(
+                { name: "Global (all categories)", value: "global" },
+                { name: "Specific Category", value: "category" }
+              )
+          )
+          .addAttachmentOption((option) =>
+            option
+              .setName("file")
+              .setDescription("Text file containing documentation")
+              .setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category ID (required if scope is 'category')")
+              .setRequired(false)
+              .setAutocomplete(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("clear")
+          .setDescription("Clear documentation")
+          .addStringOption((option) =>
+            option
+              .setName("scope")
+              .setDescription("What to clear")
+              .setRequired(true)
+              .addChoices(
+                { name: "Global Documentation", value: "global" },
+                { name: "Global Learnings", value: "global-learned" },
+                { name: "Category Documentation", value: "category" },
+                { name: "Category Learnings", value: "category-learned" }
+              )
+          )
+          .addBooleanOption((option) =>
+            option
+              .setName("confirm")
+              .setDescription("Confirm that you want to delete the documentation")
+              .setRequired(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("category")
+              .setDescription("Category ID (required for category scopes)")
+              .setRequired(false)
+              .setAutocomplete(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("status").setDescription("View documentation status")
       )
   )
   .addSubcommandGroup((group) =>
@@ -699,6 +828,133 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
           return interaction.reply({
             embeds: [
               ModmailEmbeds.error(client, "Command Error", "Failed to load the AI status command."),
+            ],
+            ephemeral: true,
+          });
+        }
+    }
+    return;
+  }
+
+  // Handle docs subcommands
+  if (subcommandGroup === "docs") {
+    switch (subcommand) {
+      case "import":
+        try {
+          const { default: importDocs, importDocsOptions } = await import(
+            "../../subcommands/modmail/docs/importDocs"
+          );
+          const importDocsCheck = await canRunCommand(
+            { interaction, client, handler },
+            importDocsOptions
+          );
+          if (importDocsCheck !== false) return importDocsCheck;
+          return importDocs({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading importDocs:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the docs import command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "export":
+        try {
+          const { default: exportDocs, exportDocsOptions } = await import(
+            "../../subcommands/modmail/docs/exportDocs"
+          );
+          const exportDocsCheck = await canRunCommand(
+            { interaction, client, handler },
+            exportDocsOptions
+          );
+          if (exportDocsCheck !== false) return exportDocsCheck;
+          return exportDocs({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading exportDocs:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the docs export command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "upload":
+        try {
+          const { default: uploadDocs, uploadDocsOptions } = await import(
+            "../../subcommands/modmail/docs/uploadDocs"
+          );
+          const uploadDocsCheck = await canRunCommand(
+            { interaction, client, handler },
+            uploadDocsOptions
+          );
+          if (uploadDocsCheck !== false) return uploadDocsCheck;
+          return uploadDocs({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading uploadDocs:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the docs upload command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "clear":
+        try {
+          const { default: clearDocs, clearDocsOptions } = await import(
+            "../../subcommands/modmail/docs/clearDocs"
+          );
+          const clearDocsCheck = await canRunCommand(
+            { interaction, client, handler },
+            clearDocsOptions
+          );
+          if (clearDocsCheck !== false) return clearDocsCheck;
+          return clearDocs({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading clearDocs:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the docs clear command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "status":
+        try {
+          const { default: statusDocs, statusDocsOptions } = await import(
+            "../../subcommands/modmail/docs/statusDocs"
+          );
+          const statusDocsCheck = await canRunCommand(
+            { interaction, client, handler },
+            statusDocsOptions
+          );
+          if (statusDocsCheck !== false) return statusDocsCheck;
+          return statusDocs({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading statusDocs:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the docs status command."
+              ),
             ],
             ephemeral: true,
           });

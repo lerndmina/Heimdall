@@ -13,6 +13,7 @@ import ResponsePlugins from "../../ResponsePlugins";
 import BasicEmbed from "../../BasicEmbed";
 import { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from "discord.js";
 import { redisClient } from "../../../Bot";
+import { DocumentationService } from "../../../services/DocumentationService";
 
 const env = FetchEnvs();
 
@@ -22,6 +23,7 @@ const env = FetchEnvs();
  */
 export class AIResponseHook extends BaseHook {
   private openai: OpenAI | null = null;
+  private documentationService: DocumentationService;
 
   constructor() {
     super(
@@ -31,6 +33,9 @@ export class AIResponseHook extends BaseHook {
       HookType.BEFORE_CREATION,
       HookPriority.LOW // Run after server/category selection but before creation
     );
+
+    // Initialize services
+    this.documentationService = new DocumentationService();
 
     // Initialize OpenAI if API key is available
     if (!isOptionalUnset(env.OPENAI_API_KEY)) {
@@ -101,15 +106,23 @@ export class AIResponseHook extends BaseHook {
       const aiResponse = await this.generateAIResponse(
         ctx.messageContent,
         aiConfig,
+        selectedGuild.guild.id,
         selectedGuild.guild.name,
+        ctx.selectedCategoryId,
         selectedCategory.name,
         ctx.formResponses,
         selectedGuild.config
       );
 
+      log.debug(`AIResponseHook: AI response generated: ${aiResponse ? "yes" : "no"}`, {
+        responseLength: aiResponse?.length,
+      });
+
       if (aiResponse) {
+        log.debug(`AIResponseHook: Sending AI response to user...`);
         // Send AI response to user before creating modmail
         await this.sendAIResponse(ctx, aiResponse, aiConfig);
+        log.debug(`AIResponseHook: AI response sent successfully`);
 
         // Optionally prevent modmail creation if AI fully resolved the issue
         if (aiConfig.preventModmailCreation) {
@@ -120,6 +133,8 @@ export class AIResponseHook extends BaseHook {
             preventModmailCreation: true,
           });
         }
+      } else {
+        log.debug(`AIResponseHook: No AI response generated, continuing with modmail creation`);
       }
 
       return this.createSuccessResult({ aiResponseSent: !!aiResponse });
@@ -298,7 +313,9 @@ export class AIResponseHook extends BaseHook {
   private async generateAIResponse(
     userMessage: string,
     aiConfig: any,
+    guildId: string,
     guildName: string,
+    categoryId: string,
     categoryName: string,
     formResponses?: Record<string, any>,
     guildConfig?: any
@@ -306,55 +323,63 @@ export class AIResponseHook extends BaseHook {
     if (!this.openai) return null;
 
     try {
-      let systemPrompt = `
-      You are a helpful AI assistant for the ${guildName} Discord server's modmail system.
-      The user is asking about the "${categoryName}" category.
+      log.debug(`AIResponseHook: Starting AI response generation`, {
+        userMessage: userMessage.substring(0, 50) + "...",
+        guildName,
+        categoryName,
+        hasFormResponses: !!formResponses,
+      });
+      let systemPrompt = `You are an AI assistant for the ${guildName} Discord server's modmail system, helping users with the "${categoryName}" category.
 
-      The Discord Server Admins have provided the following system prompt to guide your responses:
-      ${aiConfig.systemPrompt || "No specific system prompt provided."}
+CORE OBJECTIVES:
+- Provide accurate, helpful answers to user questions
+- Determine if the user's issue can be fully resolved without human assistance
+- Guide users appropriately based on their needs
 
-      Please provide a concise, helpful response to the user's inquiry.
+RESPONSE GUIDELINES:
+- Be concise but comprehensive - aim for 1-3 sentences for simple questions, longer for complex issues
+- Use a ${aiConfig.responseStyle || "helpful"} tone
+- If you can fully resolve the user's question, clearly state that the issue is resolved
+- If human assistance is needed, explain why and encourage creating a support ticket
 
-      Please keep your responses short and sweet while conveying enough information to solve the user's query
-    `;
+ADMIN-PROVIDED CONTEXT:
+${aiConfig.systemPrompt || "No specific guidance provided by server administrators."}
 
-      // Fetch documentation if available
-      let documentationContent = "";
+DECISION FRAMEWORK:
+✅ Can resolve: Simple questions with obvious answers OR issues explicitly addressed in the provided documentation
+❌ Needs human help: Everything else - complex questions, account-specific issues, anything not clearly documented, policy decisions, or requests requiring server permissions`;
 
-      // Always try to get global documentation first (if available and not explicitly disabled)
-      if (aiConfig.useGlobalDocumentation && guildConfig?.globalAIConfig?.documentationUrl) {
-        const globalCacheKey = `ai_docs:global:${guildConfig.globalAIConfig.documentationUrl}`;
-        const globalDocs = await this.fetchDocumentation(
-          guildConfig.globalAIConfig.documentationUrl,
-          globalCacheKey
-        );
-        if (globalDocs) {
-          documentationContent += `\n\n--- Server Documentation ---\n${globalDocs}`;
-          log.debug(`Added global documentation to AI context`);
-        }
-      }
-
-      // Then get category-specific documentation (if available)
-      if (aiConfig.documentationUrl) {
-        const cacheKey = `ai_docs:category:${aiConfig.documentationUrl}`;
-        const docs = await this.fetchDocumentation(aiConfig.documentationUrl, cacheKey);
-        if (docs) {
-          documentationContent += `\n\n--- Category-Specific Documentation ---\n${docs}`;
-          log.debug(`Added category-specific documentation to AI context`);
-        }
-      }
+      // Get stored documentation
+      const documentationContent = await this.documentationService.getDocumentationForAI(
+        guildId,
+        categoryId,
+        aiConfig.useGlobalDocumentation
+      );
 
       // Add documentation to system prompt if available
       if (documentationContent) {
-        systemPrompt += `\n\nYou have access to the following documentation that should be used to answer user questions:${documentationContent}
+        systemPrompt += `
 
-IMPORTANT: When both server documentation and category-specific documentation are provided:
-1. Use the server documentation as your baseline knowledge
-2. Use the category-specific documentation for detailed, category-relevant information
-3. If there are conflicts, prioritize the category-specific documentation as it's more specific
-4. Combine information from both sources when helpful
+KNOWLEDGE BASE:
+You have access to server-specific documentation. Reference this information to provide accurate answers:${documentationContent}
 
-Please reference this documentation when answering questions. If the documentation contains relevant information, use it to provide accurate answers. If the user's question cannot be answered from the documentation, let them know that you'll need to connect them with human support.`;
+DOCUMENTATION USAGE RULES:
+1. ONLY ANSWER what is explicitly documented - do not extrapolate or assume
+2. PRIMARY SOURCE: Use server documentation as your baseline knowledge
+3. CATEGORY SPECIFICS: Use category-specific documentation for detailed, specialized information  
+4. CONFLICT RESOLUTION: If information conflicts, prioritize category-specific over general documentation
+5. STRICT BOUNDARIES: If the documentation doesn't explicitly address the user's specific question, recommend human support
+
+RESPONSE REQUIREMENTS:
+- ONLY provide answers that are directly supported by the documentation
+- Quote or reference specific documentation sections when possible
+- If the documentation partially covers the topic but doesn't fully answer the question, recommend human assistance
+- If the documentation doesn't address the question at all, clearly state this and recommend creating a support ticket
+- When in doubt, always recommend human support rather than guessing`;
+      } else {
+        systemPrompt += `
+
+KNOWLEDGE BASE: No server-specific documentation is available. Base your responses on general best practices and clearly indicate when human assistance is needed for server-specific information.`;
       }
 
       const conversation = [{ role: "system", content: systemPrompt }];
@@ -376,17 +401,57 @@ Please reference this documentation when answering questions. If the documentati
         });
       }
 
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-5-mini", // Use a more capable model for modmail
-        messages: conversation as any,
-        max_completion_tokens: aiConfig.maxTokens,
-        reasoning_effort: "low",
-        service_tier: "flex",
+      log.debug(`AIResponseHook: Making OpenAI API call`, {
+        model: "gpt-5-mini",
+        conversationLength: conversation.length,
+        maxTokens: aiConfig.maxTokens,
       });
 
+      const response = await this.openai.chat.completions.create({
+        model: "gpt-5-mini", // Use gpt-5-mini with reasoning
+        messages: conversation as any,
+        max_completion_tokens: aiConfig.maxTokens + 1000, // Add extra tokens for reasoning
+        // Note: gpt-5-mini only supports default temperature (1)
+        reasoning_effort: "low", // Use low reasoning effort
+      });
+
+      log.debug(`AIResponseHook: OpenAI API response received`, {
+        hasContent: !!response.choices[0]?.message?.content,
+        usage: response.usage,
+        choicesLength: response.choices?.length,
+        firstChoice: response.choices[0]
+          ? {
+              message: {
+                role: response.choices[0].message?.role,
+                hasContent: !!response.choices[0].message?.content,
+                contentLength: response.choices[0].message?.content?.length,
+                hasReasoning: !!(response.choices[0].message as any)?.reasoning,
+                reasoningLength: (response.choices[0].message as any)?.reasoning?.length,
+              },
+              finishReason: response.choices[0].finish_reason,
+            }
+          : null,
+      });
+
+      // For reasoning models, the actual response content is in message.content
+      // The reasoning is in message.reasoning (which we can ignore for user responses)
       if (response.choices[0]?.message?.content) {
-        return await ResponsePlugins(response.choices[0].message.content);
+        const content = await ResponsePlugins(response.choices[0].message.content);
+        log.debug(`AIResponseHook: Processed content length: ${content?.length}`);
+        return content;
       }
+
+      // Fallback: if no content but there's reasoning, log it for debugging
+      const reasoning = (response.choices[0]?.message as any)?.reasoning;
+      if (reasoning) {
+        log.debug(`AIResponseHook: Only reasoning found, no user-facing content`, {
+          reasoningPreview: reasoning.substring(0, 100) + "...",
+        });
+      }
+
+      log.warn(`AIResponseHook: No content in OpenAI response`, {
+        response: JSON.stringify(response, null, 2),
+      });
 
       return null;
     } catch (error) {

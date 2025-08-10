@@ -41,6 +41,7 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
         `**Fallback to Global:** ${
           (globalAI as any).fallbackToGlobal !== false ? "✅ Yes" : "❌ No"
         }\n` +
+        `**Documentation URL:** ${(globalAI as any).documentationUrl ? "✅ Set" : "❌ Not set"}\n` +
         `**Prevent Modmail Creation:** ${
           (globalAI as any).preventModmailCreation ? "✅ Yes" : "❌ No"
         }\n` +
@@ -57,6 +58,10 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
         name: `📂 Default Category: ${config.defaultCategory.name}`,
         value:
           `**Enabled:** ${defaultAI.enabled ? "✅ Yes" : "❌ No"}\n` +
+          `**Documentation URL:** ${defaultAI.documentationUrl ? "✅ Set" : "❌ Not set"}\n` +
+          `**Use Global Docs:** ${
+            defaultAI.useGlobalDocumentation !== false ? "✅ Yes" : "❌ No"
+          }\n` +
           `**Prevent Modmail Creation:** ${
             defaultAI.preventModmailCreation ? "✅ Yes" : "❌ No"
           }\n` +
@@ -88,6 +93,8 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
           name: `📁 ${category.name}`,
           value:
             `**Enabled:** ✅ Yes\n` +
+            `**Documentation URL:** ${ai?.documentationUrl ? "✅ Set" : "❌ Not set"}\n` +
+            `**Use Global Docs:** ${ai?.useGlobalDocumentation !== false ? "✅ Yes" : "❌ No"}\n` +
             `**Prevent Modmail Creation:** ${ai?.preventModmailCreation ? "✅ Yes" : "❌ No"}\n` +
             `**Response Style:** ${ai?.responseStyle || "helpful"}\n` +
             `**Max Tokens:** ${ai?.maxTokens || 500}\n` +
@@ -138,8 +145,9 @@ export default async function statusAI({ interaction, client, handler }: LegacyS
         "\n\n" +
         "**Next Steps:**\n" +
         "• Use `/modmail ai enable` to enable AI\n" +
-        "• Use `/modmail ai configure` to customize settings\n" +
-        "• Use `/modmail ai disable` to disable AI",
+        "• Use `/modmail ai configure` to customize settings and add documentation URLs\n" +
+        "• Use `/modmail ai disable` to disable AI\n" +
+        "\n**Documentation URLs:** Provide links to Pastebin raw, GitHub raw, or Gist raw text files for AI context.",
       inline: false,
     });
 

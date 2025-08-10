@@ -7,6 +7,7 @@ import { ModmailConfigType, CategoryType } from "../../models/ModmailConfig";
 export enum HookType {
   BEFORE_CREATION = "beforeCreation",
   BEFORE_CLOSING = "beforeClosing",
+  AFTER_CLOSING = "afterClosing",
 }
 
 /**
@@ -60,9 +61,37 @@ export interface BeforeClosingHookContext extends BaseHookContext {
 }
 
 /**
+ * Context passed to afterClosing hooks
+ */
+export interface AfterClosingHookContext extends BaseHookContext {
+  hookType: HookType.AFTER_CLOSING;
+  modmailId: string;
+  closingReason?: string;
+  closedBy: User;
+  forceClose?: boolean;
+  threadId: string;
+  categoryId: string;
+  transcript?: {
+    messages: Array<{
+      authorId: string;
+      authorName: string;
+      content: string;
+      timestamp: Date;
+      isStaff: boolean;
+    }>;
+    openedAt: Date;
+    closedAt: Date;
+    duration: number; // in minutes
+  };
+}
+
+/**
  * Union type for all hook contexts
  */
-export type HookContext = BeforeCreationHookContext | BeforeClosingHookContext;
+export type HookContext =
+  | BeforeCreationHookContext
+  | BeforeClosingHookContext
+  | AfterClosingHookContext;
 
 /**
  * Result returned by hook execution

@@ -2,6 +2,7 @@ import { hookManager } from "./HookManager";
 import { ServerSelectionHook } from "./defaults/ServerSelectionHook";
 import { CategorySelectionHook } from "./defaults/CategorySelectionHook";
 import { AIResponseHook } from "./defaults/AIResponseHook";
+import { LearningHook } from "./defaults/LearningHook";
 import log from "../log";
 
 /**
@@ -16,10 +17,12 @@ export function initializeModmailHooks(): void {
     const serverSelectionHook = new ServerSelectionHook();
     const categorySelectionHook = new CategorySelectionHook();
     const aiResponseHook = new AIResponseHook();
+    const learningHook = new LearningHook();
 
     hookManager.registerHook(serverSelectionHook);
     hookManager.registerHook(categorySelectionHook);
     hookManager.registerHook(aiResponseHook);
+    hookManager.registerHook(learningHook);
 
     // Log initialization results
     const stats = hookManager.getStats();

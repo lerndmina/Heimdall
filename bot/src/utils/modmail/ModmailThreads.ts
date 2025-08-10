@@ -1,4 +1,4 @@
-import { Client, Guild, User, GuildMember, ForumChannel, ThreadChannel } from "discord.js";
+import { Client, Guild, User, GuildMember, ForumChannel, ThreadChannel, Message } from "discord.js";
 import { ThingGetter } from "../TinyUtils";
 import { createModmailThread } from "../ModmailUtils";
 import { tryCatch } from "../trycatch";
@@ -7,6 +7,8 @@ import Modmail from "../../models/Modmail";
 import log from "../log";
 import FetchEnvs from "../FetchEnvs";
 import ModmailCache from "../ModmailCache";
+import { hookManager } from "../hooks/HookManager";
+import { HookType, AfterClosingHookContext } from "../hooks/HookTypes";
 
 /**
  * Modmail thread operations utility
@@ -368,6 +370,9 @@ export async function closeModmailThreadSafe(
       }) with reason: ${reason}`
     );
 
+    // Execute after-closing hooks
+    await executeAfterClosingHooks(client, modmail, closedBy, reason, forumThread);
+
     return { success: true, modmail: updatedModmail };
   } catch (error) {
     log.error("Unexpected error in closeModmailThreadSafe:", error);
@@ -375,6 +380,130 @@ export async function closeModmailThreadSafe(
       success: false,
       error: error instanceof Error ? error.message : "Unknown error occurred",
     };
+  }
+}
+
+/**
+ * Execute after-closing hooks for a modmail thread
+ */
+async function executeAfterClosingHooks(
+  client: Client<true>,
+  modmail: any,
+  closedBy?: { type: "User" | "Staff" | "System"; username: string; userId: string },
+  reason?: string,
+  forumThread?: ThreadChannel | null
+): Promise<void> {
+  try {
+    if (!forumThread) {
+      log.debug("No forum thread available for after-closing hooks");
+      return;
+    }
+
+    // Get the guild and user
+    const guild = forumThread.guild;
+    const getter = new ThingGetter(client);
+
+    // Try to get the user
+    const { data: user } = await tryCatch(getter.getUser(modmail.userId));
+    if (!user) {
+      log.debug("Could not get user for after-closing hooks");
+      return;
+    }
+
+    // Generate transcript data
+    const transcript = await generateTranscriptData(forumThread, modmail);
+    if (!transcript) {
+      log.debug("Could not generate transcript for after-closing hooks");
+      return;
+    }
+
+    // Create the hook context
+    const hookContext: AfterClosingHookContext = {
+      client,
+      user,
+      guild,
+      originalMessage: {} as Message, // We don't have the original message in this context
+      hookType: HookType.AFTER_CLOSING,
+      requestId: `close-${modmail._id}-${Date.now()}`,
+      modmailId: modmail._id.toString(),
+      closingReason: reason,
+      closedBy: user, // This might not be accurate, but it's the best we have
+      forceClose: false,
+      threadId: forumThread.id,
+      categoryId: forumThread.parentId || "",
+      transcript,
+    };
+
+    // Execute the hooks
+    await hookManager.executeHooks(HookType.AFTER_CLOSING, hookContext);
+  } catch (error) {
+    log.error("Error executing after-closing hooks:", error);
+    // Don't throw - hooks are optional and shouldn't break the closing process
+  }
+}
+
+/**
+ * Generate transcript data from a forum thread
+ */
+async function generateTranscriptData(
+  forumThread: ThreadChannel,
+  modmail: any
+): Promise<{
+  messages: Array<{
+    authorId: string;
+    authorName: string;
+    content: string;
+    timestamp: Date;
+    isStaff: boolean;
+  }>;
+  openedAt: Date;
+  closedAt: Date;
+  duration: number;
+} | null> {
+  try {
+    const messages: Array<{
+      authorId: string;
+      authorName: string;
+      content: string;
+      timestamp: Date;
+      isStaff: boolean;
+    }> = [];
+
+    // Fetch messages from the thread
+    const threadMessages = await forumThread.messages.fetch({ limit: 100 });
+
+    for (const [, message] of threadMessages) {
+      // Skip system messages and bot messages (except if they contain user content)
+      if (message.author.system || message.webhookId) continue;
+
+      // Check if the author is staff (has manage messages permission)
+      const isStaff = message.member?.permissions.has("ManageMessages") || false;
+
+      messages.push({
+        authorId: message.author.id,
+        authorName: message.author.displayName || message.author.username,
+        content: message.content,
+        timestamp: message.createdAt,
+        isStaff,
+      });
+    }
+
+    // Sort messages by timestamp (oldest first)
+    messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    const openedAt = modmail.createdAt || new Date();
+    const closedAt = new Date();
+    const duration = Math.round((closedAt.getTime() - openedAt.getTime()) / (1000 * 60)); // in minutes
+
+    return {
+      messages,
+      openedAt,
+      closedAt,
+      duration,
+    };
+  } catch (error) {
+    log.error("Error generating transcript data:", error);
+    return null;
   }
 }
 
