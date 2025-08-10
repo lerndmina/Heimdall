@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { CommandKit } from "@heimdall/command-handler";
 import { Client } from "discord.js";
 import Modmail, { ModmailType, ModmailMessageType } from "../../models/Modmail";
-import ModmailConfig, { ModmailConfigType } from "../../models/ModmailConfig";
+import ModmailConfig, { ModmailConfigType, TicketPriority } from "../../models/ModmailConfig";
 import { createSuccessResponse, createErrorResponse } from "../utils/apiResponse";
 import log from "../../utils/log";
 import { generateDynamicHTMLTranscript } from "../../utils/dynamic-transcript-generator";
@@ -320,6 +320,53 @@ export async function updateModmailConfig(req: Request, res: Response) {
         .json(createErrorResponse("No update data provided", 400, req.requestId));
     }
 
+    // Convert string priority values to numbers
+    function convertPriorities(data: any): any {
+      if (!data) return data;
+
+      const priorityMap: { [key: string]: number } = {
+        LOW: TicketPriority.LOW,
+        MEDIUM: TicketPriority.MEDIUM,
+        HIGH: TicketPriority.HIGH,
+        URGENT: TicketPriority.URGENT,
+      };
+
+      // Deep clone the data to avoid mutations
+      const clonedData = JSON.parse(JSON.stringify(data));
+
+      // Convert defaultCategory priority
+      if (
+        clonedData.defaultCategory?.priority &&
+        typeof clonedData.defaultCategory.priority === "string"
+      ) {
+        clonedData.defaultCategory.priority =
+          priorityMap[clonedData.defaultCategory.priority] || clonedData.defaultCategory.priority;
+      }
+
+      // Convert categories array priorities
+      if (clonedData.categories && Array.isArray(clonedData.categories)) {
+        clonedData.categories = clonedData.categories.map((category: any) => {
+          if (category.priority && typeof category.priority === "string") {
+            category.priority = priorityMap[category.priority] || category.priority;
+          }
+          return category;
+        });
+      }
+
+      return clonedData;
+    }
+
+    // Convert string priorities to numbers
+    const processedUpdateData = convertPriorities(updateData);
+
+    // Debug logging
+    log.debug("Original updateData:", JSON.stringify(updateData, null, 2));
+    log.debug("Processed updateData:", JSON.stringify(processedUpdateData, null, 2));
+
+    // Debug TicketPriority enum values
+    log.debug("TicketPriority enum values:", Object.values(TicketPriority));
+    log.debug("TicketPriority enum keys:", Object.keys(TicketPriority));
+
     // Find existing config or create new one
     let config = await ModmailConfig.findOne({ guildId });
 
@@ -327,11 +374,45 @@ export async function updateModmailConfig(req: Request, res: Response) {
       // Create new config if it doesn't exist
       config = new ModmailConfig({
         guildId,
-        ...updateData,
+        ...processedUpdateData,
       });
     } else {
-      // Update existing config
-      Object.assign(config, updateData);
+      // Debug the existing config structure
+      log.debug("Existing config before any changes:", JSON.stringify(config.toObject(), null, 2));
+
+      // First, directly fix any string priorities in the existing document
+      if (config.defaultCategory && typeof config.defaultCategory.priority === "string") {
+        log.debug(
+          "Converting defaultCategory priority from string:",
+          config.defaultCategory.priority
+        );
+        const priorityValue =
+          TicketPriority[config.defaultCategory.priority as keyof typeof TicketPriority];
+        if (priorityValue !== undefined) {
+          config.defaultCategory.priority = priorityValue;
+          log.debug("Converted to:", priorityValue);
+        }
+      }
+
+      if (config.categories && Array.isArray(config.categories)) {
+        log.debug("Found categories array with length:", config.categories.length);
+        config.categories.forEach((category: any, index: number) => {
+          if (category.priority && typeof category.priority === "string") {
+            log.debug(`Converting category ${index} priority from string:`, category.priority);
+            const priorityValue = TicketPriority[category.priority as keyof typeof TicketPriority];
+            if (priorityValue !== undefined) {
+              category.priority = priorityValue;
+              log.debug(`Converted category ${index} to:`, priorityValue);
+            }
+          }
+        });
+      }
+
+      // Now apply the update data
+      config.set(processedUpdateData);
+
+      // Final debug of the config before save
+      log.debug("Final config before save:", JSON.stringify(config.toObject(), null, 2));
     }
 
     await config.save();

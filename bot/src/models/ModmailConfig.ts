@@ -112,7 +112,7 @@ const defaultCategorySchema = new Schema(
     // staffRoleId: NOT INCLUDED - uses main config's staffRoleId
     priority: {
       type: Number,
-      enum: Object.values(TicketPriority),
+      enum: [TicketPriority.LOW, TicketPriority.MEDIUM, TicketPriority.HIGH, TicketPriority.URGENT],
       default: TicketPriority.MEDIUM,
     },
     isActive: {
@@ -202,7 +202,7 @@ const categorySchema = new Schema(
     },
     priority: {
       type: Number,
-      enum: Object.values(TicketPriority),
+      enum: [TicketPriority.LOW, TicketPriority.MEDIUM, TicketPriority.HIGH, TicketPriority.URGENT],
       default: TicketPriority.MEDIUM,
     },
     isActive: {
@@ -330,11 +330,11 @@ const ModmailConfig = new Schema(
     },
     enableAutoClose: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     enableInactivityWarning: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     // Ticket numbering counter - starts at 0, incremented for each new ticket
     nextTicketNumber: {
