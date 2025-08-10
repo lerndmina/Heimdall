@@ -149,6 +149,7 @@ EXTRACTION GUIDELINES:
 4. Note any links, resources, or tools referenced
 5. Identify the root cause and resolution if clear
 6. Format as clear, concise knowledge points
+7. KEEP IT CONCISE: Document each feature/issue in under 30 lines unless absolutely critical
 
 OUTPUT FORMAT:
 Return extracted learnings in this structure:
@@ -236,6 +237,7 @@ MERGE OBJECTIVES:
 - Remove outdated or contradictory information
 - Organize information logically and avoid duplication
 - Maintain a clean, actionable knowledge base
+- KEEP DOCUMENTATION CONCISE: Each feature/topic should not exceed 30 lines unless absolutely necessary
 
 MERGE GUIDELINES:
 1. INTEGRATION: Merge complementary information seamlessly
@@ -244,6 +246,9 @@ MERGE GUIDELINES:
 4. ORGANIZATION: Group similar topics together
 5. CLARITY: Ensure the final document is clear and actionable
 6. EVOLUTION: The documentation should evolve and improve, not just grow
+7. BREVITY: Prioritize concise, actionable information over lengthy explanations
+8. FOCUS: Keep each section focused on essential information only
+9. RETAIN OLD DATA: If there are no conflicts for a section of the documentation, retain the old data exactly as it is. Unless there is a conflict, do not change existing documentation. Then only change the conflicting parts.
 
 OUTPUT REQUIREMENTS:
 - Return the complete merged documentation
@@ -251,6 +256,7 @@ OUTPUT REQUIREMENTS:
 - Keep the most relevant and actionable information
 - Remove outdated information that conflicts with new learnings
 - If existing documentation is empty/null, return just the new learnings properly formatted
+- STRICT LENGTH CONTROL: Keep individual topics under 30 lines each
 
 IMPORTANT: Return ONLY the final merged documentation content, no explanations or meta-commentary.`;
 
