@@ -325,8 +325,8 @@ export class AIResponseHook extends BaseHook {
 
       const cancelButton = new ButtonBuilder()
         .setCustomId(`ai_cancel_modmail:${contextKey}`)
-        .setLabel("❌ I Don't Need Anymore Help")
-        .setStyle(ButtonStyle.Primary);
+        .setLabel("✅ I'm All Set")
+        .setStyle(ButtonStyle.Secondary);
 
       const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
         continueButton,
