@@ -11,6 +11,7 @@ import {
 } from "discord.js";
 import OpenAI from "openai";
 import ModmailDocumentation from "../models/ModmailDocumentation";
+import ModmailConfig from "../models/ModmailConfig";
 import { DocumentationService } from "./DocumentationService";
 import Database from "../utils/data/database";
 import log from "../utils/log";
@@ -50,6 +51,64 @@ export class LearningService {
     this.openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
+  }
+
+  /**
+   * Resolve the actual category UUID from a potential forum channel ID or validate existing category ID
+   */
+  private async resolveCategoryId(
+    guildId: string,
+    categoryOrChannelId: string
+  ): Promise<string | null> {
+    try {
+      log.debug(`LearningService: Resolving category ID for`, {
+        guildId,
+        categoryOrChannelId,
+      });
+
+      const config = await this.db.findOne(ModmailConfig, { guildId }, true);
+      if (!config) {
+        log.warn(`LearningService: No modmail config found for guild ${guildId}`);
+        return null;
+      }
+
+      // First, check if this is already a valid category UUID
+      if (categoryOrChannelId === "default") {
+        log.debug(`LearningService: Using default category`);
+        return "default";
+      }
+
+      // Check if it's an existing category ID
+      const existingCategory = config.categories?.find((cat) => cat.id === categoryOrChannelId);
+      if (existingCategory) {
+        log.debug(`LearningService: Found existing category ${existingCategory.id}`);
+        return existingCategory.id;
+      }
+
+      // If not found as category ID, try to resolve from forum channel ID
+      // Check if it's the default category (legacy forumChannelId)
+      if (config.forumChannelId === categoryOrChannelId) {
+        log.debug(
+          `LearningService: Using default category for forum channel ${categoryOrChannelId}`
+        );
+        return "default";
+      }
+
+      // Check custom categories by forum channel ID
+      const category = config.categories?.find((cat) => cat.forumChannelId === categoryOrChannelId);
+      if (category) {
+        log.debug(
+          `LearningService: Found category ${category.id} for forum channel ${categoryOrChannelId}`
+        );
+        return category.id;
+      }
+
+      log.warn(`LearningService: No category found for ${categoryOrChannelId}`);
+      return null;
+    } catch (error) {
+      log.error("LearningService: Error resolving category ID:", error);
+      return null;
+    }
   }
 
   /**
@@ -355,6 +414,27 @@ ${newLearnings}`;
     message: Message
   ): Promise<void> {
     try {
+      // First, resolve the correct category UUID from the forum channel ID
+      const actualCategoryId = await this.resolveCategoryId(
+        transcript.guildId,
+        transcript.categoryId
+      );
+      if (!actualCategoryId) {
+        log.error(
+          `LearningService: Could not resolve category ID for forum channel ${transcript.categoryId}`
+        );
+        const errorEmbed = new EmbedBuilder()
+          .setTitle("❌ Category Resolution Error")
+          .setDescription("Could not find the modmail category configuration for this thread.")
+          .setColor(0xed4245);
+
+        await message.edit({ embeds: [errorEmbed] });
+        return;
+      }
+
+      // Update the transcript with the correct category ID
+      transcript.categoryId = actualCategoryId;
+
       // Update the message to show processing
       const processingEmbed = new EmbedBuilder()
         .setTitle("🧠 Processing Learning...")
@@ -504,6 +584,24 @@ ${newLearnings}`;
   ): Promise<void> {
     try {
       await interaction.followUp({ content: "Generating preview...", ephemeral: true });
+
+      // First, resolve the correct category UUID from the forum channel ID
+      const actualCategoryId = await this.resolveCategoryId(
+        transcript.guildId,
+        transcript.categoryId
+      );
+      if (!actualCategoryId) {
+        log.error(
+          `LearningService: Could not resolve category ID for forum channel ${transcript.categoryId}`
+        );
+        await interaction.editReply({
+          content: "❌ Error: Could not find the modmail category configuration for this thread.",
+        });
+        return;
+      }
+
+      // Update the transcript with the correct category ID
+      transcript.categoryId = actualCategoryId;
 
       const cacheKey = `learning_preview:${transcript.threadId}`;
       let extractedLearnings: string | null;
@@ -689,11 +787,25 @@ Extract learnings in this format:
         try {
           const channel = message.channel;
           if (channel?.isThread()) {
+            // Fetch fresh thread data to get current archived state
+            await channel.fetch();
+
             // Check if thread is already archived before trying to close it
             if (!channel.archived) {
-              await channel.setArchived(true);
-              await channel.setLocked(true);
-              log.debug(`LearningService: Successfully closed thread ${transcript.threadId}`);
+              try {
+                await channel.setArchived(true);
+                await channel.setLocked(true);
+                log.debug(`LearningService: Successfully closed thread ${transcript.threadId}`);
+              } catch (archiveError: any) {
+                if (archiveError.code === 50083) {
+                  // Thread was archived by another process between our check and action
+                  log.debug(
+                    `LearningService: Thread ${transcript.threadId} was archived by another process during close attempt`
+                  );
+                } else {
+                  throw archiveError;
+                }
+              }
             } else {
               log.debug(
                 `LearningService: Thread ${transcript.threadId} was already archived, skipping close`

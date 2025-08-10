@@ -52,7 +52,7 @@ export default async function clearDocs({ interaction, client }: LegacySlashComm
     }
 
     // Validate category requirement for category scopes
-    if ((scope === "category" || scope === "category-learned") && !categoryId) {
+    if (scope === "category" && !categoryId) {
       return interaction.reply({
         embeds: [
           ModmailEmbeds.error(
@@ -115,11 +115,6 @@ export default async function clearDocs({ interaction, client }: LegacySlashComm
         scopeDescription = "Global documentation";
         break;
 
-      case "global-learned":
-        result = await documentationService.deleteDocumentation(interaction.guildId!, "learned");
-        scopeDescription = "Global learned documentation";
-        break;
-
       case "category":
         result = await documentationService.deleteDocumentation(
           interaction.guildId!,
@@ -127,15 +122,6 @@ export default async function clearDocs({ interaction, client }: LegacySlashComm
           categoryId!
         );
         scopeDescription = `Category documentation for <#${categoryId}>`;
-        break;
-
-      case "category-learned":
-        result = await documentationService.deleteDocumentation(
-          interaction.guildId!,
-          "learned",
-          categoryId!
-        );
-        scopeDescription = `Category learned documentation for <#${categoryId}>`;
         break;
 
       default:

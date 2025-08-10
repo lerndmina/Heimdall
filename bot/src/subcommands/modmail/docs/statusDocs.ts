@@ -1,6 +1,5 @@
 import { ChatInputCommandInteraction, Client, PermissionFlagsBits, EmbedBuilder } from "discord.js";
 import { DocumentationService } from "../../../services/DocumentationService";
-import { LearningService } from "../../../services/LearningService";
 import { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { ModmailEmbeds } from "../../../utils/modmail/ModmailEmbeds";
 import { ModmailCache } from "../../../utils/ModmailCache";
@@ -37,11 +36,9 @@ export default async function statusDocs({ interaction, client }: LegacySlashCom
     await interaction.deferReply({ ephemeral: true });
 
     const documentationService = new DocumentationService();
-    const learningService = new LearningService();
 
     // Get all documentation
     const allDocs = await documentationService.getAllDocumentation(interaction.guildId!);
-    const learningStats = await learningService.getLearningStats(interaction.guildId!);
 
     // Get modmail config to show category names
     const { data: config } = await tryCatch(
@@ -79,65 +76,31 @@ export default async function statusDocs({ interaction, client }: LegacySlashCom
       description += `❌ **Not configured**\n`;
     }
 
-    // Global learnings
-    if (globalLearned.length > 0) {
-      const doc = globalLearned[0];
-      description += `🧠 **Learned Knowledge**: ${
-        doc.metadata?.characterCount?.toLocaleString() || 0
-      } chars from ${doc.learnedFrom?.threadCount || 0} threads\n`;
-      if (doc.learnedFrom?.lastLearnedAt) {
-        description += `📅 Last Learning: <t:${Math.floor(
-          doc.learnedFrom.lastLearnedAt.getTime() / 1000
-        )}:R>\n`;
-      }
-    } else {
-      description += `🧠 **No learned knowledge yet**\n`;
-    }
-
     // Category documentation section
     description += "\n## 📋 Category Documentation\n";
 
     if (config && config.categories && config.categories.length > 0) {
       for (const category of config.categories) {
         const categoryDoc = categoryDocs.find((doc) => doc.categoryId === category.id);
-        const categoryLearnedDoc = categoryLearned.find((doc) => doc.categoryId === category.id);
 
-        description += `\n**<#${category.id}>**\n`;
+        description += `\n**<#${category.forumChannelId}>** (${category.id})\n`;
 
         if (categoryDoc) {
           description += `✅ Documentation: ${
             categoryDoc.metadata?.characterCount?.toLocaleString() || 0
           } chars\n`;
+          description += `📅 Last Updated: <t:${Math.floor(
+            categoryDoc.lastUpdated.getTime() / 1000
+          )}:R>\n`;
+          if (categoryDoc.sourceUrl) {
+            description += `🔗 Source: ${categoryDoc.sourceUrl}\n`;
+          }
         } else {
-          description += `❌ No documentation\n`;
-        }
-
-        if (categoryLearnedDoc) {
-          description += `🧠 Learned: ${
-            categoryLearnedDoc.metadata?.characterCount?.toLocaleString() || 0
-          } chars from ${categoryLearnedDoc.learnedFrom?.threadCount || 0} threads\n`;
-        } else {
-          description += `🧠 No learned knowledge\n`;
+          description += `❌ No documentation configured\n`;
         }
       }
     } else {
       description += "❌ No modmail categories configured\n";
-    }
-
-    // Learning statistics
-    description += "\n## 📊 Learning Statistics\n";
-    description += `🎯 **Total Threads Learned From**: ${learningStats.totalThreadsLearned}\n`;
-    description += `📚 **Global Learnings**: ${learningStats.globalLearnings}\n`;
-    description += `📂 **Category Learnings**: ${
-      Object.keys(learningStats.categoryLearnings).length
-    }\n`;
-
-    if (learningStats.lastLearningDate) {
-      description += `⏰ **Last Learning**: <t:${Math.floor(
-        learningStats.lastLearningDate.getTime() / 1000
-      )}:R>\n`;
-    } else {
-      description += `⏰ **Last Learning**: Never\n`;
     }
 
     embed.setDescription(description);

@@ -4,6 +4,7 @@ import { createModmailThread } from "../ModmailUtils";
 import { tryCatch } from "../trycatch";
 import Database from "../data/database";
 import Modmail from "../../models/Modmail";
+import ModmailConfig from "../../models/ModmailConfig";
 import log from "../log";
 import FetchEnvs from "../FetchEnvs";
 import ModmailCache from "../ModmailCache";
@@ -417,6 +418,38 @@ async function executeAfterClosingHooks(
       return;
     }
 
+    // Get the correct category ID from modmail config
+    // forumThread.parentId is the Discord forum channel ID, but we need the modmail category ID
+    let categoryId = "";
+    try {
+      const db = new Database();
+      const config = await db.findOne(ModmailConfig, { guildId: guild.id });
+      if (config) {
+        // Check if it's the default category (uses legacy forumChannelId)
+        if (config.forumChannelId === forumThread.parentId && config.defaultCategory) {
+          categoryId = config.defaultCategory.id;
+        } else {
+          // Check additional categories
+          const category = config.categories?.find(
+            (cat: any) => cat.forumChannelId === forumThread.parentId
+          );
+          if (category) {
+            categoryId = category.id;
+          }
+        }
+      }
+    } catch (error) {
+      log.error("Error looking up category ID for learning:", error);
+    }
+
+    // Fallback to forum channel ID if we couldn't find the category
+    if (!categoryId) {
+      categoryId = forumThread.parentId || "";
+      log.warn(
+        `Could not find modmail category ID for forum channel ${forumThread.parentId}, using forum channel ID as fallback`
+      );
+    }
+
     // Create the hook context
     const hookContext: AfterClosingHookContext = {
       client,
@@ -430,7 +463,7 @@ async function executeAfterClosingHooks(
       closedBy: user, // This might not be accurate, but it's the best we have
       forceClose: false,
       threadId: forumThread.id,
-      categoryId: forumThread.parentId || "",
+      categoryId,
       transcript,
     };
 
