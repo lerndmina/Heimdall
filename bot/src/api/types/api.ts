@@ -46,6 +46,7 @@ export interface ModmailThread {
   userDisplayName: string;
   userAvatar?: string;
   lastUserActivityAt: string;
+  lastStaffActivityAt?: string;
   markedResolved: boolean;
   resolvedAt?: string;
   claimedBy?: string;

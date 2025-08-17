@@ -210,6 +210,11 @@ const modmailSchema = new Schema({
     default: Date.now,
     index: true, // Index for activity-based queries
   },
+  lastStaffActivityAt: {
+    type: Date,
+    required: false,
+    index: true, // Index for staff activity tracking
+  },
   inactivityNotificationSent: {
     type: Date,
     required: false,
@@ -268,6 +273,7 @@ const modmailSchema = new Schema({
 // Compound indexes for better query performance
 modmailSchema.index({ guildId: 1, userId: 1 }); // Guild-user combination
 modmailSchema.index({ userId: 1, lastUserActivityAt: -1 }); // User activity
+modmailSchema.index({ userId: 1, lastStaffActivityAt: -1 }); // Staff activity
 modmailSchema.index({ guildId: 1, markedResolved: 1 }); // Guild resolution status
 modmailSchema.index({ guildId: 1, isClosed: 1 }); // Guild open/closed status
 modmailSchema.index({ autoCloseScheduledAt: 1, autoCloseDisabled: 1 }); // Auto-close scheduling

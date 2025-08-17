@@ -1254,11 +1254,11 @@ async function handleReply(message: Message, client: Client<true>, staffUser: Us
       Modmail,
       { forumThreadId: thread.id, isClosed: false },
       {
-        lastUserActivityAt: new Date(), // Use same field as user messages for consistency
+        lastStaffActivityAt: new Date(), // Track staff activity separately
         // Reset resolved status when staff sends a message
         markedResolved: false,
         resolvedAt: null,
-        // Reset inactivity tracking
+        // Reset inactivity tracking (but not for resolved tickets)
         inactivityNotificationSent: null,
         autoCloseScheduledAt: null,
       },

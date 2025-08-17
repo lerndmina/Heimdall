@@ -130,9 +130,36 @@ export class ModmailInactivityService {
       await redisClient.del(`modmail_warning_${modmailId}`);
       await redisClient.del(`modmail_autoclose_${modmailId}`);
 
-      log.debug(`Updated last activity for modmail ${modmailId}`);
+      log.debug(`Updated last user activity for modmail ${modmailId}`);
     } catch (error) {
-      log.error(`Failed to update last activity for modmail ${modmailId}:`, error);
+      log.error(`Failed to update last user activity for modmail ${modmailId}:`, error);
+    }
+  }
+
+  /**
+   * Update the last staff activity timestamp for a modmail thread
+   */
+  async updateLastStaffActivity(modmailId: string): Promise<void> {
+    try {
+      await this.db.findOneAndUpdate(
+        Modmail,
+        { _id: modmailId },
+        {
+          lastStaffActivityAt: new Date(),
+          // Reset notification tracking when staff becomes active (but not resolved status)
+          inactivityNotificationSent: null,
+          autoCloseScheduledAt: null,
+        },
+        { upsert: false, new: true }
+      );
+
+      // Remove from Redis scheduling if it exists
+      await redisClient.del(`modmail_warning_${modmailId}`);
+      await redisClient.del(`modmail_autoclose_${modmailId}`);
+
+      log.debug(`Updated last staff activity for modmail ${modmailId}`);
+    } catch (error) {
+      log.error(`Failed to update last staff activity for modmail ${modmailId}:`, error);
     }
   }
   /**
@@ -197,7 +224,18 @@ export class ModmailInactivityService {
       }
 
       const now = new Date();
-      const lastActivity = new Date(modmail.lastUserActivityAt || modmail.createdAt || now);
+
+      // For regular inactivity warnings, consider both user and staff activity
+      const lastUserActivity = new Date(modmail.lastUserActivityAt || modmail.createdAt || now);
+      const lastStaffActivity = modmail.lastStaffActivityAt
+        ? new Date(modmail.lastStaffActivityAt)
+        : null;
+
+      // Use the most recent activity (user or staff) for general inactivity warnings
+      const lastAnyActivity =
+        lastStaffActivity && lastStaffActivity > lastUserActivity
+          ? lastStaffActivity
+          : lastUserActivity;
 
       // Get config for this guild
       const config = await ModmailCache.getModmailConfig(modmail.guildId, this.db);
@@ -213,9 +251,13 @@ export class ModmailInactivityService {
       const warningHours = getInactivityWarningHours(config);
       const autoCloseHours = getAutoCloseHours(config);
 
-      const hoursSinceLastActivity = (now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60);
+      const hoursSinceLastActivity = (now.getTime() - lastAnyActivity.getTime()) / (1000 * 60 * 60);
       log.debug(
-        `Modmail ${modmail._id}: ${hoursSinceLastActivity.toFixed(2)} hours since last activity`
+        `Modmail ${modmail._id}: ${hoursSinceLastActivity.toFixed(
+          2
+        )} hours since last activity (user: ${lastUserActivity.toISOString()}, staff: ${
+          lastStaffActivity?.toISOString() || "none"
+        }, using: ${lastAnyActivity.toISOString()})`
       );
 
       // TEMPORARY INACTIVITY BLOCKING: Check if thread is marked as resolved
