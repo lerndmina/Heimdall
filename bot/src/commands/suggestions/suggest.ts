@@ -15,7 +15,6 @@ import {
   userMention,
 } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey, waitingEmoji } from "../../Bot";
-import generateHelpFields from "../../utils/data/static/generateHelpFields";
 import { initialReply } from "../../utils/initialReply";
 import Database from "../../utils/data/database";
 import SuggestionConfigModel, { SuggestionConfigType } from "../../models/SuggestionConfig";
@@ -356,7 +355,7 @@ async function getSuggestionTitle(suggestion: string, reason?: string): Promise<
       {
         role: "system",
         content:
-          "You are a title generating service. You will be provided with a suggestion and you will generate a short title for it 20-100 characters.",
+          "You are a title generating service. You will be provided with a suggestion and you will generate a short, clear, and descriptive title for it that is between 20-100 characters. Focus on the main feature or improvement being suggested.",
       },
     ];
     conversation.push({
@@ -369,18 +368,38 @@ async function getSuggestionTitle(suggestion: string, reason?: string): Promise<
         content: `The reason for this suggestion is: ${reason}`,
       });
     }
+
+    log.debug("Generating suggestion title with OpenAI", {
+      model: "gpt-5-mini",
+      suggestionLength: suggestion.length,
+      hasReason: !!reason,
+    });
+
     const response = await openai.chat.completions.create({
-      model: "gpt-5-nano",
+      model: "gpt-5-mini", // Use gpt-5-mini like AI modmail
       messages: conversation as any,
-      max_tokens: 100, // limit token usage
-      temperature: 0.5,
+      max_completion_tokens: 150, // Use max_completion_tokens instead of max_tokens
+      temperature: 0.3, // Lower temperature for more consistent titles
+      reasoning_effort: "low", // Low reasoning effort for faster responses
+    });
+
+    log.debug("OpenAI response received for suggestion title", {
+      hasContent: !!response.choices[0]?.message?.content,
+      usage: response.usage,
+      contentLength: response.choices[0]?.message?.content?.length,
     });
 
     if (!response || !response.choices[0] || !response.choices[0].message.content) {
+      log.warn("No content received from OpenAI for suggestion title");
       return "Untitled Suggestion";
     }
-    return response.choices[0].message.content.trim();
+
+    const title = response.choices[0].message.content.trim();
+    log.debug("Generated suggestion title", { title, titleLength: title.length });
+
+    return title;
   } catch (error) {
+    log.error("Error generating suggestion title with OpenAI", error);
     return "Untitled Suggestion"; // Fallback title in case of error
   }
 }
