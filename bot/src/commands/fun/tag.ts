@@ -79,12 +79,13 @@ export const options: LegacyCommandOptions = {
 };
 
 export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
-  await initialReply(interaction, true);
   const name = interaction.options.getString("name")?.toLowerCase();
   const content = interaction.options.getString("content");
   const user = interaction.options.getUser("user");
   const subcommand = interaction.options.getSubcommand();
   const guild = interaction.guild;
+
+  await initialReply(interaction, subcommand !== "send");
 
   try {
     if (subcommand == "add") {
@@ -185,10 +186,9 @@ async function sendTag(
   setCommandCooldown(globalCooldownKey(COMMAND_NAME), 15);
   /* 15 seconds cooldown for the tag command */
 
-  returnMessage(interaction, client, COMMAND_NAME_TITLE, `Sending tag \`${name}\`...`);
   const channel = interaction.channel;
   if (channel && "send" in channel) {
-    return channel.send({
+    return interaction.editReply({
       content: user ? userMention(user.id) : "",
       embeds: [BasicEmbed(client, `Tags`, tag.tag)],
     });
