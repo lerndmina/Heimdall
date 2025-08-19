@@ -379,7 +379,6 @@ async function getSuggestionTitle(suggestion: string, reason?: string): Promise<
       model: "gpt-5-mini", // Use gpt-5-mini like AI modmail
       messages: conversation as any,
       max_completion_tokens: 150, // Use max_completion_tokens instead of max_tokens
-      temperature: 0.3, // Lower temperature for more consistent titles
       reasoning_effort: "low", // Low reasoning effort for faster responses
     });
 
