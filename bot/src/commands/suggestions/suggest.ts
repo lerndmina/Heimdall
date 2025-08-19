@@ -26,9 +26,9 @@ import SuggestionModel, {
   generateUniqueSuggestionId,
 } from "../../models/Suggestions";
 import FetchEnvs from "../../utils/FetchEnvs";
-import OpenAI from "openai";
 import log from "../../utils/log";
 import { Channel } from "diagnostics_channel";
+import { AIService } from "../../services/AIService";
 
 export const data = new SlashCommandBuilder()
   .setName("suggest")
@@ -342,65 +342,10 @@ async function submitSuggestion(
   }
 }
 
-const openai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY,
-});
+const aiService = new AIService();
 
 async function getSuggestionTitle(suggestion: string, reason?: string): Promise<string> {
-  // // !!! DISABLED FOR NOW !!!
-  // return "A User Suggestion Title"; // Fallback title
-
-  try {
-    const conversation = [
-      {
-        role: "system",
-        content:
-          "You are a title generating service. You will be provided with a suggestion and you will generate a short, clear, and descriptive title for it that is between 20-100 characters. Focus on the main feature or improvement being suggested.",
-      },
-    ];
-    conversation.push({
-      role: "user",
-      content: suggestion,
-    });
-    if (reason) {
-      conversation.push({
-        role: "user",
-        content: `The reason for this suggestion is: ${reason}`,
-      });
-    }
-
-    log.debug("Generating suggestion title with OpenAI", {
-      model: "gpt-5-mini",
-      suggestionLength: suggestion.length,
-      hasReason: !!reason,
-    });
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-5-mini", // Use gpt-5-mini like AI modmail
-      messages: conversation as any,
-      max_completion_tokens: 150, // Use max_completion_tokens instead of max_tokens
-      reasoning_effort: "low", // Low reasoning effort for faster responses
-    });
-
-    log.debug("OpenAI response received for suggestion title", {
-      hasContent: !!response.choices[0]?.message?.content,
-      usage: response.usage,
-      contentLength: response.choices[0]?.message?.content?.length,
-    });
-
-    if (!response || !response.choices[0] || !response.choices[0].message.content) {
-      log.warn("No content received from OpenAI for suggestion title");
-      return "Untitled Suggestion";
-    }
-
-    const title = response.choices[0].message.content.trim();
-    log.debug("Generated suggestion title", { title, titleLength: title.length });
-
-    return title;
-  } catch (error) {
-    log.error("Error generating suggestion title with OpenAI", error);
-    return "Untitled Suggestion"; // Fallback title in case of error
-  }
+  return await aiService.generateSuggestionTitle(suggestion, reason);
 }
 
 export function getSuggestionButtons(
