@@ -631,29 +631,85 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           );
       }
 
-      // Create the player record
-      const { error: playerError } = await tryCatch(
-        (async () => {
-          const player = new MinecraftPlayer({
-            guildId,
-            minecraftUsername: pendingAuth.minecraftUsername,
-            discordId: pendingAuth.discordId,
-            whitelistStatus: "whitelisted",
-            linkedAt: pendingAuth.createdAt,
-            whitelistedAt: new Date(),
-            approvedBy: staffMemberId,
-            source: "linked",
-            notes: notes || undefined,
-          });
-          await player.save();
-        })()
+      // Check if a player with this username already exists
+      const { data: existingPlayer, error: findError } = await tryCatch(
+        MinecraftPlayer.findOne({
+          guildId,
+          minecraftUsername: pendingAuth.minecraftUsername,
+        })
       );
 
-      if (playerError) {
-        log.error("Failed to create player record:", playerError);
+      if (findError) {
+        log.error("Failed to check for existing player:", findError);
         return res
           .status(500)
-          .json(createErrorResponse("Failed to create player record", 500, req.requestId));
+          .json(createErrorResponse("Failed to check player records", 500, req.requestId));
+      }
+
+      let playerError: Error | null = null;
+
+      if (existingPlayer) {
+        // Update existing player record
+        log.info(`Updating existing player record for ${pendingAuth.minecraftUsername}`);
+
+        // Prepare update data
+        const updateData: any = {
+          discordId: pendingAuth.discordId,
+          whitelistStatus: "whitelisted",
+          linkedAt: pendingAuth.createdAt,
+          whitelistedAt: new Date(),
+          approvedBy: staffMemberId,
+          source: "linked",
+          notes: notes || existingPlayer.notes,
+          updatedAt: new Date(),
+        };
+
+        // Add UUID if available from the last connection attempt
+        if (pendingAuth.lastConnectionAttempt?.uuid) {
+          updateData.minecraftUuid = pendingAuth.lastConnectionAttempt.uuid;
+          log.info(
+            `Also updating UUID for ${pendingAuth.minecraftUsername} to ${pendingAuth.lastConnectionAttempt.uuid}`
+          );
+        }
+
+        const { error } = await tryCatch(
+          MinecraftPlayer.findOneAndUpdate({ _id: existingPlayer._id }, updateData, { new: true })
+        );
+        playerError = error;
+      } else {
+        // Create new player record
+        log.info(`Creating new player record for ${pendingAuth.minecraftUsername}`);
+        const { error } = await tryCatch(
+          (async () => {
+            const playerData: any = {
+              guildId,
+              minecraftUsername: pendingAuth.minecraftUsername,
+              discordId: pendingAuth.discordId,
+              whitelistStatus: "whitelisted",
+              linkedAt: pendingAuth.createdAt,
+              whitelistedAt: new Date(),
+              approvedBy: staffMemberId,
+              source: "linked",
+              notes: notes || undefined,
+            };
+
+            // Add UUID if available from the last connection attempt
+            if (pendingAuth.lastConnectionAttempt?.uuid) {
+              playerData.minecraftUuid = pendingAuth.lastConnectionAttempt.uuid;
+            }
+
+            const player = new MinecraftPlayer(playerData);
+            await player.save();
+          })()
+        );
+        playerError = error;
+      }
+
+      if (playerError) {
+        log.error("Failed to create/update player record:", playerError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to create/update player record", 500, req.requestId));
       }
 
       // Clean up the pending auth
