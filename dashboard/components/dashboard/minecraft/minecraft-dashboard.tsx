@@ -124,7 +124,7 @@ export function MinecraftDashboard() {
     },
     onSuccess: (data) => {
       const approvedPlayers = data.data.approvedPlayers || [];
-      
+
       let description = `Successfully approved ${data.data.approved} players.`;
       if (data.data.errors > 0) {
         description += ` ${data.data.errors} errors occurred.`;
@@ -142,7 +142,7 @@ export function MinecraftDashboard() {
       if (approvedPlayers.length > 0) {
         setTimeout(async () => {
           try {
-            const playerList = approvedPlayers.join('\n');
+            const playerList = approvedPlayers.join("\n");
             await navigator.clipboard.writeText(playerList);
             toast({
               title: "Player List Copied",
@@ -152,7 +152,7 @@ export function MinecraftDashboard() {
             console.error("Failed to copy:", err);
             toast({
               title: "Copy Available",
-              description: `Approved players: ${approvedPlayers.join(', ')}`,
+              description: `Approved players: ${approvedPlayers.join(", ")}`,
             });
           }
         }, 500);
