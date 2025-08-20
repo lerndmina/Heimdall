@@ -66,8 +66,9 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           }
         }
 
-        // If no server IP provided or no config found, try to find any pending auth for this username
+        // If no server IP provided or no config found, try to find any pending auth for this username or UUID
         if (!guildId) {
+          // First try by username
           const { data: pendingAuth } = await tryCatch(
             MinecraftAuthPending.findOne({
               minecraftUsername: username,
@@ -79,17 +80,47 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           if (pendingAuth) {
             guildId = pendingAuth.guildId;
           }
+
+          // If not found by username and UUID is available, try by UUID
+          if (!guildId && uuid) {
+            const { data: uuidPendingAuth } = await tryCatch(
+              MinecraftAuthPending.findOne({
+                "lastConnectionAttempt.uuid": uuid,
+                status: { $in: ["awaiting_connection", "code_shown"] },
+                expiresAt: { $gt: new Date() },
+              }).lean()
+            );
+
+            if (uuidPendingAuth) {
+              guildId = uuidPendingAuth.guildId;
+            }
+          }
         }
 
-        // If still no guild found, check if we have any player record for this username
+        // If still no guild found, check if we have any player record for this username or UUID
         if (!guildId) {
-          const { data: existingPlayer } = await tryCatch(
-            MinecraftPlayer.findOne({
-              minecraftUsername: username,
-            }).lean()
-          );
-          if (existingPlayer) {
-            guildId = existingPlayer.guildId;
+          // First try by UUID (more reliable)
+          if (uuid) {
+            const { data: existingPlayer } = await tryCatch(
+              MinecraftPlayer.findOne({
+                minecraftUuid: uuid,
+              }).lean()
+            );
+            if (existingPlayer) {
+              guildId = existingPlayer.guildId;
+            }
+          }
+
+          // Fallback to username if UUID didn't find anything
+          if (!guildId) {
+            const { data: existingPlayer } = await tryCatch(
+              MinecraftPlayer.findOne({
+                minecraftUsername: username,
+              }).lean()
+            );
+            if (existingPlayer) {
+              guildId = existingPlayer.guildId;
+            }
           }
         }
 
@@ -144,13 +175,87 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           )
         );
 
-        // Check if player should be whitelisted (check player record first)
-        const { data: player, error: playerError } = await tryCatch(
-          MinecraftPlayer.findOne({
-            guildId,
-            minecraftUsername: username,
-          }).lean()
-        );
+        // Check if player should be whitelisted (check by UUID first, then username)
+        let player: any = null;
+        let playerError: Error | null = null;
+
+        // First, try to find player by UUID (most reliable)
+        if (uuid) {
+          const uuidResult = await tryCatch(
+            MinecraftPlayer.findOne({
+              guildId,
+              minecraftUuid: uuid,
+            }).lean()
+          );
+          player = uuidResult.data;
+          playerError = uuidResult.error;
+
+          // If found by UUID but username is different, update the username
+          if (player && player.minecraftUsername !== username) {
+            log.info(
+              `Player UUID ${uuid} found with different username. Updating from '${player.minecraftUsername}' to '${username}'`
+            );
+
+            const { error: updateError } = await tryCatch(
+              MinecraftPlayer.findOneAndUpdate(
+                { _id: player._id },
+                {
+                  minecraftUsername: username,
+                  lastConnectionAttempt: new Date(),
+                },
+                { upsert: false, new: true }
+              )
+            );
+
+            if (updateError) {
+              log.warn("Failed to update username for UUID:", updateError);
+            } else {
+              log.info(
+                `Successfully updated username for UUID ${uuid} from '${player.minecraftUsername}' to '${username}'`
+              );
+              // Update the player object with new username
+              player.minecraftUsername = username;
+            }
+          }
+        }
+
+        // If not found by UUID, try to find by username (fallback for legacy players)
+        if (!player && !playerError) {
+          const usernameResult = await tryCatch(
+            MinecraftPlayer.findOne({
+              guildId,
+              minecraftUsername: username,
+            }).lean()
+          );
+          player = usernameResult.data;
+          playerError = usernameResult.error;
+
+          // If found by username but UUID is missing/different, update the UUID
+          if (player && uuid && (!player.minecraftUuid || player.minecraftUuid !== uuid)) {
+            log.info(
+              `Player ${username} found but UUID is missing or different. Updating UUID to ${uuid}`
+            );
+
+            const { error: updateError } = await tryCatch(
+              MinecraftPlayer.findOneAndUpdate(
+                { _id: player._id },
+                {
+                  minecraftUuid: uuid,
+                  lastConnectionAttempt: new Date(),
+                },
+                { upsert: false, new: true }
+              )
+            );
+
+            if (updateError) {
+              log.warn("Failed to update UUID for player:", updateError);
+            } else {
+              log.info(`Successfully updated UUID for player ${username} to ${uuid}`);
+              // Update the player object with new UUID
+              player.minecraftUuid = uuid;
+            }
+          }
+        }
 
         if (playerError) {
           log.error("Failed to fetch player record:", playerError);
@@ -197,25 +302,12 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           );
         }
 
-        // If player exists but is banned, deny them
-        if (player && player.whitelistStatus === "banned") {
-          log.info(`Player ${username} is banned, denying connection`);
-          return res.json(
-            createSuccessResponse(
-              {
-                shouldBeWhitelisted: false,
-                hasAuth: false,
-                action: "kick_with_message",
-                kickMessage:
-                  "§cYou have been banned from this server.\n§7Contact staff if you believe this is an error.",
-              },
-              req.requestId
-            )
-          );
-        }
-
         // Player doesn't exist or is unwhitelisted - check for pending auth
-        const { data: pendingAuth, error: authError } = await tryCatch(
+        // Try to find by username first, then by UUID from previous connection attempts
+        let pendingAuth: any = null;
+        let authError: Error | null = null;
+
+        const pendingAuthResult = await tryCatch(
           MinecraftAuthPending.findOne({
             guildId,
             minecraftUsername: username,
@@ -223,6 +315,47 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             expiresAt: { $gt: new Date() },
           }).lean()
         );
+
+        pendingAuth = pendingAuthResult.data;
+        authError = pendingAuthResult.error;
+
+        // If not found by username but UUID is available, try to find by UUID in connection attempts
+        if (!pendingAuth && !authError && uuid) {
+          const uuidAuthResult = await tryCatch(
+            MinecraftAuthPending.findOne({
+              guildId,
+              "lastConnectionAttempt.uuid": uuid,
+              status: { $in: ["awaiting_connection", "code_shown", "code_confirmed"] },
+              expiresAt: { $gt: new Date() },
+            }).lean()
+          );
+
+          if (uuidAuthResult.data && !uuidAuthResult.error) {
+            pendingAuth = uuidAuthResult.data;
+            authError = uuidAuthResult.error;
+
+            // If found by UUID but username is different, update the username
+            if (pendingAuth && pendingAuth.minecraftUsername !== username) {
+              log.info(
+                `Pending auth found by UUID ${uuid} with different username. Updating from '${pendingAuth.minecraftUsername}' to '${username}'`
+              );
+
+              const { error: updateError } = await tryCatch(
+                MinecraftAuthPending.findOneAndUpdate(
+                  { _id: pendingAuth._id },
+                  { minecraftUsername: username },
+                  { upsert: false, new: true }
+                )
+              );
+
+              if (updateError) {
+                log.warn("Failed to update pending auth username:", updateError);
+              } else {
+                pendingAuth.minecraftUsername = username;
+              }
+            }
+          }
+        }
 
         if (authError) {
           log.error("Failed to fetch pending auth:", authError);
@@ -799,49 +932,6 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
   );
 
   /**
-   * POST /api/minecraft/:guildId/players/:playerId/ban
-   * Ban a player
-   */
-  router.post(
-    "/:guildId/players/:playerId/ban",
-    authenticateApiKey,
-    requireScope("modmail:write"),
-    asyncHandler(async (req, res) => {
-      const { guildId, playerId } = req.params;
-      const { notes } = req.body;
-      const staffMemberId = req.body.staffMemberId;
-
-      const { data: player, error } = await tryCatch(
-        MinecraftPlayer.findOneAndUpdate(
-          { _id: playerId, guildId },
-          {
-            whitelistStatus: "banned",
-            bannedAt: new Date(),
-            bannedBy: staffMemberId,
-            notes: notes || undefined,
-          },
-          { upsert: false, new: true }
-        )
-      );
-
-      if (error) {
-        log.error("Failed to ban player:", error);
-        return res
-          .status(500)
-          .json(createErrorResponse("Failed to ban player", 500, req.requestId));
-      }
-
-      if (!player) {
-        return res.status(404).json(createErrorResponse("Player not found", 404, req.requestId));
-      }
-
-      log.info(`Banned player: ${player.minecraftUsername}`);
-
-      return res.json(createSuccessResponse(player, req.requestId));
-    })
-  );
-
-  /**
    * POST /api/minecraft/:guildId/test-rcon
    * Test RCON connection
    */
@@ -940,6 +1030,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
       let approvedCount = 0;
       const errors: string[] = [];
+      const approvedPlayers: string[] = []; // Track approved usernames
 
       // Process each player approval
       for (const player of pendingPlayers) {
@@ -962,6 +1053,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             errors.push(`Failed to approve ${player.minecraftUsername}: ${updateError.message}`);
           } else {
             approvedCount++;
+            approvedPlayers.push(player.minecraftUsername); // Add to approved list
             log.info(
               `[Minecraft Bulk Approve] Approved ${player.minecraftUsername} (${player._id}) by staff ${staffMemberId}`
             );
@@ -980,6 +1072,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         totalRequested: count,
         totalFound: pendingPlayers.length,
         approved: approvedCount,
+        approvedPlayers, // Include list of approved usernames
         errors: errors.length,
         errorDetails: errors,
       };
@@ -1120,7 +1213,6 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             minecraftUuid: uuid,
             isWhitelisted: true,
             whitelistStatus: "whitelisted",
-            isBanned: false,
             source: "imported",
             whitelistedAt: new Date(),
             createdAt: new Date(),

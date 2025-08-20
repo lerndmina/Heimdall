@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { User, Users, Clock, CheckCircle, AlertCircle, Settings, Server, Shield, Plus, Upload, FileText } from "lucide-react";
+import { User, Users, Clock, CheckCircle, AlertCircle, Settings, Server, Shield, Plus, Upload, FileText, Copy } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -123,10 +123,41 @@ export function MinecraftDashboard() {
       return result;
     },
     onSuccess: (data) => {
+      const approvedPlayers = data.data.approvedPlayers || [];
+      
+      let description = `Successfully approved ${data.data.approved} players.`;
+      if (data.data.errors > 0) {
+        description += ` ${data.data.errors} errors occurred.`;
+      }
+      if (approvedPlayers.length > 0) {
+        description += ` Click the copy button to get the player list.`;
+      }
+
       toast({
         title: "Bulk Approval Completed",
-        description: `Successfully approved ${data.data.approved} players. ${data.data.errors > 0 ? `${data.data.errors} errors occurred.` : ""}`,
+        description,
       });
+
+      // Auto-copy the player list to clipboard if any players were approved
+      if (approvedPlayers.length > 0) {
+        setTimeout(async () => {
+          try {
+            const playerList = approvedPlayers.join('\n');
+            await navigator.clipboard.writeText(playerList);
+            toast({
+              title: "Player List Copied",
+              description: `${approvedPlayers.length} usernames copied to clipboard (newline separated)`,
+            });
+          } catch (err) {
+            console.error("Failed to copy:", err);
+            toast({
+              title: "Copy Available",
+              description: `Approved players: ${approvedPlayers.join(', ')}`,
+            });
+          }
+        }, 500);
+      }
+
       // Refresh both queries
       queryClient.invalidateQueries({ queryKey: ["minecraft-pending"] });
       queryClient.invalidateQueries({ queryKey: ["minecraft-stats"] });

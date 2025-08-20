@@ -11,7 +11,7 @@ export interface MinecraftPlayerType extends Document {
   discordId?: string;
 
   // Status tracking
-  whitelistStatus: "whitelisted" | "unwhitelisted" | "banned";
+  whitelistStatus: "whitelisted" | "unwhitelisted";
 
   // Timestamps
   linkedAt?: Date;
@@ -22,8 +22,6 @@ export interface MinecraftPlayerType extends Document {
   approvedBy?: string; // Staff Discord ID
   revokedBy?: string;
   revokedAt?: Date;
-  bannedBy?: string;
-  bannedAt?: Date;
 
   // Metadata
   source: "imported" | "linked" | "manual"; // How they got added
@@ -61,7 +59,7 @@ const MinecraftPlayerSchema = new Schema<MinecraftPlayerType>(
     // Status tracking
     whitelistStatus: {
       type: String,
-      enum: ["whitelisted", "unwhitelisted", "banned"],
+      enum: ["whitelisted", "unwhitelisted"],
       default: "unwhitelisted",
       index: true,
     },
@@ -75,8 +73,6 @@ const MinecraftPlayerSchema = new Schema<MinecraftPlayerType>(
     approvedBy: { type: String },
     revokedBy: { type: String },
     revokedAt: { type: Date },
-    bannedBy: { type: String },
-    bannedAt: { type: Date },
 
     // Metadata
     source: {

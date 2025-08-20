@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { User, Users, Search, Filter, CheckCircle, XCircle, AlertCircle, Shield, Clock, MoreVertical, Ban, UserPlus, Upload, FileText, Link } from "lucide-react";
+import { User, Users, Search, Filter, CheckCircle, XCircle, AlertCircle, Shield, Clock, MoreVertical, UserPlus, Upload, FileText, Link } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ interface MinecraftPlayer {
   _id: string;
   minecraftUsername: string;
   discordId?: string;
-  whitelistStatus: "whitelisted" | "unwhitelisted" | "banned";
+  whitelistStatus: "whitelisted" | "unwhitelisted";
   linkedAt?: string;
   approvedAt?: string;
   approvedBy?: string;
@@ -71,7 +71,7 @@ export function MinecraftPlayersList() {
 
   // Whitelist/unwhitelist mutation
   const whitelistMutation = useMutation({
-    mutationFn: async ({ playerId, action, notes }: { playerId: string; action: "whitelist" | "unwhitelist" | "ban"; notes?: string }) => {
+    mutationFn: async ({ playerId, action, notes }: { playerId: string; action: "whitelist" | "unwhitelist"; notes?: string }) => {
       if (!selectedGuild) throw new Error("No guild selected");
 
       const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/players/${playerId}/${action}`, {
@@ -91,7 +91,7 @@ export function MinecraftPlayersList() {
       return result;
     },
     onSuccess: (data, variables) => {
-      const actionText = variables.action === "whitelist" ? "whitelisted" : variables.action === "ban" ? "banned" : "removed from whitelist";
+      const actionText = variables.action === "whitelist" ? "whitelisted" : "removed from whitelist";
 
       toast({
         title: "Player Updated",
@@ -238,13 +238,6 @@ export function MinecraftPlayersList() {
             Whitelisted
           </Badge>
         );
-      case "banned":
-        return (
-          <Badge variant="destructive">
-            <Ban className="h-3 w-3 mr-1" />
-            Banned
-          </Badge>
-        );
       default:
         return (
           <Badge variant="secondary">
@@ -294,26 +287,6 @@ export function MinecraftPlayersList() {
           disabled={whitelistMutation.isPending}>
           <XCircle className="h-4 w-4 mr-2" />
           Remove
-        </Button>
-      );
-    }
-
-    if (player.whitelistStatus !== "banned") {
-      actions.push(
-        <Button
-          key="ban"
-          size="sm"
-          variant="destructive"
-          onClick={() =>
-            whitelistMutation.mutate({
-              playerId: player._id,
-              action: "ban",
-              notes: "Banned via dashboard",
-            })
-          }
-          disabled={whitelistMutation.isPending}>
-          <Ban className="h-4 w-4 mr-2" />
-          Ban
         </Button>
       );
     }
@@ -378,7 +351,6 @@ export function MinecraftPlayersList() {
               <SelectItem value="all">All Players</SelectItem>
               <SelectItem value="whitelisted">Whitelisted</SelectItem>
               <SelectItem value="unwhitelisted">Unwhitelisted</SelectItem>
-              <SelectItem value="banned">Banned</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>

@@ -26,13 +26,14 @@ public class WhitelistManager {
   }
 
   public WhitelistResponse checkPlayerWhitelist(String username, String uuid, String ip) throws Exception {
-    String cacheKey = username.toLowerCase();
+    // Use UUID as primary cache key, fallback to username if UUID is null
+    String cacheKey = uuid != null ? uuid : username.toLowerCase();
 
     // Check cache first
     CachedResponse cached = cache.get(cacheKey);
     if (cached != null && !cached.isExpired()) {
       if (plugin.getConfig().getBoolean("logging.debug", false)) {
-        plugin.getLogger().info("Using cached whitelist result for " + username);
+        plugin.getLogger().info("Using cached whitelist result for " + username + " (" + uuid + ")");
       }
       return cached.getResponse();
     }
@@ -43,17 +44,17 @@ public class WhitelistManager {
           plugin.getConfig().getInt("api.timeout", 5000) + 1000, // Add 1 second buffer
           TimeUnit.MILLISECONDS);
 
-      // Cache only successful responses (when player is allowed)
+      // Cache successful responses (when player is allowed)
       if (response.shouldBeWhitelisted()) {
         long cacheTimeout = plugin.getConfig().getInt("performance.cacheTimeout", 30) * 1000L;
         cache.put(cacheKey, new CachedResponse(response, System.currentTimeMillis() + cacheTimeout));
 
         if (plugin.getConfig().getBoolean("logging.debug", false)) {
-          plugin.getLogger().info("Cached successful whitelist result for " + username);
+          plugin.getLogger().info("Cached successful whitelist result for " + username + " (" + uuid + ")");
         }
       } else {
         if (plugin.getConfig().getBoolean("logging.debug", false)) {
-          plugin.getLogger().info("Not caching failed whitelist result for " + username);
+          plugin.getLogger().info("Not caching failed whitelist result for " + username + " (" + uuid + ")");
         }
       }
 
@@ -76,34 +77,27 @@ public class WhitelistManager {
     plugin.getLogger().info("Whitelist cache cleared");
   }
 
-  public void clearCacheForPlayer(String username) {
+  public void clearCacheForPlayer(String username, String uuid) {
+    // Clear cache for both username and UUID if available
+    if (uuid != null) {
+      cache.remove(uuid);
+    }
     cache.remove(username.toLowerCase());
     if (plugin.getConfig().getBoolean("logging.debug", false)) {
-      plugin.getLogger().info("Cleared cache for player: " + username);
+      plugin.getLogger().info("Cleared cache for player: " + username + " (" + uuid + ")");
     }
   }
 
   private void startCacheCleanupTask() {
     // Run cache cleanup every 5 minutes
     plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-      int removedCount = 0;
-      long currentTime = System.currentTimeMillis();
+      // Count entries before cleanup for debug logging
+      int sizeBefore = cache.size();
 
-      cache.entrySet().removeIf(entry -> {
-        if (entry.getValue().isExpired()) {
-          return true;
-        }
-        return false;
-      });
+      // Remove expired entries
+      cache.entrySet().removeIf(entry -> entry.getValue().isExpired());
 
-      for (String key : cache.keySet()) {
-        CachedResponse cached = cache.get(key);
-        if (cached != null && cached.isExpired()) {
-          cache.remove(key);
-          removedCount++;
-        }
-      }
-
+      int removedCount = sizeBefore - cache.size();
       if (removedCount > 0 && plugin.getConfig().getBoolean("logging.debug", false)) {
         plugin.getLogger().info("Cleaned up " + removedCount + " expired cache entries");
       }

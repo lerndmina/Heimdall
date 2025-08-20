@@ -2,7 +2,6 @@ package com.heimdall.whitelist;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -58,7 +57,7 @@ public class ApiClient {
       }
       requestBody.addProperty("ip", ip);
       requestBody.addProperty("serverIp", getServerIp());
-      requestBody.addProperty("currentlyWhitelisted", isCurrentlyWhitelisted(normalizedUsername));
+      requestBody.addProperty("currentlyWhitelisted", isCurrentlyWhitelisted(normalizedUsername, uuid));
 
       try {
         return makeRequest("/api/minecraft/connection-attempt", requestBody);
@@ -189,9 +188,15 @@ public class ApiClient {
     return new WhitelistResponse(shouldBeWhitelisted, hasAuth, kickMessage, action);
   }
 
-  private boolean isCurrentlyWhitelisted(String username) {
+  private boolean isCurrentlyWhitelisted(String username, String uuid) {
     return plugin.getServer().getWhitelistedPlayers().stream()
-        .anyMatch(profile -> profile.getName() != null && profile.getName().equalsIgnoreCase(username));
+        .anyMatch(profile -> {
+          // Check by UUID first (more reliable), then fallback to username
+          if (uuid != null && profile.getUniqueId() != null) {
+            return profile.getUniqueId().toString().equalsIgnoreCase(uuid);
+          }
+          return profile.getName() != null && profile.getName().equalsIgnoreCase(username);
+        });
   }
 
   private String getServerIp() {
