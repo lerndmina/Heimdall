@@ -13,7 +13,7 @@
     "start": "concurrently --prefix \"[{name}]\" --prefix-colors \"cyan,magenta\" --names \"bot,dashboard\" \"cd bot && bun run start\" \"cd dashboard && bun run start\"",
     "start:bot": "cd bot && bun run start",
     "start:dashboard": "cd dashboard && bun run start",
-    "install:all": "cd bot && bun install && cd ../dashboard && bun install && cd .. && bun install",
+    "install:all": "cd logger && bun install && bun run build && cd ../command-handler && bun install && bun run build && cd ../bot && bun install && bun run build && cd ../dashboard && bun install && bun run build",
     "db:push": "cd dashboard && bunx prisma db push"
   },
   "dependencies": {
