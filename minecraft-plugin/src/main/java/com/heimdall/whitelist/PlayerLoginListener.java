@@ -21,6 +21,15 @@ public class PlayerLoginListener implements Listener {
 
   @EventHandler(priority = EventPriority.HIGHEST)
   public void onPlayerPreLogin(AsyncPlayerPreLoginEvent event) {
+    // Check if the plugin is globally enabled
+    if (!plugin.getConfig().getBoolean("enabled", false)) {
+      if (plugin.getConfig().getBoolean("logging.debug", false)) {
+        plugin.getLogger().info("Plugin is disabled, allowing " + event.getName() + " without whitelist check");
+      }
+      event.allow();
+      return;
+    }
+
     // Skip if player has bypass permission (this check works in async)
     // Note: We can't check permissions in AsyncPlayerPreLoginEvent reliably
     // So we'll handle bypass in the sync PlayerLoginEvent

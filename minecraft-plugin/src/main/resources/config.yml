@@ -1,6 +1,13 @@
 # Heimdall Whitelist Plugin Configuration
 # This plugin integrates with your Heimdall Discord bot for dynamic whitelist management
 
+# Global Plugin Control
+# IMPORTANT: Plugin starts DISABLED by default for security
+# When disabled, ALL players can join without any whitelist checks
+# Set this to true only after configuring your API settings properly
+# You can also use '/hwl enable' command in-game
+enabled: false
+
 # Bot API Configuration
 api:
   # The URL of your Heimdall bot API endpoint

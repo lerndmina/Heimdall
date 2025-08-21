@@ -39,6 +39,18 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
     getLogger().info("Heimdall Whitelist Plugin enabled successfully!");
     getLogger().info("API URL: " + getConfig().getString("api.baseUrl"));
     getLogger().info("Server ID: " + getConfig().getString("server.serverId"));
+    
+    // Check if plugin is enabled and warn accordingly
+    boolean enabled = getConfig().getBoolean("enabled", false);
+    if (enabled) {
+      getLogger().info("Whitelist protection is ACTIVE - all players will be checked");
+    } else {
+      getLogger().warning("================================================");
+      getLogger().warning("WHITELIST PROTECTION IS DISABLED!");
+      getLogger().warning("All players can join without Discord verification!");
+      getLogger().warning("Enable in config.yml or use '/hwl enable' command");
+      getLogger().warning("================================================");
+    }
   }
 
   @Override
@@ -64,6 +76,8 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
       sender.sendMessage(ChatColor.YELLOW + "Heimdall Whitelist Commands:");
       sender.sendMessage(ChatColor.GRAY + "/hwl reload - Reload configuration");
       sender.sendMessage(ChatColor.GRAY + "/hwl status - Show plugin status");
+      sender.sendMessage(ChatColor.GRAY + "/hwl enable - Enable the whitelist plugin");
+      sender.sendMessage(ChatColor.GRAY + "/hwl disable - Disable the whitelist plugin");
       sender.sendMessage(ChatColor.GRAY + "/hwl test <player> - Test whitelist check for player");
       return true;
     }
@@ -79,11 +93,37 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
         return true;
 
       case "status":
+        boolean enabled = getConfig().getBoolean("enabled", false);
+        String enabledStatus = enabled ? "§aENABLED" : "§cDISABLED";
+        
         String statusMsg = getConfig().getString("messages.status", "Status: OK")
             .replace("{url}", getConfig().getString("api.baseUrl", "Not set"))
             .replace("{serverId}", getConfig().getString("server.serverId", "Not set"))
             .replace("{lastCheck}", whitelistManager.getLastCheckTime());
+        
         sender.sendMessage(ChatColor.translateAlternateColorCodes('&', statusMsg));
+        sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "§7Plugin Status: " + enabledStatus));
+        
+        if (!enabled) {
+          sender.sendMessage(ChatColor.translateAlternateColorCodes('&', 
+            "§eWarning: Plugin is disabled. All players can join without whitelist checks!"));
+          sender.sendMessage(ChatColor.translateAlternateColorCodes('&', 
+            "§7Enable in config.yml by setting 'enabled: true'"));
+        }
+        return true;
+
+      case "enable":
+        getConfig().set("enabled", true);
+        saveConfig();
+        sender.sendMessage(ChatColor.GREEN + "§aHeimdall Whitelist plugin enabled!");
+        sender.sendMessage(ChatColor.YELLOW + "§eWhitelist checks are now active for all players.");
+        return true;
+
+      case "disable":
+        getConfig().set("enabled", false);
+        saveConfig();
+        sender.sendMessage(ChatColor.RED + "§cHeimdall Whitelist plugin disabled!");
+        sender.sendMessage(ChatColor.YELLOW + "§eWarning: All players can now join without whitelist checks!");
         return true;
 
       case "test":

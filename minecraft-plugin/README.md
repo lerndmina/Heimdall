@@ -31,6 +31,11 @@ A Minecraft plugin that integrates with the Heimdall Discord bot to provide dyna
 Edit `plugins/HeimdallWhitelist/config.yml`:
 
 ```yaml
+# Global Plugin Control (IMPORTANT!)
+# Plugin starts DISABLED by default for security
+# When disabled, ALL players can join without any whitelist checks
+enabled: false
+
 # Bot API Configuration
 api:
   # The URL of your Heimdall bot API endpoint
@@ -59,10 +64,14 @@ performance:
 
 ### Important Configuration Notes
 
+- **enabled**: Controls whether whitelist protection is active. Starts `false` for security
 - **api.baseUrl**: Must point to your Heimdall bot's API endpoint (e.g., `http://your-bot-server.com:3001`)
+- **api.apiKey**: Authentication key from your bot (use `/api-keys` command in Discord)
 - **server.serverId**: Auto-generated unique identifier - don't change this after setup
 - **server.displayName**: How your server appears in Discord
 - **cacheTimeout**: Balance between API load and real-time updates
+
+⚠️ **Security Notice**: The plugin starts **DISABLED** by default to prevent unauthorized access when using default configuration. Enable only after properly configuring your API settings.
 
 ## Commands
 
@@ -75,6 +84,8 @@ _None - all interaction happens through Discord_
 - `/hwl` - Show available commands
 - `/hwl reload` - Reload configuration from file
 - `/hwl status` - Display plugin status and connectivity
+- `/hwl enable` - Enable whitelist protection (requires proper API config)
+- `/hwl disable` - Disable whitelist protection (allows all players)
 - `/hwl test <player>` - Test whitelist check for a specific player
 
 **Permission Required**: `heimdall.admin` (defaults to OP)
