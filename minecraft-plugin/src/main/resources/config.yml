@@ -73,3 +73,20 @@ performance:
   
   # Maximum concurrent API requests
   maxConcurrentRequests: 5
+
+# Whitelist Cache Settings
+cache:
+  # How long to cache whitelist decisions (in minutes)
+  # This reduces API calls for repeat connections
+  cacheWindow: 60
+  
+  # How long to extend cache when a player joins (in minutes)
+  # Since they successfully joined, extend their cache
+  extendOnJoin: 120
+  
+  # How long to extend cache when a player leaves (in minutes)
+  # Since they were allowed to play, extend their cache
+  extendOnLeave: 180
+  
+  # How often to clean up expired cache entries (in minutes)
+  cleanupInterval: 30

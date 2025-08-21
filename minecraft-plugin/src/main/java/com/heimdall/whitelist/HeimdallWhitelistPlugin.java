@@ -6,7 +6,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.ChatColor;
-import java.util.logging.Level;
 import java.util.UUID;
 
 public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
@@ -14,6 +13,8 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
   private ApiClient apiClient;
   private ConfigManager configManager;
   private WhitelistManager whitelistManager;
+  private WhitelistCache whitelistCache;
+  private int cacheCleanupTaskId = -1;
 
   @Override
   public void onEnable() {
@@ -25,8 +26,21 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
     apiClient = new ApiClient(this);
     whitelistManager = new WhitelistManager(this, apiClient);
 
+    // Initialize whitelist cache
+    long cacheWindow = getConfig().getLong("cache.cacheWindow", 60);
+    long extendOnJoin = getConfig().getLong("cache.extendOnJoin", 120);
+    long extendOnLeave = getConfig().getLong("cache.extendOnLeave", 180);
+    whitelistCache = new WhitelistCache(this, cacheWindow, extendOnJoin, extendOnLeave);
+
     // Register events
     getServer().getPluginManager().registerEvents(new PlayerLoginListener(this), this);
+    getServer().getPluginManager().registerEvents(new PlayerJoinLeaveListener(this), this);
+
+    // Start cache cleanup task
+    long cleanupInterval = getConfig().getLong("cache.cleanupInterval", 30) * 60 * 20; // Convert minutes to ticks
+    cacheCleanupTaskId = getServer().getScheduler().runTaskTimerAsynchronously(this, () -> {
+      whitelistCache.cleanupExpiredEntries();
+    }, cleanupInterval, cleanupInterval).getTaskId();
 
     // Generate server ID if not set
     if (getConfig().getString("server.serverId", "").isEmpty()) {
@@ -55,9 +69,21 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
 
   @Override
   public void onDisable() {
+    // Cancel cache cleanup task
+    if (cacheCleanupTaskId != -1) {
+      getServer().getScheduler().cancelTask(cacheCleanupTaskId);
+    }
+
+    // Shutdown cache
+    if (whitelistCache != null) {
+      whitelistCache.shutdown();
+    }
+
+    // Shutdown API client
     if (apiClient != null) {
       apiClient.shutdown();
     }
+
     getLogger().info("Heimdall Whitelist Plugin disabled!");
   }
 
@@ -79,6 +105,9 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
       sender.sendMessage(ChatColor.GRAY + "/hwl enable - Enable the whitelist plugin");
       sender.sendMessage(ChatColor.GRAY + "/hwl disable - Disable the whitelist plugin");
       sender.sendMessage(ChatColor.GRAY + "/hwl test <player> - Test whitelist check for player");
+      sender.sendMessage(ChatColor.GRAY + "/hwl cache stats - Show cache statistics");
+      sender.sendMessage(ChatColor.GRAY + "/hwl cache clear - Clear the whitelist cache");
+      sender.sendMessage(ChatColor.GRAY + "/hwl cache cleanup - Clean up expired cache entries");
       return true;
     }
 
@@ -159,6 +188,40 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
         });
         return true;
 
+      case "cache":
+        if (args.length < 2) {
+          sender.sendMessage(ChatColor.RED + "Usage: /hwl cache <stats|clear|cleanup>");
+          return true;
+        }
+
+        String cacheSubCommand = args[1].toLowerCase();
+        switch (cacheSubCommand) {
+          case "stats":
+            sender.sendMessage(ChatColor.YELLOW + "Whitelist Cache Statistics:");
+            sender.sendMessage(ChatColor.GRAY + whitelistCache.getCacheStats());
+            return true;
+
+          case "clear":
+            // Clear the cache by creating a new instance
+            long cacheWindow = getConfig().getLong("cache.cacheWindow", 60);
+            long extendOnJoin = getConfig().getLong("cache.extendOnJoin", 120);
+            long extendOnLeave = getConfig().getLong("cache.extendOnLeave", 180);
+            whitelistCache.shutdown();
+            whitelistCache = new WhitelistCache(this, cacheWindow, extendOnJoin, extendOnLeave);
+            sender.sendMessage(ChatColor.GREEN + "Whitelist cache cleared successfully!");
+            return true;
+
+          case "cleanup":
+            whitelistCache.cleanupExpiredEntries();
+            sender.sendMessage(ChatColor.GREEN + "Expired cache entries cleaned up!");
+            return true;
+
+          default:
+            sender.sendMessage(ChatColor.RED + "Unknown cache subcommand: " + cacheSubCommand);
+            sender.sendMessage(ChatColor.GRAY + "Available: stats, clear, cleanup");
+            return true;
+        }
+
       default:
         sender.sendMessage(ChatColor.RED + "Unknown subcommand: " + subCommand);
         return false;
@@ -175,5 +238,9 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
 
   public ConfigManager getConfigManager() {
     return configManager;
+  }
+
+  public WhitelistCache getWhitelistCache() {
+    return whitelistCache;
   }
 }

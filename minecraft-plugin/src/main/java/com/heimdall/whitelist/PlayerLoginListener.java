@@ -1,6 +1,5 @@
 package com.heimdall.whitelist;
 
-import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -51,6 +50,25 @@ public class PlayerLoginListener implements Listener {
       plugin.getLogger().info("Checking whitelist for " + username + " (" + uuid + ") from " + ip);
     }
 
+    // First check cache (only for positive results)
+    Boolean cachedResult = plugin.getWhitelistCache().isCachedWhitelisted(uuid, username);
+    if (cachedResult != null && cachedResult) {
+      if (plugin.getConfig().getBoolean("logging.debug", false)) {
+        plugin.getLogger().info("Cache hit for " + username + ": allowing based on cache");
+      }
+      // Player is cached as whitelisted - let the event proceed naturally
+      return;
+    }
+
+    // Cache miss or no positive cache - check with API
+    if (plugin.getConfig().getBoolean("logging.debug", false)) {
+      if (cachedResult == null) {
+        plugin.getLogger().info("No cache entry for " + username + ", checking API");
+      } else {
+        plugin.getLogger().info("Not in positive cache for " + username + ", checking API");
+      }
+    }
+
     try {
       // Check whitelist with API
       WhitelistResponse response = plugin.getWhitelistManager().checkPlayerWhitelist(username, uuid, ip);
@@ -60,13 +78,8 @@ public class PlayerLoginListener implements Listener {
       }
 
       if (response.shouldBeWhitelisted()) {
-        // Player should be whitelisted - ensure they're on the local whitelist
-        if (!isPlayerWhitelisted(username, uuid)) {
-          plugin.getServer().getScheduler().runTask(plugin, () -> {
-            addToWhitelist(username, uuid);
-            plugin.getLogger().info("Added " + username + " (" + uuid + ") to local whitelist per API decision");
-          });
-        }
+        // Only cache positive results so newly whitelisted players can join immediately
+        plugin.getWhitelistCache().addWhitelistedPlayer(uuid, username);
 
         // If the action is to show an auth code, we need to kick with the code
         if ("show_auth_code".equals(response.getAction())) {
@@ -78,15 +91,9 @@ public class PlayerLoginListener implements Listener {
         // This ensures other plugins (like LiteBans) can still deny the connection if
         // needed
       } else {
-        // Player should not be whitelisted - remove from local whitelist if present
-        if (isPlayerWhitelisted(username, uuid)) {
-          plugin.getServer().getScheduler().runTask(plugin, () -> {
-            removeFromWhitelist(username, uuid);
-            plugin.getLogger().info("Removed " + username + " (" + uuid + ") from local whitelist per API decision");
-          });
-        }
-
-        // Deny connection with appropriate message
+        // DON'T cache negative results - we want newly whitelisted players to be able
+        // to join immediately
+        // Just deny the connection
         event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST,
             ChatColor.translateAlternateColorCodes('&', response.getKickMessage()));
       }
@@ -115,13 +122,14 @@ public class PlayerLoginListener implements Listener {
           break;
 
         case "whitelist-only":
-          // Fall back to local whitelist
-          if (isPlayerWhitelisted(username, uuid)) {
+          // Fall back to cache - only allow if player has a positive cache entry
+          Boolean cachedWhitelisted = plugin.getWhitelistCache().isCachedWhitelisted(uuid, username);
+          if (cachedWhitelisted != null && cachedWhitelisted) {
             plugin.getLogger()
-                .warning("API failed for " + username + " (" + uuid + "), allowing based on local whitelist");
+                .warning("API failed for " + username + " (" + uuid + "), allowing based on positive cache");
             // Don't call event.allow() - just let the event proceed naturally
           } else {
-            plugin.getLogger().warning("API failed for " + username + ", denying (not on local whitelist)");
+            plugin.getLogger().warning("API failed for " + username + ", denying (no positive cache entry)");
             String errorMessage = plugin.getConfig().getString("messages.apiUnavailable",
                 "§cWhitelist system is temporarily unavailable. Please try again later.");
             event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST,
@@ -158,47 +166,5 @@ public class PlayerLoginListener implements Listener {
 
     // The actual whitelist check was done in AsyncPlayerPreLoginEvent
     // This is just for bypass permission check and any final validations
-  }
-
-  private boolean isPlayerWhitelisted(String username, String uuid) {
-    return plugin.getServer().getWhitelistedPlayers().stream()
-        .anyMatch(profile -> {
-          // Check by UUID first (more reliable), then fallback to username
-          if (uuid != null && profile.getUniqueId() != null) {
-            return profile.getUniqueId().toString().equalsIgnoreCase(uuid);
-          }
-          return profile.getName() != null && profile.getName().equalsIgnoreCase(username);
-        });
-  }
-
-  private void addToWhitelist(String username, String uuid) {
-    // Prefer UUID-based operations if available
-    if (uuid != null) {
-      try {
-        plugin.getServer().getWhitelistedPlayers().add(
-            plugin.getServer().getOfflinePlayer(java.util.UUID.fromString(uuid)));
-      } catch (IllegalArgumentException e) {
-        // Fallback to username if UUID is invalid
-        plugin.getLogger().warning("Invalid UUID format: " + uuid + ", falling back to username");
-        @SuppressWarnings("deprecation")
-        OfflinePlayer offlinePlayer = plugin.getServer().getOfflinePlayer(username);
-        plugin.getServer().getWhitelistedPlayers().add(offlinePlayer);
-      }
-    } else {
-      // Fallback to username-based operation
-      @SuppressWarnings("deprecation")
-      OfflinePlayer offlinePlayer = plugin.getServer().getOfflinePlayer(username);
-      plugin.getServer().getWhitelistedPlayers().add(offlinePlayer);
-    }
-  }
-
-  private void removeFromWhitelist(String username, String uuid) {
-    // Remove by UUID first if available, then by username
-    plugin.getServer().getWhitelistedPlayers().removeIf(profile -> {
-      if (uuid != null && profile.getUniqueId() != null) {
-        return profile.getUniqueId().toString().equalsIgnoreCase(uuid);
-      }
-      return profile.getName() != null && profile.getName().equalsIgnoreCase(username);
-    });
   }
 }

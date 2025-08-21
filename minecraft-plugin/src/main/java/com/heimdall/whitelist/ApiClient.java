@@ -189,14 +189,13 @@ public class ApiClient {
   }
 
   private boolean isCurrentlyWhitelisted(String username, String uuid) {
-    return plugin.getServer().getWhitelistedPlayers().stream()
-        .anyMatch(profile -> {
-          // Check by UUID first (more reliable), then fallback to username
-          if (uuid != null && profile.getUniqueId() != null) {
-            return profile.getUniqueId().toString().equalsIgnoreCase(uuid);
-          }
-          return profile.getName() != null && profile.getName().equalsIgnoreCase(username);
-        });
+    // Check our cache instead of Bukkit's whitelist for better performance
+    Boolean cachedResult = plugin.getWhitelistCache().isCachedWhitelisted(uuid, username);
+
+    // If cached as whitelisted, return true
+    // If cached as not whitelisted or not cached at all, return false
+    // This is safer - we only report as whitelisted if we're sure
+    return cachedResult != null && cachedResult;
   }
 
   private String getServerIp() {

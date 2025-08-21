@@ -1,0 +1,34 @@
+{
+  "folders": [
+    {
+      "name": "Heimdall Root",
+      "path": "."
+    },
+    {
+      "name": "Minecraft Plugin",
+      "path": "./minecraft-plugin"
+    }
+  ],
+  "settings": {
+    "java.configuration.workspaceCacheLimit": 90,
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.project.sourcePaths": ["minecraft-plugin/src/main/java"],
+    "java.project.referencedLibraries": ["minecraft-plugin/target/dependency-jars/*.jar", "minecraft-plugin/.m2/repository/**/*.jar"],
+    "java.project.outputPath": "minecraft-plugin/target/classes",
+    "java.import.maven.enabled": true,
+    "java.import.gradle.enabled": false,
+    "java.import.generatesMetadataFilesAtProjectRoot": false,
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "files.exclude": {
+      "**/target": true,
+      "**/.classpath": true,
+      "**/.project": true,
+      "**/.settings": true,
+      "**/.factorypath": true,
+      "**/node_modules": true
+    }
+  },
+  "extensions": {
+    "recommendations": ["vscjava.vscode-java-pack", "redhat.java", "vscjava.vscode-maven"]
+  }
+}
