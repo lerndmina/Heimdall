@@ -1,7 +1,0 @@
-com\heimdall\whitelist\ConfigManager.class
-com\heimdall\whitelist\PlayerLoginListener.class
-com\heimdall\whitelist\WhitelistManager.class
-com\heimdall\whitelist\WhitelistResponse.class
-com\heimdall\whitelist\WhitelistManager$CachedResponse.class
-com\heimdall\whitelist\HeimdallWhitelistPlugin.class
-com\heimdall\whitelist\ApiClient.class
