@@ -1444,5 +1444,174 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
     })
   );
 
+  /**
+   * POST /api/minecraft/:guildId/players/manual
+   * Manually create a player record with username, UUID, and Discord ID
+   */
+  router.post(
+    "/:guildId/players/manual",
+    authenticateApiKey,
+    requireScope("minecraft:admin"),
+    asyncHandler(async (req, res) => {
+      const { guildId } = req.params;
+      const { minecraftUsername, minecraftUuid, discordId, notes, staffMemberId } = req.body;
+
+      // Validation
+      if (!minecraftUsername || !discordId || !staffMemberId) {
+        return res
+          .status(400)
+          .json(
+            createErrorResponse(
+              "minecraftUsername, discordId, and staffMemberId are required",
+              400,
+              req.requestId
+            )
+          );
+      }
+
+      // Validate UUID format if provided
+      if (
+        minecraftUuid &&
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(minecraftUuid)
+      ) {
+        return res.status(400).json(createErrorResponse("Invalid UUID format", 400, req.requestId));
+      }
+
+      log.info(
+        `[Minecraft Manual Create] Creating player record for ${minecraftUsername} by staff ${staffMemberId}`
+      );
+
+      // Check if player already exists by username
+      const { data: existingByUsername, error: usernameError } = await tryCatch(
+        MinecraftPlayer.findOne({
+          guildId,
+          minecraftUsername: minecraftUsername,
+        }).lean()
+      );
+
+      if (usernameError) {
+        log.error("Failed to check for existing username:", usernameError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to check for existing records", 500, req.requestId));
+      }
+
+      if (existingByUsername) {
+        return res
+          .status(409)
+          .json(
+            createErrorResponse(
+              `Player with username '${minecraftUsername}' already exists`,
+              409,
+              req.requestId
+            )
+          );
+      }
+
+      // Check if UUID already exists (if provided)
+      if (minecraftUuid) {
+        const { data: existingByUuid, error: uuidError } = await tryCatch(
+          MinecraftPlayer.findOne({
+            guildId,
+            minecraftUuid: minecraftUuid,
+          }).lean()
+        );
+
+        if (uuidError) {
+          log.error("Failed to check for existing UUID:", uuidError);
+          return res
+            .status(500)
+            .json(createErrorResponse("Failed to check for existing records", 500, req.requestId));
+        }
+
+        if (existingByUuid) {
+          return res
+            .status(409)
+            .json(
+              createErrorResponse(
+                `Player with UUID '${minecraftUuid}' already exists`,
+                409,
+                req.requestId
+              )
+            );
+        }
+      }
+
+      // Check if Discord ID already exists
+      const { data: existingByDiscord, error: discordError } = await tryCatch(
+        MinecraftPlayer.findOne({
+          guildId,
+          discordId: discordId,
+        }).lean()
+      );
+
+      if (discordError) {
+        log.error("Failed to check for existing Discord ID:", discordError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to check for existing records", 500, req.requestId));
+      }
+
+      if (existingByDiscord) {
+        return res
+          .status(409)
+          .json(
+            createErrorResponse(
+              `Discord user is already linked to player: ${existingByDiscord.minecraftUsername}`,
+              409,
+              req.requestId
+            )
+          );
+      }
+
+      // Create the player record
+      const { data: newPlayer, error: createError } = await tryCatch(
+        (async () => {
+          const playerData: any = {
+            guildId,
+            minecraftUsername,
+            discordId,
+            whitelistStatus: "whitelisted",
+            isWhitelisted: true,
+            linkedAt: new Date(),
+            whitelistedAt: new Date(),
+            approvedBy: staffMemberId,
+            source: "manual",
+            notes: notes || "Manually created via dashboard",
+          };
+
+          // Add UUID if provided
+          if (minecraftUuid) {
+            playerData.minecraftUuid = minecraftUuid;
+          }
+
+          const player = new MinecraftPlayer(playerData);
+          return await player.save();
+        })()
+      );
+
+      if (createError) {
+        log.error("Failed to create player record:", createError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to create player record", 500, req.requestId));
+      }
+
+      log.info(
+        `[Minecraft Manual Create] Successfully created player ${minecraftUsername} for Discord ${discordId}`
+      );
+
+      return res.json(
+        createSuccessResponse(
+          {
+            message: "Player created successfully",
+            player: newPlayer,
+          },
+          req.requestId
+        )
+      );
+    })
+  );
+
   return router;
 }

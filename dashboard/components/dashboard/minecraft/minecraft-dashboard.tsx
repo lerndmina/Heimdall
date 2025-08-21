@@ -45,6 +45,15 @@ export function MinecraftDashboard() {
   const [importText, setImportText] = useState("");
   const [importMethod, setImportMethod] = useState<"file" | "text">("file");
 
+  // Manual player creation state
+  const [showManualDialog, setShowManualDialog] = useState(false);
+  const [manualPlayerData, setManualPlayerData] = useState({
+    minecraftUsername: "",
+    minecraftUuid: "",
+    discordId: "",
+    notes: "",
+  });
+
   // Fetch minecraft stats
   const {
     data: stats,
@@ -315,6 +324,54 @@ export function MinecraftDashboard() {
     },
   });
 
+  // Manual player creation mutation
+  const manualCreateMutation = useMutation({
+    mutationFn: async (playerData: typeof manualPlayerData) => {
+      if (!selectedGuild) throw new Error("No guild selected");
+
+      const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/players/manual`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...playerData,
+          staffMemberId: session?.user?.id || "unknown",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to create player");
+      }
+
+      return result;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Player Created",
+        description: `Successfully created player record for ${data.data.player.minecraftUsername}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["minecraft-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["minecraft-pending"] });
+      setShowManualDialog(false);
+      setManualPlayerData({
+        minecraftUsername: "",
+        minecraftUuid: "",
+        discordId: "",
+        notes: "",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   if (!selectedGuild) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -339,6 +396,10 @@ export function MinecraftDashboard() {
           <p className="text-discord-text">Manage Minecraft account linking and whitelist approvals for {selectedGuild.guildName}</p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={() => setShowManualDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Player
+          </Button>
           <Button variant="outline" asChild>
             <a href="/minecraft/config">
               <Settings className="h-4 w-4 mr-2" />
@@ -600,6 +661,97 @@ export function MinecraftDashboard() {
                 }}
                 disabled={(importMethod === "file" && !importFile) || (importMethod === "text" && !importText.trim()) || importMutation.isPending}>
                 {importMutation.isPending ? "Importing..." : "Import"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Player Creation Dialog */}
+      {showManualDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-card rounded-lg p-6 w-96 max-w-90vw">
+            <h3 className="text-lg font-semibold mb-4 text-white">Add Player Manually</h3>
+            <p className="text-discord-text mb-4">Create a player record manually by providing their Minecraft username, UUID (optional), and Discord ID.</p>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="manual-username" className="text-discord-text">
+                  Minecraft Username *
+                </Label>
+                <Input
+                  id="manual-username"
+                  placeholder="PlayerName"
+                  value={manualPlayerData.minecraftUsername}
+                  onChange={(e) => setManualPlayerData((prev) => ({ ...prev, minecraftUsername: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="manual-uuid" className="text-discord-text">
+                  Minecraft UUID (Optional)
+                </Label>
+                <Input
+                  id="manual-uuid"
+                  placeholder="550e8400-e29b-41d4-a716-446655440000"
+                  value={manualPlayerData.minecraftUuid}
+                  onChange={(e) => setManualPlayerData((prev) => ({ ...prev, minecraftUuid: e.target.value }))}
+                  className="mt-1"
+                />
+                <div className="text-sm text-discord-muted mt-1">Leave empty if unknown. Will be auto-filled when player joins.</div>
+              </div>
+
+              <div>
+                <Label htmlFor="manual-discord" className="text-discord-text">
+                  Discord User ID *
+                </Label>
+                <Input
+                  id="manual-discord"
+                  placeholder="123456789012345678"
+                  value={manualPlayerData.discordId}
+                  onChange={(e) => setManualPlayerData((prev) => ({ ...prev, discordId: e.target.value }))}
+                  className="mt-1"
+                />
+                <div className="text-sm text-discord-muted mt-1">Right-click user in Discord → Copy User ID (Developer Mode required)</div>
+              </div>
+
+              <div>
+                <Label htmlFor="manual-notes" className="text-discord-text">
+                  Notes (Optional)
+                </Label>
+                <Textarea
+                  id="manual-notes"
+                  placeholder="Additional notes about this player..."
+                  value={manualPlayerData.notes}
+                  onChange={(e) => setManualPlayerData((prev) => ({ ...prev, notes: e.target.value }))}
+                  className="mt-1 h-20"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowManualDialog(false);
+                  setManualPlayerData({
+                    minecraftUsername: "",
+                    minecraftUuid: "",
+                    discordId: "",
+                    notes: "",
+                  });
+                }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (manualPlayerData.minecraftUsername.trim() && manualPlayerData.discordId.trim()) {
+                    manualCreateMutation.mutate(manualPlayerData);
+                  }
+                }}
+                disabled={!manualPlayerData.minecraftUsername.trim() || !manualPlayerData.discordId.trim() || manualCreateMutation.isPending}>
+                {manualCreateMutation.isPending ? "Creating..." : "Create Player"}
               </Button>
             </div>
           </div>
