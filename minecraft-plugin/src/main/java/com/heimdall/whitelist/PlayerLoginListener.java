@@ -19,14 +19,23 @@ public class PlayerLoginListener implements Listener {
     this.plugin = plugin;
   }
 
-  @EventHandler(priority = EventPriority.HIGHEST)
+  @EventHandler(priority = EventPriority.LOW)
   public void onPlayerPreLogin(AsyncPlayerPreLoginEvent event) {
+    // Skip if the event is already cancelled (e.g., by ban plugins like LiteBans)
+    if (event.getLoginResult() != AsyncPlayerPreLoginEvent.Result.ALLOWED) {
+      if (plugin.getConfig().getBoolean("logging.debug", false)) {
+        plugin.getLogger().info("Skipping whitelist check for " + event.getName() +
+            " - already denied by another plugin: " + event.getLoginResult());
+      }
+      return;
+    }
+
     // Check if the plugin is globally enabled
     if (!plugin.getConfig().getBoolean("enabled", false)) {
       if (plugin.getConfig().getBoolean("logging.debug", false)) {
         plugin.getLogger().info("Plugin is disabled, allowing " + event.getName() + " without whitelist check");
       }
-      event.allow();
+      // Don't call event.allow() - just let other plugins handle it
       return;
     }
 
@@ -63,10 +72,11 @@ public class PlayerLoginListener implements Listener {
         if ("show_auth_code".equals(response.getAction())) {
           event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST,
               ChatColor.translateAlternateColorCodes('&', response.getKickMessage()));
-        } else {
-          // Allow connection
-          event.allow();
         }
+        // If player should be whitelisted and no auth code needed, do nothing - let
+        // event proceed naturally
+        // This ensures other plugins (like LiteBans) can still deny the connection if
+        // needed
       } else {
         // Player should not be whitelisted - remove from local whitelist if present
         if (isPlayerWhitelisted(username, uuid)) {
@@ -90,7 +100,8 @@ public class PlayerLoginListener implements Listener {
       switch (fallbackMode.toLowerCase()) {
         case "allow":
           plugin.getLogger().warning("API failed for " + username + ", allowing connection (fail-open mode)");
-          event.allow();
+          // Don't call event.allow() - just let the event proceed naturally
+          // This allows other plugins like LiteBans to still deny if needed
 
           // Schedule a task to send a message to the player after they join
           plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
@@ -108,7 +119,7 @@ public class PlayerLoginListener implements Listener {
           if (isPlayerWhitelisted(username, uuid)) {
             plugin.getLogger()
                 .warning("API failed for " + username + " (" + uuid + "), allowing based on local whitelist");
-            event.allow();
+            // Don't call event.allow() - just let the event proceed naturally
           } else {
             plugin.getLogger().warning("API failed for " + username + ", denying (not on local whitelist)");
             String errorMessage = plugin.getConfig().getString("messages.apiUnavailable",
