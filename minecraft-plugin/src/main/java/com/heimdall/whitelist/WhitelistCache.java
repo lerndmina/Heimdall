@@ -60,6 +60,11 @@ public class WhitelistCache {
    * @return true if cached and whitelisted, null if not cached or cache expired
    */
   public Boolean isCachedWhitelisted(String uuid, String username) {
+    // If UUID is null, we can't check the cache (which is keyed by UUID)
+    if (uuid == null) {
+      return null;
+    }
+
     CacheEntry entry = cache.get(uuid);
     if (entry == null) {
       return null; // Not cached
@@ -92,6 +97,12 @@ public class WhitelistCache {
    * @param username Player's username
    */
   public void addWhitelistedPlayer(String uuid, String username) {
+    // If UUID is null, we can't cache (cache is keyed by UUID)
+    if (uuid == null) {
+      plugin.getLogger().warning("Cannot cache whitelisted player with null UUID: " + username);
+      return;
+    }
+
     long now = System.currentTimeMillis();
     CacheEntry entry = new CacheEntry(
         username,
@@ -114,6 +125,11 @@ public class WhitelistCache {
    * @param username Player's username
    */
   public void extendCacheOnJoin(String uuid, String username) {
+    // If UUID is null, we can't extend cache (cache is keyed by UUID)
+    if (uuid == null) {
+      return;
+    }
+
     CacheEntry entry = cache.get(uuid);
     if (entry != null && entry.whitelisted) {
       long now = System.currentTimeMillis();
@@ -135,6 +151,11 @@ public class WhitelistCache {
    * @param username Player's username
    */
   public void extendCacheOnLeave(String uuid, String username) {
+    // If UUID is null, we can't extend cache (cache is keyed by UUID)
+    if (uuid == null) {
+      return;
+    }
+
     CacheEntry entry = cache.get(uuid);
     if (entry != null && entry.whitelisted) {
       long now = System.currentTimeMillis();
@@ -154,6 +175,11 @@ public class WhitelistCache {
    * @param uuid Player's UUID
    */
   public void removeFromCache(String uuid) {
+    // If UUID is null, we can't remove from cache (cache is keyed by UUID)
+    if (uuid == null) {
+      return;
+    }
+
     if (cache.remove(uuid) != null) {
       saveCache();
       plugin.getLogger().info("Removed player " + uuid + " from cache");

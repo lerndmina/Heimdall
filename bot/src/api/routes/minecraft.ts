@@ -1613,5 +1613,213 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
     })
   );
 
+  /**
+   * POST /api/minecraft/:guildId/bulk-whitelist-manual
+   * Manually whitelist multiple players by their usernames
+   */
+  router.post(
+    "/:guildId/bulk-whitelist-manual",
+    authenticateApiKey,
+    requireScope("minecraft:admin"),
+    asyncHandler(async (req, res) => {
+      const { guildId } = req.params;
+      const { usernames, staffMemberId } = req.body;
+
+      if (!staffMemberId) {
+        return res
+          .status(400)
+          .json(createErrorResponse("staffMemberId is required", 400, req.requestId));
+      }
+
+      if (!Array.isArray(usernames) || usernames.length === 0) {
+        return res
+          .status(400)
+          .json(createErrorResponse("usernames must be a non-empty array", 400, req.requestId));
+      }
+
+      log.info(
+        `[Minecraft Bulk Manual Whitelist] Processing ${usernames.length} usernames for guild ${guildId} by staff ${staffMemberId}`
+      );
+
+      // Validate and prepare data in batch
+      const validUsernames: string[] = [];
+      const errors: string[] = [];
+
+      // First pass: validate all usernames
+      for (const rawUsername of usernames) {
+        const username = rawUsername?.toLowerCase()?.trim();
+        if (!username) {
+          errors.push(`Invalid username: ${rawUsername}`);
+          continue;
+        }
+        validUsernames.push(username);
+      }
+
+      if (validUsernames.length === 0) {
+        return res.json(
+          createSuccessResponse(
+            {
+              totalProcessed: usernames.length,
+              processed: 0,
+              created: 0,
+              updated: 0,
+              errors: errors.length,
+              errorDetails: errors,
+              processedPlayers: [],
+            },
+            req.requestId
+          )
+        );
+      }
+
+      // Bulk find existing players
+      const { data: existingPlayers, error: findError } = await tryCatch(
+        MinecraftPlayer.find({
+          guildId,
+          minecraftUsername: { $in: validUsernames },
+        }).lean()
+      );
+
+      if (findError) {
+        log.error("[Minecraft Bulk Manual Whitelist] Failed to query existing players:", findError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to query existing players", 500, req.requestId));
+      }
+
+      // Create lookup map for efficient checking
+      const existingByUsername = new Map<string, any>();
+      (existingPlayers || []).forEach((player) => {
+        if (player.minecraftUsername) {
+          existingByUsername.set(player.minecraftUsername, player);
+        }
+      });
+
+      // Prepare bulk operations
+      const playersToUpdate: Array<{
+        filter: any;
+        update: any;
+      }> = [];
+
+      const playersToCreate: Array<any> = [];
+      const processedPlayers: string[] = [];
+
+      // Process each valid username
+      for (const username of validUsernames) {
+        const existingPlayer = existingByUsername.get(username);
+
+        if (existingPlayer) {
+          // Only update if not already whitelisted
+          if (existingPlayer.whitelistStatus !== "whitelisted") {
+            playersToUpdate.push({
+              filter: { _id: existingPlayer._id },
+              update: {
+                whitelistStatus: "whitelisted",
+                isWhitelisted: true,
+                approvedBy: staffMemberId,
+                approvedAt: new Date(),
+                updatedAt: new Date(),
+              },
+            });
+          }
+          processedPlayers.push(username);
+        } else {
+          // Prepare create operation
+          playersToCreate.push({
+            guildId,
+            minecraftUsername: username,
+            whitelistStatus: "whitelisted",
+            isWhitelisted: true,
+            approvedBy: staffMemberId,
+            approvedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            // We don't have UUID or Discord ID for manual entries
+            minecraftUuid: null,
+            discordId: null,
+            linkedAt: null,
+            source: "manual_bulk",
+          });
+          processedPlayers.push(username);
+        }
+      }
+
+      let updatedCount = 0;
+      let createdCount = 0;
+
+      // Perform bulk updates
+      if (playersToUpdate.length > 0) {
+        try {
+          const bulkUpdateOps = playersToUpdate.map(({ filter, update }) => ({
+            updateOne: {
+              filter,
+              update,
+            },
+          }));
+
+          const { data: updateResult, error: updateError } = await tryCatch(
+            MinecraftPlayer.bulkWrite(bulkUpdateOps)
+          );
+
+          if (updateError) {
+            log.error("[Minecraft Bulk Manual Whitelist] Bulk update failed:", updateError);
+            errors.push(`Bulk update failed: ${updateError.message}`);
+          } else {
+            updatedCount = updateResult?.modifiedCount || 0;
+            log.info(`[Minecraft Bulk Manual Whitelist] Bulk updated ${updatedCount} players`);
+          }
+        } catch (error) {
+          errors.push(
+            `Bulk update error: ${error instanceof Error ? error.message : "Unknown error"}`
+          );
+        }
+      }
+
+      // Perform bulk inserts
+      if (playersToCreate.length > 0) {
+        try {
+          const { data: insertResult, error: insertError } = await tryCatch(
+            MinecraftPlayer.insertMany(playersToCreate, { ordered: false })
+          );
+
+          if (insertError) {
+            log.error("[Minecraft Bulk Manual Whitelist] Bulk insert failed:", insertError);
+            errors.push(`Bulk insert failed: ${insertError.message}`);
+          } else {
+            createdCount = Array.isArray(insertResult) ? insertResult.length : 0;
+            log.info(`[Minecraft Bulk Manual Whitelist] Bulk inserted ${createdCount} players`);
+          }
+        } catch (error) {
+          errors.push(
+            `Bulk insert error: ${error instanceof Error ? error.message : "Unknown error"}`
+          );
+        }
+      }
+
+      const summary = {
+        totalProcessed: usernames.length,
+        validated: validUsernames.length,
+        processed: processedPlayers.length,
+        created: createdCount,
+        updated: updatedCount,
+        errors: errors.length,
+        errorDetails: errors,
+        processedPlayers,
+        performance: {
+          bulkUpdates: playersToUpdate.length,
+          bulkInserts: playersToCreate.length,
+          optimized: true,
+        },
+      };
+
+      log.info(
+        `[Minecraft Bulk Manual Whitelist] Optimized bulk operation completed for guild ${guildId}:`,
+        summary
+      );
+
+      return res.json(createSuccessResponse(summary, req.requestId));
+    })
+  );
+
   return router;
 }

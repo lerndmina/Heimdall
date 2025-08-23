@@ -45,6 +45,12 @@ export function MinecraftDashboard() {
   const [importText, setImportText] = useState("");
   const [importMethod, setImportMethod] = useState<"file" | "text">("file");
 
+  // Bulk whitelist state
+  const [showBulkWhitelistDialog, setShowBulkWhitelistDialog] = useState(false);
+  const [bulkWhitelistMethod, setBulkWhitelistMethod] = useState<"recent" | "all" | "manual">("recent");
+  const [bulkWhitelistCount, setBulkWhitelistCount] = useState(5);
+  const [bulkWhitelistUsernames, setBulkWhitelistUsernames] = useState("");
+
   // Manual player creation state
   const [showManualDialog, setShowManualDialog] = useState(false);
   const [manualPlayerData, setManualPlayerData] = useState({
@@ -174,6 +180,84 @@ export function MinecraftDashboard() {
     onError: (error) => {
       toast({
         title: "Bulk Approval Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Bulk manual whitelist mutation
+  const bulkManualWhitelistMutation = useMutation({
+    mutationFn: async (usernames: string[]) => {
+      if (!selectedGuild) throw new Error("No guild selected");
+
+      const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/bulk-whitelist-manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usernames,
+          staffMemberId: session?.user?.id || "unknown",
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to bulk whitelist players");
+      }
+
+      return result;
+    },
+    onSuccess: (data) => {
+      const summary = data.data;
+
+      let description = `Processed ${summary.processed} players. Created: ${summary.created}, Updated: ${summary.updated}`;
+      if (summary.errors > 0) {
+        description += `, Errors: ${summary.errors}`;
+      }
+
+      toast({
+        title: "Bulk Manual Whitelist Completed",
+        description,
+      });
+
+      // Auto-copy the processed player list to clipboard if any players were processed
+      if (summary.processedPlayers.length > 0) {
+        setTimeout(async () => {
+          try {
+            const playerList = summary.processedPlayers.join("\n");
+            await navigator.clipboard.writeText(playerList);
+            toast({
+              title: "Player List Copied",
+              description: `${summary.processedPlayers.length} usernames copied to clipboard (newline separated)`,
+            });
+          } catch (err) {
+            console.error("Failed to copy:", err);
+            toast({
+              title: "Copy Available",
+              description: `Processed players: ${summary.processedPlayers.join(", ")}`,
+            });
+          }
+        }, 500);
+      }
+
+      // Show errors if any
+      if (summary.errors > 0) {
+        setTimeout(() => {
+          toast({
+            title: "Some Errors Occurred",
+            description: `${summary.errors} players could not be processed. Check logs for details.`,
+            variant: "destructive",
+          });
+        }, 1000);
+      }
+
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ["minecraft-players"] });
+      queryClient.invalidateQueries({ queryKey: ["minecraft-stats"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Bulk Manual Whitelist Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -477,17 +561,10 @@ export function MinecraftDashboard() {
               {actualPendingCount > 1 && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-discord-muted">Queue processing:</span>
-                  <Button variant="outline" size="sm" onClick={() => bulkApproveMutation.mutate(Math.min(5, actualPendingCount))} disabled={bulkApproveMutation.isPending}>
-                    {bulkApproveMutation.isPending ? "Approving..." : `Approve Oldest 5`}
+                  <Button variant="outline" size="sm" onClick={() => setShowBulkWhitelistDialog(true)} disabled={bulkApproveMutation.isPending}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Bulk Whitelist
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => bulkApproveMutation.mutate(Math.min(10, actualPendingCount))} disabled={bulkApproveMutation.isPending}>
-                    {bulkApproveMutation.isPending ? "Approving..." : `Approve Oldest 10`}
-                  </Button>
-                  {actualPendingCount > 10 && (
-                    <Button variant="outline" size="sm" onClick={() => bulkApproveMutation.mutate(actualPendingCount)} disabled={bulkApproveMutation.isPending}>
-                      {bulkApproveMutation.isPending ? "Approving..." : `Approve All ${actualPendingCount}`}
-                    </Button>
-                  )}
                 </div>
               )}
             </div>
@@ -752,6 +829,127 @@ export function MinecraftDashboard() {
                 }}
                 disabled={!manualPlayerData.minecraftUsername.trim() || !manualPlayerData.discordId.trim() || manualCreateMutation.isPending}>
                 {manualCreateMutation.isPending ? "Creating..." : "Create Player"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Whitelist Dialog */}
+      {showBulkWhitelistDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-card rounded-lg p-6 w-96 max-w-90vw">
+            <h3 className="text-lg font-semibold mb-4 text-white">Bulk Whitelist</h3>
+            <p className="text-discord-text mb-4">Choose how you want to whitelist multiple players from the pending approvals queue.</p>
+
+            {/* Method Selection */}
+            <div className="space-y-4">
+              <div>
+                <Label className="text-discord-text">Whitelist Method</Label>
+                <div className="flex space-x-2 mt-2">
+                  <Button variant={bulkWhitelistMethod === "recent" ? "default" : "outline"} size="sm" onClick={() => setBulkWhitelistMethod("recent")} className="flex-1">
+                    <Clock className="h-4 w-4 mr-2" />
+                    Most Recent
+                  </Button>
+                  <Button variant={bulkWhitelistMethod === "all" ? "default" : "outline"} size="sm" onClick={() => setBulkWhitelistMethod("all")} className="flex-1">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    All Pending
+                  </Button>
+                  <Button variant={bulkWhitelistMethod === "manual" ? "default" : "outline"} size="sm" onClick={() => setBulkWhitelistMethod("manual")} className="flex-1">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Manual List
+                  </Button>
+                </div>
+              </div>
+
+              {bulkWhitelistMethod === "recent" && (
+                <div>
+                  <Label htmlFor="bulk-count" className="text-discord-text">
+                    Number of Players
+                  </Label>
+                  <Input
+                    id="bulk-count"
+                    type="number"
+                    min="1"
+                    max={actualPendingCount}
+                    value={bulkWhitelistCount}
+                    onChange={(e) => setBulkWhitelistCount(Math.max(1, Math.min(actualPendingCount, parseInt(e.target.value) || 1)))}
+                    className="mt-1"
+                  />
+                  <div className="text-sm text-discord-muted mt-2">Will approve the {bulkWhitelistCount} oldest pending requests</div>
+                </div>
+              )}
+
+              {bulkWhitelistMethod === "all" && (
+                <div className="p-3 bg-discord-darker/50 rounded-lg border border-discord-darker">
+                  <div className="flex items-center gap-2 text-discord-warning">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="font-medium">All Pending Approvals</span>
+                  </div>
+                  <div className="text-sm text-discord-muted mt-1">This will approve all {actualPendingCount} pending requests</div>
+                </div>
+              )}
+
+              {bulkWhitelistMethod === "manual" && (
+                <div>
+                  <Label htmlFor="bulk-usernames" className="text-discord-text">
+                    Usernames to Whitelist
+                  </Label>
+                  <Textarea
+                    id="bulk-usernames"
+                    placeholder="Enter Minecraft usernames, one per line:&#10;PlayerName1&#10;PlayerName2&#10;PlayerName3"
+                    value={bulkWhitelistUsernames}
+                    onChange={(e) => setBulkWhitelistUsernames(e.target.value)}
+                    className="mt-1 h-32"
+                  />
+                  {bulkWhitelistUsernames && <div className="text-sm text-discord-muted mt-2">{bulkWhitelistUsernames.split("\n").filter((line) => line.trim()).length} usernames entered</div>}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowBulkWhitelistDialog(false);
+                  setBulkWhitelistMethod("recent");
+                  setBulkWhitelistCount(5);
+                  setBulkWhitelistUsernames("");
+                }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (bulkWhitelistMethod === "recent") {
+                    bulkApproveMutation.mutate(bulkWhitelistCount);
+                    setShowBulkWhitelistDialog(false);
+                    setBulkWhitelistMethod("recent");
+                    setBulkWhitelistCount(5);
+                    setBulkWhitelistUsernames("");
+                  } else if (bulkWhitelistMethod === "all") {
+                    bulkApproveMutation.mutate(actualPendingCount);
+                    setShowBulkWhitelistDialog(false);
+                    setBulkWhitelistMethod("recent");
+                    setBulkWhitelistCount(5);
+                    setBulkWhitelistUsernames("");
+                  } else if (bulkWhitelistMethod === "manual") {
+                    const usernames = bulkWhitelistUsernames.split("\n").filter((line) => line.trim());
+                    if (usernames.length > 0) {
+                      bulkManualWhitelistMutation.mutate(usernames);
+                      setShowBulkWhitelistDialog(false);
+                      setBulkWhitelistMethod("recent");
+                      setBulkWhitelistCount(5);
+                      setBulkWhitelistUsernames("");
+                    }
+                  }
+                }}
+                disabled={
+                  bulkApproveMutation.isPending ||
+                  bulkManualWhitelistMutation.isPending ||
+                  (bulkWhitelistMethod === "recent" && bulkWhitelistCount < 1) ||
+                  (bulkWhitelistMethod === "manual" && !bulkWhitelistUsernames.trim())
+                }>
+                {bulkApproveMutation.isPending || bulkManualWhitelistMutation.isPending ? "Processing..." : "Whitelist Players"}
               </Button>
             </div>
           </div>

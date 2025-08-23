@@ -47,6 +47,11 @@ public class ApiClient {
 
   public CompletableFuture<WhitelistResponse> checkWhitelist(String username, String uuid, String ip) {
     return CompletableFuture.supplyAsync(() -> {
+      // Validate input parameters
+      if (username == null || username.trim().isEmpty()) {
+        throw new IllegalArgumentException("Username cannot be null or empty");
+      }
+
       // Normalize username to lowercase for consistent matching
       String normalizedUsername = username.toLowerCase();
 

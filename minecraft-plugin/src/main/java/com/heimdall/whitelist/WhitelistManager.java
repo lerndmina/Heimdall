@@ -26,6 +26,11 @@ public class WhitelistManager {
   }
 
   public WhitelistResponse checkPlayerWhitelist(String username, String uuid, String ip) throws Exception {
+    // Validate input parameters
+    if (username == null || username.trim().isEmpty()) {
+      throw new IllegalArgumentException("Username cannot be null or empty");
+    }
+
     // Use UUID as primary cache key, fallback to username if UUID is null
     String cacheKey = uuid != null ? uuid : username.toLowerCase();
 
@@ -78,6 +83,12 @@ public class WhitelistManager {
   }
 
   public void clearCacheForPlayer(String username, String uuid) {
+    // Validate input parameters
+    if (username == null || username.trim().isEmpty()) {
+      plugin.getLogger().warning("clearCacheForPlayer called with null or empty username");
+      return;
+    }
+
     // Clear cache for both username and UUID if available
     if (uuid != null) {
       cache.remove(uuid);
