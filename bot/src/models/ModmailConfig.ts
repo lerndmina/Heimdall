@@ -343,6 +343,17 @@ const ModmailConfig = new Schema(
       min: 0,
     },
 
+    // Typing indicator settings
+    typingIndicators: {
+      type: Boolean,
+      default: true, // Enable typing indicators by default
+    },
+    typingIndicatorStyle: {
+      type: String,
+      enum: ["native", "message", "both"], // native = Discord typing, message = visual message, both = both
+      default: "native",
+    },
+
     // Global AI Configuration for the server
     globalAIConfig: {
       enabled: {

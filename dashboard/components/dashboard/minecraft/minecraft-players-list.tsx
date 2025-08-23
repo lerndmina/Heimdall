@@ -26,6 +26,7 @@ interface MinecraftPlayer {
   discordDisplayName?: string;
   whitelistStatus: "whitelisted" | "unwhitelisted";
   linkedAt?: string;
+  whitelistedAt?: string;
   approvedAt?: string;
   approvedBy?: string;
   revokedAt?: string;
@@ -44,6 +45,7 @@ export function MinecraftPlayersList() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("recent"); // newest, oldest, discord-linked, whitelist-date
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
@@ -301,6 +303,35 @@ export function MinecraftPlayersList() {
     return matchesSearch && matchesStatus;
   });
 
+  // Sort filtered players
+  const sortedPlayers = [...filteredPlayers].sort((a, b) => {
+    switch (sortBy) {
+      case "discord-linked":
+        // Discord linked players first, then by creation date (newest first)
+        const aHasDiscord = !!a.discordId;
+        const bHasDiscord = !!b.discordId;
+        if (aHasDiscord && !bHasDiscord) return -1;
+        if (!aHasDiscord && bHasDiscord) return 1;
+        // If both have same discord status, sort by creation date (newest first)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+
+      case "whitelist-date":
+        // Sort by when they were whitelisted (newest first), non-whitelisted at bottom
+        const aWhitelistDate = a.whitelistStatus === "whitelisted" && a.whitelistedAt ? new Date(a.whitelistedAt).getTime() : 0;
+        const bWhitelistDate = b.whitelistStatus === "whitelisted" && b.whitelistedAt ? new Date(b.whitelistedAt).getTime() : 0;
+        return bWhitelistDate - aWhitelistDate;
+
+      case "oldest":
+        // Oldest first (by creation date)
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+
+      case "recent":
+      default:
+        // Newest first (by creation date)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+  });
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "whitelisted":
@@ -447,6 +478,17 @@ export function MinecraftPlayersList() {
               <SelectItem value="unwhitelisted">Unwhitelisted</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Newest First</SelectItem>
+              <SelectItem value="oldest">Oldest First</SelectItem>
+              <SelectItem value="discord-linked">Discord Linked First</SelectItem>
+              <SelectItem value="whitelist-date">Recently Whitelisted</SelectItem>
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
@@ -455,7 +497,7 @@ export function MinecraftPlayersList() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            Players ({filteredPlayers.length})
+            Players ({sortedPlayers.length})
           </CardTitle>
           <CardDescription>{statusFilter === "all" ? "All registered players" : `Players with status: ${statusFilter}`}</CardDescription>
         </CardHeader>
@@ -464,7 +506,7 @@ export function MinecraftPlayersList() {
             <div className="flex items-center justify-center py-8">
               <Clock className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : filteredPlayers.length === 0 ? (
+          ) : sortedPlayers.length === 0 ? (
             <div className="text-center py-8">
               <Users className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 text-lg font-medium">{searchQuery || statusFilter !== "all" ? "No players match your filters" : "No players found"}</h3>
@@ -474,7 +516,7 @@ export function MinecraftPlayersList() {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredPlayers.map((player: MinecraftPlayer) => (
+              {sortedPlayers.map((player: MinecraftPlayer) => (
                 <div key={player._id} className="flex items-center justify-between p-4 border rounded-lg bg-card">
                   <div className="flex items-center space-x-4">
                     {/* Player Avatar */}

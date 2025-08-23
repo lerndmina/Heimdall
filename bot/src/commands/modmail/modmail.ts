@@ -572,6 +572,33 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommandGroup((group) =>
     group
+      .setName("typing")
+      .setDescription("Configure typing indicators for modmail")
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("enable")
+          .setDescription("Enable typing indicators for this server")
+          .addStringOption((option) =>
+            option
+              .setName("style")
+              .setDescription("Style of typing indicator to use")
+              .setRequired(false)
+              .addChoices(
+                { name: "Native Discord typing", value: "native" },
+                { name: "Visual message (auto-deleted)", value: "message" },
+                { name: "Both native and message", value: "both" }
+              )
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("disable").setDescription("Disable typing indicators for this server")
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("status").setDescription("View current typing indicator configuration")
+      )
+  )
+  .addSubcommandGroup((group) =>
+    group
       .setName("debug")
       .setDescription("Debug modmail system issues (Administrator only)")
       .addSubcommand((subcommand) =>
@@ -1015,6 +1042,104 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
             ephemeral: true,
           });
         }
+    }
+    return;
+  }
+
+  // Handle typing subcommands - Staff only (ManageMessages permission)
+  if (subcommandGroup === "typing") {
+    // Check for ManageMessages permission
+    if (!interaction.memberPermissions?.has("ManageMessages")) {
+      return interaction.reply({
+        embeds: [
+          ModmailEmbeds.error(
+            client,
+            "Permission Denied",
+            "You need Manage Messages permissions to configure typing indicators."
+          ),
+        ],
+        ephemeral: true,
+      });
+    }
+
+    switch (subcommand) {
+      case "enable":
+        try {
+          const { default: enableTyping, enableTypingOptions } = await import(
+            "../../subcommands/modmail/typing/enableTyping"
+          );
+          const enableTypingCheck = await canRunCommand(
+            { interaction, client, handler },
+            enableTypingOptions
+          );
+          if (enableTypingCheck !== false) return enableTypingCheck;
+          return enableTyping({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading enableTyping:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the typing enable command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "disable":
+        try {
+          const { default: disableTyping, disableTypingOptions } = await import(
+            "../../subcommands/modmail/typing/disableTyping"
+          );
+          const disableTypingCheck = await canRunCommand(
+            { interaction, client, handler },
+            disableTypingOptions
+          );
+          if (disableTypingCheck !== false) return disableTypingCheck;
+          return disableTyping({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading disableTyping:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the typing disable command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      case "status":
+        try {
+          const { default: statusTyping, statusTypingOptions } = await import(
+            "../../subcommands/modmail/typing/statusTyping"
+          );
+          const statusTypingCheck = await canRunCommand(
+            { interaction, client, handler },
+            statusTypingOptions
+          );
+          if (statusTypingCheck !== false) return statusTypingCheck;
+          return statusTyping({ interaction, client, handler });
+        } catch (error) {
+          log.error("Error loading statusTyping:", error);
+          return interaction.reply({
+            embeds: [
+              ModmailEmbeds.error(
+                client,
+                "Command Error",
+                "Failed to load the typing status command."
+              ),
+            ],
+            ephemeral: true,
+          });
+        }
+      default:
+        return interaction.reply({
+          embeds: [ModmailEmbeds.subcommandNotFound(client)],
+          ephemeral: true,
+        });
     }
     return;
   }
