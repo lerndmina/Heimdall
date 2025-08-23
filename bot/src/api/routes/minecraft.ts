@@ -1264,221 +1264,191 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
               totalProcessed: whitelistData.length,
               imported: 0,
               updated: 0,
+              skipped: 0,
               errors: errors.length,
               errorDetails: errors,
+              processedPlayers: [],
             },
             req.requestId
           )
         );
       }
 
-      // Extract usernames and UUIDs for bulk query
-      const usernames = validPlayers.map((p) => p.username);
-      const uuids = validPlayers.map((p) => p.uuid);
-
-      // Bulk find existing players
-      const { data: existingPlayers, error: findError } = await tryCatch(
-        MinecraftPlayer.find({
-          guildId,
-          $or: [{ minecraftUsername: { $in: usernames } }, { minecraftUuid: { $in: uuids } }],
-        }).lean()
+      log.info(
+        `[Minecraft Import] Starting individual processing for ${validPlayers.length} players`
       );
 
-      if (findError) {
-        log.error("[Minecraft Import] Failed to query existing players:", findError);
-        return res
-          .status(500)
-          .json(createErrorResponse("Failed to query existing players", 500, req.requestId));
-      }
-
-      // Create lookup maps for efficient checking
-      const existingByUsername = new Map<string, any>();
-      const existingByUuid = new Map<string, any>();
-
-      (existingPlayers || []).forEach((player) => {
-        if (player.minecraftUsername) {
-          existingByUsername.set(player.minecraftUsername, player);
-        }
-        if (player.minecraftUuid) {
-          existingByUuid.set(player.minecraftUuid, player);
-        }
-      });
-
-      // Prepare bulk operations
-      const playersToUpdate: Array<{
-        filter: any;
-        update: any;
-      }> = [];
-
-      const playersToCreate: Array<any> = [];
-
-      // Process each valid player
-      for (const { username, uuid } of validPlayers) {
-        const existingPlayer =
-          existingByUsername.get(username) || (uuid ? existingByUuid.get(uuid) : null);
-
-        if (existingPlayer) {
-          // Prepare update operation
-          const updateData: any = {
-            whitelistStatus: "whitelisted",
-            minecraftUsername: username,
-            updatedAt: new Date(),
-          };
-
-          // Only set UUID if we have one (not null for text imports)
-          if (uuid) {
-            updateData.minecraftUuid = uuid;
-          }
-
-          playersToUpdate.push({
-            filter: { _id: existingPlayer._id },
-            update: updateData,
-          });
-        } else {
-          // Prepare create operation
-          const createData: any = {
-            guildId,
-            minecraftUsername: username,
-            whitelistStatus: "whitelisted",
-            source: "imported",
-            whitelistedAt: new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-
-          // Only set UUID if we have one (don't set the field at all for text imports to avoid null constraint issues)
-          if (uuid) {
-            createData.minecraftUuid = uuid;
-          }
-
-          playersToCreate.push(createData);
-        }
-      }
-
-      let updatedCount = 0;
+      // Process each player individually for better debugging
       let importedCount = 0;
+      let updatedCount = 0;
+      let skippedCount = 0;
+      const processedPlayers: any[] = [];
 
-      // Perform bulk updates
-      if (playersToUpdate.length > 0) {
+      for (const { username, uuid, isTextImport, staffMemberId } of validPlayers) {
         try {
-          const bulkUpdateOps = playersToUpdate.map(({ filter, update }) => ({
-            updateOne: {
-              filter,
-              update,
-            },
-          }));
-
-          const { data: updateResult, error: updateError } = await tryCatch(
-            MinecraftPlayer.bulkWrite(bulkUpdateOps)
+          // Check if player already exists
+          const { data: existingPlayer } = await tryCatch(
+            MinecraftPlayer.findOne({
+              guildId,
+              minecraftUsername: username,
+            }).lean()
           );
 
-          if (updateError) {
-            log.error("[Minecraft Import] Bulk update failed:", updateError);
-            errors.push(`Bulk update failed: ${updateError.message}`);
-          } else {
-            updatedCount = updateResult?.modifiedCount || 0;
-            log.info(`[Minecraft Import] Bulk updated ${updatedCount} players`);
-          }
-        } catch (error) {
-          errors.push(
-            `Bulk update error: ${error instanceof Error ? error.message : "Unknown error"}`
-          );
-        }
-      }
+          if (existingPlayer) {
+            // Update existing player
+            const updateData: any = {
+              whitelistStatus: "whitelisted",
+              minecraftUsername: username,
+              updatedAt: new Date(),
+            };
 
-      // Perform bulk inserts
-      if (playersToCreate.length > 0) {
-        if (isTextImport) {
-          // For text imports, use individual inserts to handle duplicates gracefully
-          let successfulInserts = 0;
-          const insertErrors: string[] = [];
+            if (uuid) {
+              updateData.minecraftUuid = uuid;
+            }
 
-          for (const playerData of playersToCreate) {
-            const { data: insertResult, error: insertError } = await tryCatch(
-              MinecraftPlayer.create(playerData)
+            const { data: updateResult, error: updateError } = await tryCatch(
+              MinecraftPlayer.findOneAndUpdate({ _id: existingPlayer._id }, updateData, {
+                new: true,
+              })
             );
 
-            if (insertError) {
-              // Check if it's a duplicate key error (MongoDB error code 11000)
-              if ((insertError as any).code === 11000) {
-                // Duplicate key error - this is expected for existing usernames
-                log.debug(
-                  `[Minecraft Import] Skipping duplicate username: ${playerData.minecraftUsername}`
-                );
-                // Don't add to errors array for duplicates as they're expected
+            if (updateError) {
+              errors.push(`Failed to update ${username}: ${updateError.message}`);
+              processedPlayers.push({
+                username,
+                action: "error",
+                error: updateError.message,
+              });
+            } else {
+              updatedCount++;
+              processedPlayers.push({
+                username,
+                action: "updated",
+                playerId: existingPlayer._id,
+              });
+              log.debug(`[Minecraft Import] Updated player: ${username}`);
+            }
+          } else {
+            // Create new player
+            const createData: any = {
+              guildId,
+              minecraftUsername: username,
+              whitelistStatus: "whitelisted",
+              source: "imported",
+              whitelistedAt: new Date(),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+
+            if (uuid) {
+              createData.minecraftUuid = uuid;
+            }
+
+            const { data: createResult, error: createError } = await tryCatch(
+              MinecraftPlayer.create(createData)
+            );
+
+            if (createError) {
+              log.error(`[Minecraft Import] CREATE ERROR for ${username}:`, createError);
+              if ((createError as any).code === 11000) {
+                // Duplicate key - this shouldn't happen now but just in case
+                skippedCount++;
+                processedPlayers.push({
+                  username,
+                  action: "skipped",
+                  reason: "duplicate",
+                });
+                log.debug(`[Minecraft Import] Skipped duplicate: ${username}`);
               } else {
-                log.error(
-                  `[Minecraft Import] Failed to insert ${playerData.minecraftUsername}:`,
-                  insertError
-                );
-                insertErrors.push(
-                  `Failed to insert ${playerData.minecraftUsername}: ${insertError.message}`
-                );
+                errors.push(`Failed to create ${username}: ${createError.message}`);
+                processedPlayers.push({
+                  username,
+                  action: "error",
+                  error: createError.message,
+                });
               }
             } else {
-              successfulInserts++;
+              importedCount++;
+              processedPlayers.push({
+                username,
+                action: "created",
+                playerId: createResult._id,
+              });
+              log.info(
+                `[Minecraft Import] ✅ SUCCESSFULLY CREATED player: ${username} with ID: ${createResult._id}`
+              );
+
+              // Verify the player was actually saved by immediately querying it back
+              const { data: verifyPlayer } = await tryCatch(
+                MinecraftPlayer.findById(createResult._id).lean()
+              );
+
+              if (verifyPlayer) {
+                log.info(
+                  `[Minecraft Import] ✅ VERIFIED player exists in DB: ${verifyPlayer.minecraftUsername}`
+                );
+              } else {
+                log.error(
+                  `[Minecraft Import] ❌ VERIFICATION FAILED: Player ${username} with ID ${createResult._id} NOT FOUND in database immediately after creation!`
+                );
+              }
             }
           }
-
-          importedCount = successfulInserts;
-          const skippedDuplicates =
-            playersToCreate.length - successfulInserts - insertErrors.length;
-
-          if (insertErrors.length > 0) {
-            errors.push(...insertErrors);
-          }
-          log.info(
-            `[Minecraft Import] Individual inserts completed: ${successfulInserts} successful, ${skippedDuplicates} duplicates skipped, ${insertErrors.length} failed`
-          );
-        } else {
-          // For JSON imports, use bulk insert as before
-          try {
-            const { data: insertResult, error: insertError } = await tryCatch(
-              MinecraftPlayer.insertMany(playersToCreate, { ordered: false })
-            );
-
-            if (insertError) {
-              log.error("[Minecraft Import] Bulk insert failed:", insertError);
-              errors.push(`Bulk insert failed: ${insertError.message}`);
-            } else {
-              importedCount = Array.isArray(insertResult) ? insertResult.length : 0;
-              log.info(`[Minecraft Import] Bulk inserted ${importedCount} players`);
-            }
-          } catch (error) {
-            errors.push(
-              `Bulk insert error: ${error instanceof Error ? error.message : "Unknown error"}`
-            );
-          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          errors.push(`Failed to process ${username}: ${errorMessage}`);
+          processedPlayers.push({
+            username,
+            action: "error",
+            error: errorMessage,
+          });
         }
       }
-
-      // Calculate skipped duplicates for text imports
-      const skippedDuplicates = isTextImport
-        ? playersToCreate.length - importedCount - errors.length
-        : 0;
 
       const summary = {
         totalProcessed: whitelistData.length,
         validated: validPlayers.length,
         imported: importedCount,
         updated: updatedCount,
-        skipped: skippedDuplicates,
+        skipped: skippedCount,
         errors: errors.length,
         errorDetails: errors,
         importType: isTextImport ? "text" : "json",
+        processedPlayers, // Detailed results for debugging
         performance: {
-          bulkUpdates: playersToUpdate.length,
-          bulkInserts: playersToCreate.length,
-          optimized: true,
+          individualProcessing: true,
         },
       };
 
-      log.info(
-        `[Minecraft Import] Optimized ${
-          isTextImport ? "text" : "JSON"
-        } import completed for guild ${guildId}:`,
-        summary
-      );
+      log.info(`[Minecraft Import] Individual processing completed for guild ${guildId}:`, {
+        ...summary,
+        processedPlayers: `${processedPlayers.length} players processed`,
+      });
+
+      // Final verification: Count total players in database
+      const { data: totalPlayersCount } = await tryCatch(MinecraftPlayer.countDocuments());
+      log.info(`[Minecraft Import] Total players in database after import: ${totalPlayersCount}`);
+
+      // Sample a few created players to verify they exist
+      if (processedPlayers.length > 0) {
+        const createdPlayers = processedPlayers.filter((p) => p.action === "created");
+        if (createdPlayers.length > 0) {
+          log.info(`[Minecraft Import] Sampling created players for verification...`);
+          for (let i = 0; i < Math.min(3, createdPlayers.length); i++) {
+            const player = createdPlayers[i];
+            const { data: samplePlayer } = await tryCatch(
+              MinecraftPlayer.findOne({ minecraftUsername: player.username }).lean()
+            );
+            if (samplePlayer) {
+              log.info(`[Minecraft Import] ✅ Sample verification: ${player.username} exists`);
+            } else {
+              log.error(
+                `[Minecraft Import] ❌ Sample verification FAILED: ${player.username} NOT FOUND`
+              );
+            }
+          }
+        }
+      }
 
       return res.json(createSuccessResponse(summary, req.requestId));
     })
@@ -1571,6 +1541,158 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         createSuccessResponse(
           {
             message: "Discord account linked successfully",
+            player: updatedPlayer,
+          },
+          req.requestId
+        )
+      );
+    })
+  );
+
+  /**
+   * PUT /api/minecraft/:guildId/players/:playerId
+   * Update a player's information (username, UUID, Discord ID, notes)
+   */
+  router.put(
+    "/:guildId/players/:playerId",
+    authenticateApiKey,
+    requireScope("minecraft:admin"),
+    asyncHandler(async (req, res) => {
+      const { guildId, playerId } = req.params;
+      const { minecraftUsername, minecraftUuid, discordId, notes } = req.body;
+
+      // Validation
+      if (!minecraftUsername) {
+        return res
+          .status(400)
+          .json(createErrorResponse("minecraftUsername is required", 400, req.requestId));
+      }
+
+      // Find the player and verify guild ownership
+      const { data: player, error: findError } = await tryCatch(
+        MinecraftPlayer.findOne({ _id: playerId, guildId }).lean()
+      );
+
+      if (findError || !player) {
+        return res.status(404).json(createErrorResponse("Player not found", 404, req.requestId));
+      }
+
+      // Check if another player already has this username (excluding current player)
+      const { data: existingUsernamePlayer } = await tryCatch(
+        MinecraftPlayer.findOne({
+          guildId,
+          minecraftUsername: minecraftUsername.toLowerCase(),
+          _id: { $ne: playerId },
+        }).lean()
+      );
+
+      if (existingUsernamePlayer) {
+        return res
+          .status(409)
+          .json(
+            createErrorResponse(
+              `Another player already has the username: ${minecraftUsername}`,
+              409,
+              req.requestId
+            )
+          );
+      }
+
+      // Check if another player already has this UUID (if provided and not null)
+      if (minecraftUuid) {
+        const { data: existingUuidPlayer } = await tryCatch(
+          MinecraftPlayer.findOne({
+            guildId,
+            minecraftUuid: minecraftUuid,
+            _id: { $ne: playerId },
+          }).lean()
+        );
+
+        if (existingUuidPlayer) {
+          return res
+            .status(409)
+            .json(
+              createErrorResponse(
+                `Another player already has the UUID: ${minecraftUuid}`,
+                409,
+                req.requestId
+              )
+            );
+        }
+      }
+
+      // Check if another player already has this Discord ID (if provided)
+      if (discordId) {
+        const { data: existingDiscordPlayer } = await tryCatch(
+          MinecraftPlayer.findOne({
+            guildId,
+            discordId: discordId,
+            _id: { $ne: playerId },
+          }).lean()
+        );
+
+        if (existingDiscordPlayer) {
+          return res
+            .status(409)
+            .json(
+              createErrorResponse(
+                `Another player is already linked to Discord ID: ${discordId}`,
+                409,
+                req.requestId
+              )
+            );
+        }
+      }
+
+      // Prepare update data
+      const updateData: any = {
+        minecraftUsername: minecraftUsername.toLowerCase(),
+        updatedAt: new Date(),
+      };
+
+      // Handle UUID - set to null if empty string, otherwise use provided value
+      if (minecraftUuid === null || minecraftUuid === "") {
+        updateData.minecraftUuid = null;
+      } else if (minecraftUuid) {
+        updateData.minecraftUuid = minecraftUuid;
+      }
+
+      // Handle Discord ID - set to null if empty string, otherwise use provided value
+      if (discordId === null || discordId === "") {
+        updateData.discordId = null;
+        updateData.discordUsername = null;
+        updateData.discordDisplayName = null;
+      } else if (discordId) {
+        updateData.discordId = discordId;
+      }
+
+      // Handle notes
+      if (notes === null || notes === "") {
+        updateData.notes = null;
+      } else if (notes) {
+        updateData.notes = notes;
+      }
+
+      // Update the player
+      const { data: updatedPlayer, error: updateError } = await tryCatch(
+        MinecraftPlayer.findOneAndUpdate({ _id: playerId, guildId }, updateData, { new: true })
+      );
+
+      if (updateError || !updatedPlayer) {
+        log.error(`[Minecraft Update] Failed to update player ${playerId}:`, updateError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to update player", 500, req.requestId));
+      }
+
+      log.info(
+        `[Minecraft Update] Successfully updated player ${updatedPlayer.minecraftUsername} in guild ${guildId}`
+      );
+
+      return res.json(
+        createSuccessResponse(
+          {
+            message: "Player updated successfully",
             player: updatedPlayer,
           },
           req.requestId

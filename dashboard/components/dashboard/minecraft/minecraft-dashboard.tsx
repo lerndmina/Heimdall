@@ -194,7 +194,7 @@ export function MinecraftDashboard() {
 
       let description = "";
       const parts = [];
-      
+
       if (data.data.approved > 0) {
         parts.push(`${data.data.approved} new players imported`);
       }
@@ -204,13 +204,13 @@ export function MinecraftDashboard() {
       if (data.data.skipped > 0) {
         parts.push(`${data.data.skipped} duplicates skipped`);
       }
-      
+
       if (parts.length > 0) {
         description = `Successfully processed: ${parts.join(", ")}.`;
       } else {
         description = "No changes made.";
       }
-      
+
       if (data.data.errors > 0) {
         description += ` ${data.data.errors} errors occurred.`;
       }
@@ -576,18 +576,10 @@ export function MinecraftDashboard() {
                 <CardDescription className="text-discord-muted">
                   {lastOperationSummary && (
                     <div className="space-y-1 mt-1">
-                      {lastOperationSummary.approved > 0 && (
-                        <span className="text-green-400">✅ {lastOperationSummary.approved} imported</span>
-                      )}
-                      {lastOperationSummary.updated > 0 && (
-                        <span className="text-blue-400 ml-3">🔄 {lastOperationSummary.updated} updated</span>
-                      )}
-                      {lastOperationSummary.skipped > 0 && (
-                        <span className="text-yellow-400 ml-3">⏭️ {lastOperationSummary.skipped} skipped</span>
-                      )}
-                      {lastOperationSummary.errors > 0 && (
-                        <span className="text-red-400 ml-3">⚠️ {lastOperationSummary.errors} errors</span>
-                      )}
+                      {lastOperationSummary.approved > 0 && <span className="text-green-400">✅ {lastOperationSummary.approved} imported</span>}
+                      {lastOperationSummary.updated > 0 && <span className="text-blue-400 ml-3">🔄 {lastOperationSummary.updated} updated</span>}
+                      {lastOperationSummary.skipped > 0 && <span className="text-yellow-400 ml-3">⏭️ {lastOperationSummary.skipped} skipped</span>}
+                      {lastOperationSummary.errors > 0 && <span className="text-red-400 ml-3">⚠️ {lastOperationSummary.errors} errors</span>}
                     </div>
                   )}
                 </CardDescription>
@@ -948,21 +940,11 @@ export function MinecraftDashboard() {
                     <div className="p-4 bg-green-900/20 border border-green-800 rounded-md">
                       <h4 className="text-green-400 font-medium mb-2">Operation Successful</h4>
                       <div className="space-y-1 text-sm text-green-300">
-                        {bulkOperationResult.approved > 0 && (
-                          <p>✅ {bulkOperationResult.approved} new players imported</p>
-                        )}
-                        {bulkOperationResult.updated > 0 && (
-                          <p>🔄 {bulkOperationResult.updated} existing players updated</p>
-                        )}
-                        {bulkOperationResult.skipped > 0 && (
-                          <p>⏭️ {bulkOperationResult.skipped} duplicates skipped</p>
-                        )}
-                        {bulkOperationResult.errors > 0 && (
-                          <p>⚠️ {bulkOperationResult.errors} errors occurred</p>
-                        )}
-                        {bulkOperationResult.approved === 0 && bulkOperationResult.updated === 0 && bulkOperationResult.skipped === 0 && (
-                          <p>ℹ️ No changes made</p>
-                        )}
+                        {bulkOperationResult.approved > 0 && <p>✅ {bulkOperationResult.approved} new players imported</p>}
+                        {bulkOperationResult.updated > 0 && <p>🔄 {bulkOperationResult.updated} existing players updated</p>}
+                        {bulkOperationResult.skipped > 0 && <p>⏭️ {bulkOperationResult.skipped} duplicates skipped</p>}
+                        {bulkOperationResult.errors > 0 && <p>⚠️ {bulkOperationResult.errors} errors occurred</p>}
+                        {bulkOperationResult.approved === 0 && bulkOperationResult.updated === 0 && bulkOperationResult.skipped === 0 && <p>ℹ️ No changes made</p>}
                       </div>
                     </div>
 

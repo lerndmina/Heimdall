@@ -98,7 +98,16 @@ const MinecraftPlayerSchema = new Schema<MinecraftPlayerType>(
 );
 
 // Compound indexes for efficient queries
-MinecraftPlayerSchema.index({ guildId: 1, minecraftUuid: 1 }, { unique: true, sparse: true });
+// Note: We use a partial index for UUID uniqueness to only apply when UUID exists and is a string
+MinecraftPlayerSchema.index(
+  { guildId: 1, minecraftUuid: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      minecraftUuid: { $exists: true, $type: "string" },
+    },
+  }
+);
 MinecraftPlayerSchema.index({ guildId: 1, minecraftUsername: 1 }, { unique: true });
 MinecraftPlayerSchema.index({ guildId: 1, discordId: 1 }, { sparse: true });
 MinecraftPlayerSchema.index({ guildId: 1, whitelistStatus: 1 });

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { User, Users, Search, Filter, CheckCircle, XCircle, AlertCircle, Shield, Clock, MoreVertical, UserPlus, Upload, FileText, Link } from "lucide-react";
+import { User, Users, Search, Filter, CheckCircle, XCircle, AlertCircle, Shield, Clock, MoreVertical, UserPlus, Upload, FileText, Link, Edit } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,12 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireGuild } from "../use-require-guild";
 
 interface MinecraftPlayer {
   _id: string;
   minecraftUsername: string;
+  minecraftUuid?: string;
   discordId?: string;
   discordUsername?: string;
   discordDisplayName?: string;
@@ -47,6 +49,16 @@ export function MinecraftPlayersList() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [linkDiscordId, setLinkDiscordId] = useState("");
+
+  // Edit player dialog state
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<MinecraftPlayer | null>(null);
+  const [editPlayerData, setEditPlayerData] = useState({
+    minecraftUsername: "",
+    minecraftUuid: "",
+    discordId: "",
+    notes: "",
+  });
 
   // Fetch all players
   const {
@@ -211,6 +223,63 @@ export function MinecraftPlayersList() {
     },
   });
 
+  // Edit player mutation
+  const editMutation = useMutation({
+    mutationFn: async ({ playerId, playerData }: { playerId: string; playerData: typeof editPlayerData }) => {
+      if (!selectedGuild) throw new Error("No guild selected");
+
+      const updateData: any = {
+        minecraftUsername: playerData.minecraftUsername.trim(),
+        discordId: playerData.discordId.trim() || undefined,
+        notes: playerData.notes.trim() || undefined,
+      };
+
+      // Only include UUID if it's not empty (allow removal by leaving blank)
+      if (playerData.minecraftUuid.trim()) {
+        updateData.minecraftUuid = playerData.minecraftUuid.trim();
+      } else {
+        // Explicitly set to null to remove the UUID
+        updateData.minecraftUuid = null;
+      }
+
+      const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/players/${playerId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update player");
+      }
+
+      return result;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Player Updated",
+        description: `Successfully updated ${data.data.minecraftUsername}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["minecraft-players"] });
+      setShowEditDialog(false);
+      setEditingPlayer(null);
+      setEditPlayerData({
+        minecraftUsername: "",
+        minecraftUuid: "",
+        discordId: "",
+        notes: "",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   if (!selectedGuild) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -311,6 +380,28 @@ export function MinecraftPlayersList() {
         </Button>
       );
     }
+
+    // Add edit button for all players
+    actions.push(
+      <Button
+        key="edit"
+        size="sm"
+        variant="ghost"
+        onClick={() => {
+          setEditingPlayer(player);
+          setEditPlayerData({
+            minecraftUsername: player.minecraftUsername,
+            minecraftUuid: player.minecraftUuid || "",
+            discordId: player.discordId || "",
+            notes: player.notes || "",
+          });
+          setShowEditDialog(true);
+        }}
+        className="flex items-center gap-2">
+        <Edit className="h-4 w-4" />
+        Edit
+      </Button>
+    );
 
     return actions;
   };
@@ -527,6 +618,89 @@ export function MinecraftPlayersList() {
                 }}
                 disabled={!linkDiscordId || !selectedPlayerId || linkMutation.isPending}>
                 {linkMutation.isPending ? "Linking..." : "Link Account"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Player Dialog */}
+      {showEditDialog && editingPlayer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-card rounded-lg p-6 w-96 max-w-90vw">
+            <h3 className="text-lg font-semibold mb-4 text-white">Edit Player</h3>
+            <p className="text-muted-foreground mb-4">Update the player's information. Leave UUID empty to remove it.</p>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-username">Minecraft Username</Label>
+                <Input
+                  id="edit-username"
+                  type="text"
+                  placeholder="Minecraft username"
+                  value={editPlayerData.minecraftUsername}
+                  onChange={(e) => setEditPlayerData((prev) => ({ ...prev, minecraftUsername: e.target.value }))}
+                  className="mt-1 bg-discord-darker border-discord-darker text-white"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-uuid">Minecraft UUID (Optional)</Label>
+                <Input
+                  id="edit-uuid"
+                  type="text"
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (leave empty to remove)"
+                  value={editPlayerData.minecraftUuid}
+                  onChange={(e) => setEditPlayerData((prev) => ({ ...prev, minecraftUuid: e.target.value }))}
+                  className="mt-1 bg-discord-darker border-discord-darker text-white"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-discord-id">Discord ID (Optional)</Label>
+                <Input
+                  id="edit-discord-id"
+                  type="text"
+                  placeholder="123456789012345678"
+                  value={editPlayerData.discordId}
+                  onChange={(e) => setEditPlayerData((prev) => ({ ...prev, discordId: e.target.value }))}
+                  className="mt-1 bg-discord-darker border-discord-darker text-white"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-notes">Notes (Optional)</Label>
+                <Textarea
+                  id="edit-notes"
+                  placeholder="Additional notes about this player..."
+                  value={editPlayerData.notes}
+                  onChange={(e) => setEditPlayerData((prev) => ({ ...prev, notes: e.target.value }))}
+                  className="mt-1 bg-discord-darker border-discord-darker text-white min-h-20"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowEditDialog(false);
+                  setEditingPlayer(null);
+                  setEditPlayerData({
+                    minecraftUsername: "",
+                    minecraftUuid: "",
+                    discordId: "",
+                    notes: "",
+                  });
+                }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (editPlayerData.minecraftUsername.trim() && editingPlayer) {
+                    editMutation.mutate({
+                      playerId: editingPlayer._id,
+                      playerData: editPlayerData,
+                    });
+                  }
+                }}
+                disabled={!editPlayerData.minecraftUsername.trim() || editMutation.isPending}>
+                {editMutation.isPending ? "Updating..." : "Update Player"}
               </Button>
             </div>
           </div>
