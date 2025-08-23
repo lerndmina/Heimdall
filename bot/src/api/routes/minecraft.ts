@@ -655,6 +655,8 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         // Prepare update data
         const updateData: any = {
           discordId: pendingAuth.discordId,
+          discordUsername: pendingAuth.discordUsername,
+          discordDisplayName: pendingAuth.discordDisplayName,
           whitelistStatus: "whitelisted",
           linkedAt: pendingAuth.createdAt,
           whitelistedAt: new Date(),
@@ -685,6 +687,8 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
               guildId,
               minecraftUsername: pendingAuth.minecraftUsername,
               discordId: pendingAuth.discordId,
+              discordUsername: pendingAuth.discordUsername,
+              discordDisplayName: pendingAuth.discordDisplayName,
               whitelistStatus: "whitelisted",
               linkedAt: pendingAuth.createdAt,
               whitelistedAt: new Date(),
@@ -864,7 +868,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         MinecraftPlayer.findOneAndUpdate(
           { _id: playerId, guildId },
           {
-            whitelistStatus: "not_whitelisted",
+            whitelistStatus: "unwhitelisted",
             revokedBy: staffMemberId,
             revokedAt: new Date(),
             notes: reason || undefined,
@@ -1096,7 +1100,6 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
               { _id: player._id },
               {
                 whitelistStatus: "whitelisted",
-                isWhitelisted: true,
                 approvedBy: staffMemberId,
                 whitelistedAt: new Date(),
                 updatedAt: new Date(),
@@ -1141,7 +1144,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
   /**
    * POST /api/minecraft/:guildId/import-whitelist
-   * Import players from a Minecraft whitelist JSON file
+   * Import players from a Minecraft whitelist JSON file OR text-based username list
    */
   router.post(
     "/:guildId/import-whitelist",
@@ -1149,45 +1152,109 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
     requireScope("minecraft:admin"),
     asyncHandler(async (req, res) => {
       const { guildId } = req.params;
-      const whitelistData = req.body;
+      const requestData = req.body;
 
-      if (!Array.isArray(whitelistData)) {
-        return res
-          .status(400)
-          .json(
-            createErrorResponse(
-              "Invalid whitelist format. Expected array of player objects.",
-              400,
-              req.requestId
-            )
-          );
+      // Handle different input formats
+      let whitelistData: any[];
+      let isTextImport = false;
+
+      // Check if it's a text-based import (from manual username entry)
+      if (requestData.method === "text" && requestData.text) {
+        isTextImport = true;
+        const staffMemberId = requestData.staffMemberId || "unknown";
+
+        // Parse the text input - handle newlines, commas, and whitespace
+        const usernames = requestData.text
+          .split(/[\n,]+/) // Split on newlines or commas
+          .map((username: string) => username.trim()) // Remove whitespace
+          .filter((username: string) => username.length > 0) // Remove empty entries
+          .filter((username: string) => /^[a-zA-Z0-9_]{1,16}$/.test(username)); // Validate Minecraft username format
+
+        if (usernames.length === 0) {
+          return res
+            .status(400)
+            .json(
+              createErrorResponse(
+                "No valid Minecraft usernames found in the provided text.",
+                400,
+                req.requestId
+              )
+            );
+        }
+
+        log.info(
+          `[Minecraft Text Import] Starting text-based import for guild ${guildId}, ${usernames.length} usernames by staff ${staffMemberId}`
+        );
+
+        // Convert usernames to whitelist format (without UUIDs for text import)
+        whitelistData = usernames.map((username: string) => ({
+          name: username.toLowerCase(),
+          uuid: null, // We don't have UUIDs for manual text import
+          source: "manual_text",
+          staffMemberId,
+        }));
+      } else {
+        // Handle traditional JSON whitelist format
+        if (!Array.isArray(requestData)) {
+          return res
+            .status(400)
+            .json(
+              createErrorResponse(
+                "Invalid whitelist format. Expected array of player objects or text import with method='text'.",
+                400,
+                req.requestId
+              )
+            );
+        }
+        whitelistData = requestData;
       }
 
       log.info(
-        `[Minecraft Import] Starting optimized whitelist import for guild ${guildId}, ${whitelistData.length} players`
+        `[Minecraft Import] Starting optimized whitelist import for guild ${guildId}, ${
+          whitelistData.length
+        } ${isTextImport ? "text usernames" : "players"}`
       );
 
       // Validate and prepare data in batch
       const validPlayers: Array<{
         username: string;
-        uuid: string;
+        uuid: string | null;
         originalEntry: any;
+        isTextImport?: boolean;
+        staffMemberId?: string;
       }> = [];
       const errors: string[] = [];
 
       // First pass: validate all entries
       for (const playerEntry of whitelistData) {
-        if (!playerEntry.name || !playerEntry.uuid) {
-          errors.push(
-            `Invalid player entry: missing name or uuid - ${JSON.stringify(playerEntry)}`
-          );
-          continue;
+        if (isTextImport) {
+          // For text imports, we only have usernames
+          if (!playerEntry.name) {
+            errors.push(`Invalid text entry: missing name - ${JSON.stringify(playerEntry)}`);
+            continue;
+          }
+          validPlayers.push({
+            username: playerEntry.name.toLowerCase(),
+            uuid: null, // No UUID for text imports
+            originalEntry: playerEntry,
+            isTextImport: true,
+            staffMemberId: playerEntry.staffMemberId,
+          });
+        } else {
+          // For JSON imports, require both name and uuid
+          if (!playerEntry.name || !playerEntry.uuid) {
+            errors.push(
+              `Invalid player entry: missing name or uuid - ${JSON.stringify(playerEntry)}`
+            );
+            continue;
+          }
+          validPlayers.push({
+            username: playerEntry.name.toLowerCase(),
+            uuid: playerEntry.uuid,
+            originalEntry: playerEntry,
+            isTextImport: false,
+          });
         }
-        validPlayers.push({
-          username: playerEntry.name.toLowerCase(),
-          uuid: playerEntry.uuid,
-          originalEntry: playerEntry,
-        });
       }
 
       if (validPlayers.length === 0) {
@@ -1247,33 +1314,44 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
       // Process each valid player
       for (const { username, uuid } of validPlayers) {
-        const existingPlayer = existingByUsername.get(username) || existingByUuid.get(uuid);
+        const existingPlayer =
+          existingByUsername.get(username) || (uuid ? existingByUuid.get(uuid) : null);
 
         if (existingPlayer) {
           // Prepare update operation
+          const updateData: any = {
+            whitelistStatus: "whitelisted",
+            minecraftUsername: username,
+            updatedAt: new Date(),
+          };
+
+          // Only set UUID if we have one (not null for text imports)
+          if (uuid) {
+            updateData.minecraftUuid = uuid;
+          }
+
           playersToUpdate.push({
             filter: { _id: existingPlayer._id },
-            update: {
-              isWhitelisted: true,
-              whitelistStatus: "whitelisted",
-              minecraftUsername: username,
-              minecraftUuid: uuid,
-              updatedAt: new Date(),
-            },
+            update: updateData,
           });
         } else {
           // Prepare create operation
-          playersToCreate.push({
+          const createData: any = {
             guildId,
             minecraftUsername: username,
-            minecraftUuid: uuid,
-            isWhitelisted: true,
             whitelistStatus: "whitelisted",
             source: "imported",
             whitelistedAt: new Date(),
             createdAt: new Date(),
             updatedAt: new Date(),
-          });
+          };
+
+          // Only set UUID if we have one (not null for text imports)
+          if (uuid) {
+            createData.minecraftUuid = uuid;
+          }
+
+          playersToCreate.push(createData);
         }
       }
 
@@ -1336,6 +1414,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         updated: updatedCount,
         errors: errors.length,
         errorDetails: errors,
+        importType: isTextImport ? "text" : "json",
         performance: {
           bulkUpdates: playersToUpdate.length,
           bulkInserts: playersToCreate.length,
@@ -1343,7 +1422,12 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         },
       };
 
-      log.info(`[Minecraft Import] Optimized import completed for guild ${guildId}:`, summary);
+      log.info(
+        `[Minecraft Import] Optimized ${
+          isTextImport ? "text" : "JSON"
+        } import completed for guild ${guildId}:`,
+        summary
+      );
 
       return res.json(createSuccessResponse(summary, req.requestId));
     })
@@ -1572,7 +1656,6 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             minecraftUsername,
             discordId,
             whitelistStatus: "whitelisted",
-            isWhitelisted: true,
             linkedAt: new Date(),
             whitelistedAt: new Date(),
             approvedBy: staffMemberId,
@@ -1610,214 +1693,6 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           req.requestId
         )
       );
-    })
-  );
-
-  /**
-   * POST /api/minecraft/:guildId/bulk-whitelist-manual
-   * Manually whitelist multiple players by their usernames
-   */
-  router.post(
-    "/:guildId/bulk-whitelist-manual",
-    authenticateApiKey,
-    requireScope("minecraft:admin"),
-    asyncHandler(async (req, res) => {
-      const { guildId } = req.params;
-      const { usernames, staffMemberId } = req.body;
-
-      if (!staffMemberId) {
-        return res
-          .status(400)
-          .json(createErrorResponse("staffMemberId is required", 400, req.requestId));
-      }
-
-      if (!Array.isArray(usernames) || usernames.length === 0) {
-        return res
-          .status(400)
-          .json(createErrorResponse("usernames must be a non-empty array", 400, req.requestId));
-      }
-
-      log.info(
-        `[Minecraft Bulk Manual Whitelist] Processing ${usernames.length} usernames for guild ${guildId} by staff ${staffMemberId}`
-      );
-
-      // Validate and prepare data in batch
-      const validUsernames: string[] = [];
-      const errors: string[] = [];
-
-      // First pass: validate all usernames
-      for (const rawUsername of usernames) {
-        const username = rawUsername?.toLowerCase()?.trim();
-        if (!username) {
-          errors.push(`Invalid username: ${rawUsername}`);
-          continue;
-        }
-        validUsernames.push(username);
-      }
-
-      if (validUsernames.length === 0) {
-        return res.json(
-          createSuccessResponse(
-            {
-              totalProcessed: usernames.length,
-              processed: 0,
-              created: 0,
-              updated: 0,
-              errors: errors.length,
-              errorDetails: errors,
-              processedPlayers: [],
-            },
-            req.requestId
-          )
-        );
-      }
-
-      // Bulk find existing players
-      const { data: existingPlayers, error: findError } = await tryCatch(
-        MinecraftPlayer.find({
-          guildId,
-          minecraftUsername: { $in: validUsernames },
-        }).lean()
-      );
-
-      if (findError) {
-        log.error("[Minecraft Bulk Manual Whitelist] Failed to query existing players:", findError);
-        return res
-          .status(500)
-          .json(createErrorResponse("Failed to query existing players", 500, req.requestId));
-      }
-
-      // Create lookup map for efficient checking
-      const existingByUsername = new Map<string, any>();
-      (existingPlayers || []).forEach((player) => {
-        if (player.minecraftUsername) {
-          existingByUsername.set(player.minecraftUsername, player);
-        }
-      });
-
-      // Prepare bulk operations
-      const playersToUpdate: Array<{
-        filter: any;
-        update: any;
-      }> = [];
-
-      const playersToCreate: Array<any> = [];
-      const processedPlayers: string[] = [];
-
-      // Process each valid username
-      for (const username of validUsernames) {
-        const existingPlayer = existingByUsername.get(username);
-
-        if (existingPlayer) {
-          // Only update if not already whitelisted
-          if (existingPlayer.whitelistStatus !== "whitelisted") {
-            playersToUpdate.push({
-              filter: { _id: existingPlayer._id },
-              update: {
-                whitelistStatus: "whitelisted",
-                isWhitelisted: true,
-                approvedBy: staffMemberId,
-                approvedAt: new Date(),
-                updatedAt: new Date(),
-              },
-            });
-          }
-          processedPlayers.push(username);
-        } else {
-          // Prepare create operation
-          playersToCreate.push({
-            guildId,
-            minecraftUsername: username,
-            whitelistStatus: "whitelisted",
-            isWhitelisted: true,
-            approvedBy: staffMemberId,
-            approvedAt: new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            // We don't have UUID or Discord ID for manual entries
-            minecraftUuid: null,
-            discordId: null,
-            linkedAt: null,
-            source: "manual_bulk",
-          });
-          processedPlayers.push(username);
-        }
-      }
-
-      let updatedCount = 0;
-      let createdCount = 0;
-
-      // Perform bulk updates
-      if (playersToUpdate.length > 0) {
-        try {
-          const bulkUpdateOps = playersToUpdate.map(({ filter, update }) => ({
-            updateOne: {
-              filter,
-              update,
-            },
-          }));
-
-          const { data: updateResult, error: updateError } = await tryCatch(
-            MinecraftPlayer.bulkWrite(bulkUpdateOps)
-          );
-
-          if (updateError) {
-            log.error("[Minecraft Bulk Manual Whitelist] Bulk update failed:", updateError);
-            errors.push(`Bulk update failed: ${updateError.message}`);
-          } else {
-            updatedCount = updateResult?.modifiedCount || 0;
-            log.info(`[Minecraft Bulk Manual Whitelist] Bulk updated ${updatedCount} players`);
-          }
-        } catch (error) {
-          errors.push(
-            `Bulk update error: ${error instanceof Error ? error.message : "Unknown error"}`
-          );
-        }
-      }
-
-      // Perform bulk inserts
-      if (playersToCreate.length > 0) {
-        try {
-          const { data: insertResult, error: insertError } = await tryCatch(
-            MinecraftPlayer.insertMany(playersToCreate, { ordered: false })
-          );
-
-          if (insertError) {
-            log.error("[Minecraft Bulk Manual Whitelist] Bulk insert failed:", insertError);
-            errors.push(`Bulk insert failed: ${insertError.message}`);
-          } else {
-            createdCount = Array.isArray(insertResult) ? insertResult.length : 0;
-            log.info(`[Minecraft Bulk Manual Whitelist] Bulk inserted ${createdCount} players`);
-          }
-        } catch (error) {
-          errors.push(
-            `Bulk insert error: ${error instanceof Error ? error.message : "Unknown error"}`
-          );
-        }
-      }
-
-      const summary = {
-        totalProcessed: usernames.length,
-        validated: validUsernames.length,
-        processed: processedPlayers.length,
-        created: createdCount,
-        updated: updatedCount,
-        errors: errors.length,
-        errorDetails: errors,
-        processedPlayers,
-        performance: {
-          bulkUpdates: playersToUpdate.length,
-          bulkInserts: playersToCreate.length,
-          optimized: true,
-        },
-      };
-
-      log.info(
-        `[Minecraft Bulk Manual Whitelist] Optimized bulk operation completed for guild ${guildId}:`,
-        summary
-      );
-
-      return res.json(createSuccessResponse(summary, req.requestId));
     })
   );
 

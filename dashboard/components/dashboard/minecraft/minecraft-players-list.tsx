@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireGuild } from "../use-require-guild";
 
@@ -19,6 +20,8 @@ interface MinecraftPlayer {
   _id: string;
   minecraftUsername: string;
   discordId?: string;
+  discordUsername?: string;
+  discordDisplayName?: string;
   whitelistStatus: "whitelisted" | "unwhitelisted";
   linkedAt?: string;
   approvedAt?: string;
@@ -417,7 +420,32 @@ export function MinecraftPlayersList() {
                         )}
                       </div>
                       <div className="text-sm text-discord-muted space-x-2">
-                        {player.discordId && <span>Discord: {player.discordId}</span>}
+                        {player.discordId && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help">Discord: {player.discordDisplayName || player.discordUsername || "Discord User"}</span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-sm">
+                                  <div>
+                                    <strong>Discord ID:</strong> {player.discordId}
+                                  </div>
+                                  {player.discordUsername && (
+                                    <div>
+                                      <strong>Username:</strong> @{player.discordUsername}
+                                    </div>
+                                  )}
+                                  {player.discordDisplayName && player.discordDisplayName !== player.discordUsername && (
+                                    <div>
+                                      <strong>Display Name:</strong> {player.discordDisplayName}
+                                    </div>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                         {player.linkedAt && <span>• Linked: {new Date(player.linkedAt).toLocaleDateString()}</span>}
                         {player.approvedAt && <span>• Approved: {new Date(player.approvedAt).toLocaleDateString()}</span>}
                       </div>

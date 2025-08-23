@@ -9,6 +9,8 @@ export interface MinecraftPlayerType extends Document {
 
   // Discord information (null if imported from existing whitelist)
   discordId?: string;
+  discordUsername?: string; // Discord username at time of linking
+  discordDisplayName?: string; // Server nickname or global display name at time of linking
 
   // Status tracking
   whitelistStatus: "whitelisted" | "unwhitelisted";
@@ -52,6 +54,14 @@ const MinecraftPlayerSchema = new Schema<MinecraftPlayerType>(
 
     // Discord information
     discordId: {
+      type: String,
+      sparse: true,
+    },
+    discordUsername: {
+      type: String,
+      sparse: true,
+    },
+    discordDisplayName: {
       type: String,
       sparse: true,
     },
