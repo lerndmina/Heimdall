@@ -57,6 +57,12 @@ export function MinecraftDashboard() {
 
   // Bulk approval result state
   const [lastApprovedPlayers, setLastApprovedPlayers] = useState<string[]>([]);
+  const [lastOperationSummary, setLastOperationSummary] = useState<{
+    approved: number;
+    updated: number;
+    skipped: number;
+    errors: number;
+  } | null>(null);
   const [showApprovalResult, setShowApprovalResult] = useState(false);
 
   // Bulk approval dialog state
@@ -148,6 +154,8 @@ export function MinecraftDashboard() {
         return {
           data: {
             approved: result.data.imported || 0,
+            updated: result.data.updated || 0,
+            skipped: result.data.skipped || 0,
             errors: result.data.errors || 0,
             errorDetails: result.data.errorDetails || [],
             approvedPlayers: params.usernames, // Show the usernames that were processed
@@ -175,10 +183,34 @@ export function MinecraftDashboard() {
     onSuccess: (data) => {
       const approvedPlayers = data.data.approvedPlayers || [];
       setLastApprovedPlayers(approvedPlayers);
+      setLastOperationSummary({
+        approved: data.data.approved || 0,
+        updated: data.data.updated || 0,
+        skipped: data.data.skipped || 0,
+        errors: data.data.errors || 0,
+      });
       setBulkOperationCompleted(true);
       setBulkOperationResult(data.data);
 
-      let description = `Successfully approved ${data.data.approved} players.`;
+      let description = "";
+      const parts = [];
+      
+      if (data.data.approved > 0) {
+        parts.push(`${data.data.approved} new players imported`);
+      }
+      if (data.data.updated > 0) {
+        parts.push(`${data.data.updated} existing players updated`);
+      }
+      if (data.data.skipped > 0) {
+        parts.push(`${data.data.skipped} duplicates skipped`);
+      }
+      
+      if (parts.length > 0) {
+        description = `Successfully processed: ${parts.join(", ")}.`;
+      } else {
+        description = "No changes made.";
+      }
+      
       if (data.data.errors > 0) {
         description += ` ${data.data.errors} errors occurred.`;
       }
@@ -188,8 +220,8 @@ export function MinecraftDashboard() {
         description,
       });
 
-      // Show the approval result card if players were approved
-      if (approvedPlayers.length > 0) {
+      // Show the approval result card if any operation occurred
+      if (data.data.approved > 0 || data.data.updated > 0 || data.data.skipped > 0 || approvedPlayers.length > 0) {
         setShowApprovalResult(true);
       }
 
@@ -532,42 +564,63 @@ export function MinecraftDashboard() {
       </div>
 
       {/* Bulk Approval Results */}
-      {showApprovalResult && lastApprovedPlayers.length > 0 && (
+      {showApprovalResult && (lastApprovedPlayers.length > 0 || lastOperationSummary) && (
         <Card className="bg-discord-dark border-discord-darker">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2 text-white">
                   <CheckCircle className="h-5 w-5 text-discord-success" />
-                  Bulk Approval Results
+                  Bulk Import Results
                 </CardTitle>
-                <CardDescription className="text-discord-muted">Successfully approved {lastApprovedPlayers.length} players</CardDescription>
+                <CardDescription className="text-discord-muted">
+                  {lastOperationSummary && (
+                    <div className="space-y-1 mt-1">
+                      {lastOperationSummary.approved > 0 && (
+                        <span className="text-green-400">✅ {lastOperationSummary.approved} imported</span>
+                      )}
+                      {lastOperationSummary.updated > 0 && (
+                        <span className="text-blue-400 ml-3">🔄 {lastOperationSummary.updated} updated</span>
+                      )}
+                      {lastOperationSummary.skipped > 0 && (
+                        <span className="text-yellow-400 ml-3">⏭️ {lastOperationSummary.skipped} skipped</span>
+                      )}
+                      {lastOperationSummary.errors > 0 && (
+                        <span className="text-red-400 ml-3">⚠️ {lastOperationSummary.errors} errors</span>
+                      )}
+                    </div>
+                  )}
+                </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={copyApprovedPlayers}>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy List
-                </Button>
+                {lastApprovedPlayers.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={copyApprovedPlayers}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy List
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" onClick={() => setShowApprovalResult(false)}>
                   Dismiss
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-discord-text">Approved players:</p>
-              <div className="bg-discord-darker p-3 rounded-md max-h-40 overflow-y-auto">
-                <div className="space-y-1">
-                  {lastApprovedPlayers.map((player, index) => (
-                    <div key={index} className="text-sm text-discord-text font-mono">
-                      {player}
-                    </div>
-                  ))}
+          {lastApprovedPlayers.length > 0 && (
+            <CardContent>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-discord-text">Processed players:</p>
+                <div className="bg-discord-darker p-3 rounded-md max-h-40 overflow-y-auto">
+                  <div className="space-y-1">
+                    {lastApprovedPlayers.map((player, index) => (
+                      <div key={index} className="text-sm text-discord-text font-mono">
+                        {player}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
+            </CardContent>
+          )}
         </Card>
       )}
 
@@ -895,8 +948,21 @@ export function MinecraftDashboard() {
                     <div className="p-4 bg-green-900/20 border border-green-800 rounded-md">
                       <h4 className="text-green-400 font-medium mb-2">Operation Successful</h4>
                       <div className="space-y-1 text-sm text-green-300">
-                        <p>✅ Successfully approved {bulkOperationResult.approved} players</p>
-                        {bulkOperationResult.errors > 0 && <p>⚠️ {bulkOperationResult.errors} errors occurred</p>}
+                        {bulkOperationResult.approved > 0 && (
+                          <p>✅ {bulkOperationResult.approved} new players imported</p>
+                        )}
+                        {bulkOperationResult.updated > 0 && (
+                          <p>🔄 {bulkOperationResult.updated} existing players updated</p>
+                        )}
+                        {bulkOperationResult.skipped > 0 && (
+                          <p>⏭️ {bulkOperationResult.skipped} duplicates skipped</p>
+                        )}
+                        {bulkOperationResult.errors > 0 && (
+                          <p>⚠️ {bulkOperationResult.errors} errors occurred</p>
+                        )}
+                        {bulkOperationResult.approved === 0 && bulkOperationResult.updated === 0 && bulkOperationResult.skipped === 0 && (
+                          <p>ℹ️ No changes made</p>
+                        )}
                       </div>
                     </div>
 

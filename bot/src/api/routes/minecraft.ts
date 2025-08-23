@@ -1346,7 +1346,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             updatedAt: new Date(),
           };
 
-          // Only set UUID if we have one (not null for text imports)
+          // Only set UUID if we have one (don't set the field at all for text imports to avoid null constraint issues)
           if (uuid) {
             createData.minecraftUuid = uuid;
           }
@@ -1388,30 +1388,81 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
       // Perform bulk inserts
       if (playersToCreate.length > 0) {
-        try {
-          const { data: insertResult, error: insertError } = await tryCatch(
-            MinecraftPlayer.insertMany(playersToCreate, { ordered: false })
-          );
+        if (isTextImport) {
+          // For text imports, use individual inserts to handle duplicates gracefully
+          let successfulInserts = 0;
+          const insertErrors: string[] = [];
 
-          if (insertError) {
-            log.error("[Minecraft Import] Bulk insert failed:", insertError);
-            errors.push(`Bulk insert failed: ${insertError.message}`);
-          } else {
-            importedCount = Array.isArray(insertResult) ? insertResult.length : 0;
-            log.info(`[Minecraft Import] Bulk inserted ${importedCount} players`);
+          for (const playerData of playersToCreate) {
+            const { data: insertResult, error: insertError } = await tryCatch(
+              MinecraftPlayer.create(playerData)
+            );
+
+            if (insertError) {
+              // Check if it's a duplicate key error (MongoDB error code 11000)
+              if ((insertError as any).code === 11000) {
+                // Duplicate key error - this is expected for existing usernames
+                log.debug(
+                  `[Minecraft Import] Skipping duplicate username: ${playerData.minecraftUsername}`
+                );
+                // Don't add to errors array for duplicates as they're expected
+              } else {
+                log.error(
+                  `[Minecraft Import] Failed to insert ${playerData.minecraftUsername}:`,
+                  insertError
+                );
+                insertErrors.push(
+                  `Failed to insert ${playerData.minecraftUsername}: ${insertError.message}`
+                );
+              }
+            } else {
+              successfulInserts++;
+            }
           }
-        } catch (error) {
-          errors.push(
-            `Bulk insert error: ${error instanceof Error ? error.message : "Unknown error"}`
+
+          importedCount = successfulInserts;
+          const skippedDuplicates =
+            playersToCreate.length - successfulInserts - insertErrors.length;
+
+          if (insertErrors.length > 0) {
+            errors.push(...insertErrors);
+          }
+          log.info(
+            `[Minecraft Import] Individual inserts completed: ${successfulInserts} successful, ${skippedDuplicates} duplicates skipped, ${insertErrors.length} failed`
           );
+        } else {
+          // For JSON imports, use bulk insert as before
+          try {
+            const { data: insertResult, error: insertError } = await tryCatch(
+              MinecraftPlayer.insertMany(playersToCreate, { ordered: false })
+            );
+
+            if (insertError) {
+              log.error("[Minecraft Import] Bulk insert failed:", insertError);
+              errors.push(`Bulk insert failed: ${insertError.message}`);
+            } else {
+              importedCount = Array.isArray(insertResult) ? insertResult.length : 0;
+              log.info(`[Minecraft Import] Bulk inserted ${importedCount} players`);
+            }
+          } catch (error) {
+            errors.push(
+              `Bulk insert error: ${error instanceof Error ? error.message : "Unknown error"}`
+            );
+          }
         }
       }
+
+      // Calculate skipped duplicates for text imports
+      const skippedDuplicates = isTextImport
+        ? playersToCreate.length - importedCount - errors.length
+        : 0;
 
       const summary = {
         totalProcessed: whitelistData.length,
         validated: validPlayers.length,
         imported: importedCount,
         updated: updatedCount,
+        skipped: skippedDuplicates,
         errors: errors.length,
         errorDetails: errors,
         importType: isTextImport ? "text" : "json",
