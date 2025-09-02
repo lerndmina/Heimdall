@@ -191,7 +191,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           playerError = uuidResult.error;
 
           // If found by UUID but username is different, update the username
-          if (player && player.minecraftUsername !== username) {
+          if (player && player.minecraftUsername.toLowerCase() !== username.toLowerCase()) {
             log.info(
               `Player UUID ${uuid} found with different username. Updating from '${player.minecraftUsername}' to '${username}'`
             );
@@ -335,7 +335,10 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             authError = uuidAuthResult.error;
 
             // If found by UUID but username is different, update the username
-            if (pendingAuth && pendingAuth.minecraftUsername !== username) {
+            if (
+              pendingAuth &&
+              pendingAuth.minecraftUsername.toLowerCase() !== username.toLowerCase()
+            ) {
               log.info(
                 `Pending auth found by UUID ${uuid} with different username. Updating from '${pendingAuth.minecraftUsername}' to '${username}'`
               );
@@ -1742,7 +1745,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const { data: existingByUsername, error: usernameError } = await tryCatch(
         MinecraftPlayer.findOne({
           guildId,
-          minecraftUsername: minecraftUsername,
+          minecraftUsername: minecraftUsername.toLowerCase(),
         }).lean()
       );
 
@@ -1826,7 +1829,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         (async () => {
           const playerData: any = {
             guildId,
-            minecraftUsername,
+            minecraftUsername: minecraftUsername.toLowerCase(),
             discordId,
             whitelistStatus: "whitelisted",
             linkedAt: new Date(),

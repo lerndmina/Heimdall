@@ -115,7 +115,7 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
 
   if (existingPending) {
     // Check if they're trying to link a different username
-    if (existingPending.minecraftUsername !== minecraftUsername) {
+    if (existingPending.minecraftUsername.toLowerCase() !== minecraftUsername.toLowerCase()) {
       // Update the existing pending request with the new username
       const { error: updateError } = await tryCatch(
         db.findOneAndUpdate(
