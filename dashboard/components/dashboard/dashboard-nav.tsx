@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, MessageSquare, BarChart3, FileText, Settings, LogOut, ArrowLeft, Server } from "lucide-react";
+import { Shield, BarChart3, FileText, Settings, LogOut, ArrowLeft, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGuild } from "./guild-provider";
@@ -21,11 +21,6 @@ const baseNavigation = [
     name: "Dashboard",
     href: "/dashboard",
     icon: BarChart3,
-  },
-  {
-    name: "Modmail",
-    href: "/modmail",
-    icon: MessageSquare,
   },
   {
     name: "Transcripts",
@@ -73,8 +68,8 @@ export function DashboardNav({ user }: { user: User }) {
 
           // Add Minecraft tab if enabled
           if (features.minecraft) {
-            // Insert Minecraft after Modmail (index 1)
-            nav.splice(2, 0, minecraftNavItem);
+            // Insert Minecraft after Dashboard (index 1)
+            nav.splice(1, 0, minecraftNavItem);
           }
 
           setNavigation(nav);

@@ -54,6 +54,7 @@ export function MinecraftDashboard() {
     discordId: "",
     notes: "",
   });
+  const [manualCreationError, setManualCreationError] = useState<string | null>(null);
 
   // Bulk approval result state
   const [lastApprovedPlayers, setLastApprovedPlayers] = useState<string[]>([]);
@@ -393,24 +394,42 @@ export function MinecraftDashboard() {
     mutationFn: async (playerData: typeof manualPlayerData) => {
       if (!selectedGuild) throw new Error("No guild selected");
 
-      const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/players/manual`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...playerData,
-          staffMemberId: session?.user?.id || "unknown",
-        }),
-      });
+      setManualCreationError(null); // Clear any previous errors
 
-      const result = await response.json();
+      try {
+        const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/players/manual`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...playerData,
+            staffMemberId: session?.user?.id || "unknown",
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to create player");
+        let result;
+        try {
+          result = await response.json();
+        } catch (jsonError) {
+          console.error("Failed to parse JSON response:", jsonError);
+          throw new Error("Server returned invalid response");
+        }
+
+        console.log("Manual player creation response:", { status: response.status, result });
+
+        if (!response.ok) {
+          // Extract error message from the API response
+          const errorMessage = result.error || result.message || `Server error (${response.status})`;
+          throw new Error(errorMessage);
+        }
+
+        return result;
+      } catch (networkError) {
+        console.error("Network error during player creation:", networkError);
+        // Re-throw the error so it's handled by onError
+        throw networkError;
       }
-
-      return result;
     },
     onSuccess: (data) => {
       toast({
@@ -426,11 +445,14 @@ export function MinecraftDashboard() {
         discordId: "",
         notes: "",
       });
+      setManualCreationError(null);
     },
     onError: (error) => {
+      const errorMessage = error.message;
+      setManualCreationError(errorMessage);
       toast({
         title: "Creation Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -497,7 +519,12 @@ export function MinecraftDashboard() {
           <p className="text-discord-text">Manage Minecraft account linking and whitelist approvals for {selectedGuild.guildName}</p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={() => setShowManualDialog(true)}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowManualDialog(true);
+              setManualCreationError(null);
+            }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Player
           </Button>
@@ -820,6 +847,27 @@ export function MinecraftDashboard() {
             <h3 className="text-lg font-semibold mb-4 text-white">Add Player Manually</h3>
             <p className="text-discord-text mb-4">Create a player record manually by providing their Minecraft username, UUID (optional), and Discord ID.</p>
 
+            {/* Error Display */}
+            {manualCreationError && (
+              <div className="mb-4 p-3 bg-red-900/20 border border-red-800 rounded-md">
+                <div className="flex items-center">
+                  <AlertCircle className="h-4 w-4 text-red-400 mr-2 flex-shrink-0" />
+                  <span className="text-red-400 text-sm font-medium">Creation Failed</span>
+                </div>
+                <p className="text-red-300 text-sm mt-1">{manualCreationError}</p>
+              </div>
+            )}
+
+            {/* Loading state during creation */}
+            {manualCreateMutation.isPending && (
+              <div className="mb-4 p-3 bg-blue-900/20 border border-blue-800 rounded-md">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400 mr-2"></div>
+                  <span className="text-blue-400 text-sm font-medium">Creating player record...</span>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               <div>
                 <Label htmlFor="manual-username" className="text-discord-text">
@@ -829,7 +877,11 @@ export function MinecraftDashboard() {
                   id="manual-username"
                   placeholder="PlayerName"
                   value={manualPlayerData.minecraftUsername}
-                  onChange={(e) => setManualPlayerData((prev) => ({ ...prev, minecraftUsername: e.target.value }))}
+                  onChange={(e) => {
+                    setManualPlayerData((prev) => ({ ...prev, minecraftUsername: e.target.value }));
+                    if (manualCreationError) setManualCreationError(null);
+                  }}
+                  disabled={manualCreateMutation.isPending}
                   className="mt-1"
                 />
               </div>
@@ -843,6 +895,7 @@ export function MinecraftDashboard() {
                   placeholder="550e8400-e29b-41d4-a716-446655440000"
                   value={manualPlayerData.minecraftUuid}
                   onChange={(e) => setManualPlayerData((prev) => ({ ...prev, minecraftUuid: e.target.value }))}
+                  disabled={manualCreateMutation.isPending}
                   className="mt-1"
                 />
                 <div className="text-sm text-discord-muted mt-1">Leave empty if unknown. Will be auto-filled when player joins.</div>
@@ -856,7 +909,11 @@ export function MinecraftDashboard() {
                   id="manual-discord"
                   placeholder="123456789012345678"
                   value={manualPlayerData.discordId}
-                  onChange={(e) => setManualPlayerData((prev) => ({ ...prev, discordId: e.target.value }))}
+                  onChange={(e) => {
+                    setManualPlayerData((prev) => ({ ...prev, discordId: e.target.value }));
+                    if (manualCreationError) setManualCreationError(null);
+                  }}
+                  disabled={manualCreateMutation.isPending}
                   className="mt-1"
                 />
                 <div className="text-sm text-discord-muted mt-1">Right-click user in Discord → Copy User ID (Developer Mode required)</div>
@@ -871,6 +928,7 @@ export function MinecraftDashboard() {
                   placeholder="Additional notes about this player..."
                   value={manualPlayerData.notes}
                   onChange={(e) => setManualPlayerData((prev) => ({ ...prev, notes: e.target.value }))}
+                  disabled={manualCreateMutation.isPending}
                   className="mt-1 h-20"
                 />
               </div>
@@ -879,6 +937,7 @@ export function MinecraftDashboard() {
             <div className="flex justify-end space-x-3 mt-6">
               <Button
                 variant="outline"
+                disabled={manualCreateMutation.isPending}
                 onClick={() => {
                   setShowManualDialog(false);
                   setManualPlayerData({
@@ -887,12 +946,14 @@ export function MinecraftDashboard() {
                     discordId: "",
                     notes: "",
                   });
+                  setManualCreationError(null);
                 }}>
                 Cancel
               </Button>
               <Button
                 onClick={() => {
                   if (manualPlayerData.minecraftUsername.trim() && manualPlayerData.discordId.trim()) {
+                    setManualCreationError(null);
                     manualCreateMutation.mutate(manualPlayerData);
                   }
                 }}
