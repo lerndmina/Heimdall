@@ -21,6 +21,8 @@ interface ModmailConfig {
   autoCloseHours: number;
   enableAutoClose: boolean;
   enableInactivityWarning: boolean;
+  typingIndicators: boolean;
+  typingIndicatorStyle: "native" | "message" | "both";
   updatedAt?: string;
   tags?: Array<{
     name: string;
@@ -49,6 +51,20 @@ const Switch = ({ checked, onCheckedChange, className }: { checked: boolean; onC
     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`} />
   </button>
 );
+
+// Simple Select component
+const Select = ({ value, onValueChange, children, className }: { value: string; onValueChange: (value: string) => void; children: React.ReactNode; className?: string }) => (
+  <select
+    value={value}
+    onChange={(e) => onValueChange(e.target.value)}
+    className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+      className || ""
+    }`}>
+    {children}
+  </select>
+);
+
+const SelectItem = ({ value, children }: { value: string; children: React.ReactNode }) => <option value={value}>{children}</option>;
 
 // Simple Textarea component
 const Textarea = ({
@@ -111,13 +127,23 @@ export function SettingsHome() {
     autoCloseHours: 72,
     enableAutoClose: false,
     enableInactivityWarning: false,
+    typingIndicators: true,
+    typingIndicatorStyle: "native",
     tags: [],
   });
 
   // Update form data when config loads
   useEffect(() => {
     if ((config as any)?.data) {
-      setFormData((config as any).data);
+      console.log("Config received:", (config as any).data);
+      console.log("typingIndicators value:", (config as any).data.typingIndicators);
+      setFormData(prev => ({
+        ...prev,
+        ...(config as any).data,
+        // Ensure default values are applied if fields are undefined
+        typingIndicators: (config as any).data.typingIndicators ?? true,
+        typingIndicatorStyle: (config as any).data.typingIndicatorStyle ?? "native",
+      }));
     }
   }, [config]);
 
@@ -125,9 +151,13 @@ export function SettingsHome() {
   const saveSettingsMutation = useMutation({
     mutationFn: async (data: Partial<ModmailConfig>) => {
       if (!selectedGuild) throw new Error("No guild selected");
-      return await apiClient.updateModmailConfig(selectedGuild.guildId, data);
+      console.log("Sending to API:", data);
+      const result = await apiClient.updateModmailConfig(selectedGuild.guildId, data);
+      console.log("API response:", result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Save successful, invalidating queries");
       queryClient.invalidateQueries({ queryKey: ["modmail-config", selectedGuild?.guildId] });
       toast({
         title: "Settings saved",
@@ -135,6 +165,7 @@ export function SettingsHome() {
       });
     },
     onError: (error) => {
+      console.error("Save failed:", error);
       toast({
         title: "Failed to save settings",
         description: error instanceof Error ? error.message : "An error occurred",
@@ -145,6 +176,7 @@ export function SettingsHome() {
 
   const handleSave = async () => {
     setIsSaving(true);
+    console.log("Saving formData:", formData);
     try {
       await saveSettingsMutation.mutateAsync(formData);
     } finally {
@@ -313,6 +345,53 @@ export function SettingsHome() {
                   onChange={(e) => setFormData({ ...formData, autoCloseHours: parseInt(e.target.value) || 72 })}
                   className="bg-discord-darker border-discord-dark text-white"
                 />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Typing Indicators */}
+        <Card className="bg-discord-dark border-discord-darker">
+          <CardHeader>
+            <CardTitle className="flex items-center text-white">
+              <Bell className="h-5 w-5 mr-2 text-discord-primary" />
+              Typing Indicators
+            </CardTitle>
+            <CardDescription className="text-discord-muted">Configure typing indicators for modmail conversations</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-discord-text">Enable Typing Indicators</Label>
+                <p className="text-sm text-discord-muted">Show when users and staff are typing in modmail</p>
+              </div>
+              <Switch checked={formData.typingIndicators || false} onCheckedChange={(checked) => setFormData({ ...formData, typingIndicators: checked })} />
+            </div>
+
+            {formData.typingIndicators && (
+              <div className="space-y-2">
+                <Label htmlFor="typing-style" className="text-discord-text">
+                  Typing Indicator Style
+                </Label>
+                <Select
+                  value={formData.typingIndicatorStyle || "native"}
+                  onValueChange={(value) => setFormData({ ...formData, typingIndicatorStyle: value as "native" | "message" | "both" })}
+                  className="bg-discord-darker border-discord-dark text-white">
+                  <SelectItem value="native">Native Discord Typing</SelectItem>
+                  <SelectItem value="message">Visual Message</SelectItem>
+                  <SelectItem value="both">Both Native + Message</SelectItem>
+                </Select>
+                <div className="space-y-2 text-sm text-discord-muted">
+                  <p>
+                    <strong>Native:</strong> Shows Discord's standard typing indicator
+                  </p>
+                  <p>
+                    <strong>Visual Message:</strong> Sends a temporary "User is typing..." message
+                  </p>
+                  <p>
+                    <strong>Both:</strong> Uses both methods for maximum visibility
+                  </p>
+                </div>
               </div>
             )}
           </CardContent>

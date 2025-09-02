@@ -17,12 +17,24 @@ import { redisClient } from "../../Bot";
  * - Rate limiting to prevent spam
  * - Guild-level configuration for enabling/disabling
  */
-export default async (client: Client<true>, handler: CommandHandler, typing: Typing) => {
+export default async (typing: Typing, client: Client<true>, handler: CommandHandler) => {
+  // Check if channel exists and is accessible
+  if (!typing.channel) {
+    log.debug("Typing event received but channel is not accessible");
+    return;
+  }
+
   // Only handle typing in DM channels
   if (typing.channel.type !== ChannelType.DM) return;
 
   // Don't handle typing from bots
-  if (typing.user.bot) return;
+  if (typing.user?.bot) return;
+
+  // Ensure we have a valid user ID
+  if (!typing.user?.id) {
+    log.debug("Typing event received but user ID is not available");
+    return;
+  }
 
   const userId = typing.user.id;
   const db = new Database();
@@ -60,15 +72,20 @@ export default async (client: Client<true>, handler: CommandHandler, typing: Typ
 
   // Rate limit typing events per user (max once every 3 seconds)
   const typingKey = `modmail_typing:${userId}`;
-  const existingTyping = await redisClient.get(typingKey);
 
-  if (existingTyping) {
-    // Already sent a typing indicator recently, skip
-    return;
+  try {
+    const existingTyping = await redisClient.get(typingKey);
+
+    if (existingTyping) {
+      // Already sent a typing indicator recently, skip
+      return;
+    }
+
+    // Set rate limit for 3 seconds
+    await redisClient.setEx(typingKey, 3, "true");
+  } catch (redisError) {
+    log.warn("Redis operation failed during typing event, continuing anyway:", redisError);
   }
-
-  // Set rate limit for 3 seconds
-  await redisClient.setEx(typingKey, 3, "true");
 
   // Get the modmail thread
   const getter = new ThingGetter(client);
@@ -97,15 +114,20 @@ export default async (client: Client<true>, handler: CommandHandler, typing: Typ
       // Don't return here, try visual message if configured
     } else {
       log.debug(
-        `Sent native typing indicator from ${typing.user.tag} to modmail thread ${thread.id}`
+        `Sent native typing indicator from ${
+          typing.user?.tag || typing.user?.username || userId
+        } to modmail thread ${thread.id}`
       );
     }
   }
 
   if (typingStyle === "message" || typingStyle === "both") {
     // Send a visual typing message that auto-deletes
+    const displayName =
+      typing.user.displayName || typing.user.username || typing.user.tag || "User";
+
     const typingEmbed = new EmbedBuilder()
-      .setDescription(`💬 **${typing.user.displayName || typing.user.username}** is typing...`)
+      .setDescription(`💬 **${displayName}** is typing...`)
       .setColor(0x5865f2) // Discord blurple
       .setTimestamp();
 
@@ -127,7 +149,9 @@ export default async (client: Client<true>, handler: CommandHandler, typing: Typ
       }, 5000);
 
       log.debug(
-        `Sent visual typing message from ${typing.user.tag} to modmail thread ${thread.id}`
+        `Sent visual typing message from ${
+          typing.user?.tag || typing.user?.username || userId
+        } to modmail thread ${thread.id}`
       );
     }
   }
