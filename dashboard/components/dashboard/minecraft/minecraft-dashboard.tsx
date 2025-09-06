@@ -644,29 +644,30 @@ export function MinecraftDashboard() {
       )}
 
       {/* Pending Approvals Section */}
-      {actualPendingCount > 0 && (
-        <Card className="bg-discord-dark border-discord-darker">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <Clock className="h-5 w-5 text-discord-warning" />
-                  Pending Approvals ({actualPendingCount})
-                </CardTitle>
-                <CardDescription className="text-discord-muted">Review and approve Discord users who want to link their Minecraft accounts</CardDescription>
-              </div>
-              {actualPendingCount > 1 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-discord-muted">Queue processing:</span>
-                  <Button variant="outline" size="sm" onClick={openBulkDialog} disabled={bulkApproveMutation.isPending}>
-                    {bulkApproveMutation.isPending ? "Processing..." : "Bulk Whitelist"}
-                  </Button>
-                </div>
-              )}
+      <Card className="bg-discord-dark border-discord-darker">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-white">
+                <Clock className="h-5 w-5 text-discord-warning" />
+                {actualPendingCount > 0 ? `Pending Approvals (${actualPendingCount})` : "Whitelist Management"}
+              </CardTitle>
+              <CardDescription className="text-discord-muted">
+                {actualPendingCount > 0 ? "Review and approve Discord users who want to link their Minecraft accounts" : "Manually whitelist players or process pending queue"}
+              </CardDescription>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {pendingApprovals?.map((auth: PendingAuth) => (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-discord-muted">{actualPendingCount > 0 ? "Queue processing:" : "Manual whitelist:"}</span>
+              <Button variant="outline" size="sm" onClick={openBulkDialog} disabled={bulkApproveMutation.isPending}>
+                {bulkApproveMutation.isPending ? "Processing..." : "Bulk Whitelist"}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {actualPendingCount > 0 ? (
+            // Show pending approvals
+            pendingApprovals?.map((auth: PendingAuth) => (
               <div key={auth._id} className="flex items-center justify-between p-4 border border-discord-darker rounded-lg bg-discord-darker/50">
                 <div className="flex items-center space-x-4">
                   <Avatar>
@@ -734,10 +735,19 @@ export function MinecraftDashboard() {
                   </Button>
                 </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+            ))
+          ) : (
+            // Show message when no pending approvals
+            <div className="text-center py-6">
+              <div className="text-discord-muted">
+                <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No pending approvals at the moment.</p>
+                <p className="text-sm mt-1">Use the "Bulk Whitelist" button above to manually add players.</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <Card className="bg-discord-dark border-discord-darker">

@@ -1060,30 +1060,31 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         `[Minecraft Bulk Approve] Processing bulk approval for guild ${guildId}, approving oldest ${count} requests`
       );
 
-      // Find the oldest pending approval requests
-      const { data: pendingPlayers, error: findError } = await tryCatch(
-        MinecraftPlayer.find({
+      // Find the oldest pending approval requests from MinecraftAuthPending collection
+      const { data: pendingAuths, error: findError } = await tryCatch(
+        MinecraftAuthPending.find({
           guildId,
-          whitelistStatus: "pending_approval",
+          status: "code_confirmed", // Only confirmed codes waiting for approval
         })
-          .sort({ createdAt: 1 }) // Oldest first
+          .sort({ confirmedAt: 1, createdAt: 1 }) // Oldest confirmed first
           .limit(count)
           .lean()
       );
 
       if (findError) {
-        log.error("[Minecraft Bulk Approve] Failed to find pending players:", findError);
+        log.error("[Minecraft Bulk Approve] Failed to find pending authentications:", findError);
         return res
           .status(500)
-          .json(createErrorResponse("Failed to find pending players", 500, req.requestId));
+          .json(createErrorResponse("Failed to find pending authentications", 500, req.requestId));
       }
 
-      if (!pendingPlayers || pendingPlayers.length === 0) {
+      if (!pendingAuths || pendingAuths.length === 0) {
         return res.json(
           createSuccessResponse(
             {
               message: "No pending approval requests found",
               approved: 0,
+              approvedPlayers: [],
               errors: [],
             },
             req.requestId
@@ -1095,34 +1096,107 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const errors: string[] = [];
       const approvedPlayers: string[] = []; // Track approved usernames
 
-      // Process each player approval
-      for (const player of pendingPlayers) {
+      // Process each authentication approval (similar to individual approve endpoint)
+      for (const pendingAuth of pendingAuths) {
         try {
-          const { error: updateError } = await tryCatch(
-            MinecraftPlayer.findOneAndUpdate(
-              { _id: player._id },
-              {
-                whitelistStatus: "whitelisted",
-                approvedBy: staffMemberId,
-                whitelistedAt: new Date(),
-                updatedAt: new Date(),
-              },
-              { new: false }
-            )
+          // Check if a player with this username already exists
+          const { data: existingPlayer, error: findPlayerError } = await tryCatch(
+            MinecraftPlayer.findOne({
+              guildId,
+              minecraftUsername: pendingAuth.minecraftUsername,
+            })
           );
 
-          if (updateError) {
-            errors.push(`Failed to approve ${player.minecraftUsername}: ${updateError.message}`);
+          if (findPlayerError) {
+            errors.push(
+              `Failed to check existing player for ${pendingAuth.minecraftUsername}: ${findPlayerError.message}`
+            );
+            continue;
+          }
+
+          let playerError: Error | null = null;
+
+          if (existingPlayer) {
+            // Update existing player record
+            const updateData: any = {
+              discordId: pendingAuth.discordId,
+              discordUsername: pendingAuth.discordUsername,
+              discordDisplayName: pendingAuth.discordDisplayName,
+              whitelistStatus: "whitelisted",
+              linkedAt: pendingAuth.createdAt,
+              whitelistedAt: new Date(),
+              approvedBy: staffMemberId,
+              source: "linked",
+              updatedAt: new Date(),
+            };
+
+            // Add UUID if available from the last connection attempt
+            if (pendingAuth.lastConnectionAttempt?.uuid) {
+              updateData.minecraftUuid = pendingAuth.lastConnectionAttempt.uuid;
+            }
+
+            const { error } = await tryCatch(
+              MinecraftPlayer.findOneAndUpdate({ _id: existingPlayer._id }, updateData, {
+                new: true,
+              })
+            );
+            playerError = error;
           } else {
+            // Create new player record
+            const { error } = await tryCatch(
+              (async () => {
+                const playerData: any = {
+                  guildId,
+                  minecraftUsername: pendingAuth.minecraftUsername,
+                  discordId: pendingAuth.discordId,
+                  discordUsername: pendingAuth.discordUsername,
+                  discordDisplayName: pendingAuth.discordDisplayName,
+                  whitelistStatus: "whitelisted",
+                  linkedAt: pendingAuth.createdAt,
+                  whitelistedAt: new Date(),
+                  approvedBy: staffMemberId,
+                  source: "linked",
+                };
+
+                // Add UUID if available from the last connection attempt
+                if (pendingAuth.lastConnectionAttempt?.uuid) {
+                  playerData.minecraftUuid = pendingAuth.lastConnectionAttempt.uuid;
+                }
+
+                const player = new MinecraftPlayer(playerData);
+                await player.save();
+              })()
+            );
+            playerError = error;
+          }
+
+          if (playerError) {
+            errors.push(
+              `Failed to create/update player record for ${pendingAuth.minecraftUsername}: ${playerError.message}`
+            );
+          } else {
+            // Clean up the pending auth
+            const { error: cleanupError } = await tryCatch(
+              MinecraftAuthPending.deleteOne({ _id: pendingAuth._id })
+            );
+
+            if (cleanupError) {
+              log.warn(
+                `Failed to cleanup pending auth for ${pendingAuth.minecraftUsername}:`,
+                cleanupError
+              );
+              // Don't fail the whole operation for cleanup errors
+            }
+
             approvedCount++;
-            approvedPlayers.push(player.minecraftUsername); // Add to approved list
+            approvedPlayers.push(pendingAuth.minecraftUsername);
             log.info(
-              `[Minecraft Bulk Approve] Approved ${player.minecraftUsername} (${player._id}) by staff ${staffMemberId}`
+              `[Minecraft Bulk Approve] Approved ${pendingAuth.minecraftUsername} (${pendingAuth._id}) by staff ${staffMemberId}`
             );
           }
         } catch (error) {
           errors.push(
-            `Error approving ${player.minecraftUsername}: ${
+            `Error approving ${pendingAuth.minecraftUsername}: ${
               error instanceof Error ? error.message : "Unknown error"
             }`
           );
@@ -1132,7 +1206,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const summary = {
         message: `Bulk approval completed`,
         totalRequested: count,
-        totalFound: pendingPlayers.length,
+        totalFound: pendingAuths.length,
         approved: approvedCount,
         approvedPlayers, // Include list of approved usernames
         errors: errors.length,
