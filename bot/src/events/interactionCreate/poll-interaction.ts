@@ -69,7 +69,9 @@ export function generatePollMessage(
       .map((option: any, index: number) => {
         const percentage = calculatePercentage(option.votes, totalVotes);
         const progressBar = generateProgressBar(percentage, 24); // Longer bars for final results
-        return `${index + 1}. **${option.name}** ${option.votes} votes (${percentage}%)\n${progressBar}`;
+        return `${index + 1}. **${option.name}** ${
+          option.votes
+        } votes (${percentage}%)\n${progressBar}`;
       })
       .join("\n\n");
 
