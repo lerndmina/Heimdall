@@ -196,7 +196,7 @@ export class ModmailEmbeds {
     let description =
       `**Your modmail thread has been created in ${guildName}!**\n\n` +
       `Staff will get back to you as soon as possible. While you wait, why not grab a hot beverage!\n\n` +
-      `Once we have solved your issue, you can use the "Close Thread" button below or \`/modmail close\` to close the thread.\n\n` +
+      `Once we have solved your issue, you can use the "Close Thread" button below to close the thread.\n\n` +
       `Please send any additional information or context here, and we will assist you as soon as possible.`;
 
     if (hasAttachments) {

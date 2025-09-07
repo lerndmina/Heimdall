@@ -91,7 +91,7 @@ export class ModmailMessageFormatter {
       `### ${staffMemberName} Responded:` +
       `\n${content}` +
       `\n-# This message was sent by a staff member of **${guildName}** in reply to your modmail thread.` +
-      `\n-# If you want to close this thread, just send \`/modmail close\` here`
+      `\n-# If you want to close this thread, just click the "Close Thread" button abvove.`
     );
   }
 
