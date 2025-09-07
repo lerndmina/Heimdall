@@ -68,10 +68,8 @@ export function generatePollMessage(
     const finalResults = poll.options
       .map((option: any, index: number) => {
         const percentage = calculatePercentage(option.votes, totalVotes);
-        const progressBar = generateProgressBar(percentage, 15); // Longer bars for final results
-        return `${index + 1}. **${option.name}**\n${progressBar} ${
-          option.votes
-        } votes (${percentage}%)`;
+        const progressBar = generateProgressBar(percentage, 24); // Longer bars for final results
+        return `${index + 1}. **${option.name}** ${option.votes} votes (${percentage}%)\n${progressBar}`;
       })
       .join("\n\n");
 
@@ -83,12 +81,12 @@ export function generatePollMessage(
       "#2F3136"
     );
   } else {
-    // Active poll formatting with standard progress bars
+    // Active poll formatting with longer progress bars
     const optionsWithBars = poll.options
       .map((option: any, index: number) => {
         const percentage = calculatePercentage(option.votes, totalVotes);
-        const progressBar = generateProgressBar(percentage);
-        return `${index + 1}. \`${option.name}\` ${progressBar} ${option.votes} (${percentage}%)`;
+        const progressBar = generateProgressBar(percentage, 24);
+        return `${index + 1}. \`${option.name}\` ${option.votes} (${percentage}%)\n${progressBar}`;
       })
       .join("\n");
 

@@ -136,8 +136,8 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
     description ? `\n${description}` : "",
     `\n${options
       .map((option, index) => {
-        const progressBar = "░".repeat(10); // Empty progress bar initially
-        return `${index + 1}. \`${option}\` ${progressBar} 0 (0%)`;
+        const progressBar = "░".repeat(24); // Empty progress bar initially
+        return `${index + 1}. \`${option}\` 0 (0%)\n${progressBar}`;
       })
       .join("\n")}`,
     "\n **You can change your vote every 60 seconds**.",
