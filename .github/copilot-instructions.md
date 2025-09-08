@@ -350,3 +350,4 @@ This structure ensures maintainable, scalable code that follows established patt
 Notes:
 Don't write random scripts to test things or new features.
 Don't write readme files for every single fucking new feature.
+Whenever you restore code you should always check the git to see the code you need to restore as a source of truth instead of going based on vibes.
