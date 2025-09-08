@@ -9,6 +9,7 @@ import { createHealthRoutes } from "./routes/health";
 import { createModmailRoutes } from "./routes/modmail";
 import { createBotInfoRoutes } from "./routes/bot-info";
 import { createMinecraftRoutes } from "./routes/minecraft";
+import { createSuggestionRoutes } from "./routes/suggestions";
 import log from "../utils/log";
 import FetchEnvs from "../utils/FetchEnvs";
 
@@ -104,6 +105,10 @@ export class ApiServer {
           minecraft: {
             "connection-attempt": "/api/minecraft/connection-attempt",
           },
+          suggestions: {
+            list: "/api/suggestions/{guildId}",
+            detail: "/api/suggestions/{guildId}/{suggestionId}",
+          }
         },
         authentication: {
           type: "API Key",
@@ -114,6 +119,8 @@ export class ApiServer {
             "modmail:write": "Read and write modmail data",
             "modmail:admin": "Full modmail administration",
             "minecraft:connection": "Minecraft plugin connection attempts",
+            "suggestions:read": "Read suggestions data",
+            "suggestions:write": "Read and write suggestions data",
             full: "All permissions",
           },
         },
@@ -131,6 +138,9 @@ export class ApiServer {
 
     // Minecraft API routes (requires authentication)
     this.app.use("/api/minecraft", createMinecraftRoutes(this.client, this.handler));
+
+    // Suggestions API routes (requires authentication)
+    this.app.use("/api/suggestions", createSuggestionRoutes(this.client, this.handler));
   }
 
   private setupErrorHandling() {

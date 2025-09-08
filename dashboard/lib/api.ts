@@ -103,88 +103,11 @@ class ApiClient {
   }
 
   // Modmail operations
-  async getModmailThreads(
-    guildId: string,
-    params: {
-      page?: number;
-      limit?: number;
-      status?: "open" | "closed" | "resolved" | "all";
-      userId?: string;
-      search?: string;
-      sortBy?: "lastActivity" | "created" | "resolved" | "closed";
-      sortOrder?: "asc" | "desc";
-    } = {}
-  ) {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        searchParams.set(key, String(value));
-      }
-    });
-
-    return this.request(`/api/modmail/${guildId}/threads?${searchParams}`);
-  }
-
   async getModmailThread(guildId: string, threadId: string, includeMessages = true) {
     return this.request(`/api/modmail/${guildId}/threads/${threadId}?includeMessages=${includeMessages}`);
   }
 
-  async getModmailMessages(
-    guildId: string,
-    threadId: string,
-    params: {
-      page?: number;
-      limit?: number;
-      type?: "user" | "staff";
-      search?: string;
-    } = {}
-  ) {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        searchParams.set(key, String(value));
-      }
-    });
-
-    return this.request(`/api/modmail/${guildId}/threads/${threadId}/messages?${searchParams}`);
-  }
-
-  async getModmailStats(guildId: string, timeframe: "24h" | "7d" | "30d" | "all" = "30d") {
-    return this.request(`/api/modmail/${guildId}/stats?timeframe=${timeframe}`);
-  }
-
-  async getModmailConfig(guildId: string) {
-    return this.request(`/api/modmail/${guildId}/config`);
-  }
-
-  async updateModmailConfig(guildId: string, config: any) {
-    return this.request(`/api/modmail/${guildId}/config`, {
-      method: "POST",
-      body: JSON.stringify(config),
-    });
-  }
-
-  async searchModmail(
-    guildId: string,
-    params: {
-      q: string;
-      page?: number;
-      limit?: number;
-      status?: "open" | "closed" | "resolved" | "all";
-      dateFrom?: string;
-      dateTo?: string;
-      authorId?: string;
-    }
-  ) {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        searchParams.set(key, String(value));
-      }
-    });
-
-    return this.request(`/api/modmail/${guildId}/search?${searchParams}`);
-  }
+  
 
   async getUserTickets(
     userId: string,
@@ -240,6 +163,24 @@ class ApiClient {
     } else {
       return await response.text();
     }
+  }
+
+  // Suggestion operations
+  async getSuggestions(guildId: string) {
+    return this.request(`/api/suggestions/${guildId}`);
+  }
+
+  async updateSuggestion(guildId: string, suggestionId: string, status: string) {
+    return this.request(`/api/suggestions/${guildId}/${suggestionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async deleteSuggestion(guildId: string, suggestionId: string) {
+    return this.request(`/api/suggestions/${guildId}/${suggestionId}`, {
+      method: "DELETE",
+    });
   }
 }
 

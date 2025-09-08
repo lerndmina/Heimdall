@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield, BarChart3, FileText, Settings, LogOut, ArrowLeft, Server } from "lucide-react";
+import { Shield, BarChart3, FileText, Settings, LogOut, ArrowLeft, Server, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useGuild } from "./guild-provider";
@@ -26,6 +26,11 @@ const baseNavigation = [
     name: "Transcripts",
     href: "/transcripts",
     icon: FileText,
+  },
+  {
+    name: "Suggestions",
+    href: "/suggestions",
+    icon: MessageSquare,
   },
   {
     name: "Settings",
