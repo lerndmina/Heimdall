@@ -9,14 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { SuggestionCard } from "./SuggestionCard";
@@ -269,9 +262,7 @@ export function SuggestionsList() {
         <DialogContent className="bg-discord-dark border-discord-darker text-white">
           <DialogHeader>
             <DialogTitle>Approve Suggestion</DialogTitle>
-            <DialogDescription className="text-discord-muted">
-              Are you sure you want to approve "{selectedSuggestion?.title}"? This action cannot be undone.
-            </DialogDescription>
+            <DialogDescription className="text-discord-muted">Are you sure you want to approve "{selectedSuggestion?.title}"? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApproveDialogOpen(false)} className="border-discord-dark hover:bg-discord-darker">
@@ -288,9 +279,7 @@ export function SuggestionsList() {
         <DialogContent className="bg-discord-dark border-discord-darker text-white">
           <DialogHeader>
             <DialogTitle>Deny Suggestion</DialogTitle>
-            <DialogDescription className="text-discord-muted">
-              Are you sure you want to deny "{selectedSuggestion?.title}"? This action cannot be undone.
-            </DialogDescription>
+            <DialogDescription className="text-discord-muted">Are you sure you want to deny "{selectedSuggestion?.title}"? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
