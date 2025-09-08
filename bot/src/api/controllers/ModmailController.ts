@@ -25,7 +25,112 @@ interface ModmailStats {
   totalMessages: number;
 }
 
+/**
+ * Get a list of modmail threads for a guild with pagination and filtering
+ */
+export async function getModmailThreads(req: Request, res: Response) {
+  try {
+    const { guildId } = req.params;
+    const {
+      page = 1,
+      limit = 20,
+      status = "all",
+      userId,
+      search,
+      sortBy = "lastActivity",
+      sortOrder = "desc",
+    } = req.query as ModmailListQuery;
 
+    // Validate pagination
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(100, Math.max(1, Number(limit))); // Max 100 per page
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query
+    const query: any = { guildId };
+
+    // Filter by status
+    if (status !== "all") {
+      if (status === "closed") {
+        query.isClosed = true;
+      } else if (status === "open") {
+        query.isClosed = false;
+      } else if (status === "resolved") {
+        query.markedResolved = true;
+      }
+    }
+
+    // Filter by user
+    if (userId) {
+      query.userId = userId;
+    }
+
+    // Text search in user display name or content
+    if (search) {
+      query.$or = [
+        { userDisplayName: { $regex: search, $options: "i" } },
+        { "messages.content": { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Build sort
+    const sortOptions: any = {};
+    switch (sortBy) {
+      case "lastActivity":
+        sortOptions.lastUserActivityAt = sortOrder === "desc" ? -1 : 1;
+        break;
+      case "created":
+        sortOptions.createdAt = sortOrder === "desc" ? -1 : 1;
+        break;
+      case "resolved":
+        sortOptions.markedResolvedAt = sortOrder === "desc" ? -1 : 1;
+        break;
+      case "closed":
+        sortOptions.closedAt = sortOrder === "desc" ? -1 : 1;
+        break;
+      default:
+        sortOptions.lastUserActivityAt = -1;
+    }
+
+    // Get threads with pagination
+    const [threads, total] = await Promise.all([
+      Modmail.find(query).sort(sortOptions).skip(skip).limit(limitNum).lean(),
+      Modmail.countDocuments(query),
+    ]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limitNum);
+    const hasNextPage = pageNum < totalPages;
+    const hasPrevPage = pageNum > 1;
+
+    const response = {
+      threads,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages,
+        hasNextPage,
+        hasPrevPage,
+      },
+      filters: {
+        status,
+        userId,
+        search,
+        sortBy,
+        sortOrder,
+      },
+    };
+
+    log.debug(`Found ${threads.length} threads for guild ${guildId}`);
+    return res.json(createSuccessResponse(response, req.requestId));
+  } catch (error) {
+    log.error("Error fetching modmail threads:", error);
+    return res
+      .status(500)
+      .json(createErrorResponse("Failed to fetch modmail threads", 500, req.requestId));
+  }
+}
 
 /**
  * Get detailed information about a specific modmail thread
@@ -86,12 +191,6 @@ export async function getModmailThread(req: Request, res: Response) {
     res.status(500).json(createErrorResponse("Failed to fetch modmail thread", 500, req.requestId));
   }
 }
-
-
-
-
-
-
 
 /**
  * Validate user permissions for guild access (for dashboard authentication)
@@ -239,8 +338,6 @@ export async function generateTranscript(req: Request, res: Response) {
     res.status(500).json(createErrorResponse("Failed to generate transcript", 500, req.requestId));
   }
 }
-
-
 
 /**
  * Sanitize modmail thread data for API response

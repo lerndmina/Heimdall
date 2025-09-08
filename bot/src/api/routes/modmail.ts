@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   getModmailThread,
+  getModmailThreads,
   validateUserAccess,
   generateTranscript,
   getUserTickets,
@@ -23,6 +24,20 @@ export function createModmailRoutes(client?: any, handler?: any): Router {
   // All modmail endpoints require authentication and modmail:read scope
   router.use(authenticateApiKey);
   router.use(requireScope("modmail:read"));
+
+  /**
+   * GET /api/modmail/:guildId/threads
+   * Get a list of modmail threads for a guild with pagination and filtering
+   * Query params:
+   * - page: Page number (default: 1)
+   * - limit: Items per page (default: 20, max: 100)
+   * - status: 'open' | 'closed' | 'resolved' | 'all' (default: 'all')
+   * - userId: Filter by specific user (optional)
+   * - search: Search in userDisplayName and message content (optional)
+   * - sortBy: 'lastActivity' | 'created' | 'resolved' | 'closed' (default: 'lastActivity')
+   * - sortOrder: 'asc' | 'desc' (default: 'desc')
+   */
+  router.get("/:guildId/threads", asyncHandler(getModmailThreads));
 
   /**
    * GET /api/modmail/:guildId/threads/:threadId

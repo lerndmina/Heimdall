@@ -107,7 +107,27 @@ class ApiClient {
     return this.request(`/api/modmail/${guildId}/threads/${threadId}?includeMessages=${includeMessages}`);
   }
 
-  
+  async getModmailThreads(
+    guildId: string,
+    params: {
+      page?: number;
+      limit?: number;
+      status?: "open" | "closed" | "resolved" | "all";
+      userId?: string;
+      search?: string;
+      sortBy?: "lastActivity" | "created" | "resolved" | "closed";
+      sortOrder?: "asc" | "desc";
+    } = {}
+  ) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        searchParams.set(key, String(value));
+      }
+    });
+
+    return this.request(`/api/modmail/${guildId}/threads?${searchParams}`);
+  }
 
   async getUserTickets(
     userId: string,

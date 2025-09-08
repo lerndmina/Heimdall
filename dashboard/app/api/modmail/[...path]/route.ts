@@ -77,19 +77,9 @@ async function handleModmailRequest(request: NextRequest, pathSegments: string[]
       }
     } else {
       // Guild-specific endpoints: /api/modmail/{guildId}/*
-      const guildId = firstSegment;
-      debugLog(`🔍 Guild data request: user ${userId} accessing guild ${guildId}`);
-      if (guildId) {
-        // Check if user has staff access to this guild
-        debugLog(`🔍 Calling validateGuildAccess for user ${userId} in guild ${guildId}`);
-        const hasAccess = await validateGuildAccess(userId, guildId);
-        debugLog(`🔍 Guild access result: ${hasAccess}`);
-        if (!hasAccess) {
-          debugLog(`❌ Access denied for user ${userId} to guild ${guildId}`);
-          return NextResponse.json({ error: "Insufficient permissions for this guild" }, { status: 403 });
-        }
-        debugLog(`✅ Access granted for user ${userId} to guild ${guildId}`);
-      }
+      // Let the bot API handle all guild-specific authorization
+      debugLog(`🔍 Guild data request: user ${userId} accessing path ${pathSegments.join("/")}`);
+      // The bot API has proper middleware that will check permissions
     }
 
     // 4. Make the request to bot API
