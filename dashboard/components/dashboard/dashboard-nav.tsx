@@ -14,6 +14,7 @@ import { useState, useEffect } from "react";
 
 interface FeatureFlags {
   minecraft: boolean;
+  suggestions: boolean;
 }
 
 const baseNavigation = [
@@ -28,11 +29,6 @@ const baseNavigation = [
     icon: FileText,
   },
   {
-    name: "Suggestions",
-    href: "/suggestions",
-    icon: MessageSquare,
-  },
-  {
     name: "Settings",
     href: "/settings",
     icon: Settings,
@@ -43,6 +39,12 @@ const minecraftNavItem = {
   name: "Minecraft",
   href: "/minecraft",
   icon: Server,
+};
+
+const suggestionsNavItem = {
+  name: "Suggestions",
+  href: "/dashboard/suggestions",
+  icon: MessageSquare,
 };
 
 interface User {
@@ -64,30 +66,39 @@ export function DashboardNav({ user }: { user: User }) {
   useEffect(() => {
     async function fetchFeatureFlags() {
       try {
-        const response = await fetch("/api/features");
+        const params = new URLSearchParams();
+        if (selectedGuild?.guildId) {
+          params.set("guildId", selectedGuild.guildId);
+        }
+
+        const response = await fetch(`/api/features?${params}`);
         if (response.ok) {
           const features: FeatureFlags = await response.json();
 
           // Build navigation based on feature flags
           const nav = [...baseNavigation];
 
-          // Add Minecraft tab if enabled
+          // Add Minecraft tab if enabled (after Dashboard)
           if (features.minecraft) {
-            // Insert Minecraft after Dashboard (index 1)
             nav.splice(1, 0, minecraftNavItem);
+          }
+
+          // Add Suggestions tab if enabled (before Settings)
+          if (features.suggestions) {
+            nav.splice(-1, 0, suggestionsNavItem);
           }
 
           setNavigation(nav);
         }
       } catch (error) {
         console.error("Failed to fetch feature flags:", error);
-        // Fallback to base navigation without Minecraft
+        // Fallback to base navigation
         setNavigation(baseNavigation);
       }
     }
 
     fetchFeatureFlags();
-  }, []);
+  }, [selectedGuild?.guildId]);
 
   const handleBackToRoleSelection = () => {
     clearRole();
