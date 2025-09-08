@@ -16,6 +16,9 @@ export default async function (
   global: boolean,
   id?: Snowflake
 ) {
+  if (!message.channel || !('send' in message.channel)) {
+    return;
+  }
   // Construct and prepare an instance of the REST module
   const rest = new REST().setToken(env.BOT_TOKEN);
 

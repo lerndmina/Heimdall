@@ -39,7 +39,9 @@ export default async function (client: Client<true>, message: Message, apiKey: s
     message.reply("Sorry, I can only transcribe files smaller than 8MB.");
     return;
   } else {
-    message.channel.sendTyping();
+    if ('sendTyping' in message.channel) {
+      message.channel.sendTyping();
+    }
   }
 
   // Download the attachment and name it the current timestamp

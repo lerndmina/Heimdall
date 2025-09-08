@@ -2,7 +2,7 @@ import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/co
 import { SlashCommandBuilder } from "discord.js";
 import log from "../../utils/log";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
-import generateHelpFields from "../../utils/data/static/generateHelpFields";
+
 
 export const data = new SlashCommandBuilder()
   .setName("coinflip")

@@ -95,7 +95,11 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
   var time = 0;
 
   for (const timeStr of timeStringArr) {
-    time += ms(timeStr);
+    const timeInMs = ms(timeStr);
+    if (typeof timeInMs !== 'number') {
+        continue;
+    }
+    time += timeInMs;
 
     debugMsg(`Adding ${timeStr} to time. Total: ${time}`);
   }

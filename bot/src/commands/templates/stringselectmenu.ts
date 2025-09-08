@@ -8,7 +8,7 @@ import {
   StringSelectMenuOptionBuilder,
 } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
-import generateHelpFields from "../../utils/data/static/generateHelpFields";
+
 import BasicEmbed from "../../utils/BasicEmbed";
 import log from "../../utils/log";
 

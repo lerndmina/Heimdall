@@ -37,7 +37,11 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
   const key = "bypasscooldowns:" + interaction.user.id;
 
   try {
-    timeInSeconds = ms(time) / 1000;
+    const timeInMs = ms(time);
+    if (typeof timeInMs !== 'number') {
+        return interaction.editReply("Invalid time format.");
+    }
+    timeInSeconds = timeInMs / 1000;
     if (timeInSeconds < 0) {
       return interaction.editReply("Time cannot be negative.");
     }

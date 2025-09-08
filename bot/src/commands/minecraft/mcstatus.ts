@@ -13,7 +13,7 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
-import generateHelpFields from "../../utils/data/static/generateHelpFields";
+
 import Database from "../../utils/data/database";
 import McServerStatus, {
   McServerStatusType,

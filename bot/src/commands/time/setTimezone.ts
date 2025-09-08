@@ -70,10 +70,15 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
     try {
       const getter = new ThingGetter(client);
       const member = await getter.getMember(interaction.guild, userId);
-      const currentName = member.nickname || member.displayName;
-      const cleanName = currentName.replace(/\s+\|\s+UTC[+-]\d+$/i, "");
-      await member.setNickname(`${cleanName} | ${offsetString}`);
-      debugMsg(`Updated nickname for ${userId} to "${cleanName} | ${offsetString}"`);
+      if (member) {
+        const currentName = member.nickname || member.displayName;
+        const cleanName = currentName.replace(/\s+Professional\s+UTC[+-]\d+$/i, "");
+        await member.setNickname(`${cleanName} | ${offsetString}`);
+        debugMsg(`Updated nickname for ${userId} to "${cleanName} | ${offsetString}"`);
+      } else {
+        failedToApply = true;
+        debugMsg(`Failed to find member ${userId} in guild`);
+      }
     } catch (error) {
       failedToApply = true;
       debugMsg(`Failed to update nickname for ${userId}`);

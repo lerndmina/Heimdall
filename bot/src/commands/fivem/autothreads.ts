@@ -1,7 +1,7 @@
 import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { ChannelType, InteractionContextType, SlashCommandBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
-import generateHelpFields from "../../utils/data/static/generateHelpFields";
+
 import { initialReply } from "../../utils/initialReply";
 import Database from "../../utils/data/database";
 import AutoThreads from "../../models/AutoThreads";

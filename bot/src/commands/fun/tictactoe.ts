@@ -10,7 +10,7 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey, waitingEmoji } from "../../Bot";
-import generateHelpFields from "../../utils/data/static/generateHelpFields";
+
 import Database from "../../utils/data/database";
 import TicTacToeSchema, { TicTacToeSchemaType } from "../../models/TicTacToeSchema";
 import { debugMsg } from "../../utils/TinyUtils";
@@ -97,7 +97,11 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
     buttonDecline
   );
 
-  const message = await interaction.channel!.send({
+  if (!interaction.channel || !('send' in interaction.channel)) {
+    return;
+  }
+
+  const message = await interaction.channel.send({
     content: `<@${opponent.id}>`,
     components: [acceptDeclineRow],
     embeds: [

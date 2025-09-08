@@ -16,7 +16,7 @@ import {
 } from "discord.js";
 import BasicEmbed from "../../utils/BasicEmbed";
 import { setCommandCooldown, userCooldownKey } from "../../Bot";
-import generateHelpFields from "../../utils/data/static/generateHelpFields";
+
 
 export const data = new SlashCommandBuilder()
   .setName("pagination")

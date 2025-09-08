@@ -217,6 +217,10 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
 
         ButtonWrapper(buttons);
 
+        if (!interaction.channel || !('send' in interaction.channel)) {
+          return;
+        }
+
         const messageJsonString = await db.cacheFetch(
           `${interaction.commandName}:${interaction.id}`
         );
@@ -225,9 +229,9 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
 
           messageJson.components = ButtonWrapper(buttons);
 
-          await interaction.channel!.send(messageJson);
+          await interaction.channel.send(messageJson);
         } else {
-          interaction.channel?.send({
+          interaction.channel.send({
             content:
               "Because you didn't provide me with any messageJSON I'm gonna make this as ugly as possible\n\nWant buttons? Here Buttons. Click them idc man do what ever you want.",
             components: ButtonWrapper(buttons),
@@ -250,19 +254,20 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
       .catch();
   } catch (error) {
     console.error(error);
-
-    interaction.channel?.send({
-      content: "",
-      embeds: [
-        BasicEmbed(
-          client,
-          "Error",
-          "We just fell back to the final trycatch for this command. Something has gone horribly wrong.\n```" +
-            error +
-            "```"
-        ),
-      ],
-    });
+    if (interaction.channel && 'send' in interaction.channel) {
+        interaction.channel.send({
+        content: "",
+        embeds: [
+            BasicEmbed(
+            client,
+            "Error",
+            "We just fell back to the final trycatch for this command. Something has gone horribly wrong.\n```" +
+                error +
+                "```"
+            ),
+        ],
+        });
+    }
   }
 }
 

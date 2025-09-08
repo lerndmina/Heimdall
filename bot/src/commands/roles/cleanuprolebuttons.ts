@@ -41,10 +41,10 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
   var messages = await channel.messages.fetch();
   messages.forEach(async (message) => {
     if (!(message.components.length > 0)) return;
-    message.components.forEach(async (component) => {
-      if (!component.components[0].customId) return;
-      if (!component.components[0].customId.startsWith(ROLE_BUTTON_PREFIX)) return;
-      component.components.forEach(async (button) => {
+    message.components.forEach(async (row) => {
+      if (row.type !== ComponentType.ActionRow) return;
+      row.components.forEach(async (button) => {
+        if (button.type !== ComponentType.Button) return;
         if (!button.customId) return;
         if (!button.customId.startsWith(ROLE_BUTTON_PREFIX)) return;
         const uuid = button.customId.split("-").slice(1).join("-");

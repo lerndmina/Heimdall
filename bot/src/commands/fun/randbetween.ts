@@ -1,7 +1,7 @@
 import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
 import { SlashCommandBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
-import generateHelpFields from "../../utils/data/static/generateHelpFields";
+
 import BasicEmbed from "../../utils/BasicEmbed";
 
 export const data = new SlashCommandBuilder()
