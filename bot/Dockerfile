@@ -14,24 +14,44 @@ RUN apt-get update && \
 # Set the working directory
 WORKDIR /app
 
-# Copy package files first
+# Copy local dependencies first (command-handler and logger)
+COPY command-handler/ ./command-handler/
+COPY logger/ ./logger/
+
+# Copy bot package files
 COPY package.json ./
 COPY bun.lock ./
 
 # Verify bun installation and show version
 RUN bun --version
 
-# Install dependencies with bun
+# Build dependencies in correct order (following install:all pattern)
+# 1. Install and build logger (lowest level dependency)
+WORKDIR /app/logger
+RUN bun install && bun run build
+
+# 2. Install and build command-handler (depends on logger)
+WORKDIR /app/command-handler
+RUN bun install && bun run build
+
+# 3. Back to bot directory and install bot dependencies
+WORKDIR /app
+COPY bot/package.json bot/bun.lock ./
+
+# Temporarily modify package.json to use absolute paths for local packages
+RUN sed -i 's|"@heimdall/command-handler": "../command-handler"|"@heimdall/command-handler": "./command-handler"|g' package.json && \
+  sed -i 's|"@heimdall/logger": "../logger"|"@heimdall/logger": "./logger"|g' package.json
+
 RUN bun install --frozen-lockfile
 
 # Copy TypeScript config for build
-COPY tsconfig.json ./
+COPY bot/tsconfig.json ./
 
 # Copy source files
-COPY src/ ./src/
+COPY bot/src/ ./src/
 
-# Copy the rest of the application files
-COPY . .
+# Copy additional bot files
+COPY bot/declarations.d.ts ./
 
 # Install tsx
 RUN npm install -g tsx
