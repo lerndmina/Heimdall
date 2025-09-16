@@ -2,7 +2,6 @@ import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/co
 import { SlashCommandBuilder } from "discord.js";
 import Database from "../../utils/data/database";
 import MinecraftConfig from "../../models/MinecraftConfig";
-import MinecraftAuthPending from "../../models/MinecraftAuthPending";
 import MinecraftPlayer from "../../models/MinecraftPlayer";
 import { tryCatch } from "../../utils/trycatch";
 import log from "../../utils/log";
@@ -77,12 +76,13 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
     });
   }
 
-  // Check for pending authentication (only non-expired ones)
+  // Check for pending authentication
   const { data: pendingAuth, error: authError } = await tryCatch(
-    MinecraftAuthPending.findOne({
+    MinecraftPlayer.findOne({
       guildId,
       discordId,
-      status: { $ne: "expired" },
+      authCode: { $ne: null }, // Has an auth code
+      linkedAt: null, // But not yet linked
       expiresAt: { $gt: new Date() }, // Only get non-expired records
     }).lean()
   );
@@ -102,17 +102,9 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
 
   // If user has a linked account
   if (existingPlayer) {
-    const statusEmoji =
-      {
-        whitelisted: "✅",
-        unwhitelisted: "❌",
-      }[existingPlayer.whitelistStatus] || "❓";
-
-    const statusText =
-      {
-        whitelisted: "Whitelisted",
-        unwhitelisted: "Not Whitelisted",
-      }[existingPlayer.whitelistStatus] || "Unknown";
+    const isWhitelisted = existingPlayer.isWhitelisted;
+    const statusEmoji = isWhitelisted ? "✅" : "❌";
+    const statusText = isWhitelisted ? "Whitelisted" : "Not Whitelisted";
 
     const description =
       `**Minecraft Username:** ${existingPlayer.minecraftUsername}\n` +
@@ -122,7 +114,7 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
       )}:R>\n`;
 
     let additionalInfo = "";
-    if (existingPlayer.whitelistStatus === "whitelisted") {
+    if (isWhitelisted) {
       additionalInfo = `\n**Server:** \`${config.serverHost}:${config.serverPort}\`\n✅ You can join the server!`;
     } else {
       additionalInfo = "\n❌ You are not currently whitelisted.";
@@ -131,7 +123,7 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
     return interaction.editReply({
       embeds: [
         BasicEmbed(client, "🎮 Your Minecraft Status", description + additionalInfo).setColor(
-          existingPlayer.whitelistStatus === "whitelisted" ? "Green" : "Orange"
+          isWhitelisted ? "Green" : "Orange"
         ),
       ],
     });
@@ -139,33 +131,38 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
 
   // If user has pending authentication
   if (pendingAuth) {
+    const authStatus = pendingAuth.authStatus;
     const statusEmoji =
       {
-        awaiting_connection: "⏳",
-        code_shown: "📋",
-        code_confirmed: "✅",
-      }[pendingAuth.status] || "❓";
+        pending: "⏳",
+        shown: "📋",
+        confirmed: "✅",
+        expired: "❌",
+      }[authStatus] || "❓";
 
     const statusText =
       {
-        awaiting_connection: "Waiting for you to join the server",
-        code_shown: "Code shown - waiting for confirmation",
-        code_confirmed: "Code confirmed - waiting for staff approval",
-      }[pendingAuth.status] || "Unknown";
+        pending: "Waiting for you to join the server",
+        shown: "Code shown - waiting for confirmation",
+        confirmed: "Code confirmed - waiting for staff approval",
+        expired: "Authentication expired",
+      }[authStatus] || "Unknown";
 
     const description =
       `**Minecraft Username:** ${pendingAuth.minecraftUsername}\n` +
       `**Status:** ${statusEmoji} ${statusText}\n` +
       `**Created:** <t:${Math.floor(pendingAuth.createdAt.getTime() / 1000)}:R>\n` +
-      `**Expires:** <t:${Math.floor(pendingAuth.expiresAt.getTime() / 1000)}:R>\n`;
+      `**Expires:** <t:${Math.floor((pendingAuth.expiresAt || new Date()).getTime() / 1000)}:R>\n`;
 
     let nextSteps = "";
-    if (pendingAuth.status === "awaiting_connection") {
+    if (authStatus === "pending") {
       nextSteps = `\n**Next Steps:**\n1. Join the server: \`${config.serverHost}:${config.serverPort}\`\n2. You'll get your auth code\n3. Use \`/confirm-code <code>\``;
-    } else if (pendingAuth.status === "code_shown") {
+    } else if (authStatus === "shown") {
       nextSteps = `\n**Your Code:** \`${pendingAuth.authCode}\`\n**Next Step:** Use \`/confirm-code ${pendingAuth.authCode}\``;
-    } else if (pendingAuth.status === "code_confirmed") {
+    } else if (authStatus === "confirmed") {
       nextSteps = "\n⏳ Waiting for staff to approve your request.";
+    } else if (authStatus === "expired") {
+      nextSteps = "\n❌ This authentication has expired. Use `/link-minecraft` to start over.";
     }
 
     return interaction.editReply({

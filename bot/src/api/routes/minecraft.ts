@@ -1,6 +1,5 @@
 import { Router } from "express";
 import MinecraftConfig from "../../models/MinecraftConfig";
-import MinecraftAuthPending from "../../models/MinecraftAuthPending";
 import MinecraftPlayer from "../../models/MinecraftPlayer";
 import { tryCatch } from "../../utils/trycatch";
 import log from "../../utils/log";
@@ -68,12 +67,13 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
         // If no server IP provided or no config found, try to find any pending auth for this username or UUID
         if (!guildId) {
-          // First try by username
+          // First try by username for players with active auth
           const { data: pendingAuth } = await tryCatch(
-            MinecraftAuthPending.findOne({
+            MinecraftPlayer.findOne({
               minecraftUsername: username,
-              status: { $in: ["awaiting_connection", "code_shown"] },
+              authCode: { $ne: null },
               expiresAt: { $gt: new Date() },
+              confirmedAt: null,
             }).lean()
           );
 
@@ -81,13 +81,14 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             guildId = pendingAuth.guildId;
           }
 
-          // If not found by username and UUID is available, try by UUID
+          // If not found by username and UUID is available, try by UUID from connection attempts
           if (!guildId && uuid) {
             const { data: uuidPendingAuth } = await tryCatch(
-              MinecraftAuthPending.findOne({
-                "lastConnectionAttempt.uuid": uuid,
-                status: { $in: ["awaiting_connection", "code_shown"] },
+              MinecraftPlayer.findOne({
+                minecraftUuid: uuid,
+                authCode: { $ne: null },
                 expiresAt: { $gt: new Date() },
+                confirmedAt: null,
               }).lean()
             );
 
@@ -162,16 +163,22 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           );
         }
 
-        // Clean up any expired pending auth records for this username
+        // Clean up any expired auth records for this username
         await tryCatch(
-          MinecraftAuthPending.updateMany(
+          MinecraftPlayer.updateMany(
             {
               guildId,
               minecraftUsername: username,
-              status: { $ne: "expired" },
+              authCode: { $ne: null },
               expiresAt: { $lte: new Date() },
             },
-            { status: "expired" }
+            {
+              $unset: {
+                authCode: 1,
+                expiresAt: 1,
+                codeShownAt: 1,
+              },
+            }
           )
         );
 
@@ -273,7 +280,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         }
 
         // If player exists and is whitelisted, allow them
-        if (player && player.whitelistStatus === "whitelisted") {
+        if (player && player.whitelistedAt) {
           log.info(`Player ${username} is whitelisted, allowing connection`);
 
           // Update last connection attempt
@@ -308,10 +315,10 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         let authError: Error | null = null;
 
         const pendingAuthResult = await tryCatch(
-          MinecraftAuthPending.findOne({
+          MinecraftPlayer.findOne({
             guildId,
             minecraftUsername: username,
-            status: { $in: ["awaiting_connection", "code_shown", "code_confirmed"] },
+            authCode: { $ne: null },
             expiresAt: { $gt: new Date() },
           }).lean()
         );
@@ -319,13 +326,13 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         pendingAuth = pendingAuthResult.data;
         authError = pendingAuthResult.error;
 
-        // If not found by username but UUID is available, try to find by UUID in connection attempts
+        // If not found by username but UUID is available, try to find by UUID
         if (!pendingAuth && !authError && uuid) {
           const uuidAuthResult = await tryCatch(
-            MinecraftAuthPending.findOne({
+            MinecraftPlayer.findOne({
               guildId,
-              "lastConnectionAttempt.uuid": uuid,
-              status: { $in: ["awaiting_connection", "code_shown", "code_confirmed"] },
+              minecraftUuid: uuid,
+              authCode: { $ne: null },
               expiresAt: { $gt: new Date() },
             }).lean()
           );
@@ -344,7 +351,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
               );
 
               const { error: updateError } = await tryCatch(
-                MinecraftAuthPending.findOneAndUpdate(
+                MinecraftPlayer.findOneAndUpdate(
                   { _id: pendingAuth._id },
                   { minecraftUsername: username },
                   { upsert: false, new: true }
@@ -378,7 +385,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         // Has pending auth - handle based on status
         if (pendingAuth) {
           // If code is confirmed, they're waiting for staff approval
-          if (pendingAuth.status === "code_confirmed") {
+          if (pendingAuth.confirmedAt && !pendingAuth.linkedAt) {
             return res.json(
               createSuccessResponse(
                 {
@@ -395,16 +402,11 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
           // Update the pending auth to mark that we showed them the code
           const { error: updateError } = await tryCatch(
-            MinecraftAuthPending.findOneAndUpdate(
+            MinecraftPlayer.findOneAndUpdate(
               { _id: pendingAuth._id },
               {
-                status: "code_shown",
                 codeShownAt: new Date(),
-                lastConnectionAttempt: {
-                  timestamp: new Date(),
-                  ip,
-                  uuid,
-                },
+                lastConnectionAttempt: new Date(),
               }
             )
           );
@@ -461,6 +463,127 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           .json(createErrorResponse("Internal server error", 500, req.requestId));
       }
     }
+  );
+
+  /**
+   * POST /api/minecraft/request-link-code
+   * Called by the Minecraft plugin when a player uses /linkdiscord command
+   * Generates an auth code for existing whitelisted players to link their Discord accounts
+   */
+  router.post(
+    "/request-link-code",
+    authenticateApiKey,
+    requireScope("minecraft:connection"),
+    asyncHandler(async (req, res) => {
+      const { username: rawUsername, uuid } = req.body;
+      const username = rawUsername?.toLowerCase(); // Normalize to lowercase
+
+      if (!username || !uuid) {
+        return res
+          .status(400)
+          .json(createErrorResponse("Missing username or uuid", 400, req.requestId));
+      }
+
+      log.info(`Link code request: ${username} (${uuid})`);
+
+      // Find existing player without Discord link
+      const { data: player, error: playerError } = await tryCatch(
+        MinecraftPlayer.findOne({
+          minecraftUsername: username,
+          discordId: null,
+          whitelistedAt: { $ne: null },
+        }).lean()
+      );
+
+      if (playerError) {
+        log.error("Failed to check existing player:", playerError);
+        return res.status(500).json(createErrorResponse("Database error", 500, req.requestId));
+      }
+
+      if (!player) {
+        return res.json(
+          createSuccessResponse(
+            {
+              success: false,
+              error: "No linkable account found for this username",
+            },
+            req.requestId
+          )
+        );
+      }
+
+      // Clean up any existing auth code for this username
+      await tryCatch(
+        MinecraftPlayer.updateOne(
+          {
+            guildId: player.guildId,
+            minecraftUsername: username,
+          },
+          {
+            $unset: {
+              authCode: 1,
+              expiresAt: 1,
+              codeShownAt: 1,
+              confirmedAt: 1,
+            },
+          }
+        )
+      );
+
+      // Generate unique 6-digit auth code
+      let authCode = "";
+      let codeIsUnique = false;
+      let attempts = 0;
+
+      while (!codeIsUnique && attempts < 10) {
+        authCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const { data: existingCode } = await tryCatch(MinecraftPlayer.findOne({ authCode }).lean());
+        if (!existingCode) {
+          codeIsUnique = true;
+        }
+        attempts++;
+      }
+
+      if (!codeIsUnique) {
+        log.error("Failed to generate unique auth code after 10 attempts");
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to generate auth code", 500, req.requestId));
+      }
+
+      // Update player with auth code
+      const { error: createError } = await tryCatch(
+        MinecraftPlayer.updateOne(
+          { _id: player._id },
+          {
+            authCode: authCode,
+            codeShownAt: new Date(),
+            isExistingPlayerLink: true,
+            expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+            lastConnectionAttempt: new Date(),
+          }
+        )
+      );
+
+      if (createError) {
+        log.error("Failed to create pending auth:", createError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to create auth record", 500, req.requestId));
+      }
+
+      log.info(`Generated link code for existing player: ${username} - ${authCode}`);
+
+      return res.json(
+        createSuccessResponse(
+          {
+            success: true,
+            authCode: authCode,
+          },
+          req.requestId
+        )
+      );
+    })
   );
 
   /**
@@ -533,7 +656,26 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       let query: any = { guildId };
 
       if (status && status !== "all") {
-        query.whitelistStatus = status;
+        // Convert old status-based filtering to date-based logic
+        switch (status) {
+          case "whitelisted":
+            query.whitelistedAt = { $ne: null };
+            break;
+          case "pending":
+            query.confirmedAt = { $ne: null };
+            query.linkedAt = null;
+            break;
+          case "linked":
+            query.linkedAt = { $ne: null };
+            break;
+          case "unlinked":
+            query.linkedAt = null;
+            query.confirmedAt = null;
+            break;
+          default:
+            // If unknown status, ignore filter
+            break;
+        }
       }
 
       if (search && typeof search === "string") {
@@ -568,10 +710,10 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const { guildId } = req.params;
 
       const { data: pending, error } = await tryCatch(
-        MinecraftAuthPending.find({
+        MinecraftPlayer.find({
           guildId,
-          status: { $in: ["code_confirmed"] }, // Only show confirmed codes waiting for approval
-          // No expiration check - once confirmed, expiration is irrelevant
+          confirmedAt: { $ne: null }, // Code has been confirmed
+          linkedAt: null, // But not yet approved by staff
         }).lean()
       );
 
@@ -601,7 +743,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
       // Find the pending auth - force database lookup to avoid stale cache
       const { data: pendingAuth, error: authError } = await tryCatch(
-        MinecraftAuthPending.findOne({
+        MinecraftPlayer.findOne({
           _id: authId,
           guildId,
         }).lean()
@@ -621,13 +763,13 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       }
 
       // Check if the status allows approval
-      if (pendingAuth.status !== "code_confirmed") {
-        log.warn(`Auth request ${authId} has status ${pendingAuth.status}, cannot approve`);
+      if (!pendingAuth.confirmedAt) {
+        log.warn(`Auth request ${authId} not confirmed yet, cannot approve`);
         return res
           .status(400)
           .json(
             createErrorResponse(
-              `Authentication request cannot be approved (current status: ${pendingAuth.status})`,
+              `Authentication request cannot be approved (not confirmed yet)`,
               400,
               req.requestId
             )
@@ -649,84 +791,37 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           .json(createErrorResponse("Failed to check player records", 500, req.requestId));
       }
 
-      let playerError: Error | null = null;
+      // Since we're using unified model, we're updating the same record
+      // The pendingAuth IS the player record now
+      log.info(`Approving player record for ${pendingAuth.minecraftUsername}`);
 
-      if (existingPlayer) {
-        // Update existing player record
-        log.info(`Updating existing player record for ${pendingAuth.minecraftUsername}`);
+      // Prepare update data
+      const updateData: any = {
+        linkedAt: new Date(),
+        whitelistedAt: new Date(),
+        approvedBy: staffMemberId,
+        notes: notes || pendingAuth.notes,
+        updatedAt: new Date(),
+        // Clear auth fields since process is complete
+        $unset: {
+          authCode: 1,
+          expiresAt: 1,
+          codeShownAt: 1,
+        },
+      };
 
-        // Prepare update data
-        const updateData: any = {
-          discordId: pendingAuth.discordId,
-          discordUsername: pendingAuth.discordUsername,
-          discordDisplayName: pendingAuth.discordDisplayName,
-          whitelistStatus: "whitelisted",
-          linkedAt: pendingAuth.createdAt,
-          whitelistedAt: new Date(),
-          approvedBy: staffMemberId,
-          source: "linked",
-          notes: notes || existingPlayer.notes,
-          updatedAt: new Date(),
-        };
-
-        // Add UUID if available from the last connection attempt
-        if (pendingAuth.lastConnectionAttempt?.uuid) {
-          updateData.minecraftUuid = pendingAuth.lastConnectionAttempt.uuid;
-          log.info(
-            `Also updating UUID for ${pendingAuth.minecraftUsername} to ${pendingAuth.lastConnectionAttempt.uuid}`
-          );
-        }
-
-        const { error } = await tryCatch(
-          MinecraftPlayer.findOneAndUpdate({ _id: existingPlayer._id }, updateData, { new: true })
-        );
-        playerError = error;
-      } else {
-        // Create new player record
-        log.info(`Creating new player record for ${pendingAuth.minecraftUsername}`);
-        const { error } = await tryCatch(
-          (async () => {
-            const playerData: any = {
-              guildId,
-              minecraftUsername: pendingAuth.minecraftUsername,
-              discordId: pendingAuth.discordId,
-              discordUsername: pendingAuth.discordUsername,
-              discordDisplayName: pendingAuth.discordDisplayName,
-              whitelistStatus: "whitelisted",
-              linkedAt: pendingAuth.createdAt,
-              whitelistedAt: new Date(),
-              approvedBy: staffMemberId,
-              source: "linked",
-              notes: notes || undefined,
-            };
-
-            // Add UUID if available from the last connection attempt
-            if (pendingAuth.lastConnectionAttempt?.uuid) {
-              playerData.minecraftUuid = pendingAuth.lastConnectionAttempt.uuid;
-            }
-
-            const player = new MinecraftPlayer(playerData);
-            await player.save();
-          })()
-        );
-        playerError = error;
-      }
-
-      if (playerError) {
-        log.error("Failed to create/update player record:", playerError);
-        return res
-          .status(500)
-          .json(createErrorResponse("Failed to create/update player record", 500, req.requestId));
-      }
-
-      // Clean up the pending auth
-      const { error: cleanupError } = await tryCatch(
-        MinecraftAuthPending.deleteOne({ _id: authId })
+      const { error: playerError } = await tryCatch(
+        MinecraftPlayer.findOneAndUpdate({ _id: pendingAuth._id }, updateData, { new: true })
       );
 
-      if (cleanupError) {
-        log.warn("Failed to cleanup pending auth:", cleanupError);
+      if (playerError) {
+        log.error("Failed to approve player record:", playerError);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to approve player record", 500, req.requestId));
       }
+
+      // NOTE: No need to cleanup pending auth since we're updating the same record
 
       // TODO: Add RCON integration here to actually whitelist the player
       // TODO: Send DM to user notifying them of approval
@@ -765,7 +860,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
       // First, check if the record exists and get its current status
       const { data: existingAuth, error: findError } = await tryCatch(
-        MinecraftAuthPending.findOne({ _id: authId, guildId }).lean()
+        MinecraftPlayer.findOne({ _id: authId, guildId }).lean()
       );
 
       if (findError) {
@@ -788,26 +883,36 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           .json(createErrorResponse("Authentication request not found", 404, req.requestId));
       }
 
-      log.debug(`Found auth with current status: ${existingAuth.status}`);
+      log.debug(`Found auth confirmed: ${!!existingAuth.confirmedAt}`);
 
-      if (existingAuth.status !== "code_confirmed") {
-        log.warn(`Auth request ${authId} has status ${existingAuth.status}, cannot reject`);
+      if (!existingAuth.confirmedAt) {
+        log.warn(`Auth request ${authId} is not confirmed, cannot reject`);
         return res
           .status(400)
           .json(
             createErrorResponse(
-              `Authentication request cannot be rejected (current status: ${existingAuth.status})`,
+              `Authentication request cannot be rejected (not confirmed yet)`,
               400,
               req.requestId
             )
           );
       }
 
-      // Update the status to rejected
+      // Update the status to rejected (clear auth fields and set rejection reason)
       const { data: pendingAuth, error: updateError } = await tryCatch(
-        MinecraftAuthPending.findOneAndUpdate(
-          { _id: authId, guildId, status: "code_confirmed" },
-          { status: "rejected", rejectedBy: staffMemberId, rejectionReason: reason },
+        MinecraftPlayer.findOneAndUpdate(
+          { _id: authId, guildId, confirmedAt: { $ne: null } },
+          {
+            rejectionReason: reason,
+            revokedBy: staffMemberId,
+            revokedAt: new Date(),
+            $unset: {
+              authCode: 1,
+              expiresAt: 1,
+              codeShownAt: 1,
+              confirmedAt: 1,
+            },
+          },
           { new: true, upsert: false } // Return the updated document
         )
       );
@@ -832,7 +937,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           );
       }
 
-      log.debug(`Successfully updated auth ${authId} to status: ${pendingAuth.status}`);
+      log.debug(`Successfully rejected auth ${authId} with reason: ${reason}`);
 
       // TODO: Send DM to user notifying them of rejection
 
@@ -871,7 +976,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         MinecraftPlayer.findOneAndUpdate(
           { _id: playerId, guildId },
           {
-            whitelistStatus: "unwhitelisted",
+            whitelistedAt: null, // Unwhitelist by removing the date
             revokedBy: staffMemberId,
             revokedAt: new Date(),
             notes: reason || undefined,
@@ -925,8 +1030,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         MinecraftPlayer.findOneAndUpdate(
           { _id: playerId, guildId },
           {
-            whitelistStatus: "whitelisted",
-            whitelistedAt: new Date(),
+            whitelistedAt: new Date(), // Set whitelist date
             approvedBy: staffMemberId,
             notes: notes || undefined,
           },
@@ -968,7 +1072,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         MinecraftPlayer.findOneAndUpdate(
           { _id: playerId, guildId },
           {
-            whitelistStatus: "unwhitelisted",
+            whitelistedAt: null, // Remove whitelist date
             revokedAt: new Date(),
             revokedBy: staffMemberId,
             notes: notes || undefined,
@@ -1060,11 +1164,12 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         `[Minecraft Bulk Approve] Processing bulk approval for guild ${guildId}, approving oldest ${count} requests`
       );
 
-      // Find the oldest pending approval requests from MinecraftAuthPending collection
+      // Find the oldest pending approval requests from MinecraftPlayer collection
       const { data: pendingAuths, error: findError } = await tryCatch(
-        MinecraftAuthPending.find({
+        MinecraftPlayer.find({
           guildId,
-          status: "code_confirmed", // Only confirmed codes waiting for approval
+          confirmedAt: { $ne: null }, // Code has been confirmed
+          linkedAt: null, // But not yet approved by staff
         })
           .sort({ confirmedAt: 1, createdAt: 1 }) // Oldest confirmed first
           .limit(count)
@@ -1096,98 +1201,32 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       const errors: string[] = [];
       const approvedPlayers: string[] = []; // Track approved usernames
 
-      // Process each authentication approval (similar to individual approve endpoint)
+      // Process each authentication approval (unified model - just update the same record)
       for (const pendingAuth of pendingAuths) {
         try {
-          // Check if a player with this username already exists
-          const { data: existingPlayer, error: findPlayerError } = await tryCatch(
-            MinecraftPlayer.findOne({
-              guildId,
-              minecraftUsername: pendingAuth.minecraftUsername,
-            })
+          // Since we're using unified model, just update the existing record
+          const updateData = {
+            linkedAt: new Date(),
+            whitelistedAt: new Date(),
+            approvedBy: staffMemberId,
+            updatedAt: new Date(),
+            // Clear auth fields since process is complete
+            $unset: {
+              authCode: 1,
+              expiresAt: 1,
+              codeShownAt: 1,
+            },
+          };
+
+          const { error: playerError } = await tryCatch(
+            MinecraftPlayer.findOneAndUpdate({ _id: pendingAuth._id }, updateData, { new: true })
           );
-
-          if (findPlayerError) {
-            errors.push(
-              `Failed to check existing player for ${pendingAuth.minecraftUsername}: ${findPlayerError.message}`
-            );
-            continue;
-          }
-
-          let playerError: Error | null = null;
-
-          if (existingPlayer) {
-            // Update existing player record
-            const updateData: any = {
-              discordId: pendingAuth.discordId,
-              discordUsername: pendingAuth.discordUsername,
-              discordDisplayName: pendingAuth.discordDisplayName,
-              whitelistStatus: "whitelisted",
-              linkedAt: pendingAuth.createdAt,
-              whitelistedAt: new Date(),
-              approvedBy: staffMemberId,
-              source: "linked",
-              updatedAt: new Date(),
-            };
-
-            // Add UUID if available from the last connection attempt
-            if (pendingAuth.lastConnectionAttempt?.uuid) {
-              updateData.minecraftUuid = pendingAuth.lastConnectionAttempt.uuid;
-            }
-
-            const { error } = await tryCatch(
-              MinecraftPlayer.findOneAndUpdate({ _id: existingPlayer._id }, updateData, {
-                new: true,
-              })
-            );
-            playerError = error;
-          } else {
-            // Create new player record
-            const { error } = await tryCatch(
-              (async () => {
-                const playerData: any = {
-                  guildId,
-                  minecraftUsername: pendingAuth.minecraftUsername,
-                  discordId: pendingAuth.discordId,
-                  discordUsername: pendingAuth.discordUsername,
-                  discordDisplayName: pendingAuth.discordDisplayName,
-                  whitelistStatus: "whitelisted",
-                  linkedAt: pendingAuth.createdAt,
-                  whitelistedAt: new Date(),
-                  approvedBy: staffMemberId,
-                  source: "linked",
-                };
-
-                // Add UUID if available from the last connection attempt
-                if (pendingAuth.lastConnectionAttempt?.uuid) {
-                  playerData.minecraftUuid = pendingAuth.lastConnectionAttempt.uuid;
-                }
-
-                const player = new MinecraftPlayer(playerData);
-                await player.save();
-              })()
-            );
-            playerError = error;
-          }
 
           if (playerError) {
             errors.push(
-              `Failed to create/update player record for ${pendingAuth.minecraftUsername}: ${playerError.message}`
+              `Failed to approve player record for ${pendingAuth.minecraftUsername}: ${playerError.message}`
             );
           } else {
-            // Clean up the pending auth
-            const { error: cleanupError } = await tryCatch(
-              MinecraftAuthPending.deleteOne({ _id: pendingAuth._id })
-            );
-
-            if (cleanupError) {
-              log.warn(
-                `Failed to cleanup pending auth for ${pendingAuth.minecraftUsername}:`,
-                cleanupError
-              );
-              // Don't fail the whole operation for cleanup errors
-            }
-
             approvedCount++;
             approvedPlayers.push(pendingAuth.minecraftUsername);
             log.info(
@@ -1374,7 +1413,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           if (existingPlayer) {
             // Update existing player
             const updateData: any = {
-              whitelistStatus: "whitelisted",
+              whitelistedAt: new Date(),
               minecraftUsername: username,
               updatedAt: new Date(),
             };
@@ -1410,7 +1449,6 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             const createData: any = {
               guildId,
               minecraftUsername: username,
-              whitelistStatus: "whitelisted",
               source: "imported",
               whitelistedAt: new Date(),
               createdAt: new Date(),
@@ -1905,7 +1943,6 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             guildId,
             minecraftUsername: minecraftUsername.toLowerCase(),
             discordId,
-            whitelistStatus: "whitelisted",
             linkedAt: new Date(),
             whitelistedAt: new Date(),
             approvedBy: staffMemberId,

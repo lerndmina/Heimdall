@@ -10,7 +10,8 @@
     "dev": "bunx nodemon --watch 'src/**/*.ts' --exec 'npx tsx' src/Bot.ts",
     "start": "tsx src/Bot.ts",
     "build": "bunx tsc",
-    "migrate:uuid-index": "bunx tsx src/migrations/fix-minecraft-uuid-index.ts"
+    "migrate:uuid-index": "bunx tsx src/migrations/fix-minecraft-uuid-index.ts",
+    "migrate:merge-collections": "bunx tsx src/migrations/run-merge.ts"
   },
   "author": "",
   "license": "ISC",

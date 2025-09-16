@@ -2,7 +2,6 @@ import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/co
 import { SlashCommandBuilder } from "discord.js";
 import Database from "../../utils/data/database";
 import MinecraftConfig from "../../models/MinecraftConfig";
-import MinecraftAuthPending from "../../models/MinecraftAuthPending";
 import MinecraftPlayer from "../../models/MinecraftPlayer";
 import { tryCatch } from "../../utils/trycatch";
 import log from "../../utils/log";
@@ -84,24 +83,25 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
   // Clean up any expired pending auth records for this user
   await tryCatch(
     db.updateMany(
-      MinecraftAuthPending,
+      MinecraftPlayer,
       {
         guildId,
         discordId,
-        status: { $ne: "expired" },
+        authCode: { $ne: null },
+        linkedAt: null,
         expiresAt: { $lte: new Date() },
       },
-      { status: "expired" }
+      { authCode: null, expiresAt: null } // Clear expired auths
     )
   );
 
   // Find the pending auth record (must not be expired)
   const { data: pendingAuth, error: pendingError } = await tryCatch(
-    MinecraftAuthPending.findOne({
+    MinecraftPlayer.findOne({
       guildId,
       discordId,
       authCode: code,
-      status: { $in: ["awaiting_connection", "code_shown"] },
+      linkedAt: null, // Not yet linked
       expiresAt: { $gt: new Date() }, // Ensure it hasn't expired
     }).lean()
   );
@@ -134,25 +134,6 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
     });
   }
 
-  // Check if the auth has expired
-  if (new Date() > pendingAuth.expiresAt) {
-    // Clean up expired auth
-    await tryCatch(
-      db.findOneAndUpdate(MinecraftAuthPending, { _id: pendingAuth._id }, { status: "expired" })
-    );
-
-    return interaction.editReply({
-      embeds: [
-        BasicEmbed(
-          client,
-          "⏰ Code Expired",
-          "Your authentication code has expired.\n\n" +
-            "Please run `/link-minecraft <username>` to start a new link request."
-        ).setColor("Red"),
-      ],
-    });
-  }
-
   // Check if they actually got the code from the server (security check)
   if (!pendingAuth.codeShownAt) {
     return interaction.editReply({
@@ -177,10 +158,9 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
   // Update the pending auth to confirmed status
   const { error: updateError } = await tryCatch(
     db.findOneAndUpdate(
-      MinecraftAuthPending,
+      MinecraftPlayer,
       { _id: pendingAuth._id },
       {
-        status: "code_confirmed",
         confirmedAt: new Date(),
       }
     )

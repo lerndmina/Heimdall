@@ -2,7 +2,6 @@ import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/co
 import { SlashCommandBuilder } from "discord.js";
 import Database from "../../utils/data/database";
 import MinecraftConfig from "../../models/MinecraftConfig";
-import MinecraftAuthPending from "../../models/MinecraftAuthPending";
 import MinecraftPlayer from "../../models/MinecraftPlayer";
 import { tryCatch } from "../../utils/trycatch";
 import log from "../../utils/log";
@@ -79,23 +78,25 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
   // Clean up any expired pending auth records for this user
   await tryCatch(
     db.updateMany(
-      MinecraftAuthPending,
+      MinecraftPlayer,
       {
         guildId,
         discordId,
-        status: { $ne: "expired" },
+        authCode: { $ne: null },
+        linkedAt: null,
         expiresAt: { $lte: new Date() },
       },
-      { status: "expired" }
+      { authCode: null, expiresAt: null } // Clear expired auths
     )
   );
 
-  // Check if user already has a pending auth (exclude expired ones by both status and time)
+  // Check if user already has a pending auth
   const { data: existingPending, error: pendingError } = await tryCatch(
-    MinecraftAuthPending.findOne({
+    MinecraftPlayer.findOne({
       guildId,
       discordId,
-      status: { $ne: "expired" },
+      authCode: { $ne: null },
+      linkedAt: null,
       expiresAt: { $gt: new Date() }, // Only get non-expired records
     }).lean()
   );
@@ -119,12 +120,11 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
       // Update the existing pending request with the new username
       const { error: updateError } = await tryCatch(
         db.findOneAndUpdate(
-          MinecraftAuthPending,
+          MinecraftPlayer,
           { _id: existingPending._id },
           {
             minecraftUsername,
-            status: "awaiting_connection",
-            codeShownAt: undefined, // Reset this since they haven't seen the code for the new username
+            codeShownAt: null, // Reset this since they haven't seen the code for the new username
           }
         )
       );
@@ -152,7 +152,9 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
               `1. Try joining the Minecraft server: \`${config.serverHost}:${config.serverPort}\`\n` +
               `2. You'll be kicked with your authentication code\n` +
               `3. Use that code with \`/confirm-code <code>\`\n\n` +
-              `**Request expires:** <t:${Math.floor(existingPending.expiresAt.getTime() / 1000)}:R>`
+              `**Request expires:** <t:${Math.floor(
+                (existingPending.expiresAt || new Date()).getTime() / 1000
+              )}:R>`
           ).setColor("Yellow"),
         ],
       });
@@ -170,7 +172,7 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
             `2. You'll be kicked with your authentication code\n` +
             `3. Use that code with \`/confirm-code <code>\`\n\n` +
             `**Request expires:** <t:${Math.floor(
-              existingPending.expiresAt.getTime() / 1000
+              (existingPending.expiresAt || new Date()).getTime() / 1000
             )}:R>\n\n` +
             `*Want to change the username? Just run this command again with a different username.*`
         ).setColor("Yellow"),
@@ -246,7 +248,7 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
 
   while (!codeIsUnique && attempts < 10) {
     authCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const { data: existingCode } = await tryCatch(db.findOne(MinecraftAuthPending, { authCode }));
+    const { data: existingCode } = await tryCatch(db.findOne(MinecraftPlayer, { authCode }));
     if (!existingCode) {
       codeIsUnique = true;
     }
@@ -277,15 +279,15 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
 
   const { error: createError } = await tryCatch(
     (async () => {
-      const pendingAuth = new MinecraftAuthPending({
+      const pendingAuth = new MinecraftPlayer({
         guildId,
         discordId,
         minecraftUsername,
         authCode: authCode!,
         expiresAt,
-        status: "awaiting_connection",
         discordUsername,
         discordDisplayName,
+        source: "command",
       });
       await pendingAuth.save();
     })()
