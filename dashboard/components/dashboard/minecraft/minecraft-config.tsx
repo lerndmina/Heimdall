@@ -16,6 +16,7 @@ import { useRequireGuild } from "../use-require-guild";
 interface MinecraftConfig {
   _id?: string;
   guildId: string;
+  enabled: boolean;
   serverHost: string;
   serverPort: number;
   authCodeExpiry: number;
@@ -31,6 +32,7 @@ interface MinecraftConfig {
 }
 
 const defaultConfig: Partial<MinecraftConfig> = {
+  enabled: false,
   serverHost: "",
   serverPort: 25565,
   authCodeExpiry: 300, // 5 minutes
@@ -105,9 +107,23 @@ export function MinecraftConfig() {
       return result;
     },
     onSuccess: () => {
+      const wasEnabled = currentConfig?.enabled;
+      const isNowEnabled = config.enabled;
+
+      let title = "Configuration Saved";
+      let description = "Minecraft integration settings have been updated.";
+
+      if (!wasEnabled && isNowEnabled) {
+        title = "🎉 Minecraft Integration Enabled!";
+        description = "Players can now connect to your server and link their Discord accounts.";
+      } else if (wasEnabled && !isNowEnabled) {
+        title = "⚠️ Integration Disabled";
+        description = "Minecraft integration has been disabled. Players cannot connect until re-enabled.";
+      }
+
       toast({
-        title: "Configuration Saved",
-        description: "Minecraft integration settings have been updated.",
+        title,
+        description,
       });
       setHasChanges(false);
       queryClient.invalidateQueries({ queryKey: ["minecraft-config"] });
@@ -162,12 +178,46 @@ export function MinecraftConfig() {
         </div>
       </div>
 
-      {/* Server Configuration */}
+      {/* Enable Integration Toggle */}
       <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Integration Status
+          </CardTitle>
+          <CardDescription>
+            {config.enabled
+              ? "Minecraft integration is currently enabled. Players can link their accounts and join the server."
+              : "Minecraft integration is disabled. Enable it to start accepting player connections and account linking."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-2">
+            <Switch id="enabled" checked={config.enabled} onCheckedChange={(checked) => handleInputChange("enabled", checked)} />
+            <Label htmlFor="enabled" className="text-sm font-medium">
+              {config.enabled ? "Integration Enabled" : "Integration Disabled"}
+            </Label>
+          </div>
+          {!config.enabled && (
+            <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <strong>Integration Disabled:</strong> Players cannot connect to your Minecraft server until you enable the integration and configure the settings below.
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Server Configuration */}
+      <Card className={config.enabled ? "" : "opacity-60"}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Server className="h-5 w-5" />
             Server Settings
+            {!config.enabled && <span className="text-xs bg-yellow-200 dark:bg-yellow-800 px-2 py-1 rounded">Requires Integration Enabled</span>}
           </CardTitle>
           <CardDescription>Basic minecraft server configuration</CardDescription>
         </CardHeader>
@@ -175,47 +225,69 @@ export function MinecraftConfig() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="serverHost">Server Host</Label>
-              <Input id="serverHost" placeholder="play.yourserver.com" value={config.serverHost} onChange={(e) => handleInputChange("serverHost", e.target.value)} />
+              <Input id="serverHost" placeholder="play.yourserver.com" value={config.serverHost} onChange={(e) => handleInputChange("serverHost", e.target.value)} disabled={!config.enabled} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="serverPort">Server Port</Label>
-              <Input id="serverPort" type="number" placeholder="25565" value={config.serverPort} onChange={(e) => handleInputChange("serverPort", parseInt(e.target.value) || 25565)} />
+              <Input
+                id="serverPort"
+                type="number"
+                placeholder="25565"
+                value={config.serverPort}
+                onChange={(e) => handleInputChange("serverPort", parseInt(e.target.value) || 25565)}
+                disabled={!config.enabled}
+              />
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Authentication Settings */}
-      <Card>
+      <Card className={config.enabled ? "" : "opacity-60"}>
         <CardHeader>
-          <CardTitle>Authentication Settings</CardTitle>
+          <CardTitle>
+            Authentication Settings
+            {!config.enabled && <span className="text-xs bg-yellow-200 dark:bg-yellow-800 px-2 py-1 rounded ml-2">Requires Integration Enabled</span>}
+          </CardTitle>
           <CardDescription>Control how players link their accounts</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="authCodeExpiry">Auth Code Expiry (seconds)</Label>
-              <Input id="authCodeExpiry" type="number" value={config.authCodeExpiry} onChange={(e) => handleInputChange("authCodeExpiry", parseInt(e.target.value) || 300)} />
+              <Input
+                id="authCodeExpiry"
+                type="number"
+                value={config.authCodeExpiry}
+                onChange={(e) => handleInputChange("authCodeExpiry", parseInt(e.target.value) || 300)}
+                disabled={!config.enabled}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="maxPendingAuths">Max Pending Applications</Label>
-              <Input id="maxPendingAuths" type="number" value={config.maxPendingAuths} onChange={(e) => handleInputChange("maxPendingAuths", parseInt(e.target.value) || 10)} />
+              <Input
+                id="maxPendingAuths"
+                type="number"
+                value={config.maxPendingAuths}
+                onChange={(e) => handleInputChange("maxPendingAuths", parseInt(e.target.value) || 10)}
+                disabled={!config.enabled}
+              />
             </div>
           </div>
 
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <Switch id="requireConfirmation" checked={config.requireConfirmation} onCheckedChange={(checked) => handleInputChange("requireConfirmation", checked)} />
+              <Switch id="requireConfirmation" checked={config.requireConfirmation} onCheckedChange={(checked) => handleInputChange("requireConfirmation", checked)} disabled={!config.enabled} />
               <Label htmlFor="requireConfirmation">Require code confirmation</Label>
             </div>
 
             <div className="flex items-center space-x-2">
-              <Switch id="allowUsernameChange" checked={config.allowUsernameChange} onCheckedChange={(checked) => handleInputChange("allowUsernameChange", checked)} />
+              <Switch id="allowUsernameChange" checked={config.allowUsernameChange} onCheckedChange={(checked) => handleInputChange("allowUsernameChange", checked)} disabled={!config.enabled} />
               <Label htmlFor="allowUsernameChange">Allow username changes</Label>
             </div>
 
             <div className="flex items-center space-x-2">
-              <Switch id="autoWhitelist" checked={config.autoWhitelist} onCheckedChange={(checked) => handleInputChange("autoWhitelist", checked)} />
+              <Switch id="autoWhitelist" checked={config.autoWhitelist} onCheckedChange={(checked) => handleInputChange("autoWhitelist", checked)} disabled={!config.enabled} />
               <Label htmlFor="autoWhitelist">Auto-whitelist approved players</Label>
             </div>
           </div>
@@ -223,9 +295,12 @@ export function MinecraftConfig() {
       </Card>
 
       {/* Message Templates */}
-      <Card>
+      <Card className={config.enabled ? "" : "opacity-60"}>
         <CardHeader>
-          <CardTitle>Message Templates</CardTitle>
+          <CardTitle>
+            Message Templates
+            {!config.enabled && <span className="text-xs bg-yellow-200 dark:bg-yellow-800 px-2 py-1 rounded ml-2">Requires Integration Enabled</span>}
+          </CardTitle>
           <CardDescription>Customize messages sent to users and shown on server kicks</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -237,6 +312,7 @@ export function MinecraftConfig() {
               onChange={(e) => handleInputChange("authSuccessMessage", e.target.value)}
               rows={2}
               placeholder="Message shown when auth code is provided"
+              disabled={!config.enabled}
             />
           </div>
 
@@ -248,6 +324,7 @@ export function MinecraftConfig() {
               onChange={(e) => handleInputChange("authRejectionMessage", e.target.value)}
               rows={2}
               placeholder="Message shown when player needs to link account"
+              disabled={!config.enabled}
             />
           </div>
 
@@ -259,6 +336,7 @@ export function MinecraftConfig() {
               onChange={(e) => handleInputChange("whitelistSuccessMessage", e.target.value)}
               rows={2}
               placeholder="Message shown when player has been whitelisted"
+              disabled={!config.enabled}
             />
           </div>
         </CardContent>

@@ -559,6 +559,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             authCode: authCode,
             codeShownAt: new Date(),
             isExistingPlayerLink: true,
+            minecraftUuid: uuid, // Store the UUID for linking
             expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
             lastConnectionAttempt: new Date(),
           }

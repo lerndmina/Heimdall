@@ -4,7 +4,7 @@
   <groupId>com.heimdall</groupId>
   <artifactId>heimdall-whitelist</artifactId>
   <name>HeimdallWhitelist</name>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <description>Dynamic whitelist integration with Heimdall Discord bot</description>
   <url>https://github.com/lerndmina/Heimdall</url>
   <build>
@@ -99,8 +99,8 @@
     </dependency>
   </dependencies>
   <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>8</maven.compiler.source>
     <maven.compiler.target>8</maven.compiler.target>
+    <maven.compiler.source>8</maven.compiler.source>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 </project>

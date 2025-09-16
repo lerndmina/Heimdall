@@ -86,7 +86,10 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
       MinecraftPlayer,
       {
         guildId,
-        discordId,
+        $or: [
+          { discordId }, // Clear expired auths for this Discord user
+          { discordId: null }, // Clear expired auths for unlinked players
+        ],
         authCode: { $ne: null },
         linkedAt: null,
         expiresAt: { $lte: new Date() },
@@ -96,13 +99,18 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
   );
 
   // Find the pending auth record (must not be expired)
+  // For existing player linking, discordId will be null initially
+  // For new player linking, discordId will already be set
   const { data: pendingAuth, error: pendingError } = await tryCatch(
     MinecraftPlayer.findOne({
       guildId,
-      discordId,
       authCode: code,
       linkedAt: null, // Not yet linked
       expiresAt: { $gt: new Date() }, // Ensure it hasn't expired
+      $or: [
+        { discordId }, // New player flow - discordId already set
+        { discordId: null, isExistingPlayerLink: true }, // Existing player flow - no discordId yet
+      ],
     }).lean()
   );
 
@@ -155,7 +163,88 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
     });
   }
 
-  // Update the pending auth to confirmed status
+  // Check if this is an existing player linking their account
+  if (pendingAuth.isExistingPlayerLink && pendingAuth.whitelistedAt) {
+    // Handle existing player linking - immediate link (no staff approval needed)
+
+    // First check if this Discord user is already linked to another Minecraft account
+    const { data: existingLink } = await tryCatch(
+      MinecraftPlayer.findOne({
+        guildId,
+        discordId,
+        linkedAt: { $ne: null },
+      }).lean()
+    );
+
+    if (existingLink) {
+      return interaction.editReply({
+        embeds: [
+          BasicEmbed(
+            client,
+            "❌ Already Linked",
+            `Your Discord account is already linked to **${existingLink.minecraftUsername}**.\n\n` +
+              `If you need to change your linked account, please contact staff.`
+          ).setColor("Red"),
+        ],
+      });
+    }
+
+    const { error: linkError } = await tryCatch(
+      db.findOneAndUpdate(
+        MinecraftPlayer,
+        {
+          _id: pendingAuth._id,
+          discordId: null, // Ensure we're only updating unlinked accounts
+          isExistingPlayerLink: true, // Extra security check
+        },
+        {
+          discordId,
+          discordUsername: interaction.user.username,
+          discordDisplayName:
+            (interaction.member as any)?.displayName || interaction.user.globalName,
+          linkedAt: new Date(),
+          // Clear auth fields
+          $unset: {
+            authCode: 1,
+            expiresAt: 1,
+            codeShownAt: 1,
+            confirmedAt: 1,
+            isExistingPlayerLink: 1,
+          },
+        }
+      )
+    );
+
+    if (linkError) {
+      log.error("Failed to link existing player account:", linkError);
+      return interaction.editReply({
+        embeds: [
+          BasicEmbed(client, "❌ Error", "Failed to link your account. Please try again.").setColor(
+            "Red"
+          ),
+        ],
+      });
+    }
+
+    log.info(
+      `Successfully linked existing player ${pendingAuth.minecraftUsername} to Discord user ${discordId}`
+    );
+
+    return interaction.editReply({
+      embeds: [
+        BasicEmbed(
+          client,
+          "✅ Account Linked Successfully",
+          `Your Minecraft account **${pendingAuth.minecraftUsername}** has been linked to your Discord account!\n\n` +
+            `✅ You're already whitelisted and can join the server immediately.\n\n` +
+            `**Server:** \`${config.serverHost}:${config.serverPort}\`\n\n` +
+            `Use \`/minecraft-status\` to view your account details.`
+        ).setColor("Green"),
+      ],
+    });
+  }
+
+  // Update the pending auth to confirmed status (for new players)
   const { error: updateError } = await tryCatch(
     db.findOneAndUpdate(
       MinecraftPlayer,
