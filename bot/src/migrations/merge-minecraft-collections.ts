@@ -39,50 +39,60 @@ export async function mergeMinecraftCollections() {
     log.info("🔄 Starting Minecraft collections merge...");
 
     // Step 1: Get current data
-    const players = (await MinecraftPlayer.find({}).lean()) as LegacyMinecraftPlayer[];
     const pending = (await MinecraftAuthPending.find({}).lean()) as MinecraftAuthPendingDoc[];
 
-    log.info(`📊 Found ${players.length} existing players, ${pending.length} pending auth records`);
+    log.info(`📊 Found ${pending.length} pending auth records to migrate`);
 
-    // Step 2: Update existing players - remove whitelistStatus, add new fields
-    log.info("🔧 Updating existing players...");
-    let playersUpdated = 0;
+    // Step 2: Check if existing players still need schema updates
+    const playersWithOldSchema = (await MinecraftPlayer.find({
+      whitelistStatus: { $exists: true },
+    }).lean()) as LegacyMinecraftPlayer[];
 
-    for (const player of players) {
-      try {
-        await MinecraftPlayer.updateOne(
-          { _id: player._id },
-          {
-            $unset: { whitelistStatus: 1 }, // Remove redundant field
-            $set: {
-              // Initialize new auth fields as null
-              authCode: null,
-              expiresAt: null,
-              codeShownAt: null,
-              confirmedAt: null,
-              isExistingPlayerLink: null,
-              rejectionReason: null,
-              updatedAt: new Date(),
-            },
+    log.info(`📊 Found ${playersWithOldSchema.length} players with old schema`);
+
+    if (playersWithOldSchema.length > 0) {
+      log.info("🔧 Updating players with old schema...");
+      let playersUpdated = 0;
+
+      for (const player of playersWithOldSchema) {
+        try {
+          await MinecraftPlayer.updateOne(
+            { _id: player._id },
+            {
+              $unset: { whitelistStatus: 1 }, // Remove redundant field
+              $set: {
+                // Initialize new auth fields as null
+                authCode: null,
+                expiresAt: null,
+                codeShownAt: null,
+                confirmedAt: null,
+                isExistingPlayerLink: null,
+                rejectionReason: null,
+                updatedAt: new Date(),
+              },
+            }
+          );
+          playersUpdated++;
+
+          if (playersUpdated % 50 === 0) {
+            log.info(`   ✅ Updated ${playersUpdated}/${playersWithOldSchema.length} players...`);
           }
-        );
-        playersUpdated++;
-
-        if (playersUpdated % 50 === 0) {
-          log.info(`   ✅ Updated ${playersUpdated}/${players.length} players...`);
+        } catch (error) {
+          log.error(`❌ Failed to update player ${player.minecraftUsername}:`, error);
         }
-      } catch (error) {
-        log.error(`❌ Failed to update player ${player.minecraftUsername}:`, error);
       }
-    }
 
-    log.info(`✅ Updated ${playersUpdated} existing players`);
+      log.info(`✅ Updated ${playersUpdated} existing players`);
+    } else {
+      log.info("✅ All players already have the new schema");
+    }
 
     // Step 3: Migrate auth pending records
     log.info("🔄 Migrating pending auth records...");
     let authRecordsMigrated = 0;
     let newPlayersCreated = 0;
     let existingPlayersLinked = 0;
+    let playersUpdated = playersWithOldSchema.length; // Track total players updated
 
     for (const auth of pending) {
       try {
@@ -110,24 +120,39 @@ export async function mergeMinecraftCollections() {
             );
           }
         } else {
-          // Create new player from auth record
-          await MinecraftPlayer.create({
+          // Check if this player already exists to avoid duplicate creation
+          const existingPlayer = await MinecraftPlayer.findOne({
             guildId: auth.guildId,
-            minecraftUuid: auth.minecraftUuid,
-            minecraftUsername: auth.minecraftUsername,
-            discordId: auth.discordId,
-            whitelistedAt: auth.confirmedAt, // Whitelisted when confirmed
-            authCode: auth.authCode,
-            expiresAt: auth.expiresAt,
-            codeShownAt: auth.codeShownAt,
-            confirmedAt: auth.confirmedAt,
-            isExistingPlayerLink: false,
-            source: "discord_link",
-            createdAt: auth.createdAt,
-            updatedAt: new Date(),
-            lastConnectionAttempt: null,
+            $or: [
+              { minecraftUuid: auth.minecraftUuid },
+              { minecraftUsername: auth.minecraftUsername },
+            ],
           });
-          newPlayersCreated++;
+
+          if (existingPlayer) {
+            log.warn(
+              `⚠️  Player already exists: ${auth.minecraftUsername} (UUID: ${auth.minecraftUuid})`
+            );
+          } else {
+            // Create new player from auth record
+            await MinecraftPlayer.create({
+              guildId: auth.guildId,
+              minecraftUuid: auth.minecraftUuid,
+              minecraftUsername: auth.minecraftUsername,
+              discordId: auth.discordId,
+              whitelistedAt: auth.confirmedAt, // Whitelisted when confirmed
+              authCode: auth.authCode,
+              expiresAt: auth.expiresAt,
+              codeShownAt: auth.codeShownAt,
+              confirmedAt: auth.confirmedAt,
+              isExistingPlayerLink: false,
+              source: "linked",
+              createdAt: auth.createdAt,
+              updatedAt: new Date(),
+              lastConnectionAttempt: null,
+            });
+            newPlayersCreated++;
+          }
         }
 
         authRecordsMigrated++;
@@ -180,18 +205,31 @@ export async function mergeMinecraftCollections() {
 export async function runMigrationSafely() {
   try {
     // Safety checks
-    const hasPlayers = await MinecraftPlayer.countDocuments({});
+    const totalPlayers = await MinecraftPlayer.countDocuments({});
+    const playersWithOldSchema = await MinecraftPlayer.countDocuments({
+      whitelistStatus: { $exists: true },
+    });
     const hasPending = await MinecraftAuthPending.countDocuments({});
 
-    if (hasPlayers === 0 && hasPending === 0) {
+    if (totalPlayers === 0 && hasPending === 0) {
       log.warn("⚠️  No data found in either collection. Migration not needed.");
       return;
     }
 
+    if (playersWithOldSchema === 0 && hasPending === 0) {
+      log.warn("⚠️  Migration already completed. No work needed.");
+      return;
+    }
+
     log.info("🔍 Pre-migration check:");
-    log.info(`   • MinecraftPlayer records: ${hasPlayers}`);
+    log.info(`   • Total MinecraftPlayer records: ${totalPlayers}`);
+    log.info(`   • Players with old schema: ${playersWithOldSchema}`);
     log.info(`   • MinecraftAuthPending records: ${hasPending}`);
     log.info("");
+
+    if (playersWithOldSchema === 0) {
+      log.info("✅ Player schema already migrated, only processing auth records");
+    }
 
     // Confirm migration
     log.info("⏰ Starting migration in 5 seconds... (Ctrl+C to cancel)");

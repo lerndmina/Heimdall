@@ -12,7 +12,11 @@ async function main() {
 
     // Connect to MongoDB
     log.info("🔌 Connecting to MongoDB...");
-    await mongoose.connect(env.MONGODB_URI);
+    log.info(`🗄️ Target database: ${env.MONGODB_DATABASE}`);
+    await mongoose.connect(env.MONGODB_URI, {
+      dbName: env.MONGODB_DATABASE,
+      retryWrites: true,
+    });
     log.info("✅ Connected to MongoDB");
 
     const result = await runMigrationSafely();
