@@ -24,7 +24,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}-full
+  IMAGE_NAME: ${{ github.repository_owner }}/heimdall-full
 
 jobs:
   validate-inputs:
