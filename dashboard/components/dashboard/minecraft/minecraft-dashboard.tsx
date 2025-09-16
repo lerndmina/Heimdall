@@ -130,6 +130,33 @@ export function MinecraftDashboard() {
     refetchInterval: 10 * 1000, // Auto-refresh every 10 seconds for real-time updates
   });
 
+  // Fetch Minecraft configuration to check if integration is enabled
+  const {
+    data: minecraftConfig,
+    isLoading: configLoading,
+    error: configError,
+  } = useQuery({
+    queryKey: ["minecraft-config", selectedGuild?.guildId],
+    queryFn: async () => {
+      if (!selectedGuild) return null;
+
+      const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/config`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        // If config doesn't exist (404), integration is not set up
+        if (response.status === 404) {
+          return { enabled: false, exists: false };
+        }
+        throw new Error(result.error || "Failed to fetch config");
+      }
+
+      return { ...result.data, exists: true };
+    },
+    enabled: !!selectedGuild,
+    staleTime: 60 * 1000, // Cache for 1 minute
+  });
+
   // Bulk approve mutation
   const bulkApproveMutation = useMutation({
     mutationFn: async (params: { count?: number; usernames?: string[] }) => {
@@ -465,6 +492,113 @@ export function MinecraftDashboard() {
           <AlertCircle className="mx-auto h-12 w-12 text-discord-warning" />
           <h3 className="mt-4 text-lg font-medium text-white">No Guild Selected</h3>
           <p className="text-discord-muted">Please select a guild to manage Minecraft integration.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show disabled state if integration is not enabled
+  if (minecraftConfig && !minecraftConfig.enabled) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-white">Minecraft Integration</h1>
+            <p className="text-discord-muted">Integration is currently disabled for {selectedGuild.guildName}</p>
+          </div>
+        </div>
+
+        {/* Disabled State Card */}
+        <Card className="border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+              <Settings className="h-5 w-5" />
+              Minecraft Integration Disabled
+            </CardTitle>
+            <CardDescription className="text-yellow-700 dark:text-yellow-300">
+              The Minecraft integration is currently disabled. Players cannot connect to your server or link their accounts until you enable it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
+              </div>
+              <div>
+                <h4 className="font-medium text-yellow-800 dark:text-yellow-200">What does this mean?</h4>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                  While disabled, your Minecraft server will reject all connection attempts with a "Server configuration error" message. No players can join or link their Discord accounts.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
+              </div>
+              <div>
+                <h4 className="font-medium text-yellow-800 dark:text-yellow-200">How to enable it?</h4>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">Go to the configuration page and toggle the "Enable Integration" switch, then configure your server settings.</p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-yellow-300 dark:border-yellow-700">
+              <Button asChild className="bg-yellow-600 hover:bg-yellow-700 text-white">
+                <a href="/minecraft/config">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Enable Integration
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Feature Preview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="opacity-60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Players</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">--</div>
+              <p className="text-xs text-muted-foreground">Available when enabled</p>
+            </CardContent>
+          </Card>
+
+          <Card className="opacity-60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Linked Accounts</CardTitle>
+              <User className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">--</div>
+              <p className="text-xs text-muted-foreground">Available when enabled</p>
+            </CardContent>
+          </Card>
+
+          <Card className="opacity-60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Whitelisted</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">--</div>
+              <p className="text-xs text-muted-foreground">Available when enabled</p>
+            </CardContent>
+          </Card>
+
+          <Card className="opacity-60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">--</div>
+              <p className="text-xs text-muted-foreground">Available when enabled</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
