@@ -279,8 +279,8 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           );
         }
 
-        // If player exists and is whitelisted, allow them
-        if (player && player.whitelistedAt) {
+        // If player exists and is whitelisted (and not revoked), allow them
+        if (player && player.whitelistedAt && !player.revokedAt) {
           log.info(`Player ${username} is whitelisted, allowing connection`);
 
           // Update last connection attempt
@@ -441,14 +441,15 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           );
         }
 
-        // No pending auth and not whitelisted - check if explicitly rejected or unknown
+        // No pending auth and not whitelisted - check if explicitly rejected/revoked or unknown
 
-        // Check if player exists and has been explicitly rejected
-        if (player && player.rejectionReason) {
-          // Player exists but was rejected - use applicationRejectionMessage with custom reason
+        // Check if player exists and has been revoked or rejected
+        if (player && (player.revokedAt || player.rejectionReason)) {
+          // Player exists but was revoked/rejected - use applicationRejectionMessage
+          const reason = player.revocationReason || player.rejectionReason || "Access revoked";
           const rejectionMessage = config.applicationRejectionMessage
             .replace(/{username}/g, username)
-            .replace(/{reason}/g, player.rejectionReason)
+            .replace(/{reason}/g, reason)
             .replace(/{serverHost}/g, config.serverHost)
             .replace(/{serverPort}/g, config.serverPort.toString());
 
@@ -1070,6 +1071,13 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             whitelistedAt: new Date(), // Set whitelist date
             approvedBy: staffMemberId,
             notes: notes || undefined,
+            // Clear revocation/rejection fields when re-whitelisting
+            $unset: {
+              revokedAt: "",
+              revokedBy: "",
+              revocationReason: "",
+              rejectionReason: "",
+            },
           },
           { upsert: false, new: true }
         )
@@ -1402,7 +1410,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         whitelistData = usernames.map((username: string) => ({
           name: username.toLowerCase(),
           uuid: null, // We don't have UUIDs for manual text import
-          source: "manual_text",
+          source: "manual",
           staffMemberId,
         }));
       } else {

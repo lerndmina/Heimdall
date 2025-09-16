@@ -843,7 +843,7 @@ export function MinecraftPlayersList() {
       {/* Unwhitelist Dialog */}
       {showUnwhitelistDialog && unwhitelistingPlayer && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-discord-primary border border-discord-secondary rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-card rounded-lg p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold text-white mb-4">Remove Player from Whitelist</h3>
             <p className="text-discord-muted mb-4">
               Are you sure you want to remove <span className="font-medium text-white">{unwhitelistingPlayer.minecraftUsername}</span> from the whitelist?
@@ -903,7 +903,7 @@ export function MinecraftPlayersList() {
       {/* Reject Dialog */}
       {showRejectDialog && rejectingPlayer && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-discord-primary border border-discord-secondary rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="bg-card rounded-lg p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold text-white mb-4">Reject Player Application</h3>
             <p className="text-discord-muted mb-4">
               Are you sure you want to reject <span className="font-medium text-white">{rejectingPlayer.minecraftUsername}</span>'s application?

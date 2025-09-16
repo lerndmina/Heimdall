@@ -287,7 +287,7 @@ export async function run({ interaction, client }: LegacySlashCommandProps) {
         expiresAt,
         discordUsername,
         discordDisplayName,
-        source: "command",
+        source: "linked",
       });
       await pendingAuth.save();
     })()

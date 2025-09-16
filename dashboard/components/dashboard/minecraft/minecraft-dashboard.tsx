@@ -74,6 +74,11 @@ export function MinecraftDashboard() {
   const [bulkOperationResult, setBulkOperationResult] = useState<any>(null);
   const [manualUsernames, setManualUsernames] = useState<string>("");
 
+  // Reject dialog state
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<{ authId: string; username: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+
   // Fetch minecraft stats
   const {
     data: stats,
@@ -338,11 +343,15 @@ export function MinecraftDashboard() {
         description: `${data.data.minecraftUsername} has been rejected.`,
       });
       queryClient.invalidateQueries({ queryKey: ["minecraft-pending"] });
+      // Close reject dialog and reset state
+      setShowRejectDialog(false);
+      setRejectTarget(null);
+      setRejectReason("");
     },
     onError: (error) => {
       toast({
-        title: "Rejection Failed",
-        description: error.message,
+        title: "Error",
+        description: error.message || "Failed to reject player",
         variant: "destructive",
       });
     },
@@ -846,12 +855,10 @@ export function MinecraftDashboard() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() =>
-                      rejectMutation.mutate({
-                        authId: auth._id,
-                        reason: "Manual rejection by staff",
-                      })
-                    }
+                    onClick={() => {
+                      setRejectTarget({ authId: auth._id, username: auth.minecraftUsername });
+                      setShowRejectDialog(true);
+                    }}
                     disabled={rejectMutation.isPending}>
                     Reject
                   </Button>
@@ -1289,6 +1296,46 @@ export function MinecraftDashboard() {
                   </Button>
                 </>
               )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Player Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Player</DialogTitle>
+            <DialogDescription>Provide a reason for rejecting {rejectTarget?.username}&apos;s whitelist application.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="rejectReason">Rejection Reason</Label>
+              <Textarea id="rejectReason" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Enter reason for rejection..." rows={3} />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowRejectDialog(false);
+                  setRejectTarget(null);
+                  setRejectReason("");
+                }}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (rejectTarget && rejectReason.trim()) {
+                    rejectMutation.mutate({
+                      authId: rejectTarget.authId,
+                      reason: rejectReason.trim(),
+                    });
+                  }
+                }}
+                disabled={rejectMutation.isPending || !rejectReason.trim()}>
+                {rejectMutation.isPending ? "Rejecting..." : "Reject Player"}
+              </Button>
             </div>
           </div>
         </DialogContent>
