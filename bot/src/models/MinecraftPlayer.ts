@@ -31,6 +31,7 @@ export interface MinecraftPlayerType extends Document {
   approvedBy?: string; // Staff Discord ID
   revokedBy?: string;
   revokedAt?: Date;
+  revocationReason?: string;
 
   // Metadata
   source: "imported" | "linked" | "manual"; // How they got added
@@ -42,6 +43,7 @@ export interface MinecraftPlayerType extends Document {
 
   // Helper methods
   isWhitelisted: boolean;
+  whitelistStatus: "pending" | "whitelisted" | "revoked";
   isLinked: boolean;
   hasActiveAuth: boolean;
   authStatus: "none" | "pending" | "shown" | "confirmed" | "expired";
@@ -104,6 +106,7 @@ const MinecraftPlayerSchema = new Schema<MinecraftPlayerType>(
     approvedBy: { type: String },
     revokedBy: { type: String },
     revokedAt: { type: Date },
+    revocationReason: { type: String },
 
     // Metadata
     source: {
@@ -141,7 +144,13 @@ MinecraftPlayerSchema.index({ guildId: 1, confirmedAt: 1, linkedAt: 1 }); // For
 
 // Helper methods
 MinecraftPlayerSchema.virtual("isWhitelisted").get(function () {
-  return !!this.whitelistedAt;
+  return !!this.whitelistedAt && !this.revokedAt;
+});
+
+MinecraftPlayerSchema.virtual("whitelistStatus").get(function () {
+  if (this.revokedAt) return "revoked";
+  if (this.whitelistedAt) return "whitelisted";
+  return "pending";
 });
 
 MinecraftPlayerSchema.virtual("isLinked").get(function () {

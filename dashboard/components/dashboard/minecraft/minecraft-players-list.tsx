@@ -24,13 +24,15 @@ interface MinecraftPlayer {
   discordId?: string;
   discordUsername?: string;
   discordDisplayName?: string;
-  whitelistStatus: "whitelisted" | "unwhitelisted";
+  whitelistStatus: "pending" | "whitelisted" | "revoked";
   linkedAt?: string;
   whitelistedAt?: string;
   approvedAt?: string;
   approvedBy?: string;
   revokedAt?: string;
   revokedBy?: string;
+  revocationReason?: string;
+  rejectionReason?: string;
   notes?: string;
   lastSeen?: string;
   createdAt: string;
@@ -62,6 +64,16 @@ export function MinecraftPlayersList() {
     notes: "",
   });
 
+  // Unwhitelist dialog state
+  const [showUnwhitelistDialog, setShowUnwhitelistDialog] = useState(false);
+  const [unwhitelistingPlayer, setUnwhitelistingPlayer] = useState<MinecraftPlayer | null>(null);
+  const [revocationReason, setRevocationReason] = useState("");
+
+  // Reject dialog state
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectingPlayer, setRejectingPlayer] = useState<MinecraftPlayer | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+
   // Fetch all players
   const {
     data: players,
@@ -88,16 +100,22 @@ export function MinecraftPlayersList() {
 
   // Whitelist/unwhitelist mutation
   const whitelistMutation = useMutation({
-    mutationFn: async ({ playerId, action, notes }: { playerId: string; action: "whitelist" | "unwhitelist"; notes?: string }) => {
+    mutationFn: async ({ playerId, action, notes, revocationReason }: { playerId: string; action: "whitelist" | "unwhitelist"; notes?: string; revocationReason?: string }) => {
       if (!selectedGuild) throw new Error("No guild selected");
+
+      const body: any = {
+        notes,
+        staffMemberId: session?.user?.id || "unknown",
+      };
+
+      if (action === "unwhitelist" && revocationReason) {
+        body.revocationReason = revocationReason;
+      }
 
       const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/players/${playerId}/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          notes,
-          staffMemberId: session?.user?.id || "unknown",
-        }),
+        body: JSON.stringify(body),
       });
 
       const result = await response.json();
@@ -282,6 +300,47 @@ export function MinecraftPlayersList() {
     },
   });
 
+  // Reject mutation
+  const rejectMutation = useMutation({
+    mutationFn: async ({ playerId, rejectionReason, notes }: { playerId: string; rejectionReason: string; notes?: string }) => {
+      if (!selectedGuild) throw new Error("No guild selected");
+
+      const response = await fetch(`/api/minecraft/${selectedGuild.guildId}/players/${playerId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rejectionReason,
+          notes,
+          staffMemberId: session?.user?.id || "unknown",
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to reject player");
+      }
+
+      return result;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Player Rejected",
+        description: `Successfully rejected ${data.data.minecraftUsername}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["minecraft-players"] });
+      setShowRejectDialog(false);
+      setRejectingPlayer(null);
+      setRejectionReason("");
+    },
+    onError: (error) => {
+      toast({
+        title: "Rejection Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   if (!selectedGuild) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -341,11 +400,25 @@ export function MinecraftPlayersList() {
             Whitelisted
           </Badge>
         );
+      case "revoked":
+        return (
+          <Badge className="bg-red-100 text-red-800 hover:bg-red-200">
+            <XCircle className="h-3 w-3 mr-1" />
+            Revoked
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </Badge>
+        );
       default:
         return (
           <Badge variant="secondary">
-            <XCircle className="h-3 w-3 mr-1" />
-            Unwhitelisted
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Unknown
           </Badge>
         );
     }
@@ -374,19 +447,36 @@ export function MinecraftPlayersList() {
       );
     }
 
+    // Add reject button for pending players (not yet whitelisted and not already rejected)
+    if (player.whitelistStatus === "pending" && !player.rejectionReason) {
+      actions.push(
+        <Button
+          key="reject"
+          size="sm"
+          variant="destructive"
+          onClick={() => {
+            setRejectingPlayer(player);
+            setRejectionReason("");
+            setShowRejectDialog(true);
+          }}
+          disabled={rejectMutation.isPending}>
+          <XCircle className="h-4 w-4 mr-2" />
+          Reject
+        </Button>
+      );
+    }
+
     if (player.whitelistStatus === "whitelisted") {
       actions.push(
         <Button
           key="unwhitelist"
           size="sm"
           variant="outline"
-          onClick={() =>
-            whitelistMutation.mutate({
-              playerId: player._id,
-              action: "unwhitelist",
-              notes: "Removed from whitelist via dashboard",
-            })
-          }
+          onClick={() => {
+            setUnwhitelistingPlayer(player);
+            setRevocationReason("");
+            setShowUnwhitelistDialog(true);
+          }}
           disabled={whitelistMutation.isPending}>
           <XCircle className="h-4 w-4 mr-2" />
           Remove
@@ -474,8 +564,9 @@ export function MinecraftPlayersList() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Players</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="whitelisted">Whitelisted</SelectItem>
-              <SelectItem value="unwhitelisted">Unwhitelisted</SelectItem>
+              <SelectItem value="revoked">Revoked</SelectItem>
             </SelectContent>
           </Select>
           <Select value={sortBy} onValueChange={setSortBy}>
@@ -743,6 +834,124 @@ export function MinecraftPlayersList() {
                 }}
                 disabled={!editPlayerData.minecraftUsername.trim() || editMutation.isPending}>
                 {editMutation.isPending ? "Updating..." : "Update Player"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unwhitelist Dialog */}
+      {showUnwhitelistDialog && unwhitelistingPlayer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-discord-primary border border-discord-secondary rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-white mb-4">Remove Player from Whitelist</h3>
+            <p className="text-discord-muted mb-4">
+              Are you sure you want to remove <span className="font-medium text-white">{unwhitelistingPlayer.minecraftUsername}</span> from the whitelist?
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="revocation-reason" className="text-sm font-medium text-discord-muted">
+                  Reason for Removal
+                </Label>
+                <Textarea
+                  id="revocation-reason"
+                  placeholder="Enter reason for removing this player (e.g., 'Left Discord server', 'Violation of rules', etc.)"
+                  value={revocationReason}
+                  onChange={(e) => setRevocationReason(e.target.value)}
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowUnwhitelistDialog(false);
+                  setUnwhitelistingPlayer(null);
+                  setRevocationReason("");
+                }}
+                disabled={whitelistMutation.isPending}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (unwhitelistingPlayer) {
+                    whitelistMutation.mutate({
+                      playerId: unwhitelistingPlayer._id,
+                      action: "unwhitelist",
+                      notes: "Removed from whitelist via dashboard",
+                      revocationReason: revocationReason.trim() || "No reason provided",
+                    });
+                    setShowUnwhitelistDialog(false);
+                    setUnwhitelistingPlayer(null);
+                    setRevocationReason("");
+                  }
+                }}
+                disabled={whitelistMutation.isPending}>
+                <XCircle className="h-4 w-4 mr-2" />
+                {whitelistMutation.isPending ? "Removing..." : "Remove from Whitelist"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Dialog */}
+      {showRejectDialog && rejectingPlayer && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-discord-primary border border-discord-secondary rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-white mb-4">Reject Player Application</h3>
+            <p className="text-discord-muted mb-4">
+              Are you sure you want to reject <span className="font-medium text-white">{rejectingPlayer.minecraftUsername}</span>'s application?
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="rejection-reason" className="text-sm font-medium text-discord-muted">
+                  Reason for Rejection
+                </Label>
+                <Textarea
+                  id="rejection-reason"
+                  placeholder="Enter reason for rejecting this application (e.g., 'Insufficient playtime', 'Does not meet requirements', etc.)"
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowRejectDialog(false);
+                  setRejectingPlayer(null);
+                  setRejectionReason("");
+                }}
+                disabled={rejectMutation.isPending}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (rejectingPlayer) {
+                    rejectMutation.mutate({
+                      playerId: rejectingPlayer._id,
+                      rejectionReason: rejectionReason.trim() || "No reason provided",
+                    });
+                    setShowRejectDialog(false);
+                    setRejectingPlayer(null);
+                    setRejectionReason("");
+                  }
+                }}
+                disabled={rejectMutation.isPending}>
+                <XCircle className="h-4 w-4 mr-2" />
+                {rejectMutation.isPending ? "Rejecting..." : "Reject Application"}
               </Button>
             </div>
           </div>

@@ -437,7 +437,31 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           );
         }
 
-        // No pending auth and not whitelisted - tell them to link account
+        // No pending auth and not whitelisted - check if explicitly rejected or unknown
+
+        // Check if player exists and has been explicitly rejected
+        if (player && player.rejectionReason) {
+          // Player exists but was rejected - use applicationRejectionMessage with custom reason
+          const rejectionMessage = config.applicationRejectionMessage
+            .replace(/{username}/g, username)
+            .replace(/{reason}/g, player.rejectionReason)
+            .replace(/{serverHost}/g, config.serverHost)
+            .replace(/{serverPort}/g, config.serverPort.toString());
+
+          return res.json(
+            createSuccessResponse(
+              {
+                shouldBeWhitelisted: false,
+                hasAuth: false,
+                action: "kick_with_message",
+                kickMessage: rejectionMessage,
+              },
+              req.requestId
+            )
+          );
+        }
+
+        // Player doesn't exist or exists but no rejection reason - tell them to start linking process
         const kickMessage = config.authRejectionMessage
           .replace(/{username}/g, username)
           .replace(/{serverHost}/g, config.serverHost)
@@ -657,14 +681,18 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
       let query: any = { guildId };
 
       if (status && status !== "all") {
-        // Convert old status-based filtering to date-based logic
+        // Convert status-based filtering to date-based logic
         switch (status) {
           case "whitelisted":
             query.whitelistedAt = { $ne: null };
+            query.revokedAt = null; // Ensure not revoked
+            break;
+          case "revoked":
+            query.revokedAt = { $ne: null };
             break;
           case "pending":
-            query.confirmedAt = { $ne: null };
-            query.linkedAt = null;
+            query.whitelistedAt = null;
+            query.revokedAt = null;
             break;
           case "linked":
             query.linkedAt = { $ne: null };
@@ -686,7 +714,11 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         ];
       }
 
-      const { data: players, error } = await tryCatch(MinecraftPlayer.find(query).lean());
+      const { data: players, error } = await tryCatch(
+        MinecraftPlayer.find(query).transform((docs) =>
+          docs.map((doc) => doc.toObject({ virtuals: true }))
+        )
+      );
 
       if (error) {
         log.error("Failed to fetch minecraft players:", error);
@@ -1066,7 +1098,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
     requireScope("modmail:write"),
     asyncHandler(async (req, res) => {
       const { guildId, playerId } = req.params;
-      const { notes } = req.body;
+      const { notes, revocationReason } = req.body;
       const staffMemberId = req.body.staffMemberId;
 
       const { data: player, error } = await tryCatch(
@@ -1076,6 +1108,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             whitelistedAt: null, // Remove whitelist date
             revokedAt: new Date(),
             revokedBy: staffMemberId,
+            revocationReason: revocationReason || "Removed via dashboard",
             notes: notes || undefined,
           },
           { upsert: false, new: true }
@@ -1093,7 +1126,65 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         return res.status(404).json(createErrorResponse("Player not found", 404, req.requestId));
       }
 
-      log.info(`Unwhitelisted player: ${player.minecraftUsername}`);
+      log.info(
+        `Unwhitelisted player: ${player.minecraftUsername} (Reason: ${
+          revocationReason || "Not specified"
+        })`
+      );
+
+      return res.json(createSuccessResponse(player, req.requestId));
+    })
+  );
+
+  /**
+   * POST /api/minecraft/:guildId/players/:playerId/reject
+   * Reject a player's application with a custom reason
+   */
+  router.post(
+    "/:guildId/players/:playerId/reject",
+    authenticateApiKey,
+    requireScope("modmail:write"),
+    asyncHandler(async (req, res) => {
+      const { guildId, playerId } = req.params;
+      const { rejectionReason, notes } = req.body;
+      const staffMemberId = req.body.staffMemberId;
+
+      if (
+        !rejectionReason ||
+        typeof rejectionReason !== "string" ||
+        rejectionReason.trim().length === 0
+      ) {
+        return res
+          .status(400)
+          .json(createErrorResponse("Rejection reason is required", 400, req.requestId));
+      }
+
+      const { data: player, error } = await tryCatch(
+        MinecraftPlayer.findOneAndUpdate(
+          { _id: playerId, guildId },
+          {
+            rejectionReason: rejectionReason.trim(),
+            whitelistedAt: null, // Ensure not whitelisted
+            revokedAt: new Date(), // Mark as rejected
+            revokedBy: staffMemberId,
+            notes: notes || undefined,
+          },
+          { upsert: false, new: true }
+        )
+      );
+
+      if (error) {
+        log.error("Failed to reject player:", error);
+        return res
+          .status(500)
+          .json(createErrorResponse("Failed to reject player", 500, req.requestId));
+      }
+
+      if (!player) {
+        return res.status(404).json(createErrorResponse("Player not found", 404, req.requestId));
+      }
+
+      log.info(`Rejected player: ${player.minecraftUsername} (Reason: ${rejectionReason})`);
 
       return res.json(createSuccessResponse(player, req.requestId));
     })

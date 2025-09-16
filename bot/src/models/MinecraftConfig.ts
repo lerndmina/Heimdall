@@ -26,6 +26,7 @@ export interface MinecraftConfigType extends Document {
   // Messages
   authSuccessMessage: string;
   authRejectionMessage: string;
+  applicationRejectionMessage: string;
   whitelistSuccessMessage: string;
 
   // Timestamps
@@ -125,6 +126,11 @@ const MinecraftConfigSchema = new Schema<MinecraftConfigType>(
       type: String,
       default:
         "§cTo join this server:\n§7• Join the Discord server\n§7• Use §f/link-minecraft {username}\n§7• Follow the instructions to link your account",
+    },
+    applicationRejectionMessage: {
+      type: String,
+      default:
+        "§cYour whitelist application has been rejected.\n§7Please contact staff for more information.",
     },
     whitelistSuccessMessage: {
       type: String,

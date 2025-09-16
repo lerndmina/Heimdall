@@ -26,6 +26,7 @@ interface MinecraftConfig {
   autoWhitelist: boolean;
   authSuccessMessage: string;
   authRejectionMessage: string;
+  applicationRejectionMessage: string;
   whitelistSuccessMessage: string;
   updatedAt?: string;
   createdAt?: string;
@@ -41,7 +42,8 @@ const defaultConfig: Partial<MinecraftConfig> = {
   allowUsernameChange: true,
   autoWhitelist: false,
   authSuccessMessage: "✅ Your Minecraft account has been successfully linked! You can now join the server.",
-  authRejectionMessage: "❌ Your whitelist application has been rejected. Please contact staff for more information.",
+  authRejectionMessage: "❌ To join this server:\n• Join the Discord server\n• Use /link-minecraft {username}\n• Follow the instructions to link your account",
+  applicationRejectionMessage: "❌ Your whitelist application has been rejected. Please contact staff for more information.",
   whitelistSuccessMessage: "🎉 You have been whitelisted! You can now join the Minecraft server.",
 };
 
@@ -326,6 +328,22 @@ export function MinecraftConfig() {
               placeholder="Message shown when player needs to link account"
               disabled={!config.enabled}
             />
+            <p className="text-xs text-muted-foreground">Shown to players who don't have an account yet. Use {"{username}"} for username placeholder.</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="applicationRejectionMessage">Application Rejection Message</Label>
+            <Textarea
+              id="applicationRejectionMessage"
+              value={config.applicationRejectionMessage}
+              onChange={(e) => handleInputChange("applicationRejectionMessage", e.target.value)}
+              rows={2}
+              placeholder="Message shown when player's application is rejected"
+              disabled={!config.enabled}
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown to players who have been explicitly rejected. Use {"{username}"} and {"{reason}"} for placeholders.
+            </p>
           </div>
 
           <div className="space-y-2">
