@@ -99,6 +99,38 @@ public class WhitelistManager {
     }
   }
 
+  public String requestLinkCode(String username, String uuid) throws Exception {
+    // Validate input parameters
+    if (username == null || username.trim().isEmpty()) {
+      throw new IllegalArgumentException("Username cannot be null or empty");
+    }
+    if (uuid == null || uuid.trim().isEmpty()) {
+      throw new IllegalArgumentException("UUID cannot be null or empty");
+    }
+
+    // Make API request for link code
+    try {
+      WhitelistResponse response = apiClient.requestLinkCode(username, uuid).get(
+          plugin.getConfig().getInt("api.timeout", 5000) + 1000, // Add 1 second buffer
+          TimeUnit.MILLISECONDS);
+
+      // Update last check time
+      lastCheckTime = dateFormat.format(new Date());
+
+      // Extract auth code from response
+      if (response.getAuthCode() != null && !response.getAuthCode().isEmpty()) {
+        return response.getAuthCode();
+      } else {
+        throw new Exception("No auth code received from API");
+      }
+
+    } catch (Exception e) {
+      plugin.getLogger().log(Level.SEVERE, "Failed to request link code for " + username, e);
+      lastCheckTime = dateFormat.format(new Date()) + " (ERROR)";
+      throw e;
+    }
+  }
+
   private void startCacheCleanupTask() {
     // Run cache cleanup every 5 minutes
     plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin, () -> {

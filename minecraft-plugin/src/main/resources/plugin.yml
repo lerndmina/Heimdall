@@ -12,6 +12,11 @@ commands:
     usage: /hwl <reload|status|test>
     permission: heimdall.admin
     aliases: [heimdallwhitelist]
+  linkdiscord:
+    description: Link your Minecraft account to Discord
+    usage: /linkdiscord
+    permission: heimdall.linkdiscord
+    aliases: [link]
 
 permissions:
   heimdall.admin:
@@ -20,3 +25,6 @@ permissions:
   heimdall.bypass:
     description: Bypass whitelist checks
     default: op
+  heimdall.linkdiscord:
+    description: Link Minecraft account to Discord
+    default: true

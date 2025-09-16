@@ -5,12 +5,19 @@ public class WhitelistResponse {
   private final boolean hasAuth;
   private final String kickMessage;
   private final String action;
+  private final String authCode;
 
   public WhitelistResponse(boolean shouldBeWhitelisted, boolean hasAuth, String kickMessage, String action) {
+    this(shouldBeWhitelisted, hasAuth, kickMessage, action, null);
+  }
+
+  public WhitelistResponse(boolean shouldBeWhitelisted, boolean hasAuth, String kickMessage, String action,
+      String authCode) {
     this.shouldBeWhitelisted = shouldBeWhitelisted;
     this.hasAuth = hasAuth;
     this.kickMessage = kickMessage;
     this.action = action;
+    this.authCode = authCode;
   }
 
   public boolean shouldBeWhitelisted() {
@@ -29,6 +36,10 @@ public class WhitelistResponse {
     return action;
   }
 
+  public String getAuthCode() {
+    return authCode;
+  }
+
   @Override
   public String toString() {
     return "WhitelistResponse{" +
@@ -36,6 +47,7 @@ public class WhitelistResponse {
         ", hasAuth=" + hasAuth +
         ", kickMessage='" + kickMessage + '\'' +
         ", action='" + action + '\'' +
+        ", authCode='" + authCode + '\'' +
         '}';
   }
 }

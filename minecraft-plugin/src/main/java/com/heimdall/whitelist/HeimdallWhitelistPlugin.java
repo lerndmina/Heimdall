@@ -89,7 +89,13 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
 
   @Override
   public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-    if (!command.getName().equalsIgnoreCase("hwl")) {
+    String commandName = command.getName().toLowerCase();
+
+    if (commandName.equalsIgnoreCase("linkdiscord")) {
+      return handleLinkDiscordCommand(sender, args);
+    }
+
+    if (!commandName.equalsIgnoreCase("hwl")) {
       return false;
     }
 
@@ -242,5 +248,91 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
 
   public WhitelistCache getWhitelistCache() {
     return whitelistCache;
+  }
+
+  private boolean handleLinkDiscordCommand(CommandSender sender, String[] args) {
+    if (!(sender instanceof Player)) {
+      sender.sendMessage(ChatColor.RED + "This command can only be used by players!");
+      return true;
+    }
+
+    if (!sender.hasPermission("heimdall.linkdiscord")) {
+      sender.sendMessage(ChatColor.RED + "You don't have permission to use this command!");
+      return true;
+    }
+
+    Player player = (Player) sender;
+    String username = player.getName().toLowerCase();
+    String uuid = player.getUniqueId().toString();
+
+    // Check if plugin is enabled
+    if (!getConfig().getBoolean("enabled", false)) {
+      sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+          "§cWhitelist system is currently disabled. Please contact an administrator."));
+      return true;
+    }
+
+    // Rate limiting check - simple cooldown per player
+    long currentTime = System.currentTimeMillis();
+    String cooldownKey = "linkdiscord_cooldown_" + uuid;
+    long lastUsed = getConfig().getLong("cooldowns." + cooldownKey, 0);
+    long cooldownTime = 30000; // 30 seconds cooldown
+
+    // Allow bypass for staff
+    if (!player.hasPermission("heimdall.bypass") && (currentTime - lastUsed) < cooldownTime) {
+      long remainingSeconds = (cooldownTime - (currentTime - lastUsed)) / 1000;
+      sender.sendMessage(ChatColor.translateAlternateColorCodes('&',
+          "§cPlease wait " + remainingSeconds + " seconds before using this command again."));
+      return true;
+    }
+
+    // Set cooldown
+    getConfig().set("cooldowns." + cooldownKey, currentTime);
+
+    // Show loading message
+    sender.sendMessage(ChatColor.translateAlternateColorCodes('&', "§eRequesting Discord link code..."));
+
+    // Make API call asynchronously
+    getServer().getScheduler().runTaskAsynchronously(this, () -> {
+      try {
+        String authCode = whitelistManager.requestLinkCode(username, uuid);
+
+        // Display result on main thread
+        getServer().getScheduler().runTask(this, () -> {
+          StringBuilder borderBuilder = new StringBuilder();
+          for (int i = 0; i < 50; i++) {
+            borderBuilder.append("=");
+          }
+          String border = ChatColor.GREEN + borderBuilder.toString();
+          player.sendMessage(border);
+          player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+              "§eYour Discord Link Code: §a§l" + authCode));
+          player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+              "§7Go to Discord and use: §f/confirm-code " + authCode));
+          player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+              "§7This code expires in 5 minutes"));
+          player.sendMessage(border);
+        });
+      } catch (Exception e) {
+        // Handle errors on main thread
+        getServer().getScheduler().runTask(this, () -> {
+          String errorMessage = e.getMessage();
+          if (errorMessage != null && errorMessage.contains("No linkable account")) {
+            player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                "§cYou don't have a linkable account. You may already be linked to Discord, or you're not whitelisted on this server."));
+          } else if (errorMessage != null && errorMessage.contains("API")) {
+            player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                "§cFailed to generate link code (Error: " + errorMessage
+                    + "). Please try again in a moment or contact staff if this persists."));
+          } else {
+            player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                "§cFailed to generate link code. Please try again or contact staff if this persists."));
+          }
+          getLogger().warning("Link code generation failed for " + username + ": " + e.getMessage());
+        });
+      }
+    });
+
+    return true;
   }
 }
