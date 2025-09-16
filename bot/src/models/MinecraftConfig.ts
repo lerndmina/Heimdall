@@ -26,8 +26,8 @@ export interface MinecraftConfigType extends Document {
   // Messages
   authSuccessMessage: string;
   authRejectionMessage: string;
+  authPendingMessage: string;
   applicationRejectionMessage: string;
-  whitelistSuccessMessage: string;
 
   // Timestamps
   createdAt: Date;
@@ -127,14 +127,15 @@ const MinecraftConfigSchema = new Schema<MinecraftConfigType>(
       default:
         "§cTo join this server:\n§7• Join the Discord server\n§7• Use §f/link-minecraft {username}\n§7• Follow the instructions to link your account",
     },
+    authPendingMessage: {
+      type: String,
+      default:
+        "§eYour account is linked and waiting for staff approval.\n§7Please be patient while staff review your request.\n§7You will be automatically whitelisted once approved.",
+    },
     applicationRejectionMessage: {
       type: String,
       default:
         "§cYour whitelist application has been rejected.\n§7Please contact staff for more information.",
-    },
-    whitelistSuccessMessage: {
-      type: String,
-      default: "§aYou've been whitelisted! Please rejoin the server.",
     },
   },
   {

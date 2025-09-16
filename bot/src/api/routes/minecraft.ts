@@ -386,14 +386,18 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         if (pendingAuth) {
           // If code is confirmed, they're waiting for staff approval
           if (pendingAuth.confirmedAt && !pendingAuth.linkedAt) {
+            const pendingMessage = config.authPendingMessage
+              .replace(/{username}/g, username)
+              .replace(/{serverHost}/g, config.serverHost)
+              .replace(/{serverPort}/g, config.serverPort.toString());
+
             return res.json(
               createSuccessResponse(
                 {
                   shouldBeWhitelisted: false,
                   hasAuth: true,
                   action: "kick_with_message",
-                  kickMessage:
-                    "§eYour account is linked and waiting for staff approval.\n§7Please be patient while staff review your request.\n§7You will be automatically whitelisted once approved.",
+                  kickMessage: pendingMessage,
                 },
                 req.requestId
               )

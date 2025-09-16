@@ -26,8 +26,8 @@ interface MinecraftConfig {
   autoWhitelist: boolean;
   authSuccessMessage: string;
   authRejectionMessage: string;
+  authPendingMessage: string;
   applicationRejectionMessage: string;
-  whitelistSuccessMessage: string;
   updatedAt?: string;
   createdAt?: string;
 }
@@ -43,8 +43,8 @@ const defaultConfig: Partial<MinecraftConfig> = {
   autoWhitelist: false,
   authSuccessMessage: "✅ Your Minecraft account has been successfully linked! You can now join the server.",
   authRejectionMessage: "❌ To join this server:\n• Join the Discord server\n• Use /link-minecraft {username}\n• Follow the instructions to link your account",
+  authPendingMessage: "⏳ Your account is linked and waiting for staff approval.\nPlease be patient while staff review your request.\nYou will be automatically whitelisted once approved.",
   applicationRejectionMessage: "❌ Your whitelist application has been rejected. Please contact staff for more information.",
-  whitelistSuccessMessage: "🎉 You have been whitelisted! You can now join the Minecraft server.",
 };
 
 export function MinecraftConfig() {
@@ -347,15 +347,16 @@ export function MinecraftConfig() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="whitelistSuccessMessage">Whitelist Success Message</Label>
+            <Label htmlFor="authPendingMessage">Pending Approval Message</Label>
             <Textarea
-              id="whitelistSuccessMessage"
-              value={config.whitelistSuccessMessage}
-              onChange={(e) => handleInputChange("whitelistSuccessMessage", e.target.value)}
-              rows={2}
-              placeholder="Message shown when player has been whitelisted"
+              id="authPendingMessage"
+              value={config.authPendingMessage}
+              onChange={(e) => handleInputChange("authPendingMessage", e.target.value)}
+              rows={3}
+              placeholder="Message shown when player is linked but waiting for staff approval"
               disabled={!config.enabled}
             />
+            <p className="text-sm text-muted-foreground">Shown to players who have linked their account but are waiting for staff approval. Use {"{username}"} for placeholder.</p>
           </div>
         </CardContent>
       </Card>
