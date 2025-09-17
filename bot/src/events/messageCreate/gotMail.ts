@@ -34,7 +34,6 @@ import { redisClient, removeMentions, waitingEmoji } from "../../Bot";
 import {
   createCloseThreadButton,
   createModmailActionButtons,
-  sendModmailCloseMessage,
   createModmailThread,
 } from "../../utils/ModmailUtils";
 import {
@@ -148,54 +147,42 @@ async function handleDM(message: Message, client: Client<true>, user: User) {
     // Send the final message first
     await sendMessage(mail, message, finalContent || "", client);
 
-    // Then close the thread using the same logic as the closeModmail command
-    const getter = new ThingGetter(client);
-    const closedBy = "User";
-    const closedByName = user.username;
-    const reason = "Closed by user with final message";
-    const forumThread = (await getter.getChannel(mail.forumThreadId)) as ThreadChannel;
-
-    // Send closure message
-    await sendModmailCloseMessage(client, mail, closedBy, closedByName, reason);
-
-    // Update tags and close thread
-    const config = await db.findOne(ModmailConfig, { guildId: mail.guildId });
-    if (config) {
-      const forumChannel = (await getter.getChannel(config.forumChannelId)) as ForumChannel;
-      await handleTag(null, config, db, forumThread, forumChannel);
-    }
-
-    try {
-      await forumThread.setLocked(true, `${closedBy} closed: ${reason}`);
-      await forumThread.setArchived(true, `${closedBy} closed: ${reason}`);
-    } catch (error) {
-      log.error("Failed to close thread:", error);
-    }
-
-    // Mark modmail as closed instead of deleting
-    await db.findOneAndUpdate(
-      Modmail,
-      { forumThreadId: forumThread.id },
-      {
-        isClosed: true,
-        closedAt: new Date(),
-        closedBy: user.id,
-        closedReason: reason,
-      }
+    // Then close the thread using the centralized close utility
+    const { closeModmailThreadSafe } = await import("../../utils/modmail/ModmailThreads");
+    const { error: closeError } = await tryCatch(
+      closeModmailThreadSafe(client, {
+        threadId: mail.forumThreadId,
+        reason: "Closed by user with final message",
+        closedBy: {
+          type: "User",
+          username: user.username,
+          userId: user.id,
+        },
+        lockAndArchive: true,
+        sendCloseMessage: true,
+        updateTags: true,
+      })
     );
-    // Clean cache for both simple userId patterns and compound query patterns
-    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:userId:*`);
-    await db.cleanCache(`${env.MONGODB_DATABASE}:${env.MODMAIL_TABLE}:*userId:*`);
 
-    // Notify user
-    await message.reply({
-      embeds: [
-        ModmailEmbeds.threadClosed(
-          client,
-          "Your final message has been sent and the modmail thread has been closed."
-        ),
-      ],
-    });
+    if (closeError) {
+      log.error("Failed to close modmail thread:", closeError);
+    }
+
+    // Notify user of successful closure
+    const { error: notifyError } = await tryCatch(
+      message.reply({
+        embeds: [
+          ModmailEmbeds.threadClosed(
+            client,
+            "Your final message has been sent and the modmail thread has been closed."
+          ),
+        ],
+      })
+    );
+
+    if (notifyError) {
+      log.error("Failed to notify user of thread closure:", notifyError);
+    }
 
     return;
   }

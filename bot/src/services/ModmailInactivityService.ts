@@ -8,7 +8,6 @@ import {
   getInactivityWarningHours,
   getAutoCloseHours,
   formatTimeHours,
-  sendModmailCloseMessage,
 } from "../utils/ModmailUtils";
 import BasicEmbed from "../utils/BasicEmbed";
 import log from "../utils/log";
@@ -450,15 +449,12 @@ export class ModmailInactivityService {
       log.info(`Auto-closing inactive modmail ${modmail._id}`);
 
       const autoCloseHours = getAutoCloseHours(config);
-
-      // Send closure message using the consistent styling
       const reason = `Auto-closed due to ${formatTimeHours(
         autoCloseHours
       )} of inactivity after the warning was sent.`;
-      await sendModmailCloseMessage(this.client, modmail, "System", "Auto-Close System", reason);
 
-      // Close the modmail using existing close logic
-      await this.closeModmailThread(modmail, "Auto-closed due to inactivity");
+      // Close the modmail using existing close logic (this will send the close message)
+      await this.closeModmailThread(modmail, reason);
 
       log.info(`Successfully auto-closed modmail ${modmail._id}`);
     } catch (error) {
@@ -473,11 +469,9 @@ export class ModmailInactivityService {
     try {
       log.info(`Auto-closing resolved modmail ${modmail._id}`);
 
-      // Send closure message using the consistent styling
       const reason = "Auto-closed after 24 hours with no response to resolution";
-      await sendModmailCloseMessage(this.client, modmail, "System", "Auto-Close System", reason);
 
-      // Close the modmail using existing close logic
+      // Close the modmail using existing close logic (this will send the close message)
       await this.closeModmailThread(modmail, reason);
 
       log.info(`Successfully auto-closed resolved modmail ${modmail._id}`);

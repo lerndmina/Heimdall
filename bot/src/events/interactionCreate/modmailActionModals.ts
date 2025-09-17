@@ -13,7 +13,7 @@ import ModmailBanModel, { ModmailBanType } from "../../models/ModmailBans";
 import { ThingGetter, getDiscordDate, TimeType } from "../../utils/TinyUtils";
 import { tryCatch } from "../../utils/trycatch";
 import { handleTag } from "../messageCreate/gotMail";
-import { sendModmailCloseMessage, getModmailUserDisplayName } from "../../utils/ModmailUtils";
+import { getModmailUserDisplayName } from "../../utils/ModmailUtils";
 import BasicEmbed from "../../utils/BasicEmbed";
 import FetchEnvs from "../../utils/FetchEnvs";
 import ms from "ms";

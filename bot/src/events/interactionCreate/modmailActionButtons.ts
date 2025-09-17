@@ -16,7 +16,6 @@ import { handleTag } from "../messageCreate/gotMail";
 import FetchEnvs from "../../utils/FetchEnvs";
 import log from "../../utils/log";
 import {
-  sendModmailCloseMessage,
   sendMessageToBothChannels,
   markModmailAsResolved,
   getModmailUserDisplayName,
