@@ -109,6 +109,42 @@ export default async (message: Message, client: Client<true>) => {
         channelConfig.moderationCategories as ModerationCategory[]
       );
 
+      // Enhanced logging for threshold effectiveness monitoring
+      if (textResult.flagged) {
+        const flaggedCats = Object.entries(textResult.categories)
+          .filter(([_, isFlagged]) => isFlagged)
+          .map(([category]) => category);
+
+        const confidenceInfo = flaggedCats
+          .map((cat) => `${cat}:${textResult.categoryScores[cat]?.toFixed(3) || "N/A"}`)
+          .join(", ");
+
+        log.info(
+          `🚨 Custom thresholds triggered - Categories: [${confidenceInfo}] in #${message.channel.name}`
+        );
+      } else {
+        // Log cases where OpenAI flagged but our thresholds didn't (potential saved false positives)
+        const openAIFlags = Object.entries(
+          textResponse.results[0].categories as unknown as Record<string, boolean>
+        )
+          .filter(([_, flagged]) => flagged)
+          .map(([cat]) => cat);
+
+        if (openAIFlags.length > 0) {
+          const scores = openAIFlags
+            .map(
+              (cat) =>
+                `${cat}:${
+                  (textResponse.results[0].category_scores as any)[cat]?.toFixed(3) || "N/A"
+                }`
+            )
+            .join(", ");
+          log.debug(
+            `✅ Thresholds prevented false positive - OpenAI flagged: [${scores}] but below custom thresholds`
+          );
+        }
+      }
+
       if (textResult.flagged) {
         isContentFlagged = true;
 

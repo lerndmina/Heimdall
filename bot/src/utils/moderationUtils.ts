@@ -1,11 +1,13 @@
 import { ModerationCategory } from "../models/ModeratedChannels";
 import { Moderation, ModerationCreateResponse } from "openai/resources/moderations";
+import { applyCustomThresholds } from "./moderationThresholds";
 
 // Use the OpenAI SDK types directly
 export type OpenAIModerationResult = ModerationCreateResponse;
 
 /**
- * Process the moderation results from OpenAI
+ * Process the moderation results from OpenAI using custom optimized thresholds
+ * This replaces OpenAI's binary flagging with our data-driven thresholds
  */
 export function processModerationResult(
   moderationResult: OpenAIModerationResult,
@@ -17,31 +19,28 @@ export function processModerationResult(
 } {
   const result = moderationResult.results[0];
 
-  // Filter to only include enabled categories
+  // Get the raw confidence scores from OpenAI
+  const rawScores = result.category_scores as unknown as Record<string, number>;
+
+  // Apply our custom thresholds instead of using OpenAI's binary flags
+  const thresholdResult = applyCustomThresholds(rawScores, enabledCategories);
+
+  // Convert flagged categories array back to the expected format
   const categories: Record<string, boolean> = {};
   const categoryScores: Record<string, number> = {};
 
-  // Cast the OpenAI categories to a Record to allow string indexing
-  const resultCategories = result.categories as unknown as Record<string, boolean>;
-  const resultScores = result.category_scores as unknown as Record<string, number>;
-
   enabledCategories.forEach((category) => {
-    if (resultCategories[category] !== undefined) {
-      categories[category] = resultCategories[category];
-    }
-    if (resultScores[category] !== undefined) {
-      categoryScores[category] = resultScores[category];
+    // Set flagged status based on our custom thresholds
+    categories[category] = thresholdResult.flaggedCategories.includes(category);
+
+    // Include confidence scores for all enabled categories
+    if (thresholdResult.confidenceScores[category] !== undefined) {
+      categoryScores[category] = thresholdResult.confidenceScores[category];
     }
   });
 
-  // Check if any enabled category is flagged
-  const categoryFlagged = Object.entries(categories).some(
-    ([category, isFlagged]) =>
-      enabledCategories.includes(category as ModerationCategory) && isFlagged
-  );
-
   return {
-    flagged: categoryFlagged,
+    flagged: thresholdResult.flagged,
     categories,
     categoryScores,
   };
