@@ -1,0 +1,20 @@
+{
+  "name": "heimdall-moderation-analysis",
+  "version": "1.0.0",
+  "description": "Temporary scripts for analyzing AI moderation reports",
+  "type": "module",
+  "scripts": {
+    "analyze": "bun run analyze-reports.ts",
+    "optimize": "bun run optimize-thresholds.ts",
+    "patterns": "bun run pattern-analysis.ts",
+    "all": "bun run analyze && bun run optimize && bun run patterns"
+  },
+  "dependencies": {
+    "mongoose": "^8.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
