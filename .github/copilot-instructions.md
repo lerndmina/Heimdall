@@ -1,6 +1,6 @@
 # Copilot Instructions for Heimdall
 
-This is a monorepo containing a Discord bot, web dashboard for modmail management, and a custom command handler package.
+This is a monorepo containing a Discord bot, web dashboard, and a custom command handler package.
 
 ## Project Structure
 
