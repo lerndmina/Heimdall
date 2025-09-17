@@ -45,6 +45,19 @@ interface CategoryAnalysis {
   expectedReduction: number;
   priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
   reasoning: string;
+  // New breakdown fields for multi-category analysis
+  singleCategoryReports: {
+    accepted: number;
+    ignored: number;
+    avgConfidenceAccepted: number;
+    avgConfidenceIgnored: number;
+  };
+  multiCategoryReports: {
+    acceptedAsPrimary: number;
+    ignored: number;
+    avgConfidenceAcceptedAsPrimary: number;
+    avgConfidenceIgnored: number;
+  };
 }
 
 interface OverallAnalysis {
@@ -107,9 +120,12 @@ function calculatePercentile(values: number[], percentile: number): number {
 
 async function analyzeCategoryPerformance(): Promise<CategoryAnalysis[]> {
   console.log("🔍 Analyzing category performance...");
+  console.log("📊 Accounting for multi-category reports and primary decision factors...");
 
-  const pipeline = [
+  // First, let's analyze single-category reports for cleaner data
+  const singleCategoryPipeline = [
     { $match: { status: { $in: ["accepted", "ignored"] } } },
+    { $match: { $expr: { $eq: [{ $size: "$flaggedCategories" }, 1] } } },
     { $unwind: "$flaggedCategories" },
     {
       $group: {
@@ -118,38 +134,135 @@ async function analyzeCategoryPerformance(): Promise<CategoryAnalysis[]> {
           $push: {
             status: "$status",
             confidence: { $objectToArray: "$confidenceScores" },
+            messageId: "$messageId",
           },
         },
       },
     },
   ];
 
-  const categoryData = await ModerationHit.aggregate(pipeline);
+  // Then analyze multi-category reports to identify primary decision factors
+  const multiCategoryPipeline = [
+    { $match: { status: { $in: ["accepted", "ignored"] } } },
+    { $match: { $expr: { $gt: [{ $size: "$flaggedCategories" }, 1] } } },
+    {
+      $project: {
+        status: 1,
+        flaggedCategories: 1,
+        confidenceScores: 1,
+        messageId: 1,
+        // Find the category with highest confidence score
+        maxConfidenceCategory: {
+          $arrayElemAt: [
+            {
+              $map: {
+                input: { $objectToArray: "$confidenceScores" },
+                as: "score",
+                in: {
+                  category: "$$score.k",
+                  confidence: "$$score.v",
+                },
+              },
+            },
+            {
+              $indexOfArray: [
+                {
+                  $map: {
+                    input: { $objectToArray: "$confidenceScores" },
+                    as: "score",
+                    in: "$$score.v",
+                  },
+                },
+                { $max: { $map: { input: { $objectToArray: "$confidenceScores" }, as: "score", in: "$$score.v" } } },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    { $unwind: "$flaggedCategories" },
+    {
+      $group: {
+        _id: "$flaggedCategories",
+        reports: {
+          $push: {
+            status: "$status",
+            confidence: { $objectToArray: "$confidenceScores" },
+            messageId: "$messageId",
+            maxConfidenceCategory: "$maxConfidenceCategory",
+            isLikelyPrimaryReason: {
+              $eq: ["$flaggedCategories", "$maxConfidenceCategory.category"],
+            },
+          },
+        },
+      },
+    },
+  ];
+
+  console.log("📈 Analyzing single-category reports...");
+  const singleCategoryData = await ModerationHit.aggregate(singleCategoryPipeline);
+
+  console.log("📊 Analyzing multi-category reports...");
+  const multiCategoryData = await ModerationHit.aggregate(multiCategoryPipeline);
+
   const analyses: CategoryAnalysis[] = [];
 
-  for (const catData of categoryData) {
-    const category = catData._id;
-    const reports = catData.reports;
+  // Combine single and multi-category data for each category
+  const allCategories = new Set([...singleCategoryData.map((d) => d._id), ...multiCategoryData.map((d) => d._id)]);
+
+  for (const category of allCategories) {
+    const singleCatData = singleCategoryData.find((d) => d._id === category);
+    const multiCatData = multiCategoryData.find((d) => d._id === category);
 
     // Extract confidence scores for this category
     const acceptedConfidences: number[] = [];
     const ignoredConfidences: number[] = [];
+    const singleCategoryAccepted: number[] = [];
+    const singleCategoryIgnored: number[] = [];
+    const primaryReasonAccepted: number[] = [];
+    const primaryReasonIgnored: number[] = [];
 
-    reports.forEach((report: any) => {
-      const confidenceEntry = report.confidence.find((c: any) => c.k === category);
-      const confidence = confidenceEntry ? confidenceEntry.v : 0;
+    // Process single-category reports
+    if (singleCatData) {
+      singleCatData.reports.forEach((report: any) => {
+        const confidenceEntry = report.confidence.find((c: any) => c.k === category);
+        const confidence = confidenceEntry ? confidenceEntry.v : 0;
 
-      if (report.status === "accepted") {
-        acceptedConfidences.push(confidence);
-      } else if (report.status === "ignored") {
-        ignoredConfidences.push(confidence);
-      }
-    });
+        if (report.status === "accepted") {
+          acceptedConfidences.push(confidence);
+          singleCategoryAccepted.push(confidence);
+        } else if (report.status === "ignored") {
+          ignoredConfidences.push(confidence);
+          singleCategoryIgnored.push(confidence);
+        }
+      });
+    }
+
+    // Process multi-category reports (only count if likely primary reason)
+    if (multiCatData) {
+      multiCatData.reports.forEach((report: any) => {
+        const confidenceEntry = report.confidence.find((c: any) => c.k === category);
+        const confidence = confidenceEntry ? confidenceEntry.v : 0;
+
+        // For accepted reports, only count if this was likely the primary reason
+        if (report.status === "accepted") {
+          if (report.isLikelyPrimaryReason) {
+            acceptedConfidences.push(confidence);
+            primaryReasonAccepted.push(confidence);
+          }
+          // If not primary reason, we don't count it for this category's analysis
+        } else if (report.status === "ignored") {
+          // For ignored reports, count all since the whole report was rejected
+          ignoredConfidences.push(confidence);
+          primaryReasonIgnored.push(confidence);
+        }
+      });
+    }
 
     const totalReports = acceptedConfidences.length + ignoredConfidences.length;
     const falsePositiveRate = (ignoredConfidences.length / totalReports) * 100;
 
-    if (totalReports < 5) continue; // Skip categories with too few reports
+    if (totalReports < 3) continue; // Skip categories with too few reports
 
     const avgAccepted = acceptedConfidences.length > 0 ? acceptedConfidences.reduce((a, b) => a + b, 0) / acceptedConfidences.length : 0;
     const avgIgnored = ignoredConfidences.length > 0 ? ignoredConfidences.reduce((a, b) => a + b, 0) / ignoredConfidences.length : 0;
@@ -167,7 +280,7 @@ async function analyzeCategoryPerformance(): Promise<CategoryAnalysis[]> {
 
     // Calculate expected reduction
     const wouldBeFiltered = ignoredConfidences.filter((c) => c < recommendedThreshold).length;
-    const expectedReduction = (wouldBeFiltered / ignoredConfidences.length) * 100;
+    const expectedReduction = ignoredConfidences.length > 0 ? (wouldBeFiltered / ignoredConfidences.length) * 100 : 0;
 
     // Determine priority
     let priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" = "LOW";
@@ -186,6 +299,12 @@ async function analyzeCategoryPerformance(): Promise<CategoryAnalysis[]> {
       reasoning = `${falsePositiveRate.toFixed(1)}% false positive rate - acceptable`;
     }
 
+    // Calculate breakdown statistics
+    const singleCatAvgAccepted = singleCategoryAccepted.length > 0 ? singleCategoryAccepted.reduce((a, b) => a + b, 0) / singleCategoryAccepted.length : 0;
+    const singleCatAvgIgnored = singleCategoryIgnored.length > 0 ? singleCategoryIgnored.reduce((a, b) => a + b, 0) / singleCategoryIgnored.length : 0;
+    const primaryAvgAccepted = primaryReasonAccepted.length > 0 ? primaryReasonAccepted.reduce((a, b) => a + b, 0) / primaryReasonAccepted.length : 0;
+    const primaryAvgIgnored = primaryReasonIgnored.length > 0 ? primaryReasonIgnored.reduce((a, b) => a + b, 0) / primaryReasonIgnored.length : 0;
+
     analyses.push({
       category,
       totalReports,
@@ -202,6 +321,18 @@ async function analyzeCategoryPerformance(): Promise<CategoryAnalysis[]> {
       expectedReduction: isNaN(expectedReduction) ? 0 : expectedReduction,
       priority,
       reasoning,
+      singleCategoryReports: {
+        accepted: singleCategoryAccepted.length,
+        ignored: singleCategoryIgnored.length,
+        avgConfidenceAccepted: singleCatAvgAccepted,
+        avgConfidenceIgnored: singleCatAvgIgnored,
+      },
+      multiCategoryReports: {
+        acceptedAsPrimary: primaryReasonAccepted.length,
+        ignored: primaryReasonIgnored.length,
+        avgConfidenceAcceptedAsPrimary: primaryAvgAccepted,
+        avgConfidenceIgnored: primaryAvgIgnored,
+      },
     });
   }
 
@@ -303,6 +434,10 @@ async function main() {
     analysis.categories.slice(0, 10).forEach((cat) => {
       console.log(`• ${cat.category}: ${cat.falsePositiveRate.toFixed(1)}% FP rate (${cat.ignoredReports}/${cat.totalReports}) - ${cat.priority} priority`);
       console.log(`  Current avg confidence: ${cat.avgConfidenceIgnored.toFixed(3)} (ignored) vs ${cat.avgConfidenceAccepted.toFixed(3)} (accepted)`);
+      console.log(`  📊 Single-category: ${cat.singleCategoryReports.accepted} accepted, ${cat.singleCategoryReports.ignored} ignored`);
+      console.log(`     Confidence: ${cat.singleCategoryReports.avgConfidenceAccepted.toFixed(3)} (accepted) vs ${cat.singleCategoryReports.avgConfidenceIgnored.toFixed(3)} (ignored)`);
+      console.log(`  🎯 Multi-category primary: ${cat.multiCategoryReports.acceptedAsPrimary} accepted, ${cat.multiCategoryReports.ignored} ignored`);
+      console.log(`     Confidence: ${cat.multiCategoryReports.avgConfidenceAcceptedAsPrimary.toFixed(3)} (primary) vs ${cat.multiCategoryReports.avgConfidenceIgnored.toFixed(3)} (ignored)`);
       console.log(`  Recommended threshold: ${cat.recommendedNewThreshold.toFixed(3)} (expected ${cat.expectedReduction.toFixed(1)}% reduction)`);
     });
 
