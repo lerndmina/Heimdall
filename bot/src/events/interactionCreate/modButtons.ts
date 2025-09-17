@@ -17,6 +17,9 @@ import { moderationEmbeds } from "../../services/moderationEmbeds";
 import { tryCatch } from "../../utils/trycatch";
 import { safeErrorResponse } from "../../utils/safeInteractionResponse";
 import { shouldProcessInteraction } from "../../utils/interactionGuard";
+import Database from "../../utils/data/database";
+import ModerationHit, { ModerationHitStatus } from "../../models/ModerationHit";
+import { ModerationAction } from "../../models/ModeratedChannels";
 
 export default async (
   interaction: ButtonInteraction,
@@ -126,6 +129,27 @@ export default async (
               });
             }
 
+            // Update the ModerationHit status in the database
+            try {
+              const db = new Database();
+              await db.findOneAndUpdate(
+                ModerationHit,
+                { messageId },
+                {
+                  status: ModerationHitStatus.ACCEPTED,
+                  moderatorId: interaction.user.id,
+                  moderatorActionAt: new Date(),
+                  actionTaken: ModerationAction.DELETE,
+                },
+                { upsert: false, new: true }
+              );
+              log.info(
+                `Updated ModerationHit ${messageId} status to ACCEPTED by ${interaction.user.tag}`
+              );
+            } catch (dbError) {
+              log.error(`Failed to update ModerationHit ${messageId} in database:`, dbError);
+            }
+
             await interaction.update({
               content: "Report marked as accepted. Taking action against the message.",
               components: [],
@@ -181,6 +205,8 @@ export default async (
 
         case "mod_ignore_confirm": {
           try {
+            const [messageId, channelId, userId] = args;
+
             // Get the original message with the report embed
             const originalMessage = await interaction.channel?.messages
               .fetch(interaction.message.reference?.messageId || interaction.message.id)
@@ -188,6 +214,36 @@ export default async (
                 log.warn(`Could not fetch original report message: ${error.message}`);
                 return null;
               });
+
+            // Update database status to ignored
+            if (originalMessage && originalMessage.embeds[0]) {
+              // Extract message link from embed to find the moderation hit
+              const embed = originalMessage.embeds[0];
+              const messageField = embed.fields?.find(
+                (field) =>
+                  field.name.toLowerCase().includes("message") &&
+                  field.value.includes("discord.com")
+              );
+
+              if (messageField) {
+                const messageLink = messageField.value.match(
+                  /https:\/\/discord\.com\/channels\/\d+\/\d+\/(\d+)/
+                );
+                if (messageLink) {
+                  const originalMessageId = messageLink[1];
+                  const db = new Database();
+                  await db.findOneAndUpdate(
+                    ModerationHit,
+                    { messageId: originalMessageId },
+                    { status: ModerationHitStatus.IGNORED },
+                    { upsert: false, new: true }
+                  );
+                  log.info(
+                    `Updated moderation hit status to ignored for message ${originalMessageId}`
+                  );
+                }
+              }
+            }
 
             // If we found the original message and it has embeds
             if (originalMessage && originalMessage.embeds[0]) {
