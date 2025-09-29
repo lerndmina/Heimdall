@@ -43,9 +43,25 @@ public class WhitelistManager {
       return cached.getResponse();
     }
 
+    // Get current groups for role sync
+    java.util.List<String> currentGroups = null;
+    if (uuid != null) {
+      try {
+        java.util.UUID playerUuid = java.util.UUID.fromString(uuid);
+        LuckPermsManager luckPermsManager = plugin.getLuckPermsManager();
+        if (luckPermsManager != null && luckPermsManager.isAvailable()) {
+          currentGroups = luckPermsManager.getPlayerGroups(playerUuid);
+        }
+      } catch (Exception e) {
+        if (plugin.getConfig().getBoolean("logging.debug", false)) {
+          plugin.getLogger().warning("Failed to get current groups for " + username + ": " + e.getMessage());
+        }
+      }
+    }
+
     // Make API request
     try {
-      WhitelistResponse response = apiClient.checkWhitelist(username, uuid, ip).get(
+      WhitelistResponse response = apiClient.checkWhitelist(username, uuid, ip, currentGroups).get(
           plugin.getConfig().getInt("api.timeout", 5000) + 1000, // Add 1 second buffer
           TimeUnit.MILLISECONDS);
 

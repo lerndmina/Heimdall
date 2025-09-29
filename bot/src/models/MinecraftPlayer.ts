@@ -37,6 +37,12 @@ export interface MinecraftPlayerType extends Document {
   source: "imported" | "linked" | "manual"; // How they got added
   notes?: string; // Staff notes
 
+  // Role sync tracking
+  lastDiscordRoles?: string[]; // Discord roles at last sync
+  lastMinecraftGroups?: string[]; // Minecraft groups at last login
+  lastRoleSyncAt?: Date;
+  roleSyncEnabled?: boolean; // per-player toggle
+
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -115,6 +121,12 @@ const MinecraftPlayerSchema = new Schema<MinecraftPlayerType>(
       default: "linked",
     },
     notes: { type: String },
+
+    // Role sync tracking
+    lastDiscordRoles: [{ type: String }],
+    lastMinecraftGroups: [{ type: String }],
+    lastRoleSyncAt: { type: Date },
+    roleSyncEnabled: { type: Boolean, default: true },
   },
   {
     timestamps: true,

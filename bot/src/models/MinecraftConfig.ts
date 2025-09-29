@@ -1,5 +1,12 @@
 import { Schema, model, Document } from "mongoose";
 
+export interface RoleMapping {
+  discordRoleId: string;
+  discordRoleName: string; // cached for display
+  minecraftGroup: string;
+  enabled: boolean;
+}
+
 export interface MinecraftConfigType extends Document {
   guildId: string;
   enabled: boolean;
@@ -22,6 +29,13 @@ export interface MinecraftConfigType extends Document {
   requireConfirmation: boolean;
   allowUsernameChange: boolean;
   autoWhitelist: boolean;
+
+  // Role sync settings
+  roleSync: {
+    enabled: boolean;
+    enableCaching: boolean; // toggle for whitelist caching
+    roleMappings: RoleMapping[];
+  };
 
   // Messages
   authSuccessMessage: string;
@@ -136,6 +150,38 @@ const MinecraftConfigSchema = new Schema<MinecraftConfigType>(
       type: String,
       default:
         "§cYour whitelist application has been rejected.\n§7Please contact staff for more information.",
+    },
+
+    // Role sync settings
+    roleSync: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      enableCaching: {
+        type: Boolean,
+        default: true,
+      },
+      roleMappings: [
+        {
+          discordRoleId: {
+            type: String,
+            required: true,
+          },
+          discordRoleName: {
+            type: String,
+            required: true,
+          },
+          minecraftGroup: {
+            type: String,
+            required: true,
+          },
+          enabled: {
+            type: Boolean,
+            default: true,
+          },
+        },
+      ],
     },
   },
   {

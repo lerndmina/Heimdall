@@ -30,6 +30,12 @@
       <id>papermc-repo</id>
       <url>https://papermc.io/repo/repository/maven-public/</url>
     </repository>
+
+    <!-- LuckPerms repository -->
+    <repository>
+      <id>luck-repo</id>
+      <url>https://repo.lucko.me/</url>
+    </repository>
   </repositories>
 
   <dependencies>
@@ -46,6 +52,14 @@
       <groupId>com.google.code.gson</groupId>
       <artifactId>gson</artifactId>
       <version>2.10.1</version>
+    </dependency>
+
+    <!-- LuckPerms API -->
+    <dependency>
+      <groupId>net.luckperms</groupId>
+      <artifactId>api</artifactId>
+      <version>5.4</version>
+      <scope>provided</scope>
     </dependency>
 
     <!-- JUnit for testing -->

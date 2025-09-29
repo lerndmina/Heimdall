@@ -2,6 +2,7 @@ package com.heimdall.whitelist;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -12,6 +13,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import java.util.List;
+import java.util.UUID;
 
 public class ApiClient {
 
@@ -46,6 +49,11 @@ public class ApiClient {
   }
 
   public CompletableFuture<WhitelistResponse> checkWhitelist(String username, String uuid, String ip) {
+    return checkWhitelist(username, uuid, ip, null);
+  }
+
+  public CompletableFuture<WhitelistResponse> checkWhitelist(String username, String uuid, String ip,
+      List<String> currentGroups) {
     return CompletableFuture.supplyAsync(() -> {
       // Validate input parameters
       if (username == null || username.trim().isEmpty()) {
@@ -63,6 +71,28 @@ public class ApiClient {
       requestBody.addProperty("ip", ip);
       requestBody.addProperty("serverIp", getServerIp());
       requestBody.addProperty("currentlyWhitelisted", isCurrentlyWhitelisted(normalizedUsername, uuid));
+
+      // Add current groups for role sync
+      JsonArray groupsArray = new JsonArray();
+      if (currentGroups != null) {
+        for (String group : currentGroups) {
+          groupsArray.add(group);
+        }
+      } else if (uuid != null) {
+        try {
+          UUID playerUuid = UUID.fromString(uuid);
+          LuckPermsManager luckPermsManager = plugin.getLuckPermsManager();
+          if (luckPermsManager != null && luckPermsManager.isAvailable()) {
+            List<String> groups = luckPermsManager.getPlayerGroups(playerUuid);
+            for (String group : groups) {
+              groupsArray.add(group);
+            }
+          }
+        } catch (Exception e) {
+          plugin.getLogger().warning("Failed to get current groups for role sync: " + e.getMessage());
+        }
+      }
+      requestBody.add("currentGroups", groupsArray);
 
       try {
         return makeRequest("/api/minecraft/connection-attempt", requestBody);
@@ -216,7 +246,25 @@ public class ApiClient {
     String kickMessage = data.get("kickMessage").getAsString();
     String action = data.get("action").getAsString();
 
-    return new WhitelistResponse(shouldBeWhitelisted, hasAuth, kickMessage, action);
+    // Parse role sync data if present
+    boolean roleSyncEnabled = false;
+    List<String> targetGroups = null;
+
+    if (data.has("roleSync") && data.get("roleSync").isJsonObject()) {
+      JsonObject roleSync = data.getAsJsonObject("roleSync");
+      roleSyncEnabled = roleSync.get("enabled").getAsBoolean();
+
+      if (roleSync.has("targetGroups") && roleSync.get("targetGroups").isJsonArray()) {
+        targetGroups = new java.util.ArrayList<>();
+        JsonArray groupsArray = roleSync.getAsJsonArray("targetGroups");
+        for (int i = 0; i < groupsArray.size(); i++) {
+          targetGroups.add(groupsArray.get(i).getAsString());
+        }
+      }
+    }
+
+    return new WhitelistResponse(shouldBeWhitelisted, hasAuth, kickMessage, action, null, roleSyncEnabled,
+        targetGroups);
   }
 
   private WhitelistResponse makeRequestForLinkCode(String endpoint, JsonObject requestBody) throws IOException {

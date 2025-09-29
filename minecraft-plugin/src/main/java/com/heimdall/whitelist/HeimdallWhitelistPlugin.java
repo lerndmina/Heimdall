@@ -14,6 +14,7 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
   private ConfigManager configManager;
   private WhitelistManager whitelistManager;
   private WhitelistCache whitelistCache;
+  private LuckPermsManager luckPermsManager;
   private int cacheCleanupTaskId = -1;
 
   @Override
@@ -25,6 +26,7 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
     configManager = new ConfigManager(this);
     apiClient = new ApiClient(this);
     whitelistManager = new WhitelistManager(this, apiClient);
+    luckPermsManager = new LuckPermsManager(this);
 
     // Initialize whitelist cache
     long cacheWindow = getConfig().getLong("cache.cacheWindow", 60);
@@ -334,5 +336,9 @@ public class HeimdallWhitelistPlugin extends JavaPlugin implements Listener {
     });
 
     return true;
+  }
+
+  public LuckPermsManager getLuckPermsManager() {
+    return luckPermsManager;
   }
 }

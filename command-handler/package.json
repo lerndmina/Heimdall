@@ -1,34 +1,32 @@
 {
   "name": "@heimdall/command-handler",
   "version": "1.0.0",
-  "description": "Custom Discord.js command handler with enhanced validation system",
+  "author": "",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "dependencies": {
+    "@heimdall/logger": "file:../logger"
   },
+  "devDependencies": {
+    "@types/node": "^20.19.14",
+    "discord.js": "14.22.1",
+    "typescript": "^5.9.2"
+  },
+  "description": "Custom Discord.js command handler with enhanced validation system",
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
   "keywords": [
     "discord",
     "discord.js",
     "command-handler",
     "bot"
   ],
-  "author": "",
   "license": "MIT",
-  "peerDependencies": {
-    "discord.js": "^14.21.0"
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "dependencies": {
-    "@heimdall/logger": "file:../logger"
-  },
-  "devDependencies": {
-    "@types/node": "^20.19.14",
-    "typescript": "^5.9.2"
-  },
-  "files": [
-    "dist/**/*",
-    "README.md"
-  ]
+  "types": "dist/index.d.ts"
 }

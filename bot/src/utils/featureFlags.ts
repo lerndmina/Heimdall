@@ -1,4 +1,4 @@
-import fetchEnvs from "../utils/fetchEnvs";
+import fetchEnvs from "../utils/FetchEnvs";
 
 /**
  * Utility to conditionally disable commands based on feature flags

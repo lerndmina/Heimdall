@@ -81,6 +81,26 @@ public class PlayerLoginListener implements Listener {
         // Only cache positive results so newly whitelisted players can join immediately
         plugin.getWhitelistCache().addWhitelistedPlayer(uuid, username);
 
+        // Apply role sync if enabled and target groups are provided
+        if (response.isRoleSyncEnabled() && response.getTargetGroups() != null
+            && !response.getTargetGroups().isEmpty()) {
+          // Schedule role sync for after the player has fully connected
+          plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            try {
+              java.util.UUID playerUuid = java.util.UUID.fromString(uuid);
+              LuckPermsManager luckPermsManager = plugin.getLuckPermsManager();
+              if (luckPermsManager != null && luckPermsManager.isAvailable()) {
+                luckPermsManager.setPlayerGroups(playerUuid, response.getTargetGroups());
+                if (plugin.getConfig().getBoolean("logging.debug", false)) {
+                  plugin.getLogger().info("Applied role sync for " + username + ": " + response.getTargetGroups());
+                }
+              }
+            } catch (Exception e) {
+              plugin.getLogger().warning("Failed to apply role sync for " + username + ": " + e.getMessage());
+            }
+          }, 40L); // 2 seconds delay to ensure player is fully connected
+        }
+
         // If the action is to show an auth code, we need to kick with the code
         if ("show_auth_code".equals(response.getAction())) {
           event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_WHITELIST,

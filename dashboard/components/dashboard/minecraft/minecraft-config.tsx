@@ -13,6 +13,13 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useRequireGuild } from "../use-require-guild";
 
+interface RoleMapping {
+  discordRoleId: string;
+  discordRoleName: string;
+  minecraftGroup: string;
+  enabled: boolean;
+}
+
 interface MinecraftConfig {
   _id?: string;
   guildId: string;
@@ -24,6 +31,11 @@ interface MinecraftConfig {
   requireConfirmation: boolean;
   allowUsernameChange: boolean;
   autoWhitelist: boolean;
+  roleSync: {
+    enabled: boolean;
+    enableCaching: boolean;
+    roleMappings: RoleMapping[];
+  };
   authSuccessMessage: string;
   authRejectionMessage: string;
   authPendingMessage: string;
@@ -41,6 +53,11 @@ const defaultConfig: Partial<MinecraftConfig> = {
   requireConfirmation: true,
   allowUsernameChange: true,
   autoWhitelist: false,
+  roleSync: {
+    enabled: false,
+    enableCaching: true,
+    roleMappings: [],
+  },
   authSuccessMessage: "✅ Your Minecraft account has been successfully linked! You can now join the server.",
   authRejectionMessage: "❌ To join this server:\n• Join the Discord server\n• Use /link-minecraft {username}\n• Follow the instructions to link your account",
   authPendingMessage: "⏳ Your account is linked and waiting for staff approval.\nPlease be patient while staff review your request.\nYou will be automatically whitelisted once approved.",
@@ -293,6 +310,137 @@ export function MinecraftConfig() {
               <Label htmlFor="autoWhitelist">Auto-whitelist approved players</Label>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Role Sync Settings */}
+      <Card className={config.enabled ? "" : "opacity-60"}>
+        <CardHeader>
+          <CardTitle>
+            Role Sync Settings
+            {!config.enabled && <span className="text-xs bg-yellow-200 dark:bg-yellow-800 px-2 py-1 rounded ml-2">Requires Integration Enabled</span>}
+          </CardTitle>
+          <CardDescription>Synchronize Discord roles with Minecraft server groups</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="roleSyncEnabled"
+              checked={config.roleSync.enabled}
+              onCheckedChange={(checked) => handleInputChange("roleSync", { ...config.roleSync, enabled: checked })}
+              disabled={!config.enabled}
+            />
+            <Label htmlFor="roleSyncEnabled">Enable Role Sync</Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="enableCaching"
+              checked={config.roleSync.enableCaching}
+              onCheckedChange={(checked) => handleInputChange("roleSync", { ...config.roleSync, enableCaching: checked })}
+              disabled={!config.enabled}
+            />
+            <Label htmlFor="enableCaching">Enable Whitelist Caching</Label>
+          </div>
+
+          {config.roleSync.enabled && (
+            <div className="space-y-4 p-4 border rounded-lg">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Discord Role → Minecraft Group Mappings</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newMapping: RoleMapping = {
+                      discordRoleId: "",
+                      discordRoleName: "",
+                      minecraftGroup: "",
+                      enabled: true,
+                    };
+                    handleInputChange("roleSync", {
+                      ...config.roleSync,
+                      roleMappings: [...config.roleSync.roleMappings, newMapping],
+                    });
+                  }}
+                  disabled={!config.enabled}>
+                  Add Mapping
+                </Button>
+              </div>
+
+              {config.roleSync.roleMappings.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No role mappings configured. Add a mapping to sync Discord roles with Minecraft groups.</p>
+              ) : (
+                <div className="space-y-2">
+                  {config.roleSync.roleMappings.map((mapping, index) => (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center p-2 border rounded">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Discord Role ID</Label>
+                        <Input
+                          placeholder="123456789012345678"
+                          value={mapping.discordRoleId}
+                          onChange={(e) => {
+                            const newMappings = [...config.roleSync.roleMappings];
+                            newMappings[index] = { ...mapping, discordRoleId: e.target.value };
+                            handleInputChange("roleSync", { ...config.roleSync, roleMappings: newMappings });
+                          }}
+                          disabled={!config.enabled}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Role Name (Display)</Label>
+                        <Input
+                          placeholder="VIP"
+                          value={mapping.discordRoleName}
+                          onChange={(e) => {
+                            const newMappings = [...config.roleSync.roleMappings];
+                            newMappings[index] = { ...mapping, discordRoleName: e.target.value };
+                            handleInputChange("roleSync", { ...config.roleSync, roleMappings: newMappings });
+                          }}
+                          disabled={!config.enabled}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Minecraft Group</Label>
+                        <Input
+                          placeholder="vip"
+                          value={mapping.minecraftGroup}
+                          onChange={(e) => {
+                            const newMappings = [...config.roleSync.roleMappings];
+                            newMappings[index] = { ...mapping, minecraftGroup: e.target.value };
+                            handleInputChange("roleSync", { ...config.roleSync, roleMappings: newMappings });
+                          }}
+                          disabled={!config.enabled}
+                        />
+                      </div>
+                      <div className="flex items-center justify-end space-x-2">
+                        <Switch
+                          checked={mapping.enabled}
+                          onCheckedChange={(checked) => {
+                            const newMappings = [...config.roleSync.roleMappings];
+                            newMappings[index] = { ...mapping, enabled: checked };
+                            handleInputChange("roleSync", { ...config.roleSync, roleMappings: newMappings });
+                          }}
+                          disabled={!config.enabled}
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            const newMappings = config.roleSync.roleMappings.filter((_, i) => i !== index);
+                            handleInputChange("roleSync", { ...config.roleSync, roleMappings: newMappings });
+                          }}
+                          disabled={!config.enabled}>
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

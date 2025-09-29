@@ -6,6 +6,7 @@ import log from "../../utils/log";
 import { createSuccessResponse, createErrorResponse } from "../utils/apiResponse";
 import { authenticateApiKey, requireScope } from "../middleware/auth";
 import { asyncHandler } from "../middleware/errorHandler";
+import RoleSyncService from "../../services/RoleSyncService";
 
 export function createMinecraftRoutes(client?: any, handler?: any): Router {
   const router = Router();
@@ -36,6 +37,7 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           ip,
           serverIp,
           currentlyWhitelisted = false,
+          currentGroups = [],
         } = req.body;
         const username = rawUsername?.toLowerCase(); // Normalize to lowercase
 
@@ -283,6 +285,16 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
         if (player && player.whitelistedAt && !player.revokedAt) {
           log.info(`Player ${username} is whitelisted, allowing connection`);
 
+          // Initialize role sync service
+          const roleSyncService = new RoleSyncService(res.locals.client);
+
+          // Calculate role sync if enabled
+          const roleSyncResult = await roleSyncService.calculateRoleSync(
+            guildId!,
+            player._id.toString(),
+            currentGroups
+          );
+
           // Update last connection attempt
           const { error: updateError } = await tryCatch(
             MinecraftPlayer.findOneAndUpdate(
@@ -296,17 +308,33 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
             log.warn("Failed to update last connection attempt:", updateError);
           }
 
-          return res.json(
-            createSuccessResponse(
-              {
-                shouldBeWhitelisted: true,
-                hasAuth: false,
-                action: "allow",
-                kickMessage: "", // No kick needed
-              },
-              req.requestId
-            )
-          );
+          // Log role sync operation if there were changes
+          if (roleSyncResult.operation) {
+            await RoleSyncService.logRoleSync(guildId!, roleSyncResult.operation);
+            log.info(
+              `Role sync calculated for ${username}: target groups [${roleSyncResult.targetGroups.join(
+                ", "
+              )}]`
+            );
+          }
+
+          // Prepare response with role sync data
+          const response: any = {
+            shouldBeWhitelisted: true,
+            hasAuth: false,
+            action: "allow",
+            kickMessage: "", // No kick needed
+          };
+
+          // Add role sync data if enabled
+          if (roleSyncResult.enabled) {
+            response.roleSync = {
+              enabled: true,
+              targetGroups: roleSyncResult.targetGroups,
+            };
+          }
+
+          return res.json(createSuccessResponse(response, req.requestId));
         }
 
         // Player doesn't exist or is unwhitelisted - check for pending auth
@@ -2080,6 +2108,85 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           {
             message: "Player created successfully",
             player: newPlayer,
+          },
+          req.requestId
+        )
+      );
+    })
+  );
+
+  /**
+   * GET /api/minecraft/:guildId/role-sync/logs
+   * Get role sync logs for a guild
+   */
+  router.get(
+    "/:guildId/role-sync/logs",
+    authenticateApiKey,
+    requireScope("minecraft:read"),
+    asyncHandler(async (req, res) => {
+      const { guildId } = req.params;
+      const { limit = 50, playerId } = req.query;
+
+      const logs = await RoleSyncService.getRoleSyncLogs(
+        guildId,
+        parseInt(limit as string) || 50,
+        playerId as string
+      );
+
+      return res.json(createSuccessResponse(logs, req.requestId));
+    })
+  );
+
+  /**
+   * POST /api/minecraft/:guildId/players/:playerId/role-sync
+   * Manually trigger role sync for a specific player
+   */
+  router.post(
+    "/:guildId/players/:playerId/role-sync",
+    authenticateApiKey,
+    requireScope("minecraft:admin"),
+    asyncHandler(async (req, res) => {
+      const { guildId, playerId } = req.params;
+
+      // Get player data
+      const { data: player, error: playerError } = await tryCatch(
+        MinecraftPlayer.findOne({ _id: playerId, guildId }).lean()
+      );
+
+      if (playerError || !player) {
+        return res.status(404).json(createErrorResponse("Player not found", 404, req.requestId));
+      }
+
+      if (!player.discordId) {
+        return res
+          .status(400)
+          .json(createErrorResponse("Player is not linked to Discord", 400, req.requestId));
+      }
+
+      // Initialize role sync service
+      const roleSyncService = new RoleSyncService(res.locals.client);
+
+      // Calculate role sync with empty current groups (manual sync)
+      const roleSyncResult = await roleSyncService.calculateRoleSync(guildId, playerId, []);
+
+      if (!roleSyncResult.enabled) {
+        return res
+          .status(400)
+          .json(createErrorResponse("Role sync is not enabled for this guild", 400, req.requestId));
+      }
+
+      // Log the manual sync operation
+      if (roleSyncResult.operation) {
+        roleSyncResult.operation.syncTrigger = "manual";
+        await RoleSyncService.logRoleSync(guildId, roleSyncResult.operation);
+      }
+
+      return res.json(
+        createSuccessResponse(
+          {
+            message: "Role sync calculated successfully",
+            targetGroups: roleSyncResult.targetGroups,
+            operation: roleSyncResult.operation,
           },
           req.requestId
         )
