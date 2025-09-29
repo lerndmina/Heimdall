@@ -36,6 +36,10 @@ interface MinecraftConfig {
     enableCaching: boolean;
     roleMappings: RoleMapping[];
   };
+  leaveRevocation?: {
+    enabled: boolean;
+    customMessage: string;
+  };
   authSuccessMessage: string;
   authRejectionMessage: string;
   authPendingMessage: string;
@@ -58,6 +62,10 @@ const defaultConfig: Partial<MinecraftConfig> = {
     enableCaching: true,
     roleMappings: [],
   },
+  leaveRevocation: {
+    enabled: false,
+    customMessage: "❌ Your whitelist has been revoked because you left the Discord server. Please rejoin Discord and contact staff to restore access.",
+  },
   authSuccessMessage: "✅ Your Minecraft account has been successfully linked! You can now join the server.",
   authRejectionMessage: "❌ To join this server:\n• Join the Discord server\n• Use /link-minecraft {username}\n• Follow the instructions to link your account",
   authPendingMessage: "⏳ Your account is linked and waiting for staff approval.\nPlease be patient while staff review your request.\nYou will be automatically whitelisted once approved.",
@@ -77,6 +85,10 @@ export function MinecraftConfig() {
       enabled: false,
       enableCaching: true,
       roleMappings: [],
+    },
+    leaveRevocation: {
+      enabled: false,
+      customMessage: "❌ Your whitelist has been revoked because you left the Discord server. Please rejoin Discord and contact staff to restore access.",
     },
   } as MinecraftConfig);
   const [hasChanges, setHasChanges] = useState(false);
@@ -119,6 +131,11 @@ export function MinecraftConfig() {
           enableCaching: true,
           roleMappings: [],
           ...(currentConfig.roleSync || {}),
+        },
+        leaveRevocation: {
+          enabled: false,
+          customMessage: "❌ Your whitelist has been revoked because you left the Discord server. Please rejoin Discord and contact staff to restore access.",
+          ...(currentConfig.leaveRevocation || {}),
         },
       };
       setConfig(safeConfig as MinecraftConfig);
@@ -458,6 +475,63 @@ export function MinecraftConfig() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Leave Revocation */}
+      <Card className={config.enabled ? "" : "opacity-60"}>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Settings className="h-5 w-5" />
+            <span>Leave Revocation</span>
+            {!config.enabled && <span className="text-xs bg-yellow-200 dark:bg-yellow-800 px-2 py-1 rounded ml-2">Requires Integration Enabled</span>}
+          </CardTitle>
+          <CardDescription>Automatically revoke whitelist when users leave Discord. Players who rejoin Discord will be automatically re-whitelisted.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="leaveRevocationEnabled"
+              checked={config.leaveRevocation?.enabled || false}
+              onCheckedChange={(checked) => handleInputChange("leaveRevocation", { ...config.leaveRevocation, enabled: checked })}
+              disabled={!config.enabled}
+            />
+            <Label htmlFor="leaveRevocationEnabled">Revoke whitelist when users leave Discord</Label>
+          </div>
+
+          {config.leaveRevocation?.enabled && (
+            <div className="space-y-2">
+              <Label htmlFor="leaveRevocationMessage">Custom Revocation Message</Label>
+              <Textarea
+                id="leaveRevocationMessage"
+                value={config.leaveRevocation?.customMessage || ""}
+                onChange={(e) => handleInputChange("leaveRevocation", { ...config.leaveRevocation, customMessage: e.target.value })}
+                rows={3}
+                placeholder="Message shown to revoked players when they try to connect"
+                disabled={!config.enabled}
+              />
+              <p className="text-sm text-muted-foreground">
+                This message will be shown to players who were revoked for leaving Discord when they try to reconnect. Available placeholders: {"{username}"}, {"{serverHost}"}, {"{serverPort}"}
+              </p>
+            </div>
+          )}
+
+          {config.leaveRevocation?.enabled && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start space-x-2">
+                <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100">How it works</h4>
+                  <ul className="text-sm text-blue-800 dark:text-blue-200 mt-1 space-y-1">
+                    <li>• When a user leaves Discord, their whitelist is immediately revoked</li>
+                    <li>• If they rejoin Discord, their whitelist is automatically restored</li>
+                    <li>• This only applies to players revoked for leaving - manual revocations require staff action</li>
+                    <li>• The custom message helps explain why they cannot connect</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>

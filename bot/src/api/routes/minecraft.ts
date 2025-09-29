@@ -473,13 +473,32 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
 
         // Check if player exists and has been revoked or rejected
         if (player && (player.revokedAt || player.rejectionReason)) {
-          // Player exists but was revoked/rejected - use applicationRejectionMessage
+          // Player exists but was revoked/rejected
           const reason = player.revocationReason || player.rejectionReason || "Access revoked";
-          const rejectionMessage = config.applicationRejectionMessage
-            .replace(/{username}/g, username)
-            .replace(/{reason}/g, reason)
-            .replace(/{serverHost}/g, config.serverHost)
-            .replace(/{serverPort}/g, config.serverPort.toString());
+
+          // Use custom leave message if player was revoked for leaving Discord
+          let rejectionMessage;
+          if (
+            player.revokedAt &&
+            player.revocationReason &&
+            player.revocationReason.toLowerCase().includes("left discord") &&
+            config.leaveRevocation?.enabled &&
+            config.leaveRevocation?.customMessage
+          ) {
+            // Use custom leave revocation message
+            rejectionMessage = config.leaveRevocation.customMessage
+              .replace(/{username}/g, username)
+              .replace(/{reason}/g, reason)
+              .replace(/{serverHost}/g, config.serverHost)
+              .replace(/{serverPort}/g, config.serverPort.toString());
+          } else {
+            // Use standard application rejection message
+            rejectionMessage = config.applicationRejectionMessage
+              .replace(/{username}/g, username)
+              .replace(/{reason}/g, reason)
+              .replace(/{serverHost}/g, config.serverHost)
+              .replace(/{serverPort}/g, config.serverPort.toString());
+          }
 
           return res.json(
             createSuccessResponse(
@@ -676,6 +695,11 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           enabled: false,
           enableCaching: true,
           roleMappings: [],
+        },
+        leaveRevocation: config.leaveRevocation || {
+          enabled: false,
+          customMessage:
+            "❌ Your whitelist has been revoked because you left the Discord server. Please rejoin Discord and contact staff to restore access.",
         },
         // Ensure other potentially missing fields have defaults
         authSuccessMessage:

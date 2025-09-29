@@ -37,6 +37,12 @@ export interface MinecraftConfigType extends Document {
     roleMappings: RoleMapping[];
   };
 
+  // Leave revocation settings
+  leaveRevocation?: {
+    enabled: boolean;
+    customMessage: string;
+  };
+
   // Messages
   authSuccessMessage: string;
   authRejectionMessage: string;
@@ -129,6 +135,19 @@ const MinecraftConfigSchema = new Schema<MinecraftConfigType>(
     autoWhitelist: {
       type: Boolean,
       default: false,
+    },
+
+    // Leave revocation settings
+    leaveRevocation: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      customMessage: {
+        type: String,
+        default:
+          "❌ Your whitelist has been revoked because you left the Discord server. Please rejoin Discord and contact staff to restore access.",
+      },
     },
 
     // Messages
