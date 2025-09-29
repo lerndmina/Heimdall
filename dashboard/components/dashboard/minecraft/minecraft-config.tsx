@@ -70,14 +70,14 @@ export function MinecraftConfig() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [config, setConfig] = useState<MinecraftConfig>({ 
-    ...defaultConfig, 
+  const [config, setConfig] = useState<MinecraftConfig>({
+    ...defaultConfig,
     guildId: "",
     roleSync: {
       enabled: false,
       enableCaching: true,
       roleMappings: [],
-    }
+    },
   } as MinecraftConfig);
   const [hasChanges, setHasChanges] = useState(false);
 

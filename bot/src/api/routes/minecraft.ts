@@ -678,10 +678,18 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           roleMappings: [],
         },
         // Ensure other potentially missing fields have defaults
-        authSuccessMessage: config.authSuccessMessage || "✅ Your Minecraft account has been successfully linked! You can now join the server.",
-        authRejectionMessage: config.authRejectionMessage || "❌ To join this server:\n• Join the Discord server\n• Use /link-minecraft {username}\n• Follow the instructions to link your account",
-        authPendingMessage: config.authPendingMessage || "⏳ Your account is linked and waiting for staff approval.\nPlease be patient while staff review your request.\nYou will be automatically whitelisted once approved.",
-        applicationRejectionMessage: config.applicationRejectionMessage || "❌ Your whitelist application has been rejected. Please contact staff for more information.",
+        authSuccessMessage:
+          config.authSuccessMessage ||
+          "✅ Your Minecraft account has been successfully linked! You can now join the server.",
+        authRejectionMessage:
+          config.authRejectionMessage ||
+          "❌ To join this server:\n• Join the Discord server\n• Use /link-minecraft {username}\n• Follow the instructions to link your account",
+        authPendingMessage:
+          config.authPendingMessage ||
+          "⏳ Your account is linked and waiting for staff approval.\nPlease be patient while staff review your request.\nYou will be automatically whitelisted once approved.",
+        applicationRejectionMessage:
+          config.applicationRejectionMessage ||
+          "❌ Your whitelist application has been rejected. Please contact staff for more information.",
       };
 
       return res.json(createSuccessResponse(completeConfig, req.requestId));
