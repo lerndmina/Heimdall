@@ -70,7 +70,15 @@ export function MinecraftConfig() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [config, setConfig] = useState<MinecraftConfig>({ ...defaultConfig, guildId: "" } as MinecraftConfig);
+  const [config, setConfig] = useState<MinecraftConfig>({ 
+    ...defaultConfig, 
+    guildId: "",
+    roleSync: {
+      enabled: false,
+      enableCaching: true,
+      roleMappings: [],
+    }
+  } as MinecraftConfig);
   const [hasChanges, setHasChanges] = useState(false);
 
   // Fetch current config
@@ -102,7 +110,18 @@ export function MinecraftConfig() {
   // Update form when data loads
   useEffect(() => {
     if (currentConfig) {
-      setConfig(currentConfig);
+      // Ensure nested objects exist with defaults for backward compatibility
+      const safeConfig = {
+        ...defaultConfig,
+        ...currentConfig,
+        roleSync: {
+          enabled: false,
+          enableCaching: true,
+          roleMappings: [],
+          ...(currentConfig.roleSync || {}),
+        },
+      };
+      setConfig(safeConfig as MinecraftConfig);
       setHasChanges(false);
     }
   }, [currentConfig]);
