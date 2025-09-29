@@ -14,19 +14,24 @@ public class PlayerJoinLeaveListener implements Listener {
 
   @EventHandler
   public void onPlayerJoin(PlayerJoinEvent event) {
-    // Player successfully joined, extend their cache
-    String uuid = event.getPlayer().getUniqueId().toString();
-    String username = event.getPlayer().getName();
+    // Player successfully joined, extend their cache if caching is enabled
+    if (plugin.getConfig().getBoolean("cache.enabled", true)) {
+      String uuid = event.getPlayer().getUniqueId().toString();
+      String username = event.getPlayer().getName();
 
-    plugin.getWhitelistCache().extendCacheOnJoin(uuid, username);
+      plugin.getWhitelistCache().extendCacheOnJoin(uuid, username);
+    }
   }
 
   @EventHandler
   public void onPlayerQuit(PlayerQuitEvent event) {
-    // Player left, extend their cache since they were clearly allowed to play
-    String uuid = event.getPlayer().getUniqueId().toString();
-    String username = event.getPlayer().getName();
+    // Player left, extend their cache since they were clearly allowed to play (if
+    // caching is enabled)
+    if (plugin.getConfig().getBoolean("cache.enabled", true)) {
+      String uuid = event.getPlayer().getUniqueId().toString();
+      String username = event.getPlayer().getName();
 
-    plugin.getWhitelistCache().extendCacheOnLeave(uuid, username);
+      plugin.getWhitelistCache().extendCacheOnLeave(uuid, username);
+    }
   }
 }

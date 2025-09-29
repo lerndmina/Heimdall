@@ -50,19 +50,27 @@ public class PlayerLoginListener implements Listener {
       plugin.getLogger().info("Checking whitelist for " + username + " (" + uuid + ") from " + ip);
     }
 
-    // First check cache (only for positive results)
-    Boolean cachedResult = plugin.getWhitelistCache().isCachedWhitelisted(uuid, username);
-    if (cachedResult != null && cachedResult) {
-      if (plugin.getConfig().getBoolean("logging.debug", false)) {
-        plugin.getLogger().info("Cache hit for " + username + ": allowing based on cache");
+    // Check cache only if caching is enabled
+    boolean cacheEnabled = plugin.getConfig().getBoolean("cache.enabled", true);
+    Boolean cachedResult = null;
+
+    if (cacheEnabled) {
+      // First check cache (only for positive results)
+      cachedResult = plugin.getWhitelistCache().isCachedWhitelisted(uuid, username);
+      if (cachedResult != null && cachedResult) {
+        if (plugin.getConfig().getBoolean("logging.debug", false)) {
+          plugin.getLogger().info("Cache hit for " + username + ": allowing based on cache");
+        }
+        // Player is cached as whitelisted - let the event proceed naturally
+        return;
       }
-      // Player is cached as whitelisted - let the event proceed naturally
-      return;
     }
 
-    // Cache miss or no positive cache - check with API
+    // Cache miss/disabled or no positive cache - check with API
     if (plugin.getConfig().getBoolean("logging.debug", false)) {
-      if (cachedResult == null) {
+      if (!cacheEnabled) {
+        plugin.getLogger().info("Cache disabled for " + username + ", checking API");
+      } else if (cachedResult == null) {
         plugin.getLogger().info("No cache entry for " + username + ", checking API");
       } else {
         plugin.getLogger().info("Not in positive cache for " + username + ", checking API");
@@ -78,8 +86,10 @@ public class PlayerLoginListener implements Listener {
       }
 
       if (response.shouldBeWhitelisted()) {
-        // Only cache positive results so newly whitelisted players can join immediately
-        plugin.getWhitelistCache().addWhitelistedPlayer(uuid, username);
+        // Only cache positive results if caching is enabled
+        if (cacheEnabled) {
+          plugin.getWhitelistCache().addWhitelistedPlayer(uuid, username);
+        }
 
         // Apply role sync if enabled and target groups are provided
         if (response.isRoleSyncEnabled() && response.getTargetGroups() != null
