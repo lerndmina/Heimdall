@@ -23,8 +23,6 @@ Available template variables:
 
 - `/link-minecraft` - Link your Discord to Minecraft/whitelist systems (if the user is just asking about linking without specifying a service we can assume Minecraft)
 
-**Note:** FiveM/TAW account linking may be available on some servers but is not currently enabled by default.
-
 **How Account Linking Works:**
 
 -- Minecraft
@@ -34,10 +32,6 @@ Available template variables:
 3. Enter the code in Discord with `/confirm-code`
 4. **Wait for staff approval** - This may take some time before you can join
 5. You'll receive confirmation once linking is successful and approved
-
--- FiveM (TAW Account Linking)
-
-_FiveM/TAW account linking is currently not available through standard commands. Contact server administrators if this feature is needed for your server._
 
 **Troubleshooting Account Linking:**
 
@@ -141,7 +135,6 @@ Most servers provide various utility commands for users:
 {{BOT_NAME}} supports integration with various gaming platforms:
 
 - **Minecraft**: Whitelist management, server linking, status checking
-- **FiveM**: Server status, roleplay features, player statistics (when enabled)
 - **General Gaming**: Cross-platform communication and management
 
 ### Moderation Support
