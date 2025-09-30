@@ -11,13 +11,17 @@ import { getRandomFooterMessage } from "../Bot";
  * @returns The embed object.
  */
 export default function (
-  client: Client<true>,
+  client: Client<true> | Client<boolean>,
   title: string,
   description?: string,
   fields?: EmbedField[],
   color?: ColorResolvable
 ) {
   if (color == undefined) color = "#de3b79";
+
+  if (!client.user) {
+    throw new Error("Client user is not defined");
+  }
 
   var embed = new EmbedBuilder()
     .setTitle(title)

@@ -7,6 +7,7 @@ import systemPrompt from "../../utils/SystemPrompt";
 import ResponsePlugins from "../../utils/ResponsePlugins";
 import { returnMessage } from "../../utils/TinyUtils";
 import { globalCooldownKey, setCommandCooldown, userCooldownKey } from "../../Bot";
+import { contextService } from "../../services/ContextService";
 import log from "../../utils/log";
 const env = FetchEnvs();
 
@@ -39,15 +40,42 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
   await setCommandCooldown(userCooldownKey(interaction.user.id, interaction.commandName), 300);
   const requestMessage = interaction.options.getString("message");
 
-  let conversation = [{ role: "system", content: systemPrompt }];
+  // Tell discord to wait while we process the request
+  await interaction.deferReply({ ephemeral: false });
+
+  // Get context for AI if in a guild
+  let contextualSystemPrompt = systemPrompt;
+  let contextSources: string[] = [];
+
+  if (interaction.guildId) {
+    try {
+      const context = await contextService.getContextForAI(
+        interaction.guildId,
+        requestMessage!,
+        client
+      );
+      contextSources = await contextService.getContextSources(interaction.guildId, requestMessage!);
+
+      if (context.trim()) {
+        contextualSystemPrompt = `${systemPrompt}
+
+ADDITIONAL CONTEXT:
+${context}
+
+When using this context, prioritize accuracy and helpfulness. If the context contains relevant information for the user's question, use it. If not, rely on your general knowledge.`;
+      }
+    } catch (error) {
+      log.error("Error getting AI context:", error);
+      // Continue with default system prompt if context fails
+    }
+  }
+
+  let conversation = [{ role: "system", content: contextualSystemPrompt }];
 
   conversation.push({
     role: "user",
     content: requestMessage as string,
   });
-
-  // Tell discord to wait while we process the request
-  await interaction.deferReply({ ephemeral: false });
 
   // Send the message to OpenAI to be processed
   const response = await openai.chat.completions
@@ -70,7 +98,27 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
     );
   }
 
-  const aiResponse = await ResponsePlugins(response.choices[0].message.content);
+  let aiResponse = await ResponsePlugins(response.choices[0].message.content);
+
+  // Add context indicators if context was used
+  if (contextSources.length > 0) {
+    const contextIndicators = contextSources
+      .map((source) => {
+        switch (source) {
+          case "bot":
+            return "🤖 *Bot Knowledge*";
+          case "custom":
+            return "📝 *Server Context*";
+          default:
+            return "";
+        }
+      })
+      .filter(Boolean);
+
+    if (contextIndicators.length > 0) {
+      aiResponse += `\n\n*Response based on: ${contextIndicators.join(" + ")}*`;
+    }
+  }
 
   // Send the response back to discord
   interaction.editReply({ content: aiResponse });

@@ -1,4 +1,8 @@
-import type { LegacySlashCommandProps, LegacyCommandOptions, CommandKit } from "@heimdall/command-handler";
+import type {
+  LegacySlashCommandProps,
+  LegacyCommandOptions,
+  CommandKit,
+} from "@heimdall/command-handler";
 import { ActivityType, ChatInputCommandInteraction, Client, SlashCommandBuilder } from "discord.js";
 import { globalCooldownKey, setCommandCooldown, waitingEmoji } from "../../Bot";
 import FetchEnvs from "../../utils/FetchEnvs";
@@ -7,6 +11,7 @@ import Database from "../../utils/data/database";
 import Settings from "../../models/Settings";
 import CommandError from "../../utils/interactionErrors/CommandError";
 import { ThingGetter } from "../../utils/TinyUtils";
+import handleContext from "../../subcommands/utilities/settings/context";
 const env = FetchEnvs();
 
 export const data = new SlashCommandBuilder()
@@ -47,6 +52,86 @@ export const data = new SlashCommandBuilder()
         option.setName("text").setDescription("The text to set.").setRequired(true)
       )
   )
+  .addSubcommandGroup((group) =>
+    group
+      .setName("context")
+      .setDescription("Manage AI context for the ask command")
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("upload")
+          .setDescription("Upload custom AI context from a file")
+          .addAttachmentOption((option) =>
+            option
+              .setName("file")
+              .setDescription("Text or markdown file with context")
+              .setRequired(true)
+          )
+          .addBooleanOption((option) =>
+            option
+              .setName("use-bot-context")
+              .setDescription("Include bot knowledge")
+              .setRequired(false)
+          )
+          .addBooleanOption((option) =>
+            option
+              .setName("use-custom-context")
+              .setDescription("Use custom context")
+              .setRequired(false)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("priority")
+              .setDescription("Context priority")
+              .addChoices(
+                { name: "Bot First", value: "bot" },
+                { name: "Custom First", value: "custom" },
+                { name: "Both Combined", value: "both" }
+              )
+              .setRequired(false)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("status").setDescription("View current AI context configuration")
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("remove").setDescription("Remove custom AI context")
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("toggle-bot")
+          .setDescription("Enable/disable bot knowledge in AI responses")
+          .addBooleanOption((option) =>
+            option.setName("enabled").setDescription("Enable bot context").setRequired(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("toggle-custom")
+          .setDescription("Enable/disable custom context in AI responses")
+          .addBooleanOption((option) =>
+            option.setName("enabled").setDescription("Enable custom context").setRequired(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand
+          .setName("set-priority")
+          .setDescription("Set context priority for AI responses")
+          .addStringOption((option) =>
+            option
+              .setName("priority")
+              .setDescription("Context priority")
+              .addChoices(
+                { name: "Bot First", value: "bot" },
+                { name: "Custom First", value: "custom" },
+                { name: "Both Combined", value: "both" }
+              )
+              .setRequired(true)
+          )
+      )
+      .addSubcommand((subcommand) =>
+        subcommand.setName("export").setDescription("Export current AI context as a file")
+      )
+  )
   .setDMPermission(true);
 
 export const options: LegacyCommandOptions = {
@@ -56,6 +141,22 @@ export const options: LegacyCommandOptions = {
 
 export async function run({ interaction, client, handler }: LegacySlashCommandProps) {
   let hasErrored: any;
+
+  const subcommandGroup = interaction.options.getSubcommandGroup();
+  const subcommand = interaction.options.getSubcommand();
+
+  // Handle context subcommands (different permission requirement)
+  if (subcommandGroup === "context") {
+    if (!interaction.memberPermissions?.has("ManageGuild")) {
+      return interaction.reply({
+        content: "You need the 'Manage Guild' permission to manage AI context.",
+        ephemeral: true,
+      });
+    }
+    return handleContext({ interaction, client, handler });
+  }
+
+  // Bot-level settings require owner permissions
   if (!env.OWNER_IDS.includes(interaction.user.id)) {
     return interaction.reply({
       content: "You do not have permission to use this command.",
@@ -63,7 +164,6 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
     });
   }
 
-  const subcommand = interaction.options.getSubcommand();
   try {
     if (subcommand === "avatar") return changeAvatar(interaction, client, handler);
     if (subcommand === "username") return changeUsername(interaction, client, handler);
