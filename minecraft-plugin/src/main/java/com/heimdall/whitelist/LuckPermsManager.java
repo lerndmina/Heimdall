@@ -61,9 +61,11 @@ public class LuckPermsManager {
   }
 
   /**
-   * Sync player's Discord-managed groups (only touch groups explicitly managed by Discord sync)
+   * Sync player's Discord-managed groups (only touch groups explicitly managed by
+   * Discord sync)
    */
-  public CompletableFuture<Boolean> setPlayerGroups(UUID playerUuid, List<String> targetGroups, List<String> managedGroups) {
+  public CompletableFuture<Boolean> setPlayerGroups(UUID playerUuid, List<String> targetGroups,
+      List<String> managedGroups) {
     if (!isAvailable()) {
       return CompletableFuture.completedFuture(false);
     }
@@ -78,11 +80,13 @@ public class LuckPermsManager {
 
         // Ensure we have a list of managed groups from the API
         if (managedGroups == null || managedGroups.isEmpty()) {
-          plugin.getLogger().warning("No managed groups provided by API for player " + playerUuid + ", skipping role sync");
+          plugin.getLogger()
+              .warning("No managed groups provided by API for player " + playerUuid + ", skipping role sync");
           return false;
         }
 
-        // Ensure we have target groups (can be empty if user should have no Discord roles)
+        // Ensure we have target groups (can be empty if user should have no Discord
+        // roles)
         final List<String> finalTargetGroups = targetGroups != null ? targetGroups : new ArrayList<>();
 
         // Get current groups
@@ -91,8 +95,9 @@ public class LuckPermsManager {
             .map(group -> group.getName())
             .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
 
-        // Find Discord-managed groups that need to be removed 
-        // (player currently has them, but they're not in target, and they are Discord-managed)
+        // Find Discord-managed groups that need to be removed
+        // (player currently has them, but they're not in target, and they are
+        // Discord-managed)
         List<String> groupsToRemove = new ArrayList<>();
         for (String currentGroup : currentGroups) {
           if (managedGroups.contains(currentGroup) && !finalTargetGroups.contains(currentGroup)) {
@@ -100,7 +105,7 @@ public class LuckPermsManager {
           }
         }
 
-        // Find Discord-managed groups that need to be added 
+        // Find Discord-managed groups that need to be added
         // (in target groups, not currently assigned, and is Discord-managed)
         List<String> groupsToAdd = new ArrayList<>();
         for (String targetGroup : finalTargetGroups) {
@@ -130,11 +135,11 @@ public class LuckPermsManager {
         // Save changes only if there were changes
         if (!groupsToRemove.isEmpty() || !groupsToAdd.isEmpty()) {
           luckPerms.getUserManager().saveUser(user);
-          plugin.getLogger().info("Synchronized Discord-managed groups for player " + playerUuid + 
-              " - Added: " + groupsToAdd + ", Removed: " + groupsToRemove + 
+          plugin.getLogger().info("Synchronized Discord-managed groups for player " + playerUuid +
+              " - Added: " + groupsToAdd + ", Removed: " + groupsToRemove +
               " (Managed groups: " + managedGroups + ")");
         } else {
-          plugin.getLogger().info("No Discord-managed group changes needed for player " + playerUuid + 
+          plugin.getLogger().info("No Discord-managed group changes needed for player " + playerUuid +
               " (Managed groups: " + managedGroups + ")");
         }
 
@@ -149,7 +154,9 @@ public class LuckPermsManager {
   }
 
   /**
-   * Legacy method for backward compatibility - only use when managed groups are unknown
+   * Legacy method for backward compatibility - only use when managed groups are
+   * unknown
+   * 
    * @deprecated Use setPlayerGroups(UUID, List<String>, List<String>) instead
    */
   @Deprecated

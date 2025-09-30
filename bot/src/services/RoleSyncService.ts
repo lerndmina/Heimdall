@@ -126,12 +126,12 @@ export class RoleSyncService {
       discordRoles,
       config.roleSync.roleMappings
     );
-    
+
     // Get all managed groups from role mappings (all possible Minecraft groups that can be synced)
     const managedGroups = config.roleSync.roleMappings
-      .filter(mapping => mapping.enabled)
-      .map(mapping => mapping.minecraftGroup);
-    
+      .filter((mapping) => mapping.enabled)
+      .map((mapping) => mapping.minecraftGroup);
+
     log.debug(`Target groups for ${player.minecraftUsername}:`, targetGroups);
     log.debug(`Managed groups for server:`, managedGroups);
     log.debug(`Role mappings:`, config.roleSync.roleMappings);
