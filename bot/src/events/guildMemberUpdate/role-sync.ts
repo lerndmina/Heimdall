@@ -1,15 +1,29 @@
 import type { Client, GuildMember } from "discord.js";
-import type { CommandHandler } from "@heimdall/command-handler";
 import RoleSyncService from "../../services/RoleSyncService";
 import log from "../../utils/log";
 
-export default async (
-  client: Client,
-  handler: CommandHandler,
-  oldMember: GuildMember,
-  newMember: GuildMember
-) => {
+export default async (oldMember: GuildMember, newMember: GuildMember, client: Client) => {
   try {
+    // Guard against undefined/null members and required properties
+    if (
+      !oldMember ||
+      !newMember ||
+      !oldMember.roles ||
+      !newMember.roles ||
+      !oldMember.guild ||
+      !newMember.guild ||
+      !newMember.user
+    ) {
+      log.debug("Skipping role sync - missing member data or properties");
+      return;
+    }
+
+    // Ensure both members are from the same guild
+    if (oldMember.guild.id !== newMember.guild.id) {
+      log.debug("Skipping role sync - members from different guilds");
+      return;
+    }
+
     // Check if roles have changed
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
