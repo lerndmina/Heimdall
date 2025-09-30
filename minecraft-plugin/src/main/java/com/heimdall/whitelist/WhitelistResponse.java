@@ -10,18 +10,24 @@ public class WhitelistResponse {
   private final String authCode;
   private final boolean roleSyncEnabled;
   private final List<String> targetGroups;
+  private final List<String> managedGroups;
 
   public WhitelistResponse(boolean shouldBeWhitelisted, boolean hasAuth, String kickMessage, String action) {
-    this(shouldBeWhitelisted, hasAuth, kickMessage, action, null, false, null);
+    this(shouldBeWhitelisted, hasAuth, kickMessage, action, null, false, null, null);
   }
 
   public WhitelistResponse(boolean shouldBeWhitelisted, boolean hasAuth, String kickMessage, String action,
       String authCode) {
-    this(shouldBeWhitelisted, hasAuth, kickMessage, action, authCode, false, null);
+    this(shouldBeWhitelisted, hasAuth, kickMessage, action, authCode, false, null, null);
   }
 
   public WhitelistResponse(boolean shouldBeWhitelisted, boolean hasAuth, String kickMessage, String action,
       String authCode, boolean roleSyncEnabled, List<String> targetGroups) {
+    this(shouldBeWhitelisted, hasAuth, kickMessage, action, authCode, roleSyncEnabled, targetGroups, null);
+  }
+
+  public WhitelistResponse(boolean shouldBeWhitelisted, boolean hasAuth, String kickMessage, String action,
+      String authCode, boolean roleSyncEnabled, List<String> targetGroups, List<String> managedGroups) {
     this.shouldBeWhitelisted = shouldBeWhitelisted;
     this.hasAuth = hasAuth;
     this.kickMessage = kickMessage;
@@ -29,6 +35,7 @@ public class WhitelistResponse {
     this.authCode = authCode;
     this.roleSyncEnabled = roleSyncEnabled;
     this.targetGroups = targetGroups;
+    this.managedGroups = managedGroups;
   }
 
   public boolean shouldBeWhitelisted() {
@@ -57,6 +64,10 @@ public class WhitelistResponse {
 
   public List<String> getTargetGroups() {
     return targetGroups;
+  }
+
+  public List<String> getManagedGroups() {
+    return managedGroups;
   }
 
   @Override

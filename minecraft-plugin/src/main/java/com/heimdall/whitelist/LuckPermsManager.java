@@ -61,9 +61,9 @@ public class LuckPermsManager {
   }
 
   /**
-   * Set player's groups (clear existing and add new ones)
+   * Sync player's Discord-managed groups (only touch groups explicitly managed by Discord sync)
    */
-  public CompletableFuture<Boolean> setPlayerGroups(UUID playerUuid, List<String> groups) {
+  public CompletableFuture<Boolean> setPlayerGroups(UUID playerUuid, List<String> targetGroups, List<String> managedGroups) {
     if (!isAvailable()) {
       return CompletableFuture.completedFuture(false);
     }
@@ -76,33 +76,88 @@ public class LuckPermsManager {
           return false;
         }
 
-        // Clear existing groups (except default group)
-        String defaultGroup = "default"; // Most servers use "default" as the default group
-        user.data().clear(node -> node instanceof InheritanceNode &&
-            !((InheritanceNode) node).getGroupName().equals(defaultGroup));
+        // Ensure we have a list of managed groups from the API
+        if (managedGroups == null || managedGroups.isEmpty()) {
+          plugin.getLogger().warning("No managed groups provided by API for player " + playerUuid + ", skipping role sync");
+          return false;
+        }
 
-        // Add new groups
-        for (String group : groups) {
-          if (luckPerms.getGroupManager().isLoaded(group)) {
-            InheritanceNode node = InheritanceNode.builder(group).build();
-            user.data().add(node);
-          } else {
-            plugin.getLogger().warning("Group '" + group + "' does not exist, skipping");
+        // Ensure we have target groups (can be empty if user should have no Discord roles)
+        final List<String> finalTargetGroups = targetGroups != null ? targetGroups : new ArrayList<>();
+
+        // Get current groups
+        List<String> currentGroups = user.getInheritedGroups(user.getQueryOptions())
+            .stream()
+            .map(group -> group.getName())
+            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+
+        // Find Discord-managed groups that need to be removed 
+        // (player currently has them, but they're not in target, and they are Discord-managed)
+        List<String> groupsToRemove = new ArrayList<>();
+        for (String currentGroup : currentGroups) {
+          if (managedGroups.contains(currentGroup) && !finalTargetGroups.contains(currentGroup)) {
+            groupsToRemove.add(currentGroup);
           }
         }
 
-        // Save changes
-        luckPerms.getUserManager().saveUser(user);
+        // Find Discord-managed groups that need to be added 
+        // (in target groups, not currently assigned, and is Discord-managed)
+        List<String> groupsToAdd = new ArrayList<>();
+        for (String targetGroup : finalTargetGroups) {
+          if (managedGroups.contains(targetGroup) && !currentGroups.contains(targetGroup)) {
+            groupsToAdd.add(targetGroup);
+          }
+        }
 
-        plugin.getLogger().info("Updated groups for player " + playerUuid + ": " + String.join(", ", groups));
+        // Remove Discord-managed groups that are no longer needed
+        for (String groupToRemove : groupsToRemove) {
+          InheritanceNode node = InheritanceNode.builder(groupToRemove).build();
+          user.data().remove(node);
+          plugin.getLogger().info("Removed Discord-synced group '" + groupToRemove + "' from player " + playerUuid);
+        }
+
+        // Add new Discord-managed groups
+        for (String groupToAdd : groupsToAdd) {
+          if (luckPerms.getGroupManager().isLoaded(groupToAdd)) {
+            InheritanceNode node = InheritanceNode.builder(groupToAdd).build();
+            user.data().add(node);
+            plugin.getLogger().info("Added Discord-synced group '" + groupToAdd + "' to player " + playerUuid);
+          } else {
+            plugin.getLogger().warning("Group '" + groupToAdd + "' does not exist, skipping");
+          }
+        }
+
+        // Save changes only if there were changes
+        if (!groupsToRemove.isEmpty() || !groupsToAdd.isEmpty()) {
+          luckPerms.getUserManager().saveUser(user);
+          plugin.getLogger().info("Synchronized Discord-managed groups for player " + playerUuid + 
+              " - Added: " + groupsToAdd + ", Removed: " + groupsToRemove + 
+              " (Managed groups: " + managedGroups + ")");
+        } else {
+          plugin.getLogger().info("No Discord-managed group changes needed for player " + playerUuid + 
+              " (Managed groups: " + managedGroups + ")");
+        }
+
         return true;
 
       } catch (Exception e) {
-        plugin.getLogger().severe("Failed to set groups for player " + playerUuid + ": " + e.getMessage());
+        plugin.getLogger().severe("Failed to sync groups for player " + playerUuid + ": " + e.getMessage());
         e.printStackTrace();
         return false;
       }
     });
+  }
+
+  /**
+   * Legacy method for backward compatibility - only use when managed groups are unknown
+   * @deprecated Use setPlayerGroups(UUID, List<String>, List<String>) instead
+   */
+  @Deprecated
+  public CompletableFuture<Boolean> setPlayerGroups(UUID playerUuid, List<String> targetGroups) {
+    plugin.getLogger().warning("Using deprecated setPlayerGroups method without managed groups list. " +
+        "This may interfere with non-Discord groups.");
+    // Assume all target groups are managed groups for backward compatibility
+    return setPlayerGroups(playerUuid, targetGroups, targetGroups);
   }
 
   /**

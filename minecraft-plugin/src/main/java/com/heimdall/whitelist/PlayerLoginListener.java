@@ -98,10 +98,11 @@ public class PlayerLoginListener implements Listener {
               + (response.getTargetGroups() != null ? response.getTargetGroups().toString() : "null"));
         }
 
-        if (response.isRoleSyncEnabled() && response.getTargetGroups() != null
-            && !response.getTargetGroups().isEmpty()) {
+        if (response.isRoleSyncEnabled() && response.getManagedGroups() != null
+            && !response.getManagedGroups().isEmpty()) {
           plugin.getLogger()
-              .info("Scheduling role sync for " + username + " with groups: " + response.getTargetGroups());
+              .info("Scheduling role sync for " + username + " with target groups: " + response.getTargetGroups() +
+                  " and managed groups: " + response.getManagedGroups());
 
           // Schedule role sync for after the player has fully connected
           plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
@@ -110,8 +111,9 @@ public class PlayerLoginListener implements Listener {
               LuckPermsManager luckPermsManager = plugin.getLuckPermsManager();
               if (luckPermsManager != null && luckPermsManager.isAvailable()) {
                 plugin.getLogger()
-                    .info("Applying role sync for " + username + " with groups: " + response.getTargetGroups());
-                luckPermsManager.setPlayerGroups(playerUuid, response.getTargetGroups());
+                    .info("Applying role sync for " + username + " with target groups: " + response.getTargetGroups() +
+                        " and managed groups: " + response.getManagedGroups());
+                luckPermsManager.setPlayerGroups(playerUuid, response.getTargetGroups(), response.getManagedGroups());
                 plugin.getLogger().info("Successfully applied role sync for " + username);
               } else {
                 plugin.getLogger().warning("LuckPerms not available for role sync for " + username);
@@ -124,7 +126,7 @@ public class PlayerLoginListener implements Listener {
         } else {
           plugin.getLogger().info("Role sync not applied for " + username + ": " +
               "enabled=" + response.isRoleSyncEnabled() +
-              ", hasGroups=" + (response.getTargetGroups() != null && !response.getTargetGroups().isEmpty()));
+              ", hasManagedGroups=" + (response.getManagedGroups() != null && !response.getManagedGroups().isEmpty()));
         }
 
         // If the action is to show an auth code, we need to kick with the code

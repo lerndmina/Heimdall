@@ -249,6 +249,7 @@ public class ApiClient {
     // Parse role sync data if present
     boolean roleSyncEnabled = false;
     List<String> targetGroups = null;
+    List<String> managedGroups = null;
 
     if (data.has("roleSync") && data.get("roleSync").isJsonObject()) {
       JsonObject roleSync = data.getAsJsonObject("roleSync");
@@ -261,10 +262,18 @@ public class ApiClient {
           targetGroups.add(groupsArray.get(i).getAsString());
         }
       }
+
+      if (roleSync.has("managedGroups") && roleSync.get("managedGroups").isJsonArray()) {
+        managedGroups = new java.util.ArrayList<>();
+        JsonArray managedArray = roleSync.getAsJsonArray("managedGroups");
+        for (int i = 0; i < managedArray.size(); i++) {
+          managedGroups.add(managedArray.get(i).getAsString());
+        }
+      }
     }
 
     return new WhitelistResponse(shouldBeWhitelisted, hasAuth, kickMessage, action, null, roleSyncEnabled,
-        targetGroups);
+        targetGroups, managedGroups);
   }
 
   private WhitelistResponse makeRequestForLinkCode(String endpoint, JsonObject requestBody) throws IOException {

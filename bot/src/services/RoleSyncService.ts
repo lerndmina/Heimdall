@@ -91,6 +91,7 @@ export class RoleSyncService {
   ): Promise<{
     enabled: boolean;
     targetGroups: string[];
+    managedGroups: string[];
     operation?: RoleSyncOperation;
   }> {
     // Get config and check if role sync is enabled
@@ -99,7 +100,7 @@ export class RoleSyncService {
     );
 
     if (configError || !config || !config.roleSync?.enabled) {
-      return { enabled: false, targetGroups: [] };
+      return { enabled: false, targetGroups: [], managedGroups: [] };
     }
 
     // Get player data
@@ -108,12 +109,12 @@ export class RoleSyncService {
     );
 
     if (playerError || !player || !player.discordId) {
-      return { enabled: false, targetGroups: [] };
+      return { enabled: false, targetGroups: [], managedGroups: [] };
     }
 
     // Check if role sync is enabled for this player (default to true for backward compatibility)
     if (player.roleSyncEnabled === false) {
-      return { enabled: false, targetGroups: [] };
+      return { enabled: false, targetGroups: [], managedGroups: [] };
     }
 
     // Get current Discord roles
@@ -125,7 +126,14 @@ export class RoleSyncService {
       discordRoles,
       config.roleSync.roleMappings
     );
+    
+    // Get all managed groups from role mappings (all possible Minecraft groups that can be synced)
+    const managedGroups = config.roleSync.roleMappings
+      .filter(mapping => mapping.enabled)
+      .map(mapping => mapping.minecraftGroup);
+    
     log.debug(`Target groups for ${player.minecraftUsername}:`, targetGroups);
+    log.debug(`Managed groups for server:`, managedGroups);
     log.debug(`Role mappings:`, config.roleSync.roleMappings);
 
     // Compare with current groups
@@ -161,6 +169,7 @@ export class RoleSyncService {
     return {
       enabled: true,
       targetGroups,
+      managedGroups,
       operation,
     };
   }
