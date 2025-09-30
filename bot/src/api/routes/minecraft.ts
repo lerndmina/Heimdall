@@ -332,6 +332,14 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
               enabled: true,
               targetGroups: roleSyncResult.targetGroups,
             };
+            log.debug(`Role sync response for ${username}:`, {
+              enabled: roleSyncResult.enabled,
+              targetGroups: roleSyncResult.targetGroups,
+            });
+          } else {
+            log.debug(`Role sync disabled for ${username}`, {
+              reason: "roleSyncResult.enabled = false",
+            });
           }
 
           return res.json(createSuccessResponse(response, req.requestId));

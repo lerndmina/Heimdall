@@ -107,18 +107,26 @@ export class RoleSyncService {
       MinecraftPlayer.findById(playerId).lean()
     );
 
-    if (playerError || !player || !player.discordId || !player.roleSyncEnabled) {
+    if (playerError || !player || !player.discordId) {
+      return { enabled: false, targetGroups: [] };
+    }
+
+    // Check if role sync is enabled for this player (default to true for backward compatibility)
+    if (player.roleSyncEnabled === false) {
       return { enabled: false, targetGroups: [] };
     }
 
     // Get current Discord roles
     const discordRoles = await this.getPlayerDiscordRoles(guildId, player.discordId);
+    log.debug(`Discord roles for ${player.minecraftUsername} (${player.discordId}):`, discordRoles);
 
     // Calculate target groups based on Discord roles
     const targetGroups = RoleSyncService.getTargetGroups(
       discordRoles,
       config.roleSync.roleMappings
     );
+    log.debug(`Target groups for ${player.minecraftUsername}:`, targetGroups);
+    log.debug(`Role mappings:`, config.roleSync.roleMappings);
 
     // Compare with current groups
     const comparison = RoleSyncService.compareGroups(currentMinecraftGroups, targetGroups);
