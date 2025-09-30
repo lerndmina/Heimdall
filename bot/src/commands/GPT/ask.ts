@@ -60,9 +60,19 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
         contextualSystemPrompt = `${systemPrompt}
 
 ADDITIONAL CONTEXT:
-${context}
+{{{${context}}}}
 
-When using this context, prioritize accuracy and helpfulness. If the context contains relevant information for the user's question, use it. If not, rely on your general knowledge.`;
+When using this context, prioritize accuracy and helpfulness.
+
+## AI Notes:
+- Make sure when providing technical information to be clear and concise.
+- Use bullet points and numbered lists for steps and commands.
+- Avoid jargon unless it's commonly understood in gaming/Discord communities.
+- Tailor troubleshooting steps specifically to the docs you are provided.
+
+** Important!!! If you do not have documentation, above, do not attempt to make up answers. Instead, direct users to contact their server administrators or support team for help.**
+
+The only exception is if the user is asking about general questions not about the bot or the discord, minecraft, gameserver, etc itself. In that case you are to answer the question to the best of your ability based on your general knowledge.`;
       }
     } catch (error) {
       log.error("Error getting AI context:", error);
@@ -99,26 +109,6 @@ When using this context, prioritize accuracy and helpfulness. If the context con
   }
 
   let aiResponse = await ResponsePlugins(response.choices[0].message.content);
-
-  // Add context indicators if context was used
-  if (contextSources.length > 0) {
-    const contextIndicators = contextSources
-      .map((source) => {
-        switch (source) {
-          case "bot":
-            return "🤖 *Bot Knowledge*";
-          case "custom":
-            return "📝 *Server Context*";
-          default:
-            return "";
-        }
-      })
-      .filter(Boolean);
-
-    if (contextIndicators.length > 0) {
-      aiResponse += `\n\n*Response based on: ${contextIndicators.join(" + ")}*`;
-    }
-  }
 
   // Send the response back to discord
   interaction.editReply({ content: aiResponse });

@@ -168,74 +168,55 @@ export class ContextService {
   }
 
   /**
-   * Update guild context settings
+   * Update guild settings for AI context
    */
   async updateGuildSettings(
     guildId: string,
-    settings: {
-      useBotContext?: boolean;
-      useCustomContext?: boolean;
-      priority?: 'bot' | 'custom' | 'both';
-      enabled?: boolean;
-    }
+    settings: Partial<IGuildAIContext["settings"]>
   ): Promise<boolean> {
     try {
-      // First, try to update existing record
-      const existingRecord = await this.db.findOne(GuildAIContext, { guildId });
-      
-      if (existingRecord) {
-        // Update existing record
-        const result = await this.db.findOneAndUpdate(
-          GuildAIContext,
-          { guildId },
-          { $set: { settings: { ...existingRecord.settings, ...settings }, lastUpdated: new Date() } },
-          { upsert: false, new: true }
-        );
+      // Prepare the settings object with defaults and overrides
+      const finalSettings = {
+        useBotContext: settings.useBotContext ?? true,
+        useCustomContext: settings.useCustomContext ?? false,
+        priority: settings.priority ?? ("bot" as const),
+      };
 
-        if (result) {
-          await this.clearContextCache(guildId);
-          return true;
-        }
-      } else {
-        // Create new record with default values and provided settings
-        const defaultSettings = {
-          useBotContext: true,
-          useCustomContext: true,
-          priority: 'both' as const,
-          ...settings
-        };
-
-        const newRecord = {
+      const updateData: any = {
+        $set: {
+          lastUpdated: new Date(),
+          "settings.useBotContext": finalSettings.useBotContext,
+          "settings.useCustomContext": finalSettings.useCustomContext,
+          "settings.priority": finalSettings.priority,
+        },
+        $setOnInsert: {
           guildId,
-          content: "", // Empty content initially
+          content: "", // Empty content since we're just tracking settings
           enabled: true,
           uploadedBy: {
-            userId: "system",
+            userId: "system", // System-created for settings-only record
             uploadedAt: new Date(),
           },
           metadata: {
             characterCount: 0,
             wordCount: 0,
           },
-          settings: defaultSettings,
-        };
+        },
+      };
 
-        const result = await this.db.findOneAndUpdate(
-          GuildAIContext,
-          { guildId },
-          { $set: newRecord },
-          { upsert: true, new: true }
-        );
+      const result = await this.db.findOneAndUpdate(GuildAIContext, { guildId }, updateData, {
+        upsert: true,
+        new: true,
+      });
 
-        if (result) {
-          await this.clearContextCache(guildId);
-          return true;
-        }
+      if (result) {
+        // Clear cache
+        await this.clearContextCache(guildId);
+        return true;
       }
-
       return false;
     } catch (error) {
-      log.error("Error updating guild settings:", error);
+      log.error("Failed to update guild AI context settings:", error);
       return false;
     }
   }

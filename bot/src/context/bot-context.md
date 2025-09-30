@@ -21,20 +21,27 @@ Available template variables:
 
 **Available Linking Commands:**
 
-- `/link-minecraft` - Link your Discord to Minecraft/whitelist systems
-- `/link-fivem` - Connect your Discord to FiveM servers
-- Additional linking options may be available depending on server configuration
+- `/link-minecraft` - Link your Discord to Minecraft/whitelist systems (if the user is just asking about linking without specifying a service we can assume Minecraft)
+
+**Note:** FiveM/TAW account linking may be available on some servers but is not currently enabled by default.
 
 **How Account Linking Works:**
 
-1. Use the appropriate link command for your service
-2. Follow the verification process (may include joining game servers)
-3. Your account will be verified and linked automatically
-4. You'll receive confirmation once linking is successful
+-- Minecraft
+
+1. Use `/link-minecraft` and add your username
+2. Try joining the Minecraft server - you'll be kicked with your authentication code
+3. Enter the code in Discord with `/confirm-code`
+4. **Wait for staff approval** - This may take some time before you can join
+5. You'll receive confirmation once linking is successful and approved
+
+-- FiveM (TAW Account Linking)
+
+_FiveM/TAW account linking is currently not available through standard commands. Contact server administrators if this feature is needed for your server._
 
 **Troubleshooting Account Linking:**
 
-- **"Account not found" errors**: Make sure you've joined the game server with the correct username
+- **"Account not found" errors**: Make sure you've joined the game server with the correct username (Minecraft)
 - **Verification timeout**: The process may take a few minutes - please be patient
 - **Permission issues**: Ensure you have the required roles to link accounts
 - **Already linked**: If you need to re-link, contact server administrators
@@ -133,8 +140,8 @@ Most servers provide various utility commands for users:
 
 {{BOT_NAME}} supports integration with various gaming platforms:
 
-- **FiveM**: Character linking, server status, roleplay features
-- **Minecraft**: Whitelist management, server linking
+- **Minecraft**: Whitelist management, server linking, status checking
+- **FiveM**: Server status, roleplay features, player statistics (when enabled)
 - **General Gaming**: Cross-platform communication and management
 
 ### Moderation Support
@@ -176,4 +183,4 @@ While moderation is handled by staff, users can:
 - Always follow your server's specific rules and guidelines
 - Contact server administrators for server-specific questions
 
-This guide covers the basic functionality available to users. For administrative features, server configuration, or advanced troubleshooting, please contact your server's staff team.
+This guide covers the basic functionality available to users. For administrative features, server configuration, or advanced troubleshooting, please contact your server's staff team via modmail.
