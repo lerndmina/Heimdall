@@ -12,12 +12,27 @@
  * - mandalorianlooking (searching/loading)
  */
 
-import { ChatInputCommandInteraction, InteractionReplyOptions, InteractionUpdateOptions, MessagePayload, InteractionEditReplyOptions, Message, InteractionResponse, EmbedBuilder } from "discord.js";
+import {
+  ChatInputCommandInteraction,
+  MessageContextMenuCommandInteraction,
+  InteractionReplyOptions,
+  InteractionUpdateOptions,
+  MessagePayload,
+  InteractionEditReplyOptions,
+  Message,
+  InteractionResponse,
+  EmbedBuilder,
+} from "discord.js";
+
+/**
+ * Supported interaction types for HelpieReplies
+ */
+export type SupportedInteraction = ChatInputCommandInteraction | MessageContextMenuCommandInteraction;
 
 /**
  * Track which interactions have been replied to
  */
-const repliedInteractions = new WeakSet<ChatInputCommandInteraction>();
+const repliedInteractions = new WeakSet<SupportedInteraction>();
 
 /**
  * Animated emoji IDs for Helpie
@@ -163,7 +178,7 @@ export class HelpieReplies {
    *   content: { title: 'Context Saved', message: 'Done!' }
    * });
    */
-  static async send(interaction: ChatInputCommandInteraction, options: HelpieReplyOptions): Promise<InteractionResponse<boolean> | Message> {
+  static async send(interaction: SupportedInteraction, options: HelpieReplyOptions): Promise<InteractionResponse<boolean> | Message> {
     // Check if we've already replied to this interaction
     if (repliedInteractions.has(interaction)) {
       // Use editReply for subsequent calls
@@ -180,7 +195,7 @@ export class HelpieReplies {
    * - String content: Plain text message with emoji prefix
    * - Object content: Embed with title and message
    */
-  static async reply(interaction: ChatInputCommandInteraction, options: HelpieReplyOptions): Promise<InteractionResponse<boolean>> {
+  static async reply(interaction: SupportedInteraction, options: HelpieReplyOptions): Promise<InteractionResponse<boolean>> {
     const { type = "info", ephemeral = false, content, emoji = true } = options;
 
     // Mark as replied
@@ -212,7 +227,7 @@ export class HelpieReplies {
    * - String content: Plain text message with emoji prefix
    * - Object content: Embed with title and message
    */
-  static async editReply(interaction: ChatInputCommandInteraction, options: HelpieReplyOptions): Promise<Message> {
+  static async editReply(interaction: SupportedInteraction, options: HelpieReplyOptions): Promise<Message> {
     const { type = "info", content, emoji = true } = options;
 
     // Check if content is an object with title and message
@@ -243,7 +258,7 @@ export class HelpieReplies {
    * // ... do work ...
    * await HelpieReplies.success(interaction, 'Done!'); // Automatically uses editReply
    */
-  static async deferThinking(interaction: ChatInputCommandInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
+  static async deferThinking(interaction: SupportedInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     repliedInteractions.add(interaction);
     return interaction.reply({
       content: HelpieEmoji.what,
@@ -260,7 +275,7 @@ export class HelpieReplies {
    * // ... search database or load data ...
    * await HelpieReplies.info(interaction, 'Results...'); // Automatically uses editReply
    */
-  static async deferSearching(interaction: ChatInputCommandInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
+  static async deferSearching(interaction: SupportedInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     repliedInteractions.add(interaction);
     return interaction.reply({
       content: HelpieEmoji.looking,
@@ -277,7 +292,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.success(interaction, { title: 'Saved', message: 'Context saved!' });
    */
-  static async success(interaction: ChatInputCommandInteraction, content: ReplyContent, ephemeral: boolean = false): Promise<InteractionResponse<boolean> | Message> {
+  static async success(interaction: SupportedInteraction, content: ReplyContent, ephemeral: boolean = false): Promise<InteractionResponse<boolean> | Message> {
     return HelpieReplies.send(interaction, {
       type: "success",
       content,
@@ -291,7 +306,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.error(interaction, 'Failed to connect to database.');
    */
-  static async error(interaction: ChatInputCommandInteraction, content: ReplyContent, ephemeral: boolean = true): Promise<InteractionResponse<boolean> | Message> {
+  static async error(interaction: SupportedInteraction, content: ReplyContent, ephemeral: boolean = true): Promise<InteractionResponse<boolean> | Message> {
     return HelpieReplies.send(interaction, {
       type: "error",
       content,
@@ -305,7 +320,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.warning(interaction, 'Invalid URL format!');
    */
-  static async warning(interaction: ChatInputCommandInteraction, content: ReplyContent, ephemeral: boolean = true): Promise<InteractionResponse<boolean> | Message> {
+  static async warning(interaction: SupportedInteraction, content: ReplyContent, ephemeral: boolean = true): Promise<InteractionResponse<boolean> | Message> {
     return HelpieReplies.send(interaction, {
       type: "warning",
       content,
@@ -319,7 +334,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.info(interaction, 'Here are the available contexts...');
    */
-  static async info(interaction: ChatInputCommandInteraction, content: ReplyContent, ephemeral: boolean = false): Promise<InteractionResponse<boolean> | Message> {
+  static async info(interaction: SupportedInteraction, content: ReplyContent, ephemeral: boolean = false): Promise<InteractionResponse<boolean> | Message> {
     return HelpieReplies.send(interaction, {
       type: "info",
       content,
@@ -335,7 +350,7 @@ export class HelpieReplies {
    * // ... do work ...
    * await HelpieReplies.editSuccess(interaction, 'All done!');
    */
-  static async editSuccess(interaction: ChatInputCommandInteraction, content: ReplyContent): Promise<Message> {
+  static async editSuccess(interaction: SupportedInteraction, content: ReplyContent): Promise<Message> {
     return HelpieReplies.editReply(interaction, {
       type: "success",
       content,
@@ -350,7 +365,7 @@ export class HelpieReplies {
    * // ... operation fails ...
    * await HelpieReplies.editError(interaction, 'Something went wrong.');
    */
-  static async editError(interaction: ChatInputCommandInteraction, content: ReplyContent): Promise<Message> {
+  static async editError(interaction: SupportedInteraction, content: ReplyContent): Promise<Message> {
     return HelpieReplies.editReply(interaction, {
       type: "error",
       content,
@@ -365,7 +380,7 @@ export class HelpieReplies {
    * // ... validation fails ...
    * await HelpieReplies.editWarning(interaction, 'Invalid input detected!');
    */
-  static async editWarning(interaction: ChatInputCommandInteraction, content: ReplyContent): Promise<Message> {
+  static async editWarning(interaction: SupportedInteraction, content: ReplyContent): Promise<Message> {
     return HelpieReplies.editReply(interaction, {
       type: "warning",
       content,
@@ -380,7 +395,7 @@ export class HelpieReplies {
    * // ... fetch results ...
    * await HelpieReplies.editInfo(interaction, 'Found 5 contexts.');
    */
-  static async editInfo(interaction: ChatInputCommandInteraction, content: ReplyContent): Promise<Message> {
+  static async editInfo(interaction: SupportedInteraction, content: ReplyContent): Promise<Message> {
     return HelpieReplies.editReply(interaction, {
       type: "info",
       content,
