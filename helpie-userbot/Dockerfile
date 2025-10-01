@@ -76,19 +76,6 @@ COPY helpie-userbot/src/ ./src/
 # Go back to root
 WORKDIR /app
 
-# Create health check script for helpie
-RUN echo '#!/bin/bash\n\
-  # Simple health check - just verify the process is running\n\
-  if pgrep -f "tsx.*helpie-userbot" > /dev/null; then\n\
-  exit 0\n\
-  else\n\
-  exit 1\n\
-  fi' > /app/health-check.sh && chmod +x /app/health-check.sh
-
-# Add health check
-HEALTHCHECK --interval=60s --timeout=30s --start-period=60s --retries=5 \
-  CMD /app/health-check.sh
-
 # Set working directory to helpie
 WORKDIR /app/helpie-userbot
 
