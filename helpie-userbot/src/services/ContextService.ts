@@ -206,6 +206,8 @@ export class ContextService {
 The following context is provided in priority order (Global → Guild → User).
 **User context has the highest priority and should be given more weight in your responses.**
 
+**IMPORTANT:** Sometimes your context has links. Please include the links at the bottom of your response for the user to reference. This must be done if the documentation portion contains relevant links.
+
 ${contextParts.join("\n\n---\n\n")}
 
 --- END CONTEXT ---
