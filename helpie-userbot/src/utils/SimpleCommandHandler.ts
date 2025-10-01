@@ -19,8 +19,14 @@ export interface CommandModule {
   };
 }
 
+interface GroupedCommand {
+  group: string;
+  subcommands: Map<string, CommandModule>;
+}
+
 export class SimpleCommandHandler {
   private commands: Map<string, CommandModule> = new Map();
+  private groupedCommands: Map<string, GroupedCommand> = new Map();
   private client: Client;
   private commandsPath: string;
 
@@ -31,10 +37,16 @@ export class SimpleCommandHandler {
 
   /**
    * Load all commands from the commands directory
+   *
+   * File structure:
+   * - commands/user/ping.ts → /helpie ping
+   * - commands/user/admin/ban.ts → /helpie admin ban
+   * - commands/user/admin/kick.ts → /helpie admin kick
    */
   async loadCommands(): Promise<void> {
     log.info("Loading commands...");
     this.commands.clear();
+    this.groupedCommands.clear();
 
     const commandFiles = this.findCommandFiles(this.commandsPath);
 
@@ -56,16 +68,38 @@ export class SimpleCommandHandler {
           continue;
         }
 
-        this.commands.set(commandModule.data.name, commandModule);
-        log.debug(`Loaded command: ${commandModule.data.name}`);
+        // Detect if this is a grouped command by checking directory structure
+        const relativePath = path.relative(this.commandsPath, filePath);
+        const pathParts = relativePath.split(path.sep);
+
+        if (pathParts.length > 1) {
+          // This is a grouped command: e.g., admin/ban.ts
+          const groupName = pathParts[0];
+          const subcommandName = commandModule.data.name;
+
+          if (!this.groupedCommands.has(groupName)) {
+            this.groupedCommands.set(groupName, {
+              group: groupName,
+              subcommands: new Map(),
+            });
+          }
+
+          this.groupedCommands.get(groupName)!.subcommands.set(subcommandName, commandModule);
+          log.debug(`Loaded grouped command: ${groupName} → ${subcommandName}`);
+        } else {
+          // Regular command
+          this.commands.set(commandModule.data.name, commandModule);
+          log.debug(`Loaded command: ${commandModule.data.name}`);
+        }
       } catch (error) {
         log.error(`Failed to load command from ${filePath}:`, error);
       }
     }
 
-    log.info(`Loaded ${this.commands.size} commands`);
-  }
+    const totalSubcommands = Array.from(this.groupedCommands.values()).reduce((sum, group) => sum + group.subcommands.size, 0);
 
+    log.info(`Loaded ${this.commands.size} simple commands and ${this.groupedCommands.size} groups with ${totalSubcommands} subcommands`);
+  }
   /**
    * Build the /helpie command with all subcommands
    */
@@ -78,15 +112,48 @@ export class SimpleCommandHandler {
       // Allow in all contexts
       .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel]);
 
-    // Add each command as a subcommand or subcommand group
+    // Add grouped commands as subcommand groups
+    for (const [groupName, groupedCommand] of this.groupedCommands) {
+      command.addSubcommandGroup((group: any) => {
+        // Use first subcommand's description or generate one
+        const firstSubcommand = Array.from(groupedCommand.subcommands.values())[0];
+        const groupDescription = `${groupName.charAt(0).toUpperCase() + groupName.slice(1)} commands`;
+
+        group.setName(groupName).setDescription(groupDescription);
+
+        // Add each subcommand in the group
+        for (const [subcommandName, commandModule] of groupedCommand.subcommands) {
+          group.addSubcommand((sub: any) => {
+            const originalData = commandModule.data;
+            sub.setName(subcommandName).setDescription(originalData.description);
+
+            // Copy options from the original command
+            if (originalData.options && Array.isArray(originalData.options)) {
+              for (const option of originalData.options) {
+                // Skip subcommands and groups (type 1 and 2)
+                if (option.type !== 1 && option.type !== 2) {
+                  this.copyOption(sub, option);
+                }
+              }
+            }
+
+            return sub;
+          });
+        }
+
+        return group;
+      });
+    }
+
+    // Add simple commands as regular subcommands
     for (const [name, commandModule] of this.commands) {
       const originalData = commandModule.data;
 
-      // Check if this command has subcommand groups
+      // Check if this command manually defines subcommand groups
       const hasGroups = originalData.options?.some((opt: any) => opt.type === 2); // Type 2 = SubcommandGroup
 
       if (hasGroups) {
-        // This command uses subcommand groups, copy them directly
+        // This command manually uses subcommand groups, copy them directly
         for (const option of originalData.options) {
           if (option.type === 2) {
             // SubcommandGroup
@@ -214,18 +281,30 @@ export class SimpleCommandHandler {
    * Handle /helpie command execution
    */
   async handleCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    // Check if this is a grouped subcommand or regular subcommand
     const group = interaction.options.getSubcommandGroup(false);
     const subcommandName = interaction.options.getSubcommand();
 
-    // For grouped commands, the command name is the group name
-    // For regular commands, it's just the subcommand name
-    const commandName = group || subcommandName;
-    const commandModule = this.commands.get(commandName);
+    let commandModule: CommandModule | undefined;
+
+    // Check if this is a grouped command (from directory structure)
+    if (group) {
+      const groupedCommand = this.groupedCommands.get(group);
+      if (groupedCommand) {
+        commandModule = groupedCommand.subcommands.get(subcommandName);
+      }
+
+      // If not found in grouped commands, check regular commands (manual groups)
+      if (!commandModule) {
+        commandModule = this.commands.get(group);
+      }
+    } else {
+      // Regular subcommand
+      commandModule = this.commands.get(subcommandName);
+    }
 
     if (!commandModule) {
       await interaction.reply({
-        content: `❌ Unknown command: ${commandName}`,
+        content: `❌ Unknown command: ${group ? `${group} ${subcommandName}` : subcommandName}`,
         ephemeral: true,
       });
       return;
@@ -246,7 +325,8 @@ export class SimpleCommandHandler {
     try {
       await commandModule.run(interaction, this.client);
     } catch (error) {
-      log.error(`Error executing command ${commandName}:`, error);
+      const commandPath = group ? `${group} ${subcommandName}` : subcommandName;
+      log.error(`Error executing command ${commandPath}:`, error);
 
       const errorMessage = {
         content: `❌ An error occurred while executing this command.`,

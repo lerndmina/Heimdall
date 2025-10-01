@@ -5,6 +5,7 @@ Heimdall is a production Discord bot monorepo with an Express REST API, Next.js 
 ## Architecture Overview
 
 ### Monorepo Structure
+
 - **command-handler/** - Custom Discord.js command handler (replaces CommandKit) with ButtonKit reactive system
 - **bot/** - Discord.js 14+ bot with Express API server
 - **dashboard/** - Next.js 14 App Router with Discord OAuth
@@ -13,6 +14,7 @@ Heimdall is a production Discord bot monorepo with an Express REST API, Next.js 
 - **scripts/** - Build and deployment automation
 
 ### Data Flow & Integration Points
+
 1. **Bot ↔ Dashboard**: Bot exposes REST API (port 3001), dashboard consumes via proxy (lib/api.ts)
 2. **Bot ↔ Database**: MongoDB (Mongoose) for persistence, Redis for caching/cooldowns
 3. **Bot ↔ Minecraft**: Java plugin calls bot API for whitelist checks (scoped API keys)
@@ -26,9 +28,7 @@ Heimdall is a production Discord bot monorepo with an Express REST API, Next.js 
 
 ```typescript
 // Legacy pattern - use for most commands
-export const data = new SlashCommandBuilder()
-  .setName("command")
-  .setDescription("Description");
+export const data = new SlashCommandBuilder().setName("command").setDescription("Description");
 
 export const options: LegacyCommandOptions = {
   devOnly: false,
@@ -47,12 +47,9 @@ export async function run({ interaction, client, handler }: LegacySlashCommandPr
 Commands in the `commands/user/` directory are **user-installable** - they can be installed on a Discord user's profile and used across any server or in DMs. These commands MUST work as user commands first and foremost, but can optionally support guild installation too.
 
 **Required Pattern:**
+
 ```typescript
-import {
-  ApplicationIntegrationType,
-  InteractionContextType,
-  SlashCommandBuilder,
-} from "discord.js";
+import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from "discord.js";
 
 export const data = new SlashCommandBuilder()
   .setName("usercommand")
@@ -61,13 +58,14 @@ export const data = new SlashCommandBuilder()
   .setIntegrationTypes([ApplicationIntegrationType.UserInstall])
   // Specify where command can be used
   .setContexts([
-    InteractionContextType.Guild,        // Can use in servers
-    InteractionContextType.BotDM,        // Can use in bot DMs
+    InteractionContextType.Guild, // Can use in servers
+    InteractionContextType.BotDM, // Can use in bot DMs
     InteractionContextType.PrivateChannel, // Can use in private channels
   ]);
 ```
 
 **Key Rules:**
+
 1. **Integration Types** - Must include `ApplicationIntegrationType.UserInstall`
 2. **Contexts** - Choose based on command needs (guild-only, DM-only, or all)
 3. **Guild Validation** - Handler auto-validates based on contexts (if contexts=[Guild only], guild must exist)
@@ -101,6 +99,7 @@ export const data = new SlashCommandBuilder()
 ```
 
 **Dev-Only User Commands:**
+
 ```typescript
 export const options: LegacyCommandOptions = {
   devOnly: true, // Enforced via owner IDs at execution, not registration
@@ -110,23 +109,25 @@ export const options: LegacyCommandOptions = {
 See `bot/src/commands/user/` for complete examples of each pattern.
 
 **ButtonKit for interactive components** - replaces traditional collectors:
+
 ```typescript
 import { ButtonKit } from "@heimdall/command-handler";
 
-const button = new ButtonKit()
-  .setCustomId("my-btn")
-  .setStyle(ButtonStyle.Primary)
-  .setLabel("Click Me");
+const button = new ButtonKit().setCustomId("my-btn").setStyle(ButtonStyle.Primary).setLabel("Click Me");
 
 // Reactive onClick - no collector needed
-button.onClick(async (interaction) => {
-  await interaction.update({ content: "Clicked!" });
-}, { message }); // Pass message for context
+button.onClick(
+  async (interaction) => {
+    await interaction.update({ content: "Clicked!" });
+  },
+  { message }
+); // Pass message for context
 ```
 
 ### Error Handling - tryCatch Pattern
 
 **Always use `tryCatch` for async operations** (bot/src/utils/trycatch.ts):
+
 ```typescript
 import { tryCatch } from "./utils/trycatch";
 
@@ -143,6 +144,7 @@ Returns `{ data: T, error: null }` on success or `{ data: null, error: E }` on f
 ### Logging - Use Custom Logger
 
 **Never use console.log** - use the logger from @heimdall/logger:
+
 ```typescript
 import log from "./utils/log";
 
@@ -154,6 +156,7 @@ log.debug("Debug info"); // Only shows when DEBUG_LOG=true
 ### API Response Standards
 
 All API endpoints use standardized responses (bot/src/api/utils/apiResponse.ts):
+
 ```typescript
 import { createSuccessResponse, createErrorResponse } from "../utils/apiResponse";
 
@@ -169,11 +172,13 @@ Every response includes `success`, `timestamp`, `requestId`, and `data` or `erro
 ### API Authentication & Scopes
 
 Middleware stack for protected endpoints:
+
 ```typescript
 import { authenticateApiKey, requireScope } from "../middleware/auth";
 
-router.post("/endpoint",
-  authenticateApiKey,           // Validates API key
+router.post(
+  "/endpoint",
+  authenticateApiKey, // Validates API key
   requireScope("modmail:write"), // Checks scope
   async (req, res) => {
     // req.apiKey contains key info
@@ -187,6 +192,7 @@ API keys managed via `/api-keys` Discord command with scopes like `minecraft:con
 ### Environment Variables
 
 Centralized in `bot/src/utils/FetchEnvs.ts`. Access via:
+
 ```typescript
 import fetchEnvs from "./utils/FetchEnvs";
 const env = fetchEnvs();
@@ -198,6 +204,7 @@ Feature flags: `ENABLE_FIVEM_SYSTEMS`, `ENABLE_MINECRAFT_SYSTEMS`, `ENABLE_GITHU
 ### Validation Files
 
 Prefix with `+` for universal validations (bot/src/validations/):
+
 - `+cooldowns.ts` - Applies to all commands
 - `validate.commandname.ts` - Command-specific validation
 
@@ -212,6 +219,7 @@ export default async function cooldownValidation({ interaction, handler }) {
 ### Dashboard API Client
 
 Client-side uses relative URLs (proxies through Next.js), server-side hits bot directly:
+
 ```typescript
 // dashboard/lib/api.ts
 const api = new ApiClient();
@@ -223,6 +231,7 @@ Includes request deduplication and client-side caching (dashboard/lib/client-cac
 ## Build & Deployment Workflows
 
 ### Local Development
+
 ```bash
 # From monorepo root
 bun run dev              # Both bot and dashboard
@@ -234,11 +243,13 @@ bun run install:all
 ```
 
 ### Docker Build
+
 - `scripts/fast-build.sh` - Single platform (fast)
 - `scripts/multi-platform-build.sh` - Multi-arch (slow)
 - Main Dockerfile builds entire monorepo in single container
 
 ### Bot-specific Commands
+
 ```bash
 cd bot
 bun run dev              # Nodemon with hot reload
@@ -246,6 +257,7 @@ bun run migrate:uuid-index  # Run DB migration
 ```
 
 ### Dashboard-specific
+
 ```bash
 cd dashboard
 bun run dev              # Next.js dev server
@@ -255,15 +267,18 @@ bunx prisma db push      # Sync Prisma schema
 ## Project-Specific Conventions
 
 ### File Naming
+
 - Commands: `kebab-case.ts` (e.g., `modmail-setup.ts`)
 - Utilities: `PascalCase.ts` for classes, `camelCase.ts` for functions
 - React: `PascalCase.tsx` for components
 - Next.js pages: `lowercase/page.tsx` per App Router
 
 ### Subcommands
+
 Complex commands split into `bot/src/subcommands/commandname/subcommand.ts`. Import and call from main command file.
 
 ### Embed Utilities
+
 - `BasicEmbed(client, title, description, fields?, color?)` - Standard embeds
 - `ModmailEmbeds.*` - Specialized modmail embeds (error, success, etc.)
 - `ThingGetter` - Utility class for fetching Discord entities (guilds, channels, users)
@@ -284,18 +299,14 @@ const config = await db.findOne(ModmailConfig, { guildId: "123" });
 const modmails = await db.find(ModmailModel, { userId: user.id });
 
 // Update with upsert (creates if not exists)
-const updated = await db.findOneAndUpdate(
-  ModmailConfig,
-  { guildId: guild.id },
-  { forumChannelId: channel.id },
-  { upsert: true, new: true }
-);
+const updated = await db.findOneAndUpdate(ModmailConfig, { guildId: guild.id }, { forumChannelId: channel.id }, { upsert: true, new: true });
 
 // Delete document
 await db.deleteOne(ModmailModel, { threadId: thread.id });
 ```
 
 **Key Features:**
+
 - **Redis Caching**: Automatic caching with configurable TTL (default 1 hour)
 - **Cache Invalidation**: Auto-invalidates on updates/deletes
 - **Query Key Hashing**: Creates unique cache keys from query parameters
@@ -313,6 +324,7 @@ Modmail is the bot's primary feature for user support tickets. Located in `bot/s
 #### Architecture Overview
 
 **Hook-Based Creation Flow:**
+
 1. User DMs bot → `gotMail.ts` event handler
 2. `HookBasedModmailCreator` executes before-creation hooks
 3. Hooks can: select guild, show category menu, collect form responses, run AI triage
@@ -322,6 +334,7 @@ Modmail is the bot's primary feature for user support tickets. Located in `bot/s
 #### Key Components
 
 **`HookBasedModmailCreator.ts`** - Main creation orchestrator
+
 - Executes hook chain for pre-creation logic
 - Handles multi-guild selection
 - Validates user membership
@@ -329,6 +342,7 @@ Modmail is the bot's primary feature for user support tickets. Located in `bot/s
 - **Hook System**: Dynamic, extensible pre-creation logic (AI triage, form collection, etc.)
 
 **`ModmailEmbeds.ts`** - Standardized embeds
+
 ```typescript
 // All modmail messages use these for consistency
 ModmailEmbeds.success(client, "Title", "Description", fields?)
@@ -338,22 +352,26 @@ ModmailEmbeds.info(client, "Title", "Description")
 ```
 
 **`CategoryValidation.ts`** - Validates category configs
+
 - Validates category structure (name, description, staff role)
 - Validates form fields (type, required, length)
 - Checks Discord entities exist (channels, roles)
 - Max 5 form fields per category
 
 **`FormFieldManager.ts`** - Handles custom intake forms
+
 - Supports text inputs, select menus, and text areas
 - Validates responses against field config
 - Stores responses in ticket metadata
 
 **`TicketNumbering.ts`** - Thread naming (singleton)
+
 - Generates unique ticket numbers per guild
 - Format: `ticket-{number}-{username}` (e.g., `ticket-0042-john`)
 - Thread-safe numbering with MongoDB counters
 
 **`ModmailThreads.ts`** - Safe thread operations
+
 - `createModmailThreadSafe()` - Creates with automatic cleanup on failure
 - `cleanupModmailThread()` - Removes thread + DB record on error
 - Activity tracking and timestamp management
@@ -361,6 +379,7 @@ ModmailEmbeds.info(client, "Title", "Description")
 #### Database Schema
 
 **ModmailConfig** (per-guild config):
+
 - `forumChannelId` - Forum channel for tickets
 - `staffRoleId` - Role that can respond
 - `categories[]` - Custom categories with forms
@@ -368,6 +387,7 @@ ModmailEmbeds.info(client, "Title", "Description")
 - `minimumMessageLength` - Prevents spam
 
 **Modmail** (per-ticket):
+
 - `threadId` - Discord forum thread ID
 - `userId` - User who created ticket
 - `guildId` - Server ticket belongs to
@@ -380,6 +400,7 @@ ModmailEmbeds.info(client, "Title", "Description")
 #### Common Patterns
 
 **Creating Modmail:**
+
 ```typescript
 const creator = new HookBasedModmailCreator(client);
 const result = await creator.createModmail(user, originalMessage, content);
@@ -387,6 +408,7 @@ const result = await creator.createModmail(user, originalMessage, content);
 ```
 
 **Validation:**
+
 ```typescript
 import { validateModmailSetup } from "./utils/modmail/ModmailValidation";
 
@@ -406,16 +428,17 @@ See `CategoryManager.ts` for add/edit/delete category operations.
 
 #### Available Flags
 
-| Flag | Purpose | Related Components |
-|------|---------|-------------------|
-| `ENABLE_MINECRAFT_SYSTEMS` | Minecraft whitelist integration | `/minecraft-*` commands, API routes |
-| `ENABLE_FIVEM_SYSTEMS` | FiveM server integration | `/fivem` commands, MariaDB connection |
-| `ENABLE_GITHUB_SUGGESTIONS` | GitHub issue creation from suggestions | `/suggest` command GitHub sync |
-| `ENABLE_TAW_COMMAND` | TAW-specific API integration | `/fivem taw` subcommand |
+| Flag                        | Purpose                                | Related Components                    |
+| --------------------------- | -------------------------------------- | ------------------------------------- |
+| `ENABLE_MINECRAFT_SYSTEMS`  | Minecraft whitelist integration        | `/minecraft-*` commands, API routes   |
+| `ENABLE_FIVEM_SYSTEMS`      | FiveM server integration               | `/fivem` commands, MariaDB connection |
+| `ENABLE_GITHUB_SUGGESTIONS` | GitHub issue creation from suggestions | `/suggest` command GitHub sync        |
+| `ENABLE_TAW_COMMAND`        | TAW-specific API integration           | `/fivem taw` subcommand               |
 
 #### Implementation Pattern
 
 **In Commands:**
+
 ```typescript
 // Set deleted: true when flag is false (unregisters command)
 export const options: LegacyCommandOptions = {
@@ -424,6 +447,7 @@ export const options: LegacyCommandOptions = {
 ```
 
 **In Events/Services:**
+
 ```typescript
 // Guard at file top - prevents entire file loading
 if (env.ENABLE_FIVEM_SYSTEMS && env.FIVEM_MYSQL_URI !== DEFAULT_OPTIONAL_STRING) {
@@ -432,6 +456,7 @@ if (env.ENABLE_FIVEM_SYSTEMS && env.FIVEM_MYSQL_URI !== DEFAULT_OPTIONAL_STRING)
 ```
 
 **Runtime Checks:**
+
 ```typescript
 import { envExists } from "./utils/FetchEnvs";
 
@@ -444,16 +469,19 @@ if (!envExists(env.ENABLE_FIVEM_SYSTEMS) || !envExists(env.FIVEM_MYSQL_URI)) {
 #### Adding New Feature Flags
 
 1. **Add to FetchEnvs.ts interface:**
+
 ```typescript
 ENABLE_MY_FEATURE: boolean;
 ```
 
 2. **Add to env object:**
+
 ```typescript
 ENABLE_MY_FEATURE: process.env.ENABLE_MY_FEATURE === "true",
 ```
 
 3. **Use in commands:**
+
 ```typescript
 export const options: LegacyCommandOptions = {
   deleted: !env.ENABLE_MY_FEATURE,
@@ -476,6 +504,7 @@ No traditional unit tests - testing happens in real Discord servers:
 4. **Debug Logging**: Enable with `DEBUG_LOG=true` for verbose output
 
 **Testing Workflow:**
+
 ```bash
 # 1. Set up test environment
 # .env:
@@ -495,29 +524,33 @@ bun run dev
 ```
 
 **Why No Mocking?**
+
 - Discord.js interactions are stateful and complex
 - Real Discord environment catches edge cases
 - ButtonKit/collectors need actual Discord connections
 - Database operations tested against real Redis/MongoDB
 
 **Debug Tools:**
+
 - `log.debug()` - Verbose debug output (only when DEBUG_LOG=true)
 - `tryCatch` utility - Captures and logs all errors
 - Bot API `/health` endpoint - Check service status
 - Redis caching can be disabled globally for testing
 
 ### Minecraft Integration
+
 Java plugin (minecraft-plugin/) calls bot API. Plugin config includes `enabled` flag (defaults false for security).
 
 ## Anti-Patterns to Avoid
 
 ❌ **Don't**: Write scripts to test features (per project rules)  
-❌ **Don't**: Create README files for every feature  
+❌ **Don't**: Create README, documentation, or guide files unless explicitly requested  
+❌ **Don't**: Write documentation markdown files - focus on code implementation only  
 ❌ **Don't**: Use `console.log` - always use `log.*`  
 ❌ **Don't**: Silently swallow errors - always log and inform user  
 ❌ **Don't**: Make direct database calls - use Database utility class (if exists) or Mongoose models  
 ❌ **Don't**: Use traditional Discord.js collectors - prefer ButtonKit  
-❌ **Don't**: Hard-code values - use environment variables via FetchEnvs  
+❌ **Don't**: Hard-code values - use environment variables via FetchEnvs
 
 ## Docker Deployment
 
@@ -526,12 +559,14 @@ Java plugin (minecraft-plugin/) calls bot API. Plugin config includes `enabled` 
 ### Container Architecture
 
 **Dockerfile Strategy:**
+
 - Multi-stage build: logger → command-handler → bot → dashboard
 - Local package linking via symlinks (not npm publish)
 - Both services run in single container via `concurrently`
 - Bun as primary runtime, Node.js 18 for compatibility
 
 **Build Scripts:**
+
 ```bash
 scripts/fast-build.sh           # Single platform (local testing)
 scripts/multi-platform-build.sh # Multi-arch (amd64 + arm64)
@@ -540,6 +575,7 @@ scripts/multi-platform-build.sh # Multi-arch (amd64 + arm64)
 ### Service Startup (scripts/start.sh)
 
 **Startup Sequence:**
+
 1. Display container debug info (hostname, memory, env vars)
 2. **Optional database setup** - Dashboard can run without DB (JWT sessions)
 3. Concurrent service startup:
@@ -547,6 +583,7 @@ scripts/multi-platform-build.sh # Multi-arch (amd64 + arm64)
    - Dashboard: `bun run start` on port 3000
 
 **Database Handling:**
+
 - If `DATABASE_URL` provided → attempts connection (10 retries)
 - If connection fails → continues anyway (JWT-only mode)
 - Dashboard doesn't require database for core functionality
@@ -554,12 +591,14 @@ scripts/multi-platform-build.sh # Multi-arch (amd64 + arm64)
 ### Health Checks (scripts/health-check.sh)
 
 **Docker HEALTHCHECK configuration:**
+
 - Interval: 60s between checks
 - Timeout: 30s per check
 - Start period: 120s (allows full startup)
 - Retries: 5 before marking unhealthy
 
 **Health Endpoints:**
+
 - Bot API: `http://localhost:3001/api/health` (must return 200)
 - Dashboard: `http://localhost:3000/api/health` (must return 200)
 
@@ -568,6 +607,7 @@ Both must respond successfully for container to be healthy.
 ### Environment Variables in Production
 
 **Required for Bot:**
+
 ```bash
 BOT_TOKEN=              # Discord bot token
 MONGODB_URI=            # MongoDB connection string
@@ -578,6 +618,7 @@ TEST_SERVERS=           # Comma-separated guild IDs
 ```
 
 **Required for Dashboard:**
+
 ```bash
 NEXTAUTH_SECRET=        # Secret for JWT signing
 NEXTAUTH_URL=           # Public dashboard URL
@@ -589,6 +630,7 @@ AUTH_TRUST_HOST=true    # Required for reverse proxy
 ```
 
 **Optional (Feature Flags):**
+
 ```bash
 ENABLE_MINECRAFT_SYSTEMS=true
 ENABLE_FIVEM_SYSTEMS=true
@@ -604,6 +646,7 @@ DEBUG_LOG=true          # Verbose logging
 ### Resource Considerations
 
 **System Dependencies:**
+
 - FFmpeg (for audio processing)
 - Node.js 18.x (compatibility)
 - Bun runtime (primary)
@@ -614,6 +657,7 @@ DEBUG_LOG=true          # Verbose logging
 ### Deployment Best Practices
 
 1. **Use docker-compose** for easier management:
+
 ```yaml
 services:
   heimdall:
