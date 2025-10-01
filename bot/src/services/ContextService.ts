@@ -269,8 +269,15 @@ export class ContextService {
   /**
    * Get combined context for AI prompt
    */
-  async getContextForAI(guildId: string, query: string, client?: Client): Promise<string> {
-    const decision = await this.determineContextUsage(query, guildId);
+  async getContextForAI(
+    guildId: string,
+    query: string,
+    client?: Client,
+    forceBotContext: boolean = false
+  ): Promise<string> {
+    const decision = forceBotContext
+      ? { useBotContext: true, useCustomContext: false, selectedSources: ["bot" as const] }
+      : await this.determineContextUsage(query, guildId);
     let combinedContext = "";
 
     // Prepare template variables
@@ -285,7 +292,7 @@ export class ContextService {
     };
 
     // Add guild-specific variables if we can get the guild
-    if (client) {
+    if (client && guildId) {
       try {
         const guild = client.guilds.cache.get(guildId);
         if (guild) {
@@ -306,7 +313,7 @@ export class ContextService {
       }
     }
 
-    if (decision.useCustomContext) {
+    if (decision.useCustomContext && guildId) {
       const guildContext = await this.getGuildContext(guildId);
       if (guildContext?.content) {
         // Also apply template replacement to custom context in case users use variables
@@ -334,7 +341,14 @@ export class ContextService {
   /**
    * Get context sources used for a response (for display)
    */
-  async getContextSources(guildId: string, query: string): Promise<string[]> {
+  async getContextSources(
+    guildId: string,
+    query: string,
+    forceBotContext: boolean = false
+  ): Promise<string[]> {
+    if (forceBotContext) {
+      return ["bot"];
+    }
     const decision = await this.determineContextUsage(query, guildId);
     return decision.selectedSources;
   }

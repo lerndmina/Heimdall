@@ -1,0 +1,39 @@
+{
+  "name": "@lerndmina/helpie-userbot",
+  "version": "1.0.0",
+  "description": "A Userbot for managing support tickets.",
+  "main": "src/index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "bunx nodemon --watch 'src/**/*.ts' --exec 'npx tsx' src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "bunx tsc"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ai-sdk/openai": "^2.0.42",
+    "@heimdall/command-handler": "../command-handler",
+    "@heimdall/logger": "../logger",
+    "@types/ms": "^2.1.0",
+    "ai": "^5.0.59",
+    "discord.js": "^14.22.1",
+    "dotenv": "^16.6.1",
+    "mongoose": "^7.8.7",
+    "ms": "^2.1.3",
+    "nodemon": "^3.1.10",
+    "pretty-ms": "^9.2.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/fancy-log": "^2.0.2",
+    "@types/node": "^20.19.14",
+    "@types/uuid": "^10.0.0",
+    "concurrently": "^8.2.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
