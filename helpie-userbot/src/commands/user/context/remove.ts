@@ -8,6 +8,7 @@ import { ChatInputCommandInteraction, Client, SlashCommandBuilder, ActionRowBuil
 import { ContextService } from "../../../services/ContextService";
 import fetchEnvs from "../../../utils/FetchEnvs";
 import log from "../../../utils/log";
+import HelpieReplies from "../../../utils/HelpieReplies";
 
 const env = fetchEnvs();
 
@@ -28,13 +29,10 @@ export const options = {
 export async function run(interaction: ChatInputCommandInteraction, client: Client) {
   // Owner-only validation
   if (!env.OWNER_IDS.includes(interaction.user.id)) {
-    return interaction.reply({
-      content: "❌ This command is only available to bot owners.",
-      ephemeral: true,
-    });
+    return HelpieReplies.warning(interaction, "This command is only available to bot owners.");
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await HelpieReplies.deferSearching(interaction, true);
 
   try {
     const scope = interaction.options.getString("scope", true) as "global" | "guild" | "user";

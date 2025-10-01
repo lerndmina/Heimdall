@@ -18,7 +18,7 @@ const env = fetchEnvs();
 
 // Initialize Redis client
 export const redisClient = createClient({
-  url: env.REDIS_URL,
+  url: env.REDIS_URI,
 })
   .on("error", (err: Error) => {
     log.error("Redis Client Error", err);

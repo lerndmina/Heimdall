@@ -12,15 +12,7 @@
  * - mandalorianlooking (searching/loading)
  */
 
-import {
-  ChatInputCommandInteraction,
-  InteractionReplyOptions,
-  InteractionUpdateOptions,
-  MessagePayload,
-  InteractionEditReplyOptions,
-  Message,
-  InteractionResponse,
-} from "discord.js";
+import { ChatInputCommandInteraction, InteractionReplyOptions, InteractionUpdateOptions, MessagePayload, InteractionEditReplyOptions, Message, InteractionResponse } from "discord.js";
 
 /**
  * Animated emoji IDs for Helpie
@@ -97,10 +89,7 @@ export class HelpieReplies {
    *   content: 'Context updated successfully!'
    * });
    */
-  static async reply(
-    interaction: ChatInputCommandInteraction,
-    options: HelpieReplyOptions
-  ): Promise<InteractionResponse<boolean>> {
+  static async reply(interaction: ChatInputCommandInteraction, options: HelpieReplyOptions): Promise<InteractionResponse<boolean>> {
     const { type = "info", ephemeral = false, content, emoji = true } = options;
 
     const formattedContent = formatContent(content, type, emoji);
@@ -120,10 +109,7 @@ export class HelpieReplies {
    *   content: 'Operation completed!'
    * });
    */
-  static async editReply(
-    interaction: ChatInputCommandInteraction,
-    options: HelpieReplyOptions
-  ): Promise<Message> {
+  static async editReply(interaction: ChatInputCommandInteraction, options: HelpieReplyOptions): Promise<Message> {
     const { type = "info", content, emoji = true } = options;
 
     const formattedContent = formatContent(content, type, emoji);
@@ -149,11 +135,11 @@ export class HelpieReplies {
   }
 
   /**
-   * Defer reply with searching emoji (for lookup operations)
+   * Defer reply with searching/loading emoji (for lookup operations or loading states)
    *
    * @example
    * await HelpieReplies.deferSearching(interaction);
-   * // ... search database ...
+   * // ... search database or load data ...
    * await HelpieReplies.editReply(interaction, { type: 'info', content: 'Results...' });
    */
   static async deferSearching(interaction: ChatInputCommandInteraction, ephemeral: boolean = false): Promise<void> {
@@ -169,11 +155,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.success(interaction, 'Context saved successfully!');
    */
-  static async success(
-    interaction: ChatInputCommandInteraction,
-    content: string,
-    ephemeral: boolean = false
-  ): Promise<InteractionResponse<boolean>> {
+  static async success(interaction: ChatInputCommandInteraction, content: string, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     return HelpieReplies.reply(interaction, {
       type: "success",
       content,
@@ -187,11 +169,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.error(interaction, 'Failed to connect to database.');
    */
-  static async error(
-    interaction: ChatInputCommandInteraction,
-    content: string,
-    ephemeral: boolean = true
-  ): Promise<InteractionResponse<boolean>> {
+  static async error(interaction: ChatInputCommandInteraction, content: string, ephemeral: boolean = true): Promise<InteractionResponse<boolean>> {
     return HelpieReplies.reply(interaction, {
       type: "error",
       content,
@@ -205,11 +183,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.warning(interaction, 'Invalid URL format!');
    */
-  static async warning(
-    interaction: ChatInputCommandInteraction,
-    content: string,
-    ephemeral: boolean = true
-  ): Promise<InteractionResponse<boolean>> {
+  static async warning(interaction: ChatInputCommandInteraction, content: string, ephemeral: boolean = true): Promise<InteractionResponse<boolean>> {
     return HelpieReplies.reply(interaction, {
       type: "warning",
       content,
@@ -223,11 +197,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.info(interaction, 'Here are the available contexts...');
    */
-  static async info(
-    interaction: ChatInputCommandInteraction,
-    content: string,
-    ephemeral: boolean = false
-  ): Promise<InteractionResponse<boolean>> {
+  static async info(interaction: ChatInputCommandInteraction, content: string, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     return HelpieReplies.reply(interaction, {
       type: "info",
       content,
