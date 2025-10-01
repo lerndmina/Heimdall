@@ -8,6 +8,7 @@ import { ChatInputCommandInteraction, Client, SlashCommandBuilder } from "discor
 import { ContextService } from "../../../services/ContextService";
 import fetchEnvs from "../../../utils/FetchEnvs";
 import log from "../../../utils/log";
+import HelpieReplies from "../../../utils/HelpieReplies";
 
 const env = fetchEnvs();
 
@@ -34,13 +35,10 @@ export const options = {
 export async function run(interaction: ChatInputCommandInteraction, client: Client) {
   // Owner-only validation
   if (!env.OWNER_IDS.includes(interaction.user.id)) {
-    return interaction.reply({
-      content: "❌ This command is only available to bot owners.",
-      ephemeral: true,
-    });
+    return HelpieReplies.warning(interaction, "This command is only available to bot owners.");
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await HelpieReplies.deferThinking(interaction, true);
 
   try {
     const scope = interaction.options.getString("scope", true) as "global" | "guild" | "user";
@@ -51,22 +49,19 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
 
     // Validate GitHub URL
     if (!ContextService.isValidGitHubRawUrl(url)) {
-      return interaction.editReply({
-        content: "❌ Invalid URL. Must be a GitHub raw URL or Gist URL starting with:\n- `https://raw.githubusercontent.com/`\n- `https://gist.githubusercontent.com/`",
-      });
+      return HelpieReplies.editWarning(
+        interaction,
+        "Invalid URL. Must be a GitHub raw URL or Gist URL starting with:\n- `https://raw.githubusercontent.com/`\n- `https://gist.githubusercontent.com/`"
+      );
     }
 
     // Validate scope-specific requirements
     if (scope === "user" && !targetUser) {
-      return interaction.editReply({
-        content: "❌ User scope requires a target user. Please specify `target-user`.",
-      });
+      return HelpieReplies.editWarning(interaction, "User scope requires a target user. Please specify `target-user`.");
     }
 
     if (scope === "guild" && !targetGuild && !interaction.guildId) {
-      return interaction.editReply({
-        content: "❌ Guild scope requires a target guild ID or must be run in a guild.",
-      });
+      return HelpieReplies.editWarning(interaction, "Guild scope requires a target guild ID or must be run in a guild.");
     }
 
     // Prepare options
@@ -90,8 +85,7 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
 
     const shortUrl = url.length > 60 ? url.substring(0, 57) + "..." : url;
 
-    await interaction.editReply({
-      content: `✅ **Context Set Successfully**
+    const responseMessage = `**Context Set Successfully**
 
 **Scope:** ${scopeDisplay}
 ${name ? `**Name:** ${name}\n` : ""}**URL:** ${shortUrl}
@@ -105,8 +99,9 @@ ${
     : "This context will apply to this specific user everywhere."
 }
 
-Run \`/helpie ask\` to test it!`,
-    });
+Run \`/helpie ask\` to test it!`;
+
+    await HelpieReplies.editSuccess(interaction, responseMessage);
 
     log.info("Context set successfully", {
       scope,
@@ -118,13 +113,9 @@ Run \`/helpie ask\` to test it!`,
 
     // Handle duplicate key error
     if (error.code === 11000) {
-      return interaction.editReply({
-        content: "✅ Context updated! (Existing context for this scope was replaced)",
-      });
+      return HelpieReplies.editSuccess(interaction, "Context updated! (Existing context for this scope was replaced)");
     }
 
-    await interaction.editReply({
-      content: "❌ An error occurred while setting the context. Please try again later.",
-    });
+    await HelpieReplies.editError(interaction, "An error occurred while setting the context. Please try again later.");
   }
 }

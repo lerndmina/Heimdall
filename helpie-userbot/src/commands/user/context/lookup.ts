@@ -8,6 +8,7 @@ import { ChatInputCommandInteraction, Client, SlashCommandBuilder } from "discor
 import { ContextService } from "../../../services/ContextService";
 import fetchEnvs from "../../../utils/FetchEnvs";
 import log from "../../../utils/log";
+import HelpieReplies from "../../../utils/HelpieReplies";
 
 const env = fetchEnvs();
 
@@ -25,13 +26,10 @@ export const options = {
 export async function run(interaction: ChatInputCommandInteraction, client: Client) {
   // Owner-only validation
   if (!env.OWNER_IDS.includes(interaction.user.id)) {
-    return interaction.reply({
-      content: "❌ This command is only available to bot owners.",
-      ephemeral: true,
-    });
+    return HelpieReplies.warning(interaction, "This command is only available to bot owners.");
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await HelpieReplies.deferSearching(interaction, true);
 
   try {
     const targetUser = interaction.options.getUser("target-user") || interaction.user;
@@ -78,15 +76,15 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
 
     // Build response
     if (activeContexts.length === 0) {
-      return interaction.editReply({
-        content: `🔍 **Context Lookup Results**
+      const noContextMessage = `🔍 **Context Lookup Results**
 
 **User:** ${targetUser.tag}
 ${targetGuild ? `**Guild:** ${client.guilds.cache.get(targetGuild)?.name || targetGuild}\n` : ""}
 **Active Contexts:** None
 
-No contexts apply to this user/guild combination.`,
-      });
+No contexts apply to this user/guild combination.`;
+
+      return HelpieReplies.editInfo(interaction, noContextMessage);
     }
 
     const totalSize = activeContexts.reduce((sum, ctx) => sum + ctx.size, 0);
@@ -113,11 +111,9 @@ ${targetGuild ? `**Guild:** ${client.guilds.cache.get(targetGuild)?.name || targ
 These contexts will be injected into \`/helpie ask\` responses.
 User context has the highest priority and will be given more weight by the AI.`;
 
-    await interaction.editReply({ content: response });
+    await HelpieReplies.editInfo(interaction, response);
   } catch (error) {
     log.error("Error looking up contexts:", error);
-    await interaction.editReply({
-      content: "❌ An error occurred while looking up contexts. Please try again later.",
-    });
+    await HelpieReplies.editError(interaction, "An error occurred while looking up contexts. Please try again later.");
   }
 }
