@@ -1,7 +1,20 @@
 /**
  * Ask command - Ask Helpie AI a question
  *
- * Example: /helpie ask message:"What is the meaning of life?"
+ * Ex    log.debug("AI response generated", { userId: interaction.user.id, responseLength: text.length });
+
+    // Discord embed description has a 4096 character limit
+    const truncatedResponse = text.length > 3900 ? text.substring(0, 3900) + "..." : text;
+
+    // Send response (automatically uses editReply since we deferred)
+    await HelpieReplies.success(interaction, {
+      title: "Helpie",
+      message: truncatedResponse,
+    });
+  } catch (error) {
+    log.error("Error processing AI request:", error);
+    await HelpieReplies.error(interaction, "An error occurred while processing your question. Please try again later.");
+  }k message:"What is the meaning of life?"
  */
 
 import { ChatInputCommandInteraction, Client, SlashCommandBuilder } from "discord.js";
@@ -58,15 +71,9 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
     const truncatedResponse = text.length > 3900 ? text.substring(0, 3900) + "..." : text;
 
     // Edit reply with success and response
-    await HelpieReplies.editReply(interaction, {
-      type: "success",
-      content: {
-        title: "AI Response",
-        message: `**Your question:** ${message}\n\n**Helpie:** ${truncatedResponse}`,
-      },
-    });
+    await HelpieReplies.success(interaction, truncatedResponse);
   } catch (error) {
     log.error("Error processing AI request:", error);
-    await HelpieReplies.editError(interaction, "An error occurred while processing your question. Please try again later.");
+    await HelpieReplies.error(interaction, "An error occurred while processing your question. Please try again later.");
   }
 }

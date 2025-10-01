@@ -4,9 +4,21 @@ Quick reference for using the HelpieReplies system with animated emoji.
 
 ## Import
 
-```typescript
-import HelpieReplies from "../utils/HelpieReplies";
-```
+````typescript
+import HelpieReplies from "../utils/HelpieR## Best Practices
+
+1. **Use deferred replies** for operations that take >3 seconds
+2. **Choose the right emoji**:
+   - `deferThinking()` for AI/processing
+   - `deferSearching()` for database lookups, loading states, or any data fetching
+3. **Plain text vs Embeds**:
+   - Use **plain text (string)** for simple, short messages
+   - Use **embeds (object)** for detailed responses with formatting, lists, or multiple sections
+4. **Error types**:
+   - `error()` for system failures (not user's fault)
+   - `warning()` for validation failures (user's fault)
+5. **Ephemeral by default** for owner-only commands
+6. **Disable emoji** only when you need complex custom formatting (`emoji: false` option)`
 
 ## Available Emoji
 
@@ -20,34 +32,37 @@ import HelpieReplies from "../utils/HelpieReplies";
 
 ## Basic Usage Patterns
 
-**All replies are sent as embeds with color-coded titles and descriptions.**
+**Two reply modes:**
+1. **Simple String** → Plain text message with emoji prefix
+2. **Object with title and message** → Color-coded embed with title
 
-### 1. Simple String (Uses Default Title)
+### 1. Simple String (Plain Text Message)
 
 ```typescript
-// Uses default "Success" title
+// Plain text with emoji prefix
 await HelpieReplies.success(interaction, "Context saved successfully!");
+// Output: 🤖 Context saved successfully!
 
-// Uses default "Error" title
 await HelpieReplies.error(interaction, "Failed to connect to database.");
+// Output: 😔 Failed to connect to database.
 
-// Uses default "Warning" title
 await HelpieReplies.warning(interaction, "Invalid URL format!");
+// Output: 😲 Invalid URL format!
 
-// Uses default "Information" title
 await HelpieReplies.info(interaction, "Here are your contexts...");
-```
+// Output: 🤔 Here are your contexts...
+````
 
-### 2. Custom Title with Message
+### 2. Object with Title and Message (Embed)
 
 ```typescript
-// Custom title and message
+// Creates a green embed with custom title
 await HelpieReplies.success(interaction, {
   title: "Context Saved",
   message: "Your context has been saved successfully!",
 });
 
-// Error with custom title
+// Creates a red embed with custom title
 await HelpieReplies.error(interaction, {
   title: "Database Connection Failed",
   message: "Could not connect to MongoDB. Please check your connection string.",
