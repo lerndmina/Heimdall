@@ -5,6 +5,12 @@
  */
 
 import { ChatInputCommandInteraction, Client, SlashCommandBuilder } from "discord.js";
+import { openai } from "@ai-sdk/openai";
+import { generateText } from "ai";
+import fetchEnvs from "../../utils/FetchEnvs";
+import log from "../../utils/log";
+
+const env = fetchEnvs();
 
 export const data = new SlashCommandBuilder()
   .setName("ask")
@@ -22,13 +28,28 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
   await interaction.deferReply();
 
   try {
-    // TODO: Integrate with AI service
+    log.debug("Processing AI request", { userId: interaction.user.id, message });
+
+    // Generate AI response using Vercel AI SDK
+    const { text } = await generateText({
+      model: openai("gpt-4o-mini"),
+      system: env.SYSTEM_PROMPT,
+      prompt: message,
+      temperature: 0.7,
+    });
+
+    log.debug("AI response generated", { userId: interaction.user.id, responseLength: text.length });
+
+    // Discord has a 2000 character limit for message content
+    const truncatedResponse = text.length > 1900 ? text.substring(0, 1900) + "..." : text;
+
     await interaction.editReply({
-      content: `**Your question:** ${message}\n\n**Helpie:** I'm not connected to an AI service yet, but I received your question! This is where I would provide an AI-powered response.`,
+      content: `**Your question:** ${message}\n\n**Helpie:** ${truncatedResponse}`,
     });
   } catch (error) {
+    log.error("Error processing AI request:", error);
     await interaction.editReply({
-      content: "❌ An error occurred while processing your question.",
+      content: "❌ An error occurred while processing your question. Please try again later.",
     });
   }
 }
