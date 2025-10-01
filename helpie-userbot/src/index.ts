@@ -26,8 +26,12 @@ export const redisClient = createClient({
   })
   .on("ready", () => log.info("Redis Client Ready"));
 
+// Track bot start time for uptime command (seconds since epoch)
+export let botStartTime: number = Math.floor(Date.now() / 1000);
+
 export const start = async () => {
   const startTime = Date.now();
+  botStartTime = Math.floor(Date.now() / 1000); // Update when bot actually starts
   log.info("Starting Helpie Userbot...");
 
   // Create Discord client with minimal intents (user-installable bot)

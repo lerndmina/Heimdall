@@ -2,7 +2,7 @@
  * HelpieReplies - Universal message sending system with automatic emoji injection
  *
  * Provides consistent reply formatting across all Helpie commands with contextual
- * animated emoji based on reply type.
+ * animated emoji based on reply type. All replies are sent as embeds.
  *
  * Available emoji:
  * - mandalorianhello (greeting/success)
@@ -12,7 +12,7 @@
  * - mandalorianlooking (searching/loading)
  */
 
-import { ChatInputCommandInteraction, InteractionReplyOptions, InteractionUpdateOptions, MessagePayload, InteractionEditReplyOptions, Message, InteractionResponse } from "discord.js";
+import { ChatInputCommandInteraction, InteractionReplyOptions, InteractionUpdateOptions, MessagePayload, InteractionEditReplyOptions, Message, InteractionResponse, EmbedBuilder } from "discord.js";
 
 /**
  * Animated emoji IDs for Helpie
@@ -31,13 +31,18 @@ export const HelpieEmoji = {
 export type ReplyType = "success" | "error" | "warning" | "info" | "thinking" | "searching" | "question";
 
 /**
+ * Content input - can be a simple string or object with title and message
+ */
+export type ReplyContent = string | { title: string; message: string };
+
+/**
  * Options for HelpieReplies
  */
 export interface HelpieReplyOptions {
   type?: ReplyType;
   ephemeral?: boolean;
-  content: string;
-  emoji?: boolean; // Whether to include emoji (default: true)
+  content: ReplyContent;
+  emoji?: boolean; // Whether to include emoji in title (default: true)
 }
 
 /**
@@ -63,15 +68,71 @@ function getEmojiForType(type: ReplyType): string {
 }
 
 /**
- * Formats content with appropriate emoji prefix
+ * Gets default title for reply type
  */
-function formatContent(content: string, type: ReplyType = "info", includeEmoji: boolean = true): string {
-  if (!includeEmoji) {
-    return content;
+function getDefaultTitle(type: ReplyType): string {
+  switch (type) {
+    case "success":
+      return "Success";
+    case "error":
+      return "Error";
+    case "warning":
+      return "Warning";
+    case "info":
+      return "Information";
+    case "thinking":
+    case "question":
+      return "Processing";
+    case "searching":
+      return "Searching";
+    default:
+      return "Helpie";
+  }
+}
+
+/**
+ * Gets embed color for reply type
+ */
+function getColorForType(type: ReplyType): number {
+  switch (type) {
+    case "success":
+      return 0x43b581; // Green
+    case "error":
+      return 0xf04747; // Red
+    case "warning":
+      return 0xfaa61a; // Yellow/Orange
+    case "info":
+    case "thinking":
+    case "question":
+    case "searching":
+    default:
+      return 0x7289da; // Blurple
+  }
+}
+
+/**
+ * Creates an embed with formatted content
+ */
+function createEmbed(content: ReplyContent, type: ReplyType = "info", includeEmoji: boolean = true): EmbedBuilder {
+  const emoji = getEmojiForType(type);
+  let title: string;
+  let description: string;
+
+  // Handle content input
+  if (typeof content === "string") {
+    // Simple string - use default title
+    title = getDefaultTitle(type);
+    description = content;
+  } else {
+    // Object with custom title and message
+    title = content.title;
+    description = content.message;
   }
 
-  const emoji = getEmojiForType(type);
-  return `${emoji} ${content}`;
+  // Add emoji to title if enabled
+  const finalTitle = includeEmoji ? `${emoji} ${title}` : title;
+
+  return new EmbedBuilder().setTitle(finalTitle).setDescription(description).setColor(getColorForType(type)).setTimestamp();
 }
 
 /**
@@ -81,41 +142,55 @@ function formatContent(content: string, type: ReplyType = "info", includeEmoji: 
  */
 export class HelpieReplies {
   /**
-   * Reply to an interaction with formatted message
+   * Reply to an interaction with formatted embed
    *
    * @example
    * await HelpieReplies.reply(interaction, {
    *   type: 'success',
    *   content: 'Context updated successfully!'
    * });
+   *
+   * @example
+   * await HelpieReplies.reply(interaction, {
+   *   type: 'success',
+   *   content: { title: 'Context Saved', message: 'Your context has been saved!' }
+   * });
    */
   static async reply(interaction: ChatInputCommandInteraction, options: HelpieReplyOptions): Promise<InteractionResponse<boolean>> {
     const { type = "info", ephemeral = false, content, emoji = true } = options;
 
-    const formattedContent = formatContent(content, type, emoji);
+    const embed = createEmbed(content, type, emoji);
 
     return interaction.reply({
-      content: formattedContent,
-      ephemeral,
+      content: "", // Clear any loading symbols
+      embeds: [embed],
+      flags: ephemeral ? 64 : undefined,
     });
   }
 
   /**
-   * Edit an existing reply with formatted message
+   * Edit an existing reply with formatted embed
    *
    * @example
    * await HelpieReplies.editReply(interaction, {
    *   type: 'success',
    *   content: 'Operation completed!'
    * });
+   *
+   * @example
+   * await HelpieReplies.editReply(interaction, {
+   *   type: 'error',
+   *   content: { title: 'Failed', message: 'Operation could not be completed.' }
+   * });
    */
   static async editReply(interaction: ChatInputCommandInteraction, options: HelpieReplyOptions): Promise<Message> {
     const { type = "info", content, emoji = true } = options;
 
-    const formattedContent = formatContent(content, type, emoji);
+    const embed = createEmbed(content, type, emoji);
 
     return interaction.editReply({
-      content: formattedContent,
+      content: "", // Clear any loading symbols
+      embeds: [embed],
     });
   }
 
@@ -154,8 +229,11 @@ export class HelpieReplies {
    *
    * @example
    * await HelpieReplies.success(interaction, 'Context saved successfully!');
+   *
+   * @example
+   * await HelpieReplies.success(interaction, { title: 'Saved', message: 'Context saved!' });
    */
-  static async success(interaction: ChatInputCommandInteraction, content: string, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
+  static async success(interaction: ChatInputCommandInteraction, content: ReplyContent, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     return HelpieReplies.reply(interaction, {
       type: "success",
       content,
@@ -169,7 +247,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.error(interaction, 'Failed to connect to database.');
    */
-  static async error(interaction: ChatInputCommandInteraction, content: string, ephemeral: boolean = true): Promise<InteractionResponse<boolean>> {
+  static async error(interaction: ChatInputCommandInteraction, content: ReplyContent, ephemeral: boolean = true): Promise<InteractionResponse<boolean>> {
     return HelpieReplies.reply(interaction, {
       type: "error",
       content,
@@ -183,7 +261,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.warning(interaction, 'Invalid URL format!');
    */
-  static async warning(interaction: ChatInputCommandInteraction, content: string, ephemeral: boolean = true): Promise<InteractionResponse<boolean>> {
+  static async warning(interaction: ChatInputCommandInteraction, content: ReplyContent, ephemeral: boolean = true): Promise<InteractionResponse<boolean>> {
     return HelpieReplies.reply(interaction, {
       type: "warning",
       content,
@@ -197,7 +275,7 @@ export class HelpieReplies {
    * @example
    * await HelpieReplies.info(interaction, 'Here are the available contexts...');
    */
-  static async info(interaction: ChatInputCommandInteraction, content: string, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
+  static async info(interaction: ChatInputCommandInteraction, content: ReplyContent, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     return HelpieReplies.reply(interaction, {
       type: "info",
       content,
@@ -213,7 +291,7 @@ export class HelpieReplies {
    * // ... do work ...
    * await HelpieReplies.editSuccess(interaction, 'All done!');
    */
-  static async editSuccess(interaction: ChatInputCommandInteraction, content: string): Promise<Message> {
+  static async editSuccess(interaction: ChatInputCommandInteraction, content: ReplyContent): Promise<Message> {
     return HelpieReplies.editReply(interaction, {
       type: "success",
       content,
@@ -228,7 +306,7 @@ export class HelpieReplies {
    * // ... operation fails ...
    * await HelpieReplies.editError(interaction, 'Something went wrong.');
    */
-  static async editError(interaction: ChatInputCommandInteraction, content: string): Promise<Message> {
+  static async editError(interaction: ChatInputCommandInteraction, content: ReplyContent): Promise<Message> {
     return HelpieReplies.editReply(interaction, {
       type: "error",
       content,
@@ -243,7 +321,7 @@ export class HelpieReplies {
    * // ... validation fails ...
    * await HelpieReplies.editWarning(interaction, 'Invalid input detected!');
    */
-  static async editWarning(interaction: ChatInputCommandInteraction, content: string): Promise<Message> {
+  static async editWarning(interaction: ChatInputCommandInteraction, content: ReplyContent): Promise<Message> {
     return HelpieReplies.editReply(interaction, {
       type: "warning",
       content,
@@ -258,7 +336,7 @@ export class HelpieReplies {
    * // ... fetch results ...
    * await HelpieReplies.editInfo(interaction, 'Found 5 contexts.');
    */
-  static async editInfo(interaction: ChatInputCommandInteraction, content: string): Promise<Message> {
+  static async editInfo(interaction: ChatInputCommandInteraction, content: ReplyContent): Promise<Message> {
     return HelpieReplies.editReply(interaction, {
       type: "info",
       content,

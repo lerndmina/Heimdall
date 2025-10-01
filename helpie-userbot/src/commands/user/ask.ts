@@ -50,19 +50,20 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
       model: openai("gpt-4o-mini"),
       system: systemPromptWithContext,
       prompt: message,
-      temperature: 0.7,
     });
 
     log.debug("AI response generated", { userId: interaction.user.id, responseLength: text.length });
 
-    // Discord has a 2000 character limit for message content
-    const truncatedResponse = text.length > 1900 ? text.substring(0, 1900) + "..." : text;
+    // Discord embed description has a 4096 character limit
+    const truncatedResponse = text.length > 3900 ? text.substring(0, 3900) + "..." : text;
 
-    // Edit reply with success emoji and response
+    // Edit reply with success and response
     await HelpieReplies.editReply(interaction, {
       type: "success",
-      content: `**Your question:** ${message}\n\n**Helpie:** ${truncatedResponse}`,
-      emoji: false, // Custom formatting, no emoji prefix
+      content: {
+        title: "AI Response",
+        message: `**Your question:** ${message}\n\n**Helpie:** ${truncatedResponse}`,
+      },
     });
   } catch (error) {
     log.error("Error processing AI request:", error);

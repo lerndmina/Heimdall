@@ -20,28 +20,38 @@ import HelpieReplies from "../utils/HelpieReplies";
 
 ## Basic Usage Patterns
 
-### 1. Success Message
+**All replies are sent as embeds with color-coded titles and descriptions.**
+
+### 1. Simple String (Uses Default Title)
 
 ```typescript
+// Uses default "Success" title
 await HelpieReplies.success(interaction, "Context saved successfully!");
-```
 
-### 2. Error Message (System Error)
-
-```typescript
+// Uses default "Error" title
 await HelpieReplies.error(interaction, "Failed to connect to database.");
-```
 
-### 3. Warning Message (User Error)
-
-```typescript
+// Uses default "Warning" title
 await HelpieReplies.warning(interaction, "Invalid URL format!");
+
+// Uses default "Information" title
+await HelpieReplies.info(interaction, "Here are your contexts...");
 ```
 
-### 4. Info Message
+### 2. Custom Title with Message
 
 ```typescript
-await HelpieReplies.info(interaction, "Here are your contexts...");
+// Custom title and message
+await HelpieReplies.success(interaction, {
+  title: "Context Saved",
+  message: "Your context has been saved successfully!",
+});
+
+// Error with custom title
+await HelpieReplies.error(interaction, {
+  title: "Database Connection Failed",
+  message: "Could not connect to MongoDB. Please check your connection string.",
+});
 ```
 
 ## Defer → Edit Pattern
@@ -106,7 +116,7 @@ await HelpieReplies.reply(interaction, {
 
 ## Complete Example
 
-```typescript
+````typescript
 export async function run(interaction: ChatInputCommandInteraction, client: Client) {
   // Validate ownership
   if (!env.OWNER_IDS.includes(interaction.user.id)) {
@@ -123,25 +133,40 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
       return HelpieReplies.editInfo(interaction, "No results found.");
     }
 
+    // Simple string response
     await HelpieReplies.editSuccess(interaction, `Found ${data.length} results!`);
+
+    // OR with custom title
+    await HelpieReplies.editSuccess(interaction, {
+      title: "Search Complete",
+      message: `Found ${data.length} results!`,
+    });
   } catch (error) {
     log.error("Error fetching data:", error);
     await HelpieReplies.editError(interaction, "An error occurred while fetching data.");
   }
 }
-```
+```## Embed Colors and Emoji Mapping
 
-## Reply Type to Emoji Mapping
+All replies use color-coded embeds with timestamps:
 
-| Reply Type  | Emoji   | Use For               |
-| ----------- | ------- | --------------------- |
-| `success`   | hello   | Successful operations |
-| `error`     | sorry   | System failures       |
-| `warning`   | shocked | User mistakes         |
-| `info`      | what    | General information   |
-| `thinking`  | what    | Processing operations |
-| `question`  | what    | Asking for input      |
-| `searching` | looking | Database/API lookups  |
+| Reply Type | Emoji    | Color          | Use For                                   |
+| ---------- | -------- | -------------- | ----------------------------------------- |
+| `success`  | hello    | 🟢 Green       | Successful operations                     |
+| `error`    | sorry    | 🔴 Red         | System failures                           |
+| `warning`  | shocked  | 🟡 Orange      | User mistakes, validation errors          |
+| `info`     | what     | 🔵 Blurple     | General information                       |
+| `thinking` | what     | 🔵 Blurple     | Processing operations                     |
+| `question` | what     | 🔵 Blurple     | Asking for input                          |
+| `searching`| looking  | 🔵 Blurple     | Database/API lookups, any loading state   |
+
+**Default Titles:**
+- Success → "Success"
+- Error → "Error"
+- Warning → "Warning"
+- Info → "Information"
+- Thinking/Question → "Processing"
+- Searching → "Searching"
 
 ## Best Practices
 
@@ -163,7 +188,7 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
 await interaction.reply(`<a:mandalorianwhat:1422976946962174003>`);
 // ... processing ...
 await interaction.editReply({ content: "✅ Done!" });
-```
+````
 
 ### After
 
