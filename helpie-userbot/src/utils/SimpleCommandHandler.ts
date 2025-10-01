@@ -132,10 +132,38 @@ export class SimpleCommandHandler {
 
   /**
    * Check if a command data object is a context menu command
+   * Uses multiple detection methods for reliability
    */
   private isContextMenuCommand(data: any): boolean {
-    // Check if it's a ContextMenuCommandBuilder instance or has context menu type
-    return data instanceof ContextMenuCommandBuilder || data.type === ApplicationCommandType.Message || data.type === ApplicationCommandType.User;
+    // Method 1: instanceof check
+    if (data instanceof ContextMenuCommandBuilder) {
+      return true;
+    }
+
+    // Method 2: Check constructor name
+    if (data.constructor?.name === "ContextMenuCommandBuilder") {
+      return true;
+    }
+
+    // Method 3: Check the toJSON output for context menu type
+    if (typeof data.toJSON === "function") {
+      try {
+        const jsonData = data.toJSON();
+        if (jsonData && (jsonData.type === 2 || jsonData.type === 3)) {
+          // Type 2 = Message, Type 3 = User context menu
+          return true;
+        }
+      } catch (error) {
+        // Ignore toJSON errors
+      }
+    }
+
+    // Method 4: Check for raw object pattern
+    if (data.name && data.type && (data.type === 2 || data.type === 3 || data.type === ApplicationCommandType.Message || data.type === ApplicationCommandType.User)) {
+      return true;
+    }
+
+    return false;
   }
   /**
    * Build the /helpie command with all subcommands
@@ -421,9 +449,20 @@ export class SimpleCommandHandler {
 
       // Add all context menu commands (deleted ones already filtered out in loadCommands)
       for (const [name, commandModule] of this.contextMenuCommands) {
-        commands.push(commandModule.data.toJSON());
+        const contextMenuJSON = commandModule.data.toJSON();
+        commands.push(contextMenuJSON);
         commandNamesToKeep.add(name);
+
+        // Log context menu command type for debugging
+        const cmdType = contextMenuJSON.type === 2 ? "Message" : contextMenuJSON.type === 3 ? "User" : "Unknown";
+        log.debug(`Added context menu command: ${name} (type: ${cmdType})`);
       }
+
+      // Separate commands by type for logging
+      const slashCommands = commands.filter((cmd) => cmd.type === undefined || cmd.type === 1);
+      const contextMenuCommands = commands.filter((cmd) => cmd.type === 2 || cmd.type === 3);
+
+      log.debug(`Command breakdown: ${slashCommands.length} slash, ${contextMenuCommands.length} context menu`);
 
       // Step 3: Identify commands to delete (exist on Discord but not in our loaded commands)
       const commandsToDelete: any[] = [];
@@ -449,8 +488,8 @@ export class SimpleCommandHandler {
       }
 
       // Step 5: Register/update all current commands using PUT
-      // PUT completely replaces the command, so /helpie is always fully updated
-      log.info(`Registering ${commands.length} commands (including ${subcommandCount} /helpie subcommands)...`);
+      // PUT completely replaces all commands - Discord automatically handles slash vs context menu based on type field
+      log.info(`Registering ${commands.length} total commands (${slashCommands.length} slash + ${contextMenuCommands.length} context menu)...`);
       const data = (await rest.put(Routes.applicationCommands(clientId), { body: commands })) as any[];
 
       log.info(`✓ Successfully registered /helpie command with ${subcommandCount} subcommands and ${this.contextMenuCommands.size} context menu commands`);

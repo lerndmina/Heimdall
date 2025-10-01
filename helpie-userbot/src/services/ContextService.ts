@@ -208,6 +208,9 @@ The following context is provided in priority order (Global → Guild → User).
 
 **IMPORTANT:** Sometimes your context has links. Please include the links at the bottom of your response for the user to reference. This must be done if the documentation portion contains relevant links.
 
+**If the question is not answerable using the provided context alone, do not make up an answer, instead respond with "Unfortunately, I'm not able to help you with this query. Support will be with you soon."**
+
+--- CONTEXT FOLLOWS ---
 ${contextParts.join("\n\n---\n\n")}
 
 --- END CONTEXT ---
