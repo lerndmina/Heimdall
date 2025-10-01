@@ -327,14 +327,23 @@ export class CommandHandler {
     }
 
     // Check dev-only restrictions
-    if (command.config?.devOnly && this.config.devUserIds) {
-      if (!this.config.devUserIds.includes(interaction.user.id)) {
-        return;
+    // For user commands, dev-only is enforced at execution (owner IDs) not registration
+    if (command.config?.devOnly) {
+      // Use devUserIds (for guild commands) or fall back to owner IDs from management config
+      const ownerIds = this.config.devUserIds || this.config.management?.ownerIds || [];
+      if (!ownerIds.includes(interaction.user.id)) {
+        this.logger.debug(`User ${interaction.user.id} denied access to dev-only command ${command.name}`);
+        return; // Silent fail for unauthorized dev command access
       }
     }
 
-    // Check guild-only restrictions based on command builder settings
-    if (isCommandGuildOnly(command.data) && !interaction.guild) {
+    // Check guild-only restrictions based on command contexts
+    // Commands that ONLY allow Guild context (0) require a guild
+    const commandJson = command.data.toJSON();
+    const contexts = commandJson.contexts && Array.isArray(commandJson.contexts) ? commandJson.contexts : [0, 1, 2];
+    const onlyAllowsGuild = contexts.length === 1 && contexts[0] === 0;
+
+    if (onlyAllowsGuild && !interaction.guild) {
       if (interaction.deferred || interaction.replied) {
         await interaction.followUp({
           content: "This command can only be used in servers.",
@@ -347,6 +356,12 @@ export class CommandHandler {
         });
       }
       return;
+    }
+
+    // Log context for user commands in debug mode
+    if (command.isUserCommand) {
+      const contextType = interaction.guild ? "Guild" : interaction.channel?.type === 1 ? "DM" : "PrivateChannel";
+      this.logger.debug(`User command ${command.name} executed in ${contextType} context`);
     }
 
     // Execute the command
@@ -606,10 +621,29 @@ export class CommandHandler {
     this.logger.debug(`Commands after deleted filter: ${nonDeletedCommands.length}`);
 
     // Separate dev-only commands from regular commands
-    const devOnlyCommands = nonDeletedCommands.filter((cmd) => cmd.config?.devOnly);
-    const globalCommands = nonDeletedCommands.filter((cmd) => !cmd.config?.devOnly);
+    // IMPORTANT: Dev-only commands with UserInstall should register globally (execution restricted by owner IDs)
+    // Dev-only commands without UserInstall register to dev guilds only
+    const devOnlyCommands = nonDeletedCommands.filter((cmd) => {
+      if (!cmd.config?.devOnly) return false;
 
-    this.logger.debug(`Dev-only commands: ${devOnlyCommands.length}, Global commands: ${globalCommands.length}`);
+      // Check if command has UserInstall integration type
+      const json = cmd.data.toJSON();
+      const hasUserInstall = json.integration_types && Array.isArray(json.integration_types) && json.integration_types.includes(1);
+
+      // Only filter out if it's dev-only AND doesn't have UserInstall
+      return !hasUserInstall;
+    });
+
+    const globalCommands = nonDeletedCommands.filter((cmd) => {
+      if (!cmd.config?.devOnly) return true; // Non-dev commands go global
+
+      // For dev-only commands, only register globally if they have UserInstall
+      const json = cmd.data.toJSON();
+      const hasUserInstall = json.integration_types && Array.isArray(json.integration_types) && json.integration_types.includes(1);
+      return hasUserInstall;
+    });
+
+    this.logger.debug(`Dev-only guild commands: ${devOnlyCommands.length}, Global commands: ${globalCommands.length}`);
 
     try {
       // Register global commands globally (DM permissions are handled by Discord based on command builder settings)

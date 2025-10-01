@@ -54,3 +54,55 @@ export function isCommandGuildOnly(data: SlashCommandBuilder | ContextMenuComman
 export function commandAllowsDM(data: SlashCommandBuilder | ContextMenuCommandBuilder): boolean {
   return !isCommandGuildOnly(data);
 }
+
+/**
+ * Extracts the allowed contexts from a command builder
+ * Returns array of context types: 0=Guild, 1=BotDM, 2=PrivateChannel
+ */
+export function getCommandContexts(data: SlashCommandBuilder | ContextMenuCommandBuilder): number[] {
+  const json = data.toJSON();
+
+  // If contexts are explicitly set, return them
+  if (json.contexts && Array.isArray(json.contexts)) {
+    return json.contexts;
+  }
+
+  // Default contexts based on dm_permission for slash commands
+  if (data instanceof SlashCommandBuilder) {
+    if (json.dm_permission === false) {
+      // Guild only
+      return [0];
+    }
+    // Allow all contexts by default
+    return [0, 1, 2];
+  }
+
+  // Context menu commands default to guild only
+  return [0];
+}
+
+/**
+ * Checks if a command is configured for user installation
+ * User commands are in commands/user/ path and should have UserInstall integration type
+ */
+export function isUserCommand(filePath: string): boolean {
+  // Normalize path separators for cross-platform compatibility
+  const normalizedPath = filePath.replace(/\\/g, "/");
+  return normalizedPath.includes("/commands/user/");
+}
+
+/**
+ * Validates if a command has the required integration types for user commands
+ * User commands MUST include ApplicationIntegrationType.UserInstall (value: 1)
+ */
+export function hasUserInstallIntegration(data: SlashCommandBuilder | ContextMenuCommandBuilder): boolean {
+  const json = data.toJSON();
+
+  // Check if integration_types includes UserInstall (1)
+  if (json.integration_types && Array.isArray(json.integration_types)) {
+    return json.integration_types.includes(1);
+  }
+
+  // Default: no user install integration
+  return false;
+}

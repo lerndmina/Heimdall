@@ -146,6 +146,7 @@ export interface LoadedCommand {
   filePath: string;
   isLegacy: boolean;
   type: "slash" | "context-menu";
+  isUserCommand?: boolean; // Detected from commands/user/ path
 
   // Unified configuration
   config: {

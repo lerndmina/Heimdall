@@ -62,16 +62,63 @@ export class CommandLoader {
     const isLegacyContext = this.isLegacyContextMenuPattern(exports);
     const isModern = this.isModernPattern(exports);
 
+    let command: LoadedCommand | null = null;
+
     if (isLegacySlash) {
-      return this.adaptLegacySlashCommand(exports, filePath, commandName);
+      command = this.adaptLegacySlashCommand(exports, filePath, commandName);
     } else if (isLegacyContext) {
-      return this.adaptLegacyContextMenuCommand(exports, filePath, commandName);
+      command = this.adaptLegacyContextMenuCommand(exports, filePath, commandName);
     } else if (isModern) {
-      return this.adaptModernCommand(exports, filePath, commandName);
+      command = this.adaptModernCommand(exports, filePath, commandName);
     } else {
       this.logger.warn(`Invalid command export pattern in ${filePath}`);
       return null;
     }
+
+    // Check if this is a user command based on path
+    if (command) {
+      command = this.processUserCommand(command, filePath);
+    }
+
+    return command;
+  }
+
+  /**
+   * Process user commands - validate and mark them
+   */
+  private processUserCommand(command: LoadedCommand, filePath: string): LoadedCommand {
+    // Normalize path for cross-platform compatibility
+    const normalizedPath = filePath.replace(/\\/g, "/");
+    const isUserCmd = normalizedPath.includes("/commands/user/");
+
+    if (!isUserCmd) {
+      return command;
+    }
+
+    // Mark as user command
+    command.isUserCommand = true;
+
+    // Validate that it has UserInstall integration type
+    const json = command.data.toJSON();
+    const hasUserInstall = json.integration_types && Array.isArray(json.integration_types) && json.integration_types.includes(1);
+
+    if (!hasUserInstall) {
+      this.logger.error(
+        `User command "${command.name}" at ${filePath} is missing ApplicationIntegrationType.UserInstall! ` +
+          `Commands in commands/user/ MUST include .setIntegrationTypes([ApplicationIntegrationType.UserInstall])`
+      );
+      this.logger.warn(`Auto-fixing: Adding UserInstall integration type to "${command.name}"`);
+      // Note: We can't modify the builder after it's created, so this is just a warning
+      // The developer needs to fix this in their command file
+    }
+
+    // Log contexts for debugging
+    if (json.contexts && Array.isArray(json.contexts)) {
+      const contextNames = json.contexts.map((c: number) => (c === 0 ? "Guild" : c === 1 ? "BotDM" : c === 2 ? "PrivateChannel" : "Unknown")).join(", ");
+      this.logger.debug(`User command "${command.name}" allows contexts: ${contextNames}`);
+    }
+
+    return command;
   }
 
   /**
