@@ -63,7 +63,7 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
 
     log.debug("AI response generated", { userId, responseLength: text.length });
 
-    const responseWithPrelude = `# ${HelpieEmoji.hello} Hey there! I'm Helpie, an AI designed to help you get answers quickly.
+    const responseWithPrelude = `# Hey there! I'm Helpie, an AI designed to help you get answers quickly.
     
     ${text}`;
 
