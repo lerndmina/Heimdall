@@ -10,10 +10,21 @@ import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { SimpleCommandHandler } from "./utils/SimpleCommandHandler";
 import path from "path";
 import mongoose from "mongoose";
+import { createClient } from "redis";
 import fetchEnvs from "./utils/FetchEnvs";
 import log from "./utils/log";
 
 const env = fetchEnvs();
+
+// Initialize Redis client
+export const redisClient = createClient({
+  url: env.REDIS_URL,
+})
+  .on("error", (err: Error) => {
+    log.error("Redis Client Error", err);
+    log.warn("Redis connection failed, but continuing...");
+  })
+  .on("ready", () => log.info("Redis Client Ready"));
 
 export const start = async () => {
   const startTime = Date.now();
@@ -55,6 +66,16 @@ export const start = async () => {
       process.exit(1);
     });
 
+  // Connect to Redis
+  log.info("Connecting to Redis...");
+  try {
+    await redisClient.connect();
+    log.info("Redis connected successfully");
+  } catch (error) {
+    log.error("Failed to connect to Redis:", error);
+    log.warn("Bot will continue without Redis caching");
+  }
+
   // Login to Discord
   log.info("Logging in to Discord...");
   await client.login(env.BOT_TOKEN).catch((error) => {
@@ -82,6 +103,10 @@ export const start = async () => {
   // Handle process termination
   process.on("SIGINT", async () => {
     log.info("Received SIGINT, shutting down gracefully...");
+    if (redisClient.isReady) {
+      await redisClient.quit();
+      log.info("Redis client closed");
+    }
     await mongoose.connection.close();
     await client.destroy();
     process.exit(0);
@@ -89,6 +114,10 @@ export const start = async () => {
 
   process.on("SIGTERM", async () => {
     log.info("Received SIGTERM, shutting down gracefully...");
+    if (redisClient.isReady) {
+      await redisClient.quit();
+      log.info("Redis client closed");
+    }
     await mongoose.connection.close();
     await client.destroy();
     process.exit(0);

@@ -9,6 +9,7 @@ import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import fetchEnvs from "../../utils/FetchEnvs";
 import log from "../../utils/log";
+import { ContextService } from "../../services/ContextService";
 
 const env = fetchEnvs();
 
@@ -30,10 +31,22 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
   try {
     log.debug("Processing AI request", { userId: interaction.user.id, message });
 
+    // Resolve applicable contexts (Global → Guild → User)
+    const resolvedContext = await ContextService.resolveContextForAsk(interaction.user.id, interaction.guildId || undefined);
+
+    // Inject context into system prompt if available
+    const systemPromptWithContext = resolvedContext ? `${env.SYSTEM_PROMPT}\n\n${resolvedContext}` : env.SYSTEM_PROMPT;
+
+    log.debug("Context resolved", {
+      userId: interaction.user.id,
+      hasContext: !!resolvedContext,
+      contextLength: resolvedContext.length,
+    });
+
     // Generate AI response using Vercel AI SDK
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
-      system: env.SYSTEM_PROMPT,
+      system: systemPromptWithContext,
       prompt: message,
       temperature: 0.7,
     });

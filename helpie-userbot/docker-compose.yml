@@ -1,0 +1,59 @@
+version: "3.8"
+
+services:
+  helpie:
+    build:
+      context: ..
+      dockerfile: ./helpie-userbot/Dockerfile
+    container_name: helpie-userbot
+    restart: unless-stopped
+    environment:
+      # Discord Bot Configuration
+      BOT_TOKEN: ${BOT_TOKEN}
+      OWNER_IDS: ${OWNER_IDS}
+
+      # AI Configuration
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SYSTEM_PROMPT: ${SYSTEM_PROMPT:-You are Helpie, a helpful AI assistant integrated into Discord.}
+
+      # Database Configuration
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-helpie}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+
+      # Debug
+      DEBUG_LOG: ${DEBUG_LOG:-false}
+    depends_on:
+      - redis
+      - mongo
+    networks:
+      - helpie-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: helpie-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - helpie-network
+    command: redis-server --appendonly yes
+
+  mongo:
+    image: mongo:7
+    container_name: helpie-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: helpie
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - helpie-network
+
+volumes:
+  redis-data:
+  mongo-data:
+
+networks:
+  helpie-network:
+    driver: bridge

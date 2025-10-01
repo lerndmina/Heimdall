@@ -20,10 +20,11 @@ function getter() {
     SYSTEM_PROMPT: process.env.SYSTEM_PROMPT || "You are Helpie, a helpful AI assistant integrated into Discord.",
     MONGODB_URI: process.env.MONGODB_URI || "",
     MONGODB_DATABASE: process.env.MONGODB_DATABASE || "helpie",
+    REDIS_URL: process.env.REDIS_URL || "redis://localhost:6379",
   };
 
   var missingKeys: string[] = [];
-  const requiredKeys: (keyof typeof env)[] = ["BOT_TOKEN", "OWNER_IDS", "OPENAI_API_KEY", "MONGODB_URI"];
+  const requiredKeys: (keyof typeof env)[] = ["BOT_TOKEN", "OWNER_IDS", "OPENAI_API_KEY", "MONGODB_URI", "REDIS_URL"];
 
   for (const key of requiredKeys) {
     const value = env[key];
