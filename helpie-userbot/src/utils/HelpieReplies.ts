@@ -151,6 +151,13 @@ function formatContent(content: string, type: ReplyType = "info", includeEmoji: 
   }
 
   const emoji = getEmojiForType(type);
+  // Check if content starts with markdown header and preserve it
+  const headerMatch = content.match(/^(#{1,6}\s)/);
+  if (headerMatch) {
+    const header = headerMatch[1];
+    const contentWithoutHeader = content.slice(header.length);
+    return `${header} ${emoji} ${contentWithoutHeader}`;
+  }
   return `${emoji} ${content}`;
 }
 

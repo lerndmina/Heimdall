@@ -6,7 +6,20 @@
  * Also handles context menu commands separately.
  */
 
-import { SlashCommandBuilder, SlashCommandSubcommandBuilder, ChatInputCommandInteraction, MessageContextMenuCommandInteraction, UserContextMenuCommandInteraction, Client, ApplicationIntegrationType, InteractionContextType, REST, Routes, ContextMenuCommandBuilder, ApplicationCommandType } from "discord.js";
+import {
+  SlashCommandBuilder,
+  SlashCommandSubcommandBuilder,
+  ChatInputCommandInteraction,
+  MessageContextMenuCommandInteraction,
+  UserContextMenuCommandInteraction,
+  Client,
+  ApplicationIntegrationType,
+  InteractionContextType,
+  REST,
+  Routes,
+  ContextMenuCommandBuilder,
+  ApplicationCommandType,
+} from "discord.js";
 import fs from "fs";
 import path from "path";
 import log from "./log";
@@ -53,6 +66,7 @@ export class SimpleCommandHandler {
     this.contextMenuCommands.clear();
 
     const commandFiles = this.findCommandFiles(this.commandsPath);
+    let deletedCount = 0;
 
     for (const filePath of commandFiles) {
       try {
@@ -66,9 +80,10 @@ export class SimpleCommandHandler {
           continue;
         }
 
-        // Skip deleted commands
+        // Skip deleted commands (they will be removed from Discord during registration)
         if (commandModule.options?.deleted) {
-          log.debug(`Skipping deleted command: ${commandModule.data.name}`);
+          deletedCount++;
+          log.debug(`Skipping deleted command: ${commandModule.data.name} (marked with deleted: true)`);
           continue;
         }
 
@@ -110,6 +125,9 @@ export class SimpleCommandHandler {
     const totalSubcommands = Array.from(this.groupedCommands.values()).reduce((sum, group) => sum + group.subcommands.size, 0);
 
     log.info(`Loaded ${this.commands.size} simple commands, ${this.groupedCommands.size} groups with ${totalSubcommands} subcommands, and ${this.contextMenuCommands.size} context menu commands`);
+    if (deletedCount > 0) {
+      log.info(`Excluded ${deletedCount} deleted commands (will be removed from Discord)`);
+    }
   }
 
   /**
@@ -117,9 +135,7 @@ export class SimpleCommandHandler {
    */
   private isContextMenuCommand(data: any): boolean {
     // Check if it's a ContextMenuCommandBuilder instance or has context menu type
-    return data instanceof ContextMenuCommandBuilder || 
-           data.type === ApplicationCommandType.Message || 
-           data.type === ApplicationCommandType.User;
+    return data instanceof ContextMenuCommandBuilder || data.type === ApplicationCommandType.Message || data.type === ApplicationCommandType.User;
   }
   /**
    * Build the /helpie command with all subcommands
@@ -364,27 +380,83 @@ export class SimpleCommandHandler {
 
   /**
    * Register the /helpie command and context menu commands with Discord
+   * - Always updates the /helpie command completely (PUT replaces all)
+   * - Deleted subcommands (marked with deleted: true) are automatically excluded
+   * - Cleans up any removed context menu commands from Discord
    */
   async registerCommands(token: string, clientId: string): Promise<void> {
-    log.info("Registering /helpie command with Discord...");
-
-    const commands: any[] = [];
-    
-    // Add the main /helpie command
-    const helpieCommand = this.buildHelpieCommand();
-    commands.push(helpieCommand.toJSON());
-
-    // Add all context menu commands
-    for (const [name, commandModule] of this.contextMenuCommands) {
-      commands.push(commandModule.data.toJSON());
-    }
+    log.info("Registering commands with Discord...");
 
     const rest = new REST({ version: "10" }).setToken(token);
 
     try {
+      // Step 1: Fetch existing commands from Discord
+      const existingCommands = (await rest.get(Routes.applicationCommands(clientId))) as any[];
+      log.debug(`Found ${existingCommands.length} existing commands on Discord`);
+
+      // Step 2: Build list of commands we want to register
+      const commands: any[] = [];
+      const commandNamesToKeep = new Set<string>();
+
+      // Always add and update the main /helpie command
+      // This rebuilds all subcommands, automatically excluding deleted ones
+      const helpieCommand = this.buildHelpieCommand();
+      const helpieJSON = helpieCommand.toJSON();
+      commands.push(helpieJSON);
+      commandNamesToKeep.add("helpie");
+
+      // Count subcommands for logging
+      const subcommandCount = (helpieJSON.options || []).reduce((count: number, opt: any) => {
+        if (opt.type === 2) {
+          // SubcommandGroup
+          return count + (opt.options || []).length;
+        } else if (opt.type === 1) {
+          // Subcommand
+          return count + 1;
+        }
+        return count;
+      }, 0);
+
+      log.debug(`Built /helpie command with ${subcommandCount} total subcommands`);
+
+      // Add all context menu commands (deleted ones already filtered out in loadCommands)
+      for (const [name, commandModule] of this.contextMenuCommands) {
+        commands.push(commandModule.data.toJSON());
+        commandNamesToKeep.add(name);
+      }
+
+      // Step 3: Identify commands to delete (exist on Discord but not in our loaded commands)
+      const commandsToDelete: any[] = [];
+      for (const existingCmd of existingCommands) {
+        if (!commandNamesToKeep.has(existingCmd.name)) {
+          commandsToDelete.push(existingCmd);
+          log.debug(`Marking command for deletion: ${existingCmd.name} (file removed or marked as deleted)`);
+        }
+      }
+
+      // Step 4: Delete removed commands individually
+      // This is safer than relying solely on PUT to remove them
+      if (commandsToDelete.length > 0) {
+        log.info(`Cleaning up ${commandsToDelete.length} removed commands...`);
+        for (const cmd of commandsToDelete) {
+          try {
+            await rest.delete(Routes.applicationCommand(clientId, cmd.id));
+            log.debug(`Deleted command: ${cmd.name}`);
+          } catch (error) {
+            log.error(`Failed to delete command ${cmd.name}:`, error);
+          }
+        }
+      }
+
+      // Step 5: Register/update all current commands using PUT
+      // PUT completely replaces the command, so /helpie is always fully updated
+      log.info(`Registering ${commands.length} commands (including ${subcommandCount} /helpie subcommands)...`);
       const data = (await rest.put(Routes.applicationCommands(clientId), { body: commands })) as any[];
 
-      log.info(`Successfully registered /helpie command with ${this.commands.size} subcommands and ${this.contextMenuCommands.size} context menu commands`);
+      log.info(`✓ Successfully registered /helpie command with ${subcommandCount} subcommands and ${this.contextMenuCommands.size} context menu commands`);
+      if (commandsToDelete.length > 0) {
+        log.info(`✓ Cleaned up ${commandsToDelete.length} removed commands`);
+      }
     } catch (error) {
       log.error("Failed to register commands:", error);
       throw error;
