@@ -127,10 +127,10 @@ export class HelpieReplies {
    * // ... do work ...
    * await HelpieReplies.editReply(interaction, { type: 'success', content: 'Done!' });
    */
-  static async deferThinking(interaction: ChatInputCommandInteraction, ephemeral: boolean = false): Promise<void> {
-    await interaction.reply({
+  static async deferThinking(interaction: ChatInputCommandInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
+    return interaction.reply({
       content: HelpieEmoji.what,
-      ephemeral,
+      flags: ephemeral ? 64 : undefined, // MessageFlags.Ephemeral = 64
     });
   }
 
@@ -142,10 +142,10 @@ export class HelpieReplies {
    * // ... search database or load data ...
    * await HelpieReplies.editReply(interaction, { type: 'info', content: 'Results...' });
    */
-  static async deferSearching(interaction: ChatInputCommandInteraction, ephemeral: boolean = false): Promise<void> {
-    await interaction.reply({
+  static async deferSearching(interaction: ChatInputCommandInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
+    return interaction.reply({
       content: HelpieEmoji.looking,
-      ephemeral,
+      flags: ephemeral ? 64 : undefined, // MessageFlags.Ephemeral = 64
     });
   }
 
