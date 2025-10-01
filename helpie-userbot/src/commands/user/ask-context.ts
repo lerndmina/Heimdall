@@ -14,7 +14,6 @@ import { processAskQuestion } from "../../utils/AskHelpie";
 export const data = new ContextMenuCommandBuilder().setName("Ask Helpie About This").setType(ApplicationCommandType.Message);
 
 export const options = {
-  devOnly: false,
   deleted: false,
 };
 

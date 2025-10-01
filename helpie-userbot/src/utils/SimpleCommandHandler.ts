@@ -3,16 +3,17 @@
  *
  * Loads all commands from commands/user/ and converts them into subcommands
  * under /helpie with full argument support.
+ * Also handles context menu commands separately.
  */
 
-import { SlashCommandBuilder, SlashCommandSubcommandBuilder, ChatInputCommandInteraction, Client, ApplicationIntegrationType, InteractionContextType, REST, Routes } from "discord.js";
+import { SlashCommandBuilder, SlashCommandSubcommandBuilder, ChatInputCommandInteraction, MessageContextMenuCommandInteraction, UserContextMenuCommandInteraction, Client, ApplicationIntegrationType, InteractionContextType, REST, Routes, ContextMenuCommandBuilder, ApplicationCommandType } from "discord.js";
 import fs from "fs";
 import path from "path";
 import log from "./log";
 
 export interface CommandModule {
-  data: any; // SlashCommandBuilder from the original command
-  run: (interaction: ChatInputCommandInteraction, client: Client) => Promise<void>;
+  data: any; // SlashCommandBuilder or ContextMenuCommandBuilder from the original command
+  run: (interaction: any, client: Client) => Promise<void>;
   options?: {
     devOnly?: boolean;
     deleted?: boolean;
@@ -27,6 +28,7 @@ interface GroupedCommand {
 export class SimpleCommandHandler {
   private commands: Map<string, CommandModule> = new Map();
   private groupedCommands: Map<string, GroupedCommand> = new Map();
+  private contextMenuCommands: Map<string, CommandModule> = new Map();
   private client: Client;
   private commandsPath: string;
 
@@ -42,11 +44,13 @@ export class SimpleCommandHandler {
    * - commands/user/ping.ts → /helpie ping
    * - commands/user/admin/ban.ts → /helpie admin ban
    * - commands/user/admin/kick.ts → /helpie admin kick
+   * - commands/user/ask-context.ts → Context menu command (standalone)
    */
   async loadCommands(): Promise<void> {
     log.info("Loading commands...");
     this.commands.clear();
     this.groupedCommands.clear();
+    this.contextMenuCommands.clear();
 
     const commandFiles = this.findCommandFiles(this.commandsPath);
 
@@ -65,6 +69,13 @@ export class SimpleCommandHandler {
         // Skip deleted commands
         if (commandModule.options?.deleted) {
           log.debug(`Skipping deleted command: ${commandModule.data.name}`);
+          continue;
+        }
+
+        // Check if this is a context menu command
+        if (this.isContextMenuCommand(commandModule.data)) {
+          this.contextMenuCommands.set(commandModule.data.name, commandModule);
+          log.debug(`Loaded context menu command: ${commandModule.data.name}`);
           continue;
         }
 
@@ -98,7 +109,17 @@ export class SimpleCommandHandler {
 
     const totalSubcommands = Array.from(this.groupedCommands.values()).reduce((sum, group) => sum + group.subcommands.size, 0);
 
-    log.info(`Loaded ${this.commands.size} simple commands and ${this.groupedCommands.size} groups with ${totalSubcommands} subcommands`);
+    log.info(`Loaded ${this.commands.size} simple commands, ${this.groupedCommands.size} groups with ${totalSubcommands} subcommands, and ${this.contextMenuCommands.size} context menu commands`);
+  }
+
+  /**
+   * Check if a command data object is a context menu command
+   */
+  private isContextMenuCommand(data: any): boolean {
+    // Check if it's a ContextMenuCommandBuilder instance or has context menu type
+    return data instanceof ContextMenuCommandBuilder || 
+           data.type === ApplicationCommandType.Message || 
+           data.type === ApplicationCommandType.User;
   }
   /**
    * Build the /helpie command with all subcommands
@@ -342,18 +363,28 @@ export class SimpleCommandHandler {
   }
 
   /**
-   * Register the /helpie command with Discord
+   * Register the /helpie command and context menu commands with Discord
    */
   async registerCommands(token: string, clientId: string): Promise<void> {
     log.info("Registering /helpie command with Discord...");
 
-    const command = this.buildHelpieCommand();
+    const commands: any[] = [];
+    
+    // Add the main /helpie command
+    const helpieCommand = this.buildHelpieCommand();
+    commands.push(helpieCommand.toJSON());
+
+    // Add all context menu commands
+    for (const [name, commandModule] of this.contextMenuCommands) {
+      commands.push(commandModule.data.toJSON());
+    }
+
     const rest = new REST({ version: "10" }).setToken(token);
 
     try {
-      const data = (await rest.put(Routes.applicationCommands(clientId), { body: [command.toJSON()] })) as any[];
+      const data = (await rest.put(Routes.applicationCommands(clientId), { body: commands })) as any[];
 
-      log.info(`Successfully registered /helpie command with ${this.commands.size} subcommands`);
+      log.info(`Successfully registered /helpie command with ${this.commands.size} subcommands and ${this.contextMenuCommands.size} context menu commands`);
     } catch (error) {
       log.error("Failed to register commands:", error);
       throw error;
@@ -390,12 +421,66 @@ export class SimpleCommandHandler {
    */
   setupInteractionHandler(): void {
     this.client.on("interactionCreate", async (interaction) => {
-      if (!interaction.isChatInputCommand()) return;
-      if (interaction.commandName !== "helpie") return;
+      // Handle slash commands
+      if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === "helpie") {
+          await this.handleCommand(interaction);
+        }
+        return;
+      }
 
-      await this.handleCommand(interaction);
+      // Handle context menu commands
+      if (interaction.isMessageContextMenuCommand() || interaction.isUserContextMenuCommand()) {
+        await this.handleContextMenuCommand(interaction);
+        return;
+      }
     });
 
-    log.info("Interaction handler registered for /helpie");
+    log.info("Interaction handler registered for /helpie and context menu commands");
+  }
+
+  /**
+   * Handle context menu command execution
+   */
+  private async handleContextMenuCommand(interaction: MessageContextMenuCommandInteraction | UserContextMenuCommandInteraction): Promise<void> {
+    const commandModule = this.contextMenuCommands.get(interaction.commandName);
+
+    if (!commandModule) {
+      await interaction.reply({
+        content: `❌ Unknown context menu command: ${interaction.commandName}`,
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Check dev-only restriction
+    if (commandModule.options?.devOnly) {
+      const env = (await import("./FetchEnvs")).default();
+      if (!env.OWNER_IDS.includes(interaction.user.id)) {
+        await interaction.reply({
+          content: "❌ This command is only available to bot developers.",
+          ephemeral: true,
+        });
+        return;
+      }
+    }
+
+    try {
+      // Call run function with legacy props format
+      await commandModule.run({ interaction, client: this.client, handler: this as any }, this.client);
+    } catch (error) {
+      log.error(`Error executing context menu command ${interaction.commandName}:`, error);
+
+      const errorMessage = {
+        content: `❌ An error occurred while executing this command.`,
+        ephemeral: true,
+      };
+
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(errorMessage);
+      } else {
+        await interaction.reply(errorMessage);
+      }
+    }
   }
 }
