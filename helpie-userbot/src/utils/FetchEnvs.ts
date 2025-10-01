@@ -1,5 +1,4 @@
 import { SnowflakeUtil } from "discord.js";
-import log from "./log";
 import { configDotenv } from "dotenv";
 
 configDotenv(); // Load environment variables from .env file
@@ -36,7 +35,7 @@ function getter() {
   }
 
   if (missingKeys.length > 0) {
-    log.error(`ENV ${missingKeys.join(", ")} are missing and are required.`);
+    console.error(`ENV ${missingKeys.join(", ")} are missing and are required.`);
     process.exit(1);
   }
 
@@ -46,11 +45,11 @@ function getter() {
     try {
       const snowflake = SnowflakeUtil.deconstruct(id);
       if (snowflake.timestamp < DISCORD_EPOCH) {
-        log.error(`Env OWNER_IDS contains an invalid snowflake: ${id}`);
+        console.error(`Env OWNER_IDS contains an invalid snowflake: ${id}`);
         process.exit(1);
       }
     } catch (error) {
-      log.error(`Env OWNER_IDS contains an invalid snowflake: ${id}`);
+      console.error(`Env OWNER_IDS contains an invalid snowflake: ${id}`);
       process.exit(1);
     }
   });

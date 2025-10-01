@@ -16,4 +16,45 @@ const logger = createLogger("helpie-userbot", {
   callerPathDepth: 2,
 });
 
-export default logger;
+// Backward compatible log object that matches the old interface
+const log = Object.assign(
+  (...args: unknown[]) => {
+    logger.info(...args);
+  },
+  {
+    info: (...args: unknown[]) => logger.info(...args),
+    warn: (...args: unknown[]) => logger.warn(...args),
+    error: (...args: unknown[]) => logger.error(...args),
+    debug: (...args: unknown[]) => logger.debug(...args),
+
+    /**
+     * Configure logger settings
+     */
+    configure: (
+      newConfig: Partial<{
+        minLevel: LogLevel;
+        enableFileLogging: boolean;
+        logFilePath: string;
+        timestampFormat: "locale" | "iso";
+        showCallerInfo: boolean;
+        callerPathDepth: number;
+      }>
+    ) => {
+      logger.configure({
+        minLevel: newConfig.minLevel,
+        enableFileLogging: newConfig.enableFileLogging,
+        logFilePath: newConfig.logFilePath,
+        timestampFormat: newConfig.timestampFormat,
+        showCallerInfo: newConfig.showCallerInfo,
+        callerPathDepth: newConfig.callerPathDepth,
+      });
+    },
+
+    /**
+     * Get current logger configuration
+     */
+    getConfig: () => logger.getConfig(),
+  }
+);
+
+export default log;

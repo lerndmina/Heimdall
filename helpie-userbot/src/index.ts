@@ -7,17 +7,11 @@ import { config as dotenvConfig } from "dotenv";
 dotenvConfig(); // Load environment variables first
 
 import { Client, GatewayIntentBits, Partials } from "discord.js";
-import { CommandHandler } from "@heimdall/command-handler";
+import { SimpleCommandHandler } from "./utils/SimpleCommandHandler";
 import path from "path";
 import mongoose from "mongoose";
 import fetchEnvs from "./utils/FetchEnvs";
 import log from "./utils/log";
-
-// Configure logger with environment variables
-log.configure({
-  minLevel: process.env.DEBUG_LOG === "true" ? 2 : 1, // DEBUG : INFO
-  enableFileLogging: process.env.LOG_TO_FILE === "true",
-});
 
 const env = fetchEnvs();
 
@@ -38,47 +32,12 @@ export const start = async () => {
   // Set max listeners for events
   client.setMaxListeners(15);
 
-  // Define paths
-  const commandsPath = path.join(__dirname, "commands");
-  const eventsPath = path.join(__dirname, "events");
-  const validationsPath = path.join(__dirname, "validations");
+  // Initialize our simple command handler
+  const commandsPath = path.join(__dirname, "commands", "user");
+  const commandHandler = new SimpleCommandHandler(client, commandsPath);
 
-  log.info("Initializing command handler...", {
-    commandsPath,
-    eventsPath,
-    validationsPath,
-  });
-
-  // Initialize custom CommandHandler
-  await CommandHandler.create({
-    client,
-    commandsPath,
-    eventsPath,
-    validationsPath,
-    devUserIds: env.OWNER_IDS, // Users who can access dev commands
-    options: {
-      enableManagementCommands: true,
-      enableCommandManager: true,
-      enableHotReload: process.env.NODE_ENV !== "production",
-      enableAnalytics: false,
-    },
-    management: {
-      enabled: true,
-      ownerIds: env.OWNER_IDS,
-      allowDMs: true, // Allow management commands in DMs
-      allowGuild: true,
-      enableHotReload: process.env.NODE_ENV !== "production",
-      enableAnalytics: false,
-    },
-    hotReload: {
-      enabled: process.env.NODE_ENV !== "production",
-      watchMode: "development",
-      watchDelay: 500,
-      enableEventEmission: true,
-      enableRollback: true,
-    },
-  });
-
+  log.info("Loading commands...");
+  await commandHandler.loadCommands();
   log.info("Command handler initialized");
 
   // Connect to MongoDB
@@ -102,6 +61,13 @@ export const start = async () => {
     log.error("Failed to login to Discord:", error);
     process.exit(1);
   });
+
+  // Register commands after login
+  log.info("Registering /helpie command with Discord...");
+  await commandHandler.registerCommands(env.BOT_TOKEN, client.user!.id);
+
+  // Setup interaction handler
+  commandHandler.setupInteractionHandler();
 
   // Ready event
   client.once("ready", () => {

@@ -1,36 +1,26 @@
 /**
- * Ping command - User-installable command that works everywhere
- *
- * This command can be installed on user profiles and works in:
- * - Guilds (servers)
- * - DMs with the bot
- * - Private channels
+ * Ping command - Check bot latency and status
+ * Will be available as: /helpie ping
  */
-import type { LegacySlashCommandProps, LegacyCommandOptions } from "@heimdall/command-handler";
-import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder, EmbedBuilder } from "discord.js";
 
-export const data = new SlashCommandBuilder()
-  .setName("ping")
-  .setDescription("Check bot latency and status")
-  // User-installable - this bot is designed for users, not guilds
-  .setIntegrationTypes([ApplicationIntegrationType.UserInstall])
-  // Allow in all contexts
-  .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel]);
+import { ChatInputCommandInteraction, Client, SlashCommandBuilder, EmbedBuilder } from "discord.js";
 
-export const options: LegacyCommandOptions = {
+export const data = new SlashCommandBuilder().setName("ping").setDescription("Check bot latency and status");
+
+export const options = {
   devOnly: false,
   deleted: false,
 };
 
-export async function run({ interaction, client }: LegacySlashCommandProps) {
+export async function run(interaction: ChatInputCommandInteraction, client: Client) {
   const start = Date.now();
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply();
   const latency = Date.now() - start;
 
   const embed = new EmbedBuilder()
     .setColor(0x00ff00)
     .setTitle("🏓 Pong!")
-    .setDescription("Helpie Userbot is online and responsive")
+    .setDescription("Helpie is online and responsive")
     .addFields(
       { name: "API Latency", value: `${latency}ms`, inline: true },
       { name: "WebSocket", value: `${client.ws.ping}ms`, inline: true },

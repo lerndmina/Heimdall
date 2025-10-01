@@ -8,8 +8,9 @@
   },
   "scripts": {
     "dev": "bunx nodemon --watch 'src/**/*.ts' --exec 'npx tsx' src/index.ts",
-    "start": "tsx src/index.ts",
-    "build": "bunx tsc"
+    "start": "npx tsx src/index.ts",
+    "build": "bunx tsc",
+    "generate-helpie": "npx tsx scripts/generate-helpie.ts"
   },
   "author": "",
   "license": "ISC",
