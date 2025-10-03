@@ -21,22 +21,40 @@ function getter() {
     MONGODB_URI: process.env.MONGODB_URI || "",
     MONGODB_DATABASE: process.env.MONGODB_DATABASE || "helpie",
     REDIS_URI: process.env.REDIS_URI || "redis://localhost:6379",
+    DEEPL_API_KEY: process.env.DEEPL_API_KEY || "",
   };
 
   var missingKeys: string[] = [];
-  const requiredKeys: (keyof typeof env)[] = ["BOT_TOKEN", "OWNER_IDS", "OPENAI_API_KEY", "MONGODB_URI", "REDIS_URI"];
+  var missingOptionalKeys: string[] = [];
+  // List only the optional keys - all others are required
+  const optionalKeys: (keyof typeof env)[] = ["SYSTEM_PROMPT", "MONGODB_DATABASE", "DEBUG_LOG", "DEEPL_API_KEY"];
 
-  for (const key of requiredKeys) {
-    const value = env[key];
-    if (value === undefined || value === null || value === "") {
-      missingKeys.push(key);
-    } else if (Array.isArray(value) && value.length === 0) {
-      missingKeys.push(key);
+  for (const key in env) {
+    const typedKey = key as keyof typeof env;
+
+    // Check process.env directly (before defaults are applied)
+    const rawValue = process.env[typedKey];
+    const isEmpty = rawValue === undefined || rawValue === null || rawValue === "" || rawValue?.trim() === "";
+
+    if (optionalKeys.includes(typedKey)) {
+      // Check if optional key is missing
+      if (isEmpty) {
+        missingOptionalKeys.push(typedKey);
+      }
+    } else {
+      // Check if required key is missing
+      if (isEmpty) {
+        missingKeys.push(typedKey);
+      }
     }
   }
 
+  if (missingOptionalKeys.length > 0) {
+    console.warn(`⚠️  Optional ENV ${missingOptionalKeys.join(", ")} are missing (using defaults).`);
+  }
+
   if (missingKeys.length > 0) {
-    console.error(`ENV ${missingKeys.join(", ")} are missing and are required.`);
+    console.error(`❌ ENV ${missingKeys.join(", ")} are missing and are required.`);
     process.exit(1);
   }
 

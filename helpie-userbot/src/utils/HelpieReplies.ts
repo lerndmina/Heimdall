@@ -604,6 +604,33 @@ export class HelpieReplies {
   static getEmoji(type: ReplyType): string {
     return getEmojiForType(type);
   }
+
+  /**
+   * Edit reply with custom embed (for when you need full control over the embed)
+   * Use this when you need custom colors, fields, footers, etc. that don't fit the standard patterns
+   *
+   * @example
+   * const embed = new EmbedBuilder()
+   *   .setTitle('🌐 Translation')
+   *   .setColor(0x00d4aa)
+   *   .addFields({ name: 'Original', value: 'Hola' })
+   *   .setFooter({ text: 'Powered by DeepL' });
+   * await HelpieReplies.editCustomEmbed(interaction, embed);
+   */
+  static async editCustomEmbed(interaction: SupportedInteraction, embed: EmbedBuilder): Promise<Message> {
+    try {
+      return await interaction.editReply({
+        content: "", // Clear any loading symbols
+        embeds: [embed],
+      });
+    } catch (error: any) {
+      // Handle deleted message (user deleted message while bot was processing)
+      if (error.code === 10008) {
+        throw new InteractionDeletedError("User deleted the message while bot was processing");
+      }
+      throw error;
+    }
+  }
 }
 
 /**

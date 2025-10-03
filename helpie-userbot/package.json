@@ -19,6 +19,7 @@
     "@heimdall/logger": "../logger",
     "@types/ms": "^2.1.0",
     "ai": "^5.0.59",
+    "deepl-node": "^1.19.1",
     "discord.js": "^14.22.1",
     "dotenv": "^16.6.1",
     "mongoose": "^7.8.7",
