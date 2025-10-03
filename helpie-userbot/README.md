@@ -130,7 +130,3 @@ bun run build
 # Format code (if configured)
 bun run format
 ```
-
-## License
-
-ISC
