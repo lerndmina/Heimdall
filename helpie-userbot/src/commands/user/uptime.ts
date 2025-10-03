@@ -25,6 +25,8 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
     return HelpieReplies.warning(interaction, "This command is only available to bot owners.");
   }
 
+  await HelpieReplies.deferThinking(interaction, true);
+
   // Calculate uptime
   const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
   const uptimeSeconds = currentTime - botStartTime;
@@ -56,8 +58,12 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
 **Bot:** ${client.user?.tag || "Unknown"}
 **Ping:** ${client.ws.ping}ms`;
 
-  await HelpieReplies.success(interaction, {
-    title: "Helpie Uptime",
-    message,
-  });
+  await HelpieReplies.success(
+    interaction,
+    {
+      title: "Helpie Uptime",
+      message,
+    },
+    true
+  );
 }
