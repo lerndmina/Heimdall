@@ -11,7 +11,7 @@ import { generateText } from "ai";
 import fetchEnvs from "./FetchEnvs";
 import log from "./log";
 import { ContextService } from "../services/ContextService";
-import HelpieReplies, { HelpieEmoji } from "./HelpieReplies";
+import HelpieReplies, { HelpieEmoji, InteractionDeletedError } from "./HelpieReplies";
 
 const env = fetchEnvs();
 
@@ -73,7 +73,24 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
     // Send response - automatically uses editReply since we should defer first
     await HelpieReplies.success(interaction, truncatedResponse);
   } catch (error) {
+    // Handle deleted message - user deleted message while processing
+    if (error instanceof InteractionDeletedError) {
+      log.debug("User deleted message while processing AI request", { userId });
+      return; // Silently exit - nothing we can do
+    }
+
     log.error("Error processing AI request:", error);
-    await HelpieReplies.error(interaction, "An error occurred while processing your question. Please try again later.");
+
+    // Attempt to send error message, but catch if interaction was deleted
+    try {
+      await HelpieReplies.error(interaction, "An error occurred while processing your question. Please try again later.");
+    } catch (replyError) {
+      if (replyError instanceof InteractionDeletedError) {
+        log.debug("Cannot send error message - interaction was deleted", { userId });
+        return;
+      }
+      // Log other reply errors but don't throw
+      log.error("Failed to send error message:", replyError);
+    }
   }
 }

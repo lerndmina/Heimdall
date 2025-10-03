@@ -25,6 +25,18 @@ import {
 } from "discord.js";
 
 /**
+ * Custom error for when a user deletes their message while the bot is processing
+ * This allows commands to gracefully halt execution when the interaction is no longer valid
+ */
+export class InteractionDeletedError extends Error {
+  constructor(message: string = "User deleted the message while bot was processing") {
+    super(message);
+    this.name = "InteractionDeletedError";
+    Object.setPrototypeOf(this, InteractionDeletedError.prototype);
+  }
+}
+
+/**
  * Supported interaction types for HelpieReplies
  */
 export type SupportedInteraction = ChatInputCommandInteraction | MessageContextMenuCommandInteraction;
@@ -169,6 +181,88 @@ function formatContent(content: string, type: ReplyType = "info", includeEmoji: 
  */
 export class HelpieReplies {
   /**
+   * Handles forced ephemeral replies by Discord (userbot in large servers)
+   * Appends codeblock version if reply was forced ephemeral and character limit allows
+   */
+  private static async handleForcedEphemeral(
+    interaction: SupportedInteraction,
+    response: InteractionResponse<boolean>,
+    content: ReplyContent,
+    type: ReplyType,
+    emoji: boolean,
+    intentionalEphemeral: boolean
+  ): Promise<void> {
+    // If we intentionally made it ephemeral, don't modify
+    if (intentionalEphemeral) return;
+
+    try {
+      // Fetch the actual message to check if it was forced ephemeral
+      const message = await response.fetch();
+
+      // Check if message has ephemeral flag (64)
+      const isEphemeral = (message.flags.bitfield & 64) === 64;
+
+      if (!isEphemeral) return; // Not forced ephemeral, we're good
+
+      // Reply was forced ephemeral by Discord - append codeblock version
+      let textContent: string;
+
+      if (typeof content === "object" && "title" in content && "message" in content) {
+        // For embed content, use title + message
+        textContent = `${content.title}\n\n${content.message}`;
+      } else {
+        // For plain text, strip emoji if present
+        textContent = content as string;
+        const emojiStr = getEmojiForType(type);
+        textContent = textContent.replace(emojiStr, "").trim();
+      }
+
+      // Create codeblock version
+      const codeblockVersion = `\n\n**Copyable version:**\n\`\`\`\n${textContent}\n\`\`\``;
+
+      // Check if we have character space (Discord limit is 2000)
+      const currentContent = message.content || "";
+      const embedDescription = message.embeds[0]?.description || "";
+      const totalCurrentLength = currentContent.length + embedDescription.length;
+      const newTotalLength = totalCurrentLength + codeblockVersion.length;
+
+      if (newTotalLength <= 1900) {
+        // Leave buffer for safety
+        // Append to existing content
+        if (message.embeds.length > 0) {
+          // Edit embed to append codeblock
+          const existingEmbed = message.embeds[0];
+          const updatedEmbed = EmbedBuilder.from(existingEmbed);
+          updatedEmbed.setDescription((existingEmbed.description || "") + codeblockVersion);
+
+          await interaction.editReply({
+            embeds: [updatedEmbed],
+          });
+        } else {
+          // Edit plain text to append codeblock
+          await interaction.editReply({
+            content: currentContent + codeblockVersion,
+          });
+        }
+      } else {
+        // Not enough space, replace entire message with codeblock version
+        const replacementContent = `${emoji ? getEmojiForType(type) + " " : ""}**${getDefaultTitle(type)}**\n\`\`\`\n${textContent}\n\`\`\``;
+
+        await interaction.editReply({
+          content: replacementContent,
+          embeds: [], // Clear embeds
+        });
+      }
+    } catch (error: any) {
+      // Handle deleted message - silently ignore since this is just an enhancement
+      if (error.code === 10008) {
+        return; // User deleted message, nothing we can do
+      }
+      // Silently fail for other errors - don't break the command if this enhancement fails
+      console.error("Failed to handle forced ephemeral:", error);
+    }
+  }
+  /**
    * Smart send - automatically uses reply() or editReply() based on interaction state
    * Tracks interactions to know if they've been replied to
    *
@@ -208,27 +302,46 @@ export class HelpieReplies {
     // Mark as replied
     repliedInteractions.add(interaction);
 
-    // Check if content is an object with title and message
-    if (typeof content === "object" && "title" in content && "message" in content) {
-      // Use embed for object content
-      const embed = createEmbed(content.title, content.message, type, emoji);
+    try {
+      // Check if content is an object with title and message
+      if (typeof content === "object" && "title" in content && "message" in content) {
+        // Use embed for object content
+        const embed = createEmbed(content.title, content.message, type, emoji);
 
-      return interaction.reply({
-        content: "", // Clear any loading symbols
-        embeds: [embed],
-        flags: ephemeral ? 64 : undefined,
-      });
-    } else {
-      // Use plain text for string content
-      const formattedContent = formatContent(content as string, type, emoji);
+        const response = await interaction.reply({
+          content: "", // Clear any loading symbols
+          embeds: [embed],
+          flags: ephemeral ? 64 : undefined,
+        });
 
-      return interaction.reply({
-        content: formattedContent,
-        flags: ephemeral ? 64 : undefined,
-      });
+        // Check if reply was forced ephemeral by Discord (userbot in large server)
+        await HelpieReplies.handleForcedEphemeral(interaction, response, content, type, emoji, ephemeral);
+
+        return response;
+      } else {
+        // Use plain text for string content
+        const formattedContent = formatContent(content as string, type, emoji);
+
+        const response = await interaction.reply({
+          content: formattedContent,
+          flags: ephemeral ? 64 : undefined,
+        });
+
+        // Check if reply was forced ephemeral by Discord (userbot in large server)
+        await HelpieReplies.handleForcedEphemeral(interaction, response, content as string, type, emoji, ephemeral);
+
+        return response;
+      }
+    } catch (error: any) {
+      // Handle deleted message (user deleted message while bot was processing)
+      if (error.code === 10008) {
+        // Unknown Message - interaction was deleted, halt command flow
+        throw new InteractionDeletedError("User deleted the message while bot was processing");
+      }
+      // Re-throw other errors
+      throw error;
     }
   }
-
   /**
    * Edit an existing reply (internal use - prefer send() for automatic behavior)
    * - String content: Plain text message with emoji prefix
@@ -237,22 +350,32 @@ export class HelpieReplies {
   static async editReply(interaction: SupportedInteraction, options: HelpieReplyOptions): Promise<Message> {
     const { type = "info", content, emoji = true } = options;
 
-    // Check if content is an object with title and message
-    if (typeof content === "object" && "title" in content && "message" in content) {
-      // Use embed for object content
-      const embed = createEmbed(content.title, content.message, type, emoji);
+    try {
+      // Check if content is an object with title and message
+      if (typeof content === "object" && "title" in content && "message" in content) {
+        // Use embed for object content
+        const embed = createEmbed(content.title, content.message, type, emoji);
 
-      return interaction.editReply({
-        content: "", // Clear any loading symbols
-        embeds: [embed],
-      });
-    } else {
-      // Use plain text for string content
-      const formattedContent = formatContent(content as string, type, emoji);
+        return interaction.editReply({
+          content: "", // Clear any loading symbols
+          embeds: [embed],
+        });
+      } else {
+        // Use plain text for string content
+        const formattedContent = formatContent(content as string, type, emoji);
 
-      return interaction.editReply({
-        content: formattedContent,
-      });
+        return interaction.editReply({
+          content: formattedContent,
+        });
+      }
+    } catch (error: any) {
+      // Handle deleted message (user deleted message while bot was processing)
+      if (error.code === 10008) {
+        // Unknown Message - interaction was deleted, halt command flow
+        throw new InteractionDeletedError("User deleted the message while bot was processing");
+      }
+      // Re-throw other errors
+      throw error;
     }
   }
 
@@ -267,10 +390,18 @@ export class HelpieReplies {
    */
   static async deferThinking(interaction: SupportedInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     repliedInteractions.add(interaction);
-    return interaction.reply({
-      content: HelpieEmoji.what,
-      flags: ephemeral ? 64 : undefined, // MessageFlags.Ephemeral = 64
-    });
+    try {
+      return await interaction.reply({
+        content: HelpieEmoji.what,
+        flags: ephemeral ? 64 : undefined, // MessageFlags.Ephemeral = 64
+      });
+    } catch (error: any) {
+      // Handle deleted message (user deleted message while bot was processing)
+      if (error.code === 10008) {
+        throw new InteractionDeletedError("User deleted the message while bot was processing");
+      }
+      throw error;
+    }
   }
 
   /**
@@ -284,10 +415,18 @@ export class HelpieReplies {
    */
   static async deferSearching(interaction: SupportedInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     repliedInteractions.add(interaction);
-    return interaction.reply({
-      content: HelpieEmoji.looking,
-      flags: ephemeral ? 64 : undefined, // MessageFlags.Ephemeral = 64
-    });
+    try {
+      return await interaction.reply({
+        content: HelpieEmoji.looking,
+        flags: ephemeral ? 64 : undefined, // MessageFlags.Ephemeral = 64
+      });
+    } catch (error: any) {
+      // Handle deleted message (user deleted message while bot was processing)
+      if (error.code === 10008) {
+        throw new InteractionDeletedError("User deleted the message while bot was processing");
+      }
+      throw error;
+    }
   }
 
   /**

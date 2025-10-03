@@ -6,12 +6,15 @@
  * included in the prompt.
  */
 
-import { ContextMenuCommandBuilder, ApplicationCommandType, MessageContextMenuCommandInteraction, Client } from "discord.js";
+import { ContextMenuCommandBuilder, ApplicationCommandType, MessageContextMenuCommandInteraction, Client, InteractionContextType } from "discord.js";
 import { CommandOptions } from "../../types/commands";
 import HelpieReplies from "../../utils/HelpieReplies";
 import { processAskQuestion } from "../../utils/AskHelpie";
 
-export const data = new ContextMenuCommandBuilder().setName("Ask Helpie About This").setType(ApplicationCommandType.Message);
+export const data = new ContextMenuCommandBuilder()
+  .setName("Ask Helpie About This")
+  .setType(ApplicationCommandType.Message)
+  .setContexts([InteractionContextType.BotDM, InteractionContextType.Guild, InteractionContextType.PrivateChannel]);
 
 export const options: CommandOptions = {
   deleted: false,
