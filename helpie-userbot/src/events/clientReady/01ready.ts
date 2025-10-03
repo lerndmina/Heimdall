@@ -7,17 +7,17 @@ import log from "../../utils/log";
 
 export default async (client: Client<true>) => {
   log.info(`🤖 Logged in as ${client.user.tag}`);
-  
+
   // For user-installable bots, show user count instead of guild count
   // User bots are installed on user profiles, not guilds
   try {
     // Fetch the application to get install count
     const application = await client.application.fetch();
-    
+
     // Note: Discord doesn't expose exact user install count via API
     // We can show guilds (which will be 0 for user-only bots) and DM channels
-    const dmChannels = client.channels.cache.filter(c => c.isDMBased()).size;
-    
+    const dmChannels = client.channels.cache.filter((c) => c.isDMBased()).size;
+
     log.info(`� User-installable bot ready`);
     log.info(`📱 Accessible in ${dmChannels} DM channels`);
     log.info(`🏛️  In ${client.guilds.cache.size} guilds (user-installable bots typically show 0)`);

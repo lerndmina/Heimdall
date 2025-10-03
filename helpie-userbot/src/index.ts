@@ -54,14 +54,14 @@ export const start = async () => {
 
   log.info("Loading commands...");
   await commandHandler.loadCommands();
-  
+
   log.info("Loading events...");
   await commandHandler.loadEvents();
-  
+
   // Setup event listeners and interaction handler BEFORE login
   // so ready event can be caught
   commandHandler.setupInteractionHandler();
-  
+
   log.info("Command handler initialized");
 
   // Connect to MongoDB

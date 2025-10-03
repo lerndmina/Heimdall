@@ -159,7 +159,7 @@ export class SimpleCommandHandler {
 
   /**
    * Load all events from the events directory
-   * 
+   *
    * Events are organized by folder name (event name) and files are loaded
    * in alphanumeric order (0-9, a-z). Each event handler can return true
    * to stop propagation to subsequent handlers.
@@ -173,17 +173,19 @@ export class SimpleCommandHandler {
       return;
     }
 
-    const eventDirs = fs.readdirSync(this.eventsPath, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory())
-      .map(dirent => dirent.name);
+    const eventDirs = fs
+      .readdirSync(this.eventsPath, { withFileTypes: true })
+      .filter((dirent) => dirent.isDirectory())
+      .map((dirent) => dirent.name);
 
     let totalHandlers = 0;
 
     for (const eventName of eventDirs) {
       const eventDir = path.join(this.eventsPath, eventName);
-      const eventFiles = fs.readdirSync(eventDir, { withFileTypes: true })
-        .filter(dirent => dirent.isFile() && (dirent.name.endsWith(".ts") || dirent.name.endsWith(".js")))
-        .map(dirent => dirent.name)
+      const eventFiles = fs
+        .readdirSync(eventDir, { withFileTypes: true })
+        .filter((dirent) => dirent.isFile() && (dirent.name.endsWith(".ts") || dirent.name.endsWith(".js")))
+        .map((dirent) => dirent.name)
         .sort(); // Alphabetical order (0-9, a-z)
 
       for (const fileName of eventFiles) {
@@ -192,7 +194,7 @@ export class SimpleCommandHandler {
         try {
           // Convert to file:// URL for cross-platform ESM compatibility
           const fileUrl = pathToFileURL(filePath).href;
-          
+
           // Clear require cache for hot reload
           delete require.cache[require.resolve(filePath)];
 
