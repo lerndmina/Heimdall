@@ -23,6 +23,7 @@ import {
   InteractionResponse,
   EmbedBuilder,
 } from "discord.js";
+import log from "./log";
 
 /**
  * Custom error for when a user deletes their message while the bot is processing
@@ -199,8 +200,19 @@ export class HelpieReplies {
       // Fetch the actual message to check if it was forced ephemeral
       const message = await response.fetch();
 
+      // DEBUG: Log entire message object
+      log.debug("=== EPHEMERAL DEBUG ===");
+      log.debug("Message object:", JSON.stringify(message, null, 2));
+      log.debug("Message flags:", message.flags);
+      log.debug("Message flags.bitfield:", message.flags.bitfield);
+      log.debug("Message flags as array:", message.flags.toArray());
+      log.debug("Intentional ephemeral:", intentionalEphemeral);
+      log.debug("======================");
+
       // Check if message has ephemeral flag (64)
       const isEphemeral = (message.flags.bitfield & 64) === 64;
+
+      log.debug("Is ephemeral check result:", isEphemeral);
 
       if (!isEphemeral) return; // Not forced ephemeral, we're good
 
@@ -216,6 +228,10 @@ export class HelpieReplies {
         const emojiStr = getEmojiForType(type);
         textContent = textContent.replace(emojiStr, "").trim();
       }
+
+      // Strip prelude from textContent if it exists (for AI responses)
+      const preludePattern = /^# Hey there! I'm Helpie, an AI designed to help you get answers quickly\.\n\n/;
+      textContent = textContent.replace(preludePattern, "");
 
       // Create codeblock version
       const codeblockVersion = `\n\n**Copyable version:**\n\`\`\`\n${textContent}\n\`\`\``;
@@ -262,6 +278,91 @@ export class HelpieReplies {
       console.error("Failed to handle forced ephemeral:", error);
     }
   }
+
+  /**
+   * Handles ephemeral messages in editReply by appending codeblock version
+   * This is called after editReply() to check if the message is ephemeral and append copyable text
+   */
+  private static async handleEphemeralEditReply(interaction: SupportedInteraction, message: Message, content: ReplyContent, type: ReplyType, emoji: boolean): Promise<void> {
+    try {
+      // Check if message has ephemeral flag (64)
+      const isEphemeral = (message.flags.bitfield & 64) === 64;
+
+      log.debug("handleEphemeralEditReply - Is ephemeral:", isEphemeral);
+
+      if (!isEphemeral) return; // Not ephemeral, we're good
+
+      // Message is ephemeral - append codeblock version
+      let textContent: string;
+
+      if (typeof content === "object" && "title" in content && "message" in content) {
+        // For embed content, use title + message
+        textContent = `${content.title}\n\n${content.message}`;
+      } else {
+        // For plain text, strip emoji if present
+        textContent = content as string;
+        const emojiStr = getEmojiForType(type);
+        textContent = textContent.replace(emojiStr, "").trim();
+      }
+
+      // Strip prelude from textContent if it exists (for AI responses)
+      const preludePattern = /^# Hey there! I'm Helpie, an AI designed to help you get answers quickly\.\n\n/;
+      textContent = textContent.replace(preludePattern, "");
+
+      // Create codeblock version
+      const codeblockVersion = `\n\nIt looks like helpie's message got hidden. Here's a copyable version:\n\`\`\`\n${textContent}\n\`\`\``;
+
+      // Check if we have character space (Discord limit is 2000)
+      const currentContent = message.content || "";
+      const embedDescription = message.embeds[0]?.description || "";
+      const totalCurrentLength = currentContent.length + embedDescription.length;
+      const newTotalLength = totalCurrentLength + codeblockVersion.length;
+
+      log.debug("Character lengths - current:", totalCurrentLength, "new:", newTotalLength);
+
+      if (newTotalLength <= 1900) {
+        // Leave buffer for safety
+        // Append to existing content
+        if (message.embeds.length > 0) {
+          // Edit embed to append codeblock
+          const existingEmbed = message.embeds[0];
+          const updatedEmbed = EmbedBuilder.from(existingEmbed);
+          updatedEmbed.setDescription((existingEmbed.description || "") + codeblockVersion);
+
+          log.debug("Appending codeblock to embed");
+
+          await interaction.editReply({
+            embeds: [updatedEmbed],
+          });
+        } else {
+          // Edit plain text to append codeblock
+          log.debug("Appending codeblock to plain text");
+
+          await interaction.editReply({
+            content: currentContent + codeblockVersion,
+          });
+        }
+      } else {
+        // Not enough space, replace entire message with codeblock version
+        const replacementContent = `${emoji ? getEmojiForType(type) + " " : ""}**${getDefaultTitle(type)}**\n\`\`\`\n${textContent}\n\`\`\``;
+
+        log.debug("Replacing entire message with codeblock version");
+
+        await interaction.editReply({
+          content: replacementContent,
+          embeds: [], // Clear embeds
+        });
+      }
+    } catch (error: any) {
+      // Handle deleted message - silently ignore since this is just an enhancement
+      if (error.code === 10008) {
+        return; // User deleted message, nothing we can do
+      }
+      // Silently fail for other errors - don't break the command if this enhancement fails
+      console.error("Failed to handle ephemeral edit reply:", error);
+    }
+  }
+
   /**
    * Smart send - automatically uses reply() or editReply() based on interaction state
    * Tracks interactions to know if they've been replied to
@@ -299,6 +400,11 @@ export class HelpieReplies {
   static async reply(interaction: SupportedInteraction, options: HelpieReplyOptions): Promise<InteractionResponse<boolean>> {
     const { type = "info", ephemeral = false, content, emoji = true } = options;
 
+    log.debug("=== REPLY DEBUG ===");
+    log.debug("reply() called with ephemeral:", ephemeral);
+    log.debug("reply() called with type:", type);
+    log.debug("===================");
+
     // Mark as replied
     repliedInteractions.add(interaction);
 
@@ -314,6 +420,8 @@ export class HelpieReplies {
           flags: ephemeral ? 64 : undefined,
         });
 
+        log.debug("Reply response received, calling handleForcedEphemeral...");
+
         // Check if reply was forced ephemeral by Discord (userbot in large server)
         await HelpieReplies.handleForcedEphemeral(interaction, response, content, type, emoji, ephemeral);
 
@@ -326,6 +434,8 @@ export class HelpieReplies {
           content: formattedContent,
           flags: ephemeral ? 64 : undefined,
         });
+
+        log.debug("Reply response received, calling handleForcedEphemeral...");
 
         // Check if reply was forced ephemeral by Discord (userbot in large server)
         await HelpieReplies.handleForcedEphemeral(interaction, response, content as string, type, emoji, ephemeral);
@@ -350,23 +460,47 @@ export class HelpieReplies {
   static async editReply(interaction: SupportedInteraction, options: HelpieReplyOptions): Promise<Message> {
     const { type = "info", content, emoji = true } = options;
 
+    log.debug("=== EDIT REPLY DEBUG ===");
+    log.debug("editReply() called with type:", type);
+    log.debug("========================");
+
     try {
       // Check if content is an object with title and message
       if (typeof content === "object" && "title" in content && "message" in content) {
         // Use embed for object content
         const embed = createEmbed(content.title, content.message, type, emoji);
 
-        return interaction.editReply({
+        const message = await interaction.editReply({
           content: "", // Clear any loading symbols
           embeds: [embed],
         });
+
+        log.debug("Edit reply message received:");
+        log.debug("Message flags:", message.flags);
+        log.debug("Message flags.bitfield:", message.flags.bitfield);
+        log.debug("Message flags as array:", message.flags.toArray());
+
+        // Check if message is ephemeral and append codeblock version
+        await HelpieReplies.handleEphemeralEditReply(interaction, message, content, type, emoji);
+
+        return message;
       } else {
         // Use plain text for string content
         const formattedContent = formatContent(content as string, type, emoji);
 
-        return interaction.editReply({
+        const message = await interaction.editReply({
           content: formattedContent,
         });
+
+        log.debug("Edit reply message received:");
+        log.debug("Message flags:", message.flags);
+        log.debug("Message flags.bitfield:", message.flags.bitfield);
+        log.debug("Message flags as array:", message.flags.toArray());
+
+        // Check if message is ephemeral and append codeblock version
+        await HelpieReplies.handleEphemeralEditReply(interaction, message, content as string, type, emoji);
+
+        return message;
       }
     } catch (error: any) {
       // Handle deleted message (user deleted message while bot was processing)

@@ -15,6 +15,8 @@ import HelpieReplies, { HelpieEmoji, InteractionDeletedError } from "./HelpieRep
 
 const env = fetchEnvs();
 
+export const prelude = `# Hey there! I'm Helpie, an AI designed to help you get answers quickly.\n\n`;
+
 export interface AskHelpieOptions {
   message: string;
   userId: string;
@@ -56,16 +58,14 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
 
     // Generate AI response using Vercel AI SDK
     const { text } = await generateText({
-      model: openai("gpt-5-mini"),
+      model: openai("gpt-4.1-mini"),
       system: systemPromptWithContext,
       prompt: message,
     });
 
     log.debug("AI response generated", { userId, responseLength: text.length });
 
-    const responseWithPrelude = `# Hey there! I'm Helpie, an AI designed to help you get answers quickly.
-    
-    ${text}`;
+    const responseWithPrelude = `${prelude}${text}`;
 
     // Discord message content has a 2000 character limit
     const truncatedResponse = responseWithPrelude.length > 1900 ? responseWithPrelude.substring(0, 1900) + "..." : responseWithPrelude;
