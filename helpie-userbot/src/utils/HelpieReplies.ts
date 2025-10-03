@@ -53,6 +53,11 @@ export type SupportedInteraction = ChatInputCommandInteraction | MessageContextM
 const repliedInteractions = new WeakSet<SupportedInteraction>();
 
 /**
+ * Track which interactions were intentionally made ephemeral
+ */
+const intentionalEphemeralInteractions = new WeakSet<SupportedInteraction>();
+
+/**
  * Animated emoji IDs for Helpie
  */
 export const HelpieEmoji = {
@@ -257,6 +262,13 @@ export class HelpieReplies {
 
       if (!isEphemeral) return; // Not ephemeral, we're good
 
+      // Check if this was intentionally made ephemeral
+      const wasIntentionallyEphemeral = intentionalEphemeralInteractions.has(interaction);
+
+      log.debug("handleEphemeralEditReply - Was intentionally ephemeral:", wasIntentionallyEphemeral);
+
+      if (wasIntentionallyEphemeral) return; // Intentionally ephemeral, don't modify
+
       // Reconstruct and update the message
       const reconstructed = HelpieReplies.reconstructEphemeralMessage(content);
 
@@ -318,6 +330,11 @@ export class HelpieReplies {
 
     // Mark as replied
     repliedInteractions.add(interaction);
+
+    // Track if this was intentionally ephemeral
+    if (ephemeral) {
+      intentionalEphemeralInteractions.add(interaction);
+    }
 
     try {
       // Check if content is an object with title and message
@@ -435,6 +452,12 @@ export class HelpieReplies {
    */
   static async deferThinking(interaction: SupportedInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     repliedInteractions.add(interaction);
+
+    // Track if this was intentionally ephemeral
+    if (ephemeral) {
+      intentionalEphemeralInteractions.add(interaction);
+    }
+
     try {
       return await interaction.reply({
         content: HelpieEmoji.what,
@@ -460,6 +483,12 @@ export class HelpieReplies {
    */
   static async deferSearching(interaction: SupportedInteraction, ephemeral: boolean = false): Promise<InteractionResponse<boolean>> {
     repliedInteractions.add(interaction);
+
+    // Track if this was intentionally ephemeral
+    if (ephemeral) {
+      intentionalEphemeralInteractions.add(interaction);
+    }
+
     try {
       return await interaction.reply({
         content: HelpieEmoji.looking,

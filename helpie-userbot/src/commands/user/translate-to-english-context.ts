@@ -15,7 +15,7 @@ import log from "../../utils/log";
 const env = fetchEnvs();
 
 export const data = new ContextMenuCommandBuilder()
-  .setName("Translate to English")
+  .setName("Utils -> Translate")
   .setType(ApplicationCommandType.Message)
   .setContexts([InteractionContextType.BotDM, InteractionContextType.Guild, InteractionContextType.PrivateChannel]);
 

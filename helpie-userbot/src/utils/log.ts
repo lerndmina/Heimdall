@@ -3,6 +3,9 @@
  * Uses shared @heimdall/logger package
  */
 
+import { config as dotenvConfig } from "dotenv";
+dotenvConfig(); // Load .env before reading process.env
+
 import { createLogger, LogLevel } from "@heimdall/logger";
 import * as path from "path";
 

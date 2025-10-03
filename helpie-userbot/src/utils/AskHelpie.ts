@@ -12,6 +12,7 @@ import fetchEnvs from "./FetchEnvs";
 import log from "./log";
 import { ContextService } from "../services/ContextService";
 import HelpieReplies, { HelpieEmoji, InteractionDeletedError } from "./HelpieReplies";
+import TemporaryContextManager from "./TemporaryContextManager";
 
 const env = fetchEnvs();
 
@@ -47,23 +48,58 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
     // Resolve applicable contexts (Global → Guild → User)
     const resolvedContext = await ContextService.resolveContextForAsk(userId, guildId || undefined);
 
-    // Inject context into system prompt if available
+    // Fetch any temporary contexts stored by the user (from "Add to Context" command)
+    const temporaryContexts = await TemporaryContextManager.getAllForUser(userId);
+
+    // Inject permanent context (GitHub URLs) into system prompt if available
     const systemPromptWithContext = resolvedContext ? `${env.SYSTEM_PROMPT}\n\n${resolvedContext}` : env.SYSTEM_PROMPT;
+
+    // Build the final user message by concatenating temporary contexts with the question
+    let finalUserMessage = message;
+    if (temporaryContexts.length > 0) {
+      log.debug(`Found ${temporaryContexts.length} temporary context(s) for user ${userId}`);
+
+      // Concatenate all temporary contexts before the actual question
+      const concatenatedContexts = temporaryContexts.map((ctx) => ctx.content).join(" ");
+      finalUserMessage = `${concatenatedContexts} ${message}`;
+    }
+
+    // Build messages array with the concatenated message
+    const messages: Array<{ role: "user"; content: string }> = [
+      {
+        role: "user",
+        content: finalUserMessage,
+      },
+    ];
 
     log.debug("Context resolved", {
       userId,
       hasContext: !!resolvedContext,
-      contextLength: resolvedContext.length,
+      contextLength: resolvedContext?.length || 0,
+      temporaryContextCount: temporaryContexts.length,
+      finalMessageLength: finalUserMessage.length,
+      totalMessages: messages.length,
     });
 
-    // Generate AI response using Vercel AI SDK
+    log.debug("Final prompts constructed", {
+      systemPromptLength: systemPromptWithContext.length,
+      messageCount: messages.length,
+    });
+
+    // Generate AI response using Vercel AI SDK with messages array
     const { text } = await generateText({
-      model: openai("gpt-4.1-mini"),
+      model: openai("gpt-4o-mini"),
       system: systemPromptWithContext,
-      prompt: message,
+      messages,
     });
 
     log.debug("AI response generated", { userId, responseLength: text.length });
+
+    // Clear temporary contexts after successful use
+    if (temporaryContexts.length > 0) {
+      const deletedCount = await TemporaryContextManager.deleteAllForUser(userId);
+      log.debug(`Cleared ${deletedCount} temporary context(s) for user ${userId} after use`);
+    }
 
     const responseWithPrelude = `${prelude}${text}`;
 
@@ -73,6 +109,17 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
     // Send response - automatically uses editReply since we should defer first
     await HelpieReplies.success(interaction, truncatedResponse);
   } catch (error) {
+    // Clean up temporary contexts even on error (they were meant for this request)
+    try {
+      const temporaryContexts = await TemporaryContextManager.getAllForUser(userId);
+      if (temporaryContexts.length > 0) {
+        const deletedCount = await TemporaryContextManager.deleteAllForUser(userId);
+        log.debug(`Cleared ${deletedCount} temporary context(s) for user ${userId} after error`);
+      }
+    } catch (cleanupError) {
+      log.error("Failed to cleanup temporary contexts after error:", cleanupError);
+    }
+
     // Handle deleted message - user deleted message while processing
     if (error instanceof InteractionDeletedError) {
       log.debug("User deleted message while processing AI request", { userId });

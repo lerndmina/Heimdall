@@ -12,7 +12,7 @@ import HelpieReplies from "../../utils/HelpieReplies";
 import { processAskQuestion } from "../../utils/AskHelpie";
 
 export const data = new ContextMenuCommandBuilder()
-  .setName("Ask Helpie About This")
+  .setName("AI -> Ask")
   .setType(ApplicationCommandType.Message)
   .setContexts([InteractionContextType.BotDM, InteractionContextType.Guild, InteractionContextType.PrivateChannel]);
 
@@ -55,7 +55,8 @@ export async function run(interaction: MessageContextMenuCommandInteraction, cli
   await HelpieReplies.deferThinking(interaction);
 
   // Create the prompt that includes the message context
-  const prompt = `Please analyze or explain this message:\n\n"${messageContent}"\n\nFrom: ${targetMessage.author.tag}`;
+  // Phrased as a neutral question to avoid triggering "no interpretation" rule
+  const prompt = `Based on the following message, please help answer any questions or provide relevant information:\n\n"${messageContent}"\n\nFrom: ${targetMessage.author.tag}`;
 
   // Process the question using shared logic
   await processAskQuestion({
