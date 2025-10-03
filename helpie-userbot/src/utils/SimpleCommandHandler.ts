@@ -78,7 +78,7 @@ export class SimpleCommandHandler {
    * - commands/user/ask-context.ts → Context menu command (standalone)
    */
   async loadCommands(): Promise<void> {
-    log.info("Loading commands...");
+    log.debug("Loading commands...");
     this.commands.clear();
     this.groupedCommands.clear();
     this.contextMenuCommands.clear();
@@ -165,7 +165,7 @@ export class SimpleCommandHandler {
    * to stop propagation to subsequent handlers.
    */
   async loadEvents(): Promise<void> {
-    log.info("Loading events...");
+    log.debug("Loading events...");
     this.events.clear();
 
     if (!fs.existsSync(this.eventsPath)) {

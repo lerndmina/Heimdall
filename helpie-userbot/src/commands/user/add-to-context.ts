@@ -88,10 +88,7 @@ export async function run(interaction: MessageContextMenuCommandInteraction, cli
     const truncated = charCount > 1000;
     const preview = truncated ? messageContent.substring(0, 997) + "..." : messageContent;
 
-    await HelpieReplies.editSuccess(interaction, {
-      title: "Added to Context",
-      message: `Message content has been stored for 5 minutes.\n\n**Preview:**\n\`\`\`\n${preview}\n\`\`\`\n\n*You can now reference this message in your next ask command.*`,
-    });
+    await HelpieReplies.editSuccess(interaction, `Message content has been stored for 5 minutes.`);
   } catch (error: any) {
     log.error("Failed to store message context:", error);
 
