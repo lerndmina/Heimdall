@@ -54,30 +54,40 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
     // Inject permanent context (GitHub URLs) into system prompt if available
     const systemPromptWithContext = resolvedContext ? `${env.SYSTEM_PROMPT}\n\n${resolvedContext}` : env.SYSTEM_PROMPT;
 
-    // Build the final user message by concatenating temporary contexts with the question
-    let finalUserMessage = message;
+    // Build the final message with temporary contexts prepended
+    let finalMessage = message;
+
     if (temporaryContexts.length > 0) {
       log.debug(`Found ${temporaryContexts.length} temporary context(s) for user ${userId}`);
 
-      // Concatenate all temporary contexts before the actual question
-      const concatenatedContexts = temporaryContexts.map((ctx) => ctx.content).join(" ");
-      finalUserMessage = `${concatenatedContexts} ${message}`;
+      // Combine all temporary contexts into one string
+      const contextParts = temporaryContexts.map((ctx) => ctx.content);
+      const combinedContext = contextParts.join(" ");
+
+      // Prepend context to the message with a clear separator
+      finalMessage = `${combinedContext} ${message}`;
+
+      log.debug("Combined context with message", {
+        contextLength: combinedContext.length,
+        originalMessageLength: message.length,
+        finalMessageLength: finalMessage.length,
+      });
     }
 
-    // Build messages array with the concatenated message
+    // Build messages array with the final message
     const messages: Array<{ role: "user"; content: string }> = [
       {
         role: "user",
-        content: finalUserMessage,
+        content: finalMessage,
       },
     ];
-
     log.debug("Context resolved", {
       userId,
       hasContext: !!resolvedContext,
       contextLength: resolvedContext?.length || 0,
       temporaryContextCount: temporaryContexts.length,
-      finalMessageLength: finalUserMessage.length,
+      originalMessageLength: message.length,
+      finalMessageLength: finalMessage.length,
       totalMessages: messages.length,
     });
 

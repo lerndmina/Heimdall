@@ -54,13 +54,10 @@ export async function run(interaction: MessageContextMenuCommandInteraction, cli
   // Show thinking emoji while processing
   await HelpieReplies.deferThinking(interaction);
 
-  // Create the prompt that includes the message context
-  // Phrased as a neutral question to avoid triggering "no interpretation" rule
-  const prompt = `Based on the following message, please help answer any questions or provide relevant information:\n\n"${messageContent}"\n\nFrom: ${targetMessage.author.tag}`;
-
-  // Process the question using shared logic
+  // Pass the raw message content - processAskQuestion will handle combining with any temporary context
+  // and applying appropriate formatting
   await processAskQuestion({
-    message: prompt,
+    message: messageContent,
     userId: interaction.user.id,
     guildId: interaction.guildId,
     interaction,
