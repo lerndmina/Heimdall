@@ -187,17 +187,33 @@ function formatContent(content: string, type: ReplyType = "info", includeEmoji: 
  */
 export class HelpieReplies {
   /**
-   * Handles forced ephemeral replies by Discord (userbot in large servers)
-   * Reconstructs message with prelude + error message + codeblock when forced ephemeral
+   * Reconstructs an ephemeral message with prelude + error message + codeblock
+   * Extracts prelude from original content and formats as copyable codeblock
    */
-  private static async handleForcedEphemeral(
-    interaction: SupportedInteraction,
-    response: InteractionResponse<boolean>,
-    content: ReplyContent,
-    type: ReplyType,
-    emoji: boolean,
-    intentionalEphemeral: boolean
-  ): Promise<void> {
+  private static reconstructEphemeralMessage(content: ReplyContent): string {
+    // Extract raw text content from the original content parameter
+    let rawText: string;
+    if (typeof content === "object" && "title" in content && "message" in content) {
+      rawText = content.message;
+    } else {
+      rawText = content as string;
+    }
+
+    // Check if content has prelude and extract it
+    const preludePattern = /^# Hey there! I'm Helpie, an AI designed to help you get answers quickly\.\n\n/;
+    const preludeMatch = rawText.match(preludePattern);
+    const preludeText = preludeMatch ? preludeMatch[0] : "";
+    const contentWithoutPrelude = rawText.replace(preludePattern, "");
+
+    // Reconstruct message: prelude (if exists) + error message + codeblock with content
+    return `${preludeText}Helpie was unable to send the message, copy here:\n\`\`\`\n${contentWithoutPrelude}\n\`\`\``;
+  }
+
+  /**
+   * Handles forced ephemeral replies by Discord (userbot in large servers)
+   * Reconstructs message when Discord forces ephemeral flag
+   */
+  private static async handleForcedEphemeral(interaction: SupportedInteraction, response: InteractionResponse<boolean>, content: ReplyContent, intentionalEphemeral: boolean): Promise<void> {
     // If we intentionally made it ephemeral, don't modify
     if (intentionalEphemeral) return;
 
@@ -212,23 +228,8 @@ export class HelpieReplies {
 
       if (!isEphemeral) return; // Not forced ephemeral, we're good
 
-      // Extract raw text content from the original content parameter
-      let rawText: string;
-      if (typeof content === "object" && "title" in content && "message" in content) {
-        rawText = content.message;
-      } else {
-        rawText = content as string;
-      }
-
-      // Check if content has prelude and extract it
-      const preludePattern = /^# Hey there! I'm Helpie, an AI designed to help you get answers quickly\.\n\n/;
-      const preludeMatch = rawText.match(preludePattern);
-      const hasPrelude = !!preludeMatch;
-      const preludeText = hasPrelude ? preludeMatch[0] : "";
-      const contentWithoutPrelude = rawText.replace(preludePattern, "");
-
-      // Reconstruct message: prelude (if exists) + error message + codeblock with content
-      const reconstructed = `${preludeText}Helpie was unable to send the message, copy here:\n\`\`\`\n${contentWithoutPrelude}\n\`\`\``;
+      // Reconstruct and update the message
+      const reconstructed = HelpieReplies.reconstructEphemeralMessage(content);
 
       await interaction.editReply({
         content: reconstructed,
@@ -246,9 +247,9 @@ export class HelpieReplies {
 
   /**
    * Handles ephemeral messages in editReply
-   * Reconstructs message with prelude + error message + codeblock when ephemeral detected
+   * Reconstructs message when ephemeral flag is detected
    */
-  private static async handleEphemeralEditReply(interaction: SupportedInteraction, message: Message, content: ReplyContent, type: ReplyType, emoji: boolean): Promise<void> {
+  private static async handleEphemeralEditReply(interaction: SupportedInteraction, message: Message, content: ReplyContent): Promise<void> {
     try {
       // Check if message has ephemeral flag (64)
       const isEphemeral = (message.flags.bitfield & 64) === 64;
@@ -257,25 +258,8 @@ export class HelpieReplies {
 
       if (!isEphemeral) return; // Not ephemeral, we're good
 
-      // Extract raw text content from the original content parameter
-      let rawText: string;
-      if (typeof content === "object" && "title" in content && "message" in content) {
-        rawText = content.message;
-      } else {
-        rawText = content as string;
-      }
-
-      // Check if content has prelude and extract it
-      const preludePattern = /^# Hey there! I'm Helpie, an AI designed to help you get answers quickly\.\n\n/;
-      const preludeMatch = rawText.match(preludePattern);
-      const hasPrelude = !!preludeMatch;
-      const preludeText = hasPrelude ? preludeMatch[0] : "";
-      const contentWithoutPrelude = rawText.replace(preludePattern, "");
-
-      // Reconstruct message: prelude (if exists) + error message + codeblock with content
-      const reconstructed = `${preludeText}Helpie was unable to send the message, copy here:\n\`\`\`\n${contentWithoutPrelude}\n\`\`\``;
-
-      log.debug("Reconstructing ephemeral message with prelude and codeblock");
+      // Reconstruct and update the message
+      const reconstructed = HelpieReplies.reconstructEphemeralMessage(content);
 
       await interaction.editReply({
         content: reconstructed,
@@ -351,7 +335,7 @@ export class HelpieReplies {
         log.debug("Reply response received, calling handleForcedEphemeral...");
 
         // Check if reply was forced ephemeral by Discord (userbot in large server)
-        await HelpieReplies.handleForcedEphemeral(interaction, response, content, type, emoji, ephemeral);
+        await HelpieReplies.handleForcedEphemeral(interaction, response, content, ephemeral);
 
         return response;
       } else {
@@ -366,7 +350,7 @@ export class HelpieReplies {
         log.debug("Reply response received, calling handleForcedEphemeral...");
 
         // Check if reply was forced ephemeral by Discord (userbot in large server)
-        await HelpieReplies.handleForcedEphemeral(interaction, response, content as string, type, emoji, ephemeral);
+        await HelpieReplies.handleForcedEphemeral(interaction, response, content, ephemeral);
 
         return response;
       }
@@ -408,8 +392,8 @@ export class HelpieReplies {
         log.debug("Message flags.bitfield:", message.flags.bitfield);
         log.debug("Message flags as array:", message.flags.toArray());
 
-        // Check if message is ephemeral and append codeblock version
-        await HelpieReplies.handleEphemeralEditReply(interaction, message, content, type, emoji);
+        // Check if message is ephemeral and reconstruct if needed
+        await HelpieReplies.handleEphemeralEditReply(interaction, message, content);
 
         return message;
       } else {
@@ -425,8 +409,8 @@ export class HelpieReplies {
         log.debug("Message flags.bitfield:", message.flags.bitfield);
         log.debug("Message flags as array:", message.flags.toArray());
 
-        // Check if message is ephemeral and append codeblock version
-        await HelpieReplies.handleEphemeralEditReply(interaction, message, content as string, type, emoji);
+        // Check if message is ephemeral and reconstruct if needed
+        await HelpieReplies.handleEphemeralEditReply(interaction, message, content);
 
         return message;
       }
