@@ -698,6 +698,14 @@ export class SimpleCommandHandler {
         return;
       }
 
+      // Handle autocomplete
+      if (interaction.isAutocomplete()) {
+        if (interaction.commandName === "helpie") {
+          await this.handleAutocomplete(interaction);
+        }
+        return;
+      }
+
       // Handle context menu commands
       if (interaction.isMessageContextMenuCommand() || interaction.isUserContextMenuCommand()) {
         await this.handleContextMenuCommand(interaction);
@@ -706,6 +714,51 @@ export class SimpleCommandHandler {
     });
 
     log.info("Interaction handler registered for /helpie and context menu commands");
+  }
+
+  /**
+   * Handle autocomplete interactions
+   */
+  private async handleAutocomplete(interaction: any): Promise<void> {
+    const group = interaction.options.getSubcommandGroup(false);
+    const subcommandName = interaction.options.getSubcommand();
+
+    let commandModule: SlashCommandModule | undefined;
+
+    // Check if this is a grouped command (from directory structure)
+    if (group) {
+      const groupedCommand = this.groupedCommands.get(group);
+      if (groupedCommand) {
+        commandModule = groupedCommand.subcommands.get(subcommandName);
+      }
+
+      // If not found in grouped commands, check regular commands (manual groups)
+      if (!commandModule) {
+        commandModule = this.commands.get(group);
+      }
+    } else {
+      // Regular subcommand
+      commandModule = this.commands.get(subcommandName);
+    }
+
+    if (!commandModule) {
+      // No command found, respond with empty array
+      await interaction.respond([]);
+      return;
+    }
+
+    // Check if command has autocomplete handler
+    if (typeof (commandModule as any).autocomplete === "function") {
+      try {
+        await (commandModule as any).autocomplete(interaction, this.client);
+      } catch (error) {
+        log.error(`Error executing autocomplete for ${subcommandName}:`, error);
+        await interaction.respond([]);
+      }
+    } else {
+      // No autocomplete handler, respond with empty array
+      await interaction.respond([]);
+    }
   }
 
   /**
