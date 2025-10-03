@@ -6,25 +6,20 @@
  * included in the prompt.
  */
 
-import { ContextMenuCommandBuilder, ApplicationCommandType, Client } from "discord.js";
-import { LegacyContextMenuCommandProps } from "@heimdall/command-handler";
+import { ContextMenuCommandBuilder, ApplicationCommandType, MessageContextMenuCommandInteraction, Client } from "discord.js";
+import { CommandOptions } from "../../types/commands";
 import HelpieReplies from "../../utils/HelpieReplies";
 import { processAskQuestion } from "../../utils/AskHelpie";
 
 export const data = new ContextMenuCommandBuilder().setName("Ask Helpie About This").setType(ApplicationCommandType.Message);
 
-export const options = {
+export const options: CommandOptions = {
   deleted: false,
 };
 
-export async function run({ interaction, client, handler }: LegacyContextMenuCommandProps) {
-  // Type guard to ensure this is a message context menu command
-  if (!interaction.isMessageContextMenuCommand()) {
-    return interaction.reply({
-      content: "This command can only be used on messages.",
-      ephemeral: true,
-    });
-  }
+export async function run(interaction: MessageContextMenuCommandInteraction, client: Client) {
+  // Interaction is already typed as MessageContextMenuCommandInteraction
+  // No type guard needed - SimpleCommandHandler ensures correct type
 
   // Get the target message
   const targetMessage = interaction.targetMessage;

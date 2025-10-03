@@ -22,32 +22,50 @@ import {
 } from "discord.js";
 import fs from "fs";
 import path from "path";
+import { pathToFileURL } from "url";
 import log from "./log";
+import { SlashCommandModule, ContextMenuCommandModule } from "../types/commands";
 
-export interface CommandModule {
-  data: any; // SlashCommandBuilder or ContextMenuCommandBuilder from the original command
-  run: (interaction: any, client: Client) => Promise<void>;
-  options?: {
-    devOnly?: boolean;
-    deleted?: boolean;
-  };
-}
+export type CommandModule = SlashCommandModule | ContextMenuCommandModule;
 
 interface GroupedCommand {
   group: string;
-  subcommands: Map<string, CommandModule>;
+  subcommands: Map<string, SlashCommandModule>;
+}
+
+interface EventHandler {
+  name: string;
+  filePath: string;
+  execute: (client: Client, ...args: any[]) => Promise<boolean | void>;
 }
 
 export class SimpleCommandHandler {
-  private commands: Map<string, CommandModule> = new Map();
+  private commands: Map<string, SlashCommandModule> = new Map();
   private groupedCommands: Map<string, GroupedCommand> = new Map();
-  private contextMenuCommands: Map<string, CommandModule> = new Map();
+  private contextMenuCommands: Map<string, ContextMenuCommandModule> = new Map();
+  private events: Map<string, EventHandler[]> = new Map();
   private client: Client;
   private commandsPath: string;
+  private eventsPath: string;
 
-  constructor(client: Client, commandsPath: string) {
+  constructor(client: Client, commandsPath: string, eventsPath?: string) {
     this.client = client;
     this.commandsPath = commandsPath;
+    this.eventsPath = eventsPath || path.join(path.dirname(commandsPath), "events");
+  }
+
+  /**
+   * Type guard to check if a command module is a context menu command
+   */
+  private isContextMenuCommandModule(commandModule: CommandModule): commandModule is ContextMenuCommandModule {
+    return this.isContextMenuCommand(commandModule.data);
+  }
+
+  /**
+   * Type guard to check if a command module is a slash command
+   */
+  private isSlashCommandModule(commandModule: CommandModule): commandModule is SlashCommandModule {
+    return !this.isContextMenuCommand(commandModule.data);
   }
 
   /**
@@ -70,10 +88,13 @@ export class SimpleCommandHandler {
 
     for (const filePath of commandFiles) {
       try {
+        // Convert file path to file:// URL for ESM compatibility (works on Windows and Linux)
+        const fileUrl = pathToFileURL(filePath).href;
+
         // Clear require cache for hot reload
         delete require.cache[require.resolve(filePath)];
 
-        const commandModule: CommandModule = await import(filePath);
+        const commandModule: CommandModule = await import(fileUrl);
 
         if (!commandModule.data || !commandModule.run) {
           log.debug(`Skipping ${filePath} - missing data or run function`);
@@ -88,9 +109,15 @@ export class SimpleCommandHandler {
         }
 
         // Check if this is a context menu command
-        if (this.isContextMenuCommand(commandModule.data)) {
+        if (this.isContextMenuCommandModule(commandModule)) {
           this.contextMenuCommands.set(commandModule.data.name, commandModule);
           log.debug(`Loaded context menu command: ${commandModule.data.name}`);
+          continue;
+        }
+
+        // Type guard passed - now we know it's a SlashCommandModule
+        if (!this.isSlashCommandModule(commandModule)) {
+          // This shouldn't happen but TypeScript needs this check
           continue;
         }
 
@@ -128,6 +155,99 @@ export class SimpleCommandHandler {
     if (deletedCount > 0) {
       log.info(`Excluded ${deletedCount} deleted commands (will be removed from Discord)`);
     }
+  }
+
+  /**
+   * Load all events from the events directory
+   * 
+   * Events are organized by folder name (event name) and files are loaded
+   * in alphanumeric order (0-9, a-z). Each event handler can return true
+   * to stop propagation to subsequent handlers.
+   */
+  async loadEvents(): Promise<void> {
+    log.info("Loading events...");
+    this.events.clear();
+
+    if (!fs.existsSync(this.eventsPath)) {
+      log.warn(`Events directory not found: ${this.eventsPath}`);
+      return;
+    }
+
+    const eventDirs = fs.readdirSync(this.eventsPath, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+
+    let totalHandlers = 0;
+
+    for (const eventName of eventDirs) {
+      const eventDir = path.join(this.eventsPath, eventName);
+      const eventFiles = fs.readdirSync(eventDir, { withFileTypes: true })
+        .filter(dirent => dirent.isFile() && (dirent.name.endsWith(".ts") || dirent.name.endsWith(".js")))
+        .map(dirent => dirent.name)
+        .sort(); // Alphabetical order (0-9, a-z)
+
+      for (const fileName of eventFiles) {
+        const filePath = path.join(eventDir, fileName);
+
+        try {
+          // Convert to file:// URL for cross-platform ESM compatibility
+          const fileUrl = pathToFileURL(filePath).href;
+          
+          // Clear require cache for hot reload
+          delete require.cache[require.resolve(filePath)];
+
+          const eventModule = await import(fileUrl);
+
+          // Support default export (legacy pattern)
+          if (typeof eventModule.default === "function") {
+            const handler: EventHandler = {
+              name: eventName,
+              filePath,
+              execute: eventModule.default,
+            };
+
+            if (!this.events.has(eventName)) {
+              this.events.set(eventName, []);
+            }
+
+            this.events.get(eventName)!.push(handler);
+            totalHandlers++;
+            log.debug(`Loaded event handler: ${eventName} from ${fileName}`);
+          } else {
+            log.warn(`Event file ${filePath} does not export a default function`);
+          }
+        } catch (error) {
+          log.error(`Failed to load event from ${filePath}:`, error);
+        }
+      }
+    }
+
+    log.info(`Loaded ${totalHandlers} event handlers across ${this.events.size} event types`);
+  }
+
+  /**
+   * Setup event listeners for Discord events
+   */
+  setupEventListeners(): void {
+    log.debug("Setting up event listeners...");
+
+    for (const [eventName, handlers] of this.events) {
+      this.client.on(eventName as any, async (...args: any[]) => {
+        for (const handler of handlers) {
+          try {
+            const shouldStop = await handler.execute(this.client, ...args);
+            if (shouldStop === true) {
+              log.debug(`Event ${eventName} propagation stopped by ${handler.filePath}`);
+              break;
+            }
+          } catch (error) {
+            log.error(`Error in ${eventName} event handler (${handler.filePath}):`, error);
+          }
+        }
+      });
+    }
+
+    log.info(`Setup ${this.events.size} event types with ${Array.from(this.events.values()).reduce((sum, arr) => sum + arr.length, 0)} handlers`);
   }
 
   /**
@@ -193,10 +313,11 @@ export class SimpleCommandHandler {
             sub.setName(subcommandName).setDescription(originalData.description);
 
             // Copy options from the original command
-            if (originalData.options && Array.isArray(originalData.options)) {
-              for (const option of originalData.options) {
+            const options = (originalData as any).options;
+            if (options && Array.isArray(options)) {
+              for (const option of options) {
                 // Skip subcommands and groups (type 1 and 2)
-                if (option.type !== 1 && option.type !== 2) {
+                if ((option as any).type !== 1 && (option as any).type !== 2) {
                   this.copyOption(sub, option);
                 }
               }
@@ -213,26 +334,27 @@ export class SimpleCommandHandler {
     // Add simple commands as regular subcommands
     for (const [name, commandModule] of this.commands) {
       const originalData = commandModule.data;
+      const originalJSON = originalData.toJSON();
 
       // Check if this command manually defines subcommand groups
-      const hasGroups = originalData.options?.some((opt: any) => opt.type === 2); // Type 2 = SubcommandGroup
+      const hasGroups = originalJSON.options?.some((opt) => opt.type === 2); // Type 2 = SubcommandGroup
 
-      if (hasGroups) {
+      if (hasGroups && originalJSON.options) {
         // This command manually uses subcommand groups, copy them directly
-        for (const option of originalData.options) {
-          if (option.type === 2) {
+        for (const option of originalJSON.options) {
+          if (option.type === 2 && "options" in option) {
             // SubcommandGroup
-            command.addSubcommandGroup((group: any) => {
+            command.addSubcommandGroup((group) => {
               group.setName(option.name).setDescription(option.description);
 
               // Add subcommands within the group
               if (option.options && Array.isArray(option.options)) {
                 for (const subcommand of option.options) {
-                  group.addSubcommand((sub: any) => {
+                  group.addSubcommand((sub) => {
                     sub.setName(subcommand.name).setDescription(subcommand.description);
 
                     // Copy options for the subcommand
-                    if (subcommand.options && Array.isArray(subcommand.options)) {
+                    if ("options" in subcommand && subcommand.options && Array.isArray(subcommand.options)) {
                       for (const opt of subcommand.options) {
                         this.copyOption(sub, opt);
                       }
@@ -253,8 +375,8 @@ export class SimpleCommandHandler {
           sub.setName(name).setDescription(originalData.description);
 
           // Copy all options from the original command
-          if (originalData.options && Array.isArray(originalData.options)) {
-            for (const option of originalData.options) {
+          if (originalJSON.options && Array.isArray(originalJSON.options)) {
+            for (const option of originalJSON.options) {
               // Skip subcommands and groups (type 1 and 2)
               if (option.type !== 1 && option.type !== 2) {
                 this.copyOption(sub, option);
@@ -272,71 +394,101 @@ export class SimpleCommandHandler {
 
   /**
    * Copy an option from original command to subcommand
+   * Uses Discord.js API JSON structure
    */
-  private copyOption(subcommand: any, option: any): void {
+  private copyOption(
+    subcommand: SlashCommandSubcommandBuilder,
+    option: {
+      type: number;
+      name: string;
+      description: string;
+      required?: boolean;
+      choices?: Array<{ name: string; value: string | number }>;
+      min_value?: number;
+      max_value?: number;
+      min_length?: number;
+      max_length?: number;
+      autocomplete?: boolean;
+    }
+  ): void {
     const type = option.type;
 
     // Map Discord option types to builder methods
     switch (type) {
       case 3: // String
-        subcommand.addStringOption((opt: any) => this.configureOption(opt, option));
+        subcommand.addStringOption((opt) => this.configureOption(opt, option));
         break;
       case 4: // Integer
-        subcommand.addIntegerOption((opt: any) => this.configureOption(opt, option));
+        subcommand.addIntegerOption((opt) => this.configureOption(opt, option));
         break;
       case 5: // Boolean
-        subcommand.addBooleanOption((opt: any) => this.configureOption(opt, option));
+        subcommand.addBooleanOption((opt) => this.configureOption(opt, option));
         break;
       case 6: // User
-        subcommand.addUserOption((opt: any) => this.configureOption(opt, option));
+        subcommand.addUserOption((opt) => this.configureOption(opt, option));
         break;
       case 7: // Channel
-        subcommand.addChannelOption((opt: any) => this.configureOption(opt, option));
+        subcommand.addChannelOption((opt) => this.configureOption(opt, option));
         break;
       case 8: // Role
-        subcommand.addRoleOption((opt: any) => this.configureOption(opt, option));
+        subcommand.addRoleOption((opt) => this.configureOption(opt, option));
         break;
       case 10: // Number
-        subcommand.addNumberOption((opt: any) => this.configureOption(opt, option));
+        subcommand.addNumberOption((opt) => this.configureOption(opt, option));
         break;
       case 11: // Attachment
-        subcommand.addAttachmentOption((opt: any) => this.configureOption(opt, option));
+        subcommand.addAttachmentOption((opt) => this.configureOption(opt, option));
         break;
     }
   }
 
   /**
    * Configure an option with all its properties
+   * Generic to work with all option builder types
    */
-  private configureOption(optionBuilder: any, originalOption: any): any {
+  private configureOption<T extends { setName: (name: string) => T; setDescription: (desc: string) => T }>(
+    optionBuilder: T,
+    originalOption: {
+      name: string;
+      description: string;
+      required?: boolean;
+      choices?: Array<{ name: string; value: string | number }>;
+      min_value?: number;
+      max_value?: number;
+      min_length?: number;
+      max_length?: number;
+      autocomplete?: boolean;
+    }
+  ): T {
     optionBuilder.setName(originalOption.name).setDescription(originalOption.description);
 
-    if (originalOption.required !== undefined) {
-      optionBuilder.setRequired(originalOption.required);
+    // Use type guards to check for method existence
+    if (originalOption.required !== undefined && "setRequired" in optionBuilder) {
+      (optionBuilder as any).setRequired(originalOption.required);
     }
 
-    if (originalOption.choices && originalOption.choices.length > 0) {
-      optionBuilder.addChoices(...originalOption.choices);
+    if (originalOption.choices && originalOption.choices.length > 0 && "addChoices" in optionBuilder) {
+      (optionBuilder as any).addChoices(...originalOption.choices);
     }
 
-    if (originalOption.min_value !== undefined) {
-      optionBuilder.setMinValue(originalOption.min_value);
+    if (originalOption.min_value !== undefined && "setMinValue" in optionBuilder) {
+      (optionBuilder as any).setMinValue(originalOption.min_value);
     }
 
-    if (originalOption.max_value !== undefined) {
-      optionBuilder.setMaxValue(originalOption.max_value);
+    if (originalOption.max_value !== undefined && "setMaxValue" in optionBuilder) {
+      (optionBuilder as any).setMaxValue(originalOption.max_value);
     }
 
-    if (originalOption.min_length !== undefined) {
-      optionBuilder.setMinLength(originalOption.min_length);
+    if (originalOption.min_length !== undefined && "setMinLength" in optionBuilder) {
+      (optionBuilder as any).setMinLength(originalOption.min_length);
     }
 
-    if (originalOption.max_length !== undefined) {
-      optionBuilder.setMaxLength(originalOption.max_length);
+    if (originalOption.max_length !== undefined && "setMaxLength" in optionBuilder) {
+      (optionBuilder as any).setMaxLength(originalOption.max_length);
     }
 
-    if (originalOption.autocomplete !== undefined) {
-      optionBuilder.setAutocomplete(originalOption.autocomplete);
+    if (originalOption.autocomplete !== undefined && "setAutocomplete" in optionBuilder) {
+      (optionBuilder as any).setAutocomplete(originalOption.autocomplete);
     }
 
     return optionBuilder;
@@ -349,7 +501,7 @@ export class SimpleCommandHandler {
     const group = interaction.options.getSubcommandGroup(false);
     const subcommandName = interaction.options.getSubcommand();
 
-    let commandModule: CommandModule | undefined;
+    let commandModule: SlashCommandModule | undefined;
 
     // Check if this is a grouped command (from directory structure)
     if (group) {
@@ -528,9 +680,13 @@ export class SimpleCommandHandler {
   }
 
   /**
-   * Setup interaction handler
+   * Setup interaction handler and custom event listeners
    */
   setupInteractionHandler(): void {
+    // Setup custom event listeners first
+    this.setupEventListeners();
+
+    // Setup interaction handling
     this.client.on("interactionCreate", async (interaction) => {
       // Handle slash commands
       if (interaction.isChatInputCommand()) {
@@ -577,8 +733,8 @@ export class SimpleCommandHandler {
     }
 
     try {
-      // Call run function with legacy props format
-      await commandModule.run({ interaction, client: this.client, handler: this as any }, this.client);
+      // Call run function with proper Helpie-specific signature
+      await commandModule.run(interaction, this.client);
     } catch (error) {
       log.error(`Error executing context menu command ${interaction.commandName}:`, error);
 

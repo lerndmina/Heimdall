@@ -49,10 +49,19 @@ export const start = async () => {
 
   // Initialize our simple command handler
   const commandsPath = path.join(__dirname, "commands", "user");
-  const commandHandler = new SimpleCommandHandler(client, commandsPath);
+  const eventsPath = path.join(__dirname, "events");
+  const commandHandler = new SimpleCommandHandler(client, commandsPath, eventsPath);
 
   log.info("Loading commands...");
   await commandHandler.loadCommands();
+  
+  log.info("Loading events...");
+  await commandHandler.loadEvents();
+  
+  // Setup event listeners and interaction handler BEFORE login
+  // so ready event can be caught
+  commandHandler.setupInteractionHandler();
+  
   log.info("Command handler initialized");
 
   // Connect to MongoDB
@@ -80,7 +89,7 @@ export const start = async () => {
     log.warn("Bot will continue without Redis caching");
   }
 
-  // Login to Discord
+  // Login to Discord (ready event will fire after this)
   log.info("Logging in to Discord...");
   await client.login(env.BOT_TOKEN).catch((error) => {
     log.error("Failed to login to Discord:", error);
@@ -90,19 +99,6 @@ export const start = async () => {
   // Register commands after login
   log.info("Registering /helpie command with Discord...");
   await commandHandler.registerCommands(env.BOT_TOKEN, client.user!.id);
-
-  // Setup interaction handler
-  commandHandler.setupInteractionHandler();
-
-  // Ready event
-  client.once("ready", () => {
-    const elapsedTime = Date.now() - startTime;
-    log.info(`✅ Helpie Userbot is ready!`, {
-      user: client.user.tag,
-      id: client.user.id,
-      startupTime: `${elapsedTime}ms`,
-    });
-  });
 
   // Handle process termination
   process.on("SIGINT", async () => {
