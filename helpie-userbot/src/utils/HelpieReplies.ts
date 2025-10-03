@@ -206,7 +206,8 @@ export class HelpieReplies {
     const contentWithoutPrelude = rawText.replace(preludePattern, "");
 
     // Reconstruct message: prelude (if exists) + error message + codeblock with content
-    return `${preludeText}Helpie was unable to send the message, copy here:\n\`\`\`\n${contentWithoutPrelude}\n\`\`\``;
+    // return `${preludeText}Helpie was unable to send the message, copy here:\n\`\`\`\n${contentWithoutPrelude}\n\`\`\``;
+    return contentWithoutPrelude;
   }
 
   /**
