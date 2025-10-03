@@ -15,6 +15,6 @@ export const options = {
 };
 
 export async function run(interaction: ChatInputCommandInteraction, client: Client) {
-  // Use shared logic to clear context (ephemeral = false for slash commands by default)
-  await clearUserContext(interaction, false);
+  // Use shared logic to clear context (ephemeral = true for privacy)
+  await clearUserContext(interaction, true);
 }
