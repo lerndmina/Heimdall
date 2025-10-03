@@ -5,7 +5,6 @@
       "name": "@lerndmina/helpie-userbot",
       "dependencies": {
         "@ai-sdk/openai": "^2.0.42",
-        "@heimdall/command-handler": "../command-handler",
         "@heimdall/logger": "../logger",
         "@types/ms": "^2.1.0",
         "ai": "^5.0.59",
@@ -53,8 +52,6 @@
     "@discordjs/util": ["@discordjs/util@1.1.1", "", {}, "sha512-eddz6UnOBEB1oITPinyrB2Pttej49M9FZQY8NxgEvc3tq6ZICZ19m70RsmzRdDHk80O9NoYN/25AqJl8vPVf/g=="],
 
     "@discordjs/ws": ["@discordjs/ws@1.2.3", "", { "dependencies": { "@discordjs/collection": "^2.1.0", "@discordjs/rest": "^2.5.1", "@discordjs/util": "^1.1.0", "@sapphire/async-queue": "^1.5.2", "@types/ws": "^8.5.10", "@vladfrangu/async_event_emitter": "^2.2.4", "discord-api-types": "^0.38.1", "tslib": "^2.6.2", "ws": "^8.17.0" } }, "sha512-wPlQDxEmlDg5IxhJPuxXr3Vy9AjYq5xCvFWGJyD7w7Np8ZGu+Mc+97LCoEc/+AYCo2IDpKioiH0/c/mj5ZR9Uw=="],
-
-    "@heimdall/command-handler": ["@heimdall/command-handler@file:../command-handler", { "dependencies": { "@heimdall/logger": "file:../logger" }, "devDependencies": { "@types/node": "^20.19.14", "discord.js": "14.22.1", "typescript": "^5.9.2" } }],
 
     "@heimdall/logger": ["@heimdall/logger@file:../logger", { "devDependencies": { "@types/node": "^20.19.14", "typescript": "^5.9.2" } }],
 
@@ -335,8 +332,6 @@
     "@discordjs/rest/@discordjs/collection": ["@discordjs/collection@2.1.1", "", {}, "sha512-LiSusze9Tc7qF03sLCujF5iZp7K+vRNEDBZ86FT9aQAv3vxMLihUvKvpsCWiQ2DJq1tVckopKm1rxomgNUc9hg=="],
 
     "@discordjs/ws/@discordjs/collection": ["@discordjs/collection@2.1.1", "", {}, "sha512-LiSusze9Tc7qF03sLCujF5iZp7K+vRNEDBZ86FT9aQAv3vxMLihUvKvpsCWiQ2DJq1tVckopKm1rxomgNUc9hg=="],
-
-    "@heimdall/command-handler/@heimdall/logger": ["@heimdall/logger@file:../logger", { "devDependencies": { "@types/node": "^20.19.14", "typescript": "^5.9.2" } }],
 
     "chalk/supports-color": ["supports-color@7.2.0", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw=="],
 

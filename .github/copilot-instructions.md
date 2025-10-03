@@ -7,8 +7,9 @@ Heimdall is a production Discord bot monorepo with an Express REST API, Next.js 
 ### Monorepo Structure
 
 - **command-handler/** - Custom Discord.js command handler (replaces CommandKit) with ButtonKit reactive system
-- **bot/** - Discord.js 14+ bot with Express API server
+- **bot/** - Discord.js 14+ bot with Express API server (guild-installable)
 - **dashboard/** - Next.js 14 App Router with Discord OAuth
+- **helpie-userbot/** - User-installable Discord bot with AI assistance and context system
 - **minecraft-plugin/** - Java Spigot/Paper plugin for whitelist integration
 - **logger/** - Shared logging package
 - **scripts/** - Build and deployment automation
@@ -541,6 +542,184 @@ bun run dev
 
 Java plugin (minecraft-plugin/) calls bot API. Plugin config includes `enabled` flag (defaults false for security).
 
+## Helpie Userbot (User-Installable Bot)
+
+**Location:** `helpie-userbot/`
+
+Helpie is a **user-installable Discord bot** - installed on user profiles rather than guilds. Users can use Helpie commands across any server, in DMs, or in private channels.
+
+### Key Differences from Main Bot
+
+1. **Installation Type**: User-installable (not guild-installable)
+2. **Command Handler**: Uses `SimpleCommandHandler` instead of full CommandHandler
+3. **Command Structure**: All commands grouped under `/helpie` parent command with subcommands
+4. **No ButtonKit**: Uses standard Discord.js interaction patterns (simpler architecture)
+
+### SimpleCommandHandler System
+
+**Auto-groups commands under `/helpie` parent command:**
+
+```typescript
+// File: commands/user/ping.ts → Becomes: /helpie ping
+// File: commands/user/context/set.ts → Becomes: /helpie context set
+```
+
+**Command file structure remains the same:**
+
+```typescript
+export const data = new SlashCommandBuilder()
+  .setName("ping") // Will become /helpie ping
+  .setDescription("Check bot latency");
+
+export const options = { devOnly: false, deleted: false };
+
+export async function run(interaction: ChatInputCommandInteraction, client: Client) {
+  // Command logic
+}
+```
+
+**Directory-based grouping** - subdirectories become subcommand groups automatically:
+
+- `commands/user/ping.ts` → `/helpie ping`
+- `commands/user/context/set.ts` → `/helpie context set`
+- `commands/user/context/list.ts` → `/helpie context list`
+
+### HelpieReplies System
+
+**Universal reply system with animated emoji** (replaces manual embed creation):
+
+```typescript
+import HelpieReplies from "../utils/HelpieReplies";
+
+// Two modes: plain text or embed
+await HelpieReplies.success(interaction, "Operation successful!"); // Plain text
+await HelpieReplies.success(interaction, {
+  title: "Success",
+  message: "Details here...",
+}); // Embed
+
+// Deferred replies for long operations
+await HelpieReplies.deferThinking(interaction); // Shows thinking emoji
+await HelpieReplies.deferSearching(interaction); // Shows searching emoji
+
+// Edit deferred reply
+await HelpieReplies.editSuccess(interaction, "Done!");
+```
+
+**Emoji mapping:**
+
+- `success()` → 🤖 mandalorianhello (green embed)
+- `error()` → 😔 mandaloriansorry (red embed) - system errors
+- `warning()` → 😲 mandalorianshocked (yellow embed) - user errors
+- `thinking()` → 🤔 mandalorianwhat (blue embed)
+- `searching()` → 👀 mandalorianlooking (blue embed)
+
+**Always use HelpieReplies** - never manual `interaction.reply()` or `interaction.editReply()`.
+
+### AI Context System
+
+**Hierarchical context resolution** (Global → Guild → User):
+
+```typescript
+import { ContextService } from "../services/ContextService";
+
+// Resolve context for AI questions (cascading priority)
+const resolvedContext = await ContextService.resolveContextForAsk(userId, guildId);
+// Returns: User context > Guild context > Global context > null
+
+// Set context (owner-only)
+await ContextService.setContext("global", githubRawUrl, ownerId);
+```
+
+**Context storage:**
+
+- **MongoDB**: Stores GitHub URLs and metadata
+- **Redis**: Caches fetched content (10 min TTL)
+- **GitHub**: Content fetched from raw.githubusercontent.com or gist.githubusercontent.com
+
+**Context commands** (under `/helpie context`):
+
+- `set` - Set context URL (owner-only)
+- `view` - View current context
+- `list` - List all contexts (owner-only)
+- `refresh` - Force refresh from GitHub
+- `remove` - Delete context (owner-only)
+- `lookup` - View specific context by ID (owner-only)
+
+### AI Integration Pattern
+
+**Shared logic for AI questions** (commands/user/ask.ts and ask-context.ts):
+
+```typescript
+import { processAskQuestion } from "../utils/AskHelpie";
+
+// In command
+await HelpieReplies.deferThinking(interaction);
+await processAskQuestion({
+  message: userQuestion,
+  userId: interaction.user.id,
+  guildId: interaction.guildId,
+  interaction,
+});
+```
+
+**Uses Vercel AI SDK:**
+
+- Model: `gpt-5-mini` (OpenAI)
+- Context injection into system prompt
+- 2000 char limit (Discord constraint)
+
+### Environment Variables (Helpie-specific)
+
+```typescript
+// Required
+BOT_TOKEN: string;
+OWNER_IDS: string; // Comma-separated
+OPENAI_API_KEY: string;
+MONGODB_URI: string;
+
+// Optional
+MONGODB_DATABASE: string; // Default: "helpie"
+REDIS_URI: string; // Default: "redis://localhost:6379"
+SYSTEM_PROMPT: string; // AI system prompt
+DEBUG_LOG: boolean;
+NODE_ENV: string;
+```
+
+### Development Workflow
+
+```bash
+cd helpie-userbot
+bun install
+bun run dev  # Nodemon with hot reload
+```
+
+**Hot reload:** SimpleCommandHandler automatically reloads commands on file changes.
+
+### Context Menu Commands
+
+**Separate from slash commands** - standalone context menu actions:
+
+```typescript
+import { ContextMenuCommandBuilder, ApplicationCommandType } from "discord.js";
+
+export const data = new ContextMenuCommandBuilder().setName("Ask Helpie").setType(ApplicationCommandType.Message); // Or .User
+
+export async function run(interaction: MessageContextMenuCommandInteraction, client: Client) {
+  // Command logic
+}
+```
+
+**Detection:** SimpleCommandHandler auto-detects context menu commands and registers separately (not under `/helpie`).
+
+### Key Files
+
+- `src/utils/SimpleCommandHandler.ts` - Command loader and registration
+- `src/utils/HelpieReplies.ts` - Universal reply system with emoji
+- `src/services/ContextService.ts` - AI context management
+- `src/utils/AskHelpie.ts` - Shared AI question processing logic
+- `src/index.ts` - Bot initialization
+
 ## Anti-Patterns to Avoid
 
 ❌ **Don't**: Write scripts to test features (per project rules)  
@@ -548,9 +727,12 @@ Java plugin (minecraft-plugin/) calls bot API. Plugin config includes `enabled` 
 ❌ **Don't**: Write documentation markdown files - focus on code implementation only  
 ❌ **Don't**: Use `console.log` - always use `log.*`  
 ❌ **Don't**: Silently swallow errors - always log and inform user  
-❌ **Don't**: Make direct database calls - use Database utility class (if exists) or Mongoose models  
-❌ **Don't**: Use traditional Discord.js collectors - prefer ButtonKit  
+❌ **Don't**: Make direct database calls in bot/ - use Database utility class for Redis caching  
+❌ **Don't**: Use traditional Discord.js collectors - prefer ButtonKit (bot only, not helpie)  
 ❌ **Don't**: Hard-code values - use environment variables via FetchEnvs
+❌ **Don't**: Use manual embeds in Helpie - always use HelpieReplies system
+❌ **Don't**: Create `/helpie` command manually - SimpleCommandHandler does this automatically
+❌ **Don't**: Use ContextService for non-context DB operations - it's only for AI context management
 
 ## Docker Deployment
 
