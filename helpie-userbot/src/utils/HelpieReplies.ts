@@ -2,7 +2,12 @@
  * HelpieReplies - Universal message sending system with automatic emoji injection
  *
  * Provides consistent reply formatting across all Helpie commands with contextual
- * animated emoji based on reply type. All replies are sent as embeds.
+ * animated emoji based on reply type. All replies are sent      const textContentWithoutPrelude = textContent.replace(preludePattern, "");
+
+      // Create codeblock version
+      const codeblockVersion = `\n\nHelpie was unable to send the message, copy here:\n\`\`\`\n${textContentWithoutPrelude}\n\`\`\``;
+
+      // Check if we have character space (Discord limit is 2000)beds.
  *
  * Available emoji:
  * - mandalorianhello (greeting/success)
@@ -183,7 +188,7 @@ function formatContent(content: string, type: ReplyType = "info", includeEmoji: 
 export class HelpieReplies {
   /**
    * Handles forced ephemeral replies by Discord (userbot in large servers)
-   * Appends codeblock version if reply was forced ephemeral and character limit allows
+   * Reconstructs message with prelude + error message + codeblock when forced ephemeral
    */
   private static async handleForcedEphemeral(
     interaction: SupportedInteraction,
@@ -200,88 +205,48 @@ export class HelpieReplies {
       // Fetch the actual message to check if it was forced ephemeral
       const message = await response.fetch();
 
-      // DEBUG: Log entire message object
-      log.debug("=== EPHEMERAL DEBUG ===");
-      log.debug("Message object:", JSON.stringify(message, null, 2));
-      log.debug("Message flags:", message.flags);
-      log.debug("Message flags.bitfield:", message.flags.bitfield);
-      log.debug("Message flags as array:", message.flags.toArray());
-      log.debug("Intentional ephemeral:", intentionalEphemeral);
-      log.debug("======================");
-
       // Check if message has ephemeral flag (64)
       const isEphemeral = (message.flags.bitfield & 64) === 64;
 
-      log.debug("Is ephemeral check result:", isEphemeral);
+      log.debug("handleForcedEphemeral - Is ephemeral:", isEphemeral);
 
       if (!isEphemeral) return; // Not forced ephemeral, we're good
 
-      // Reply was forced ephemeral by Discord - append codeblock version
-      let textContent: string;
-
+      // Extract raw text content from the original content parameter
+      let rawText: string;
       if (typeof content === "object" && "title" in content && "message" in content) {
-        // For embed content, use title + message
-        textContent = `${content.title}\n\n${content.message}`;
+        rawText = content.message;
       } else {
-        // For plain text, strip emoji if present
-        textContent = content as string;
-        const emojiStr = getEmojiForType(type);
-        textContent = textContent.replace(emojiStr, "").trim();
+        rawText = content as string;
       }
 
-      // Strip prelude from textContent if it exists (for AI responses)
+      // Check if content has prelude and extract it
       const preludePattern = /^# Hey there! I'm Helpie, an AI designed to help you get answers quickly\.\n\n/;
-      textContent = textContent.replace(preludePattern, "");
+      const preludeMatch = rawText.match(preludePattern);
+      const hasPrelude = !!preludeMatch;
+      const preludeText = hasPrelude ? preludeMatch[0] : "";
+      const contentWithoutPrelude = rawText.replace(preludePattern, "");
 
-      // Create codeblock version
-      const codeblockVersion = `\n\n**Copyable version:**\n\`\`\`\n${textContent}\n\`\`\``;
+      // Reconstruct message: prelude (if exists) + error message + codeblock with content
+      const reconstructed = `${preludeText}Helpie was unable to send the message, copy here:\n\`\`\`\n${contentWithoutPrelude}\n\`\`\``;
 
-      // Check if we have character space (Discord limit is 2000)
-      const currentContent = message.content || "";
-      const embedDescription = message.embeds[0]?.description || "";
-      const totalCurrentLength = currentContent.length + embedDescription.length;
-      const newTotalLength = totalCurrentLength + codeblockVersion.length;
-
-      if (newTotalLength <= 1900) {
-        // Leave buffer for safety
-        // Append to existing content
-        if (message.embeds.length > 0) {
-          // Edit embed to append codeblock
-          const existingEmbed = message.embeds[0];
-          const updatedEmbed = EmbedBuilder.from(existingEmbed);
-          updatedEmbed.setDescription((existingEmbed.description || "") + codeblockVersion);
-
-          await interaction.editReply({
-            embeds: [updatedEmbed],
-          });
-        } else {
-          // Edit plain text to append codeblock
-          await interaction.editReply({
-            content: currentContent + codeblockVersion,
-          });
-        }
-      } else {
-        // Not enough space, replace entire message with codeblock version
-        const replacementContent = `${emoji ? getEmojiForType(type) + " " : ""}**${getDefaultTitle(type)}**\n\`\`\`\n${textContent}\n\`\`\``;
-
-        await interaction.editReply({
-          content: replacementContent,
-          embeds: [], // Clear embeds
-        });
-      }
+      await interaction.editReply({
+        content: reconstructed,
+        embeds: [], // Clear embeds
+      });
     } catch (error: any) {
       // Handle deleted message - silently ignore since this is just an enhancement
       if (error.code === 10008) {
         return; // User deleted message, nothing we can do
       }
       // Silently fail for other errors - don't break the command if this enhancement fails
-      console.error("Failed to handle forced ephemeral:", error);
+      log.error("Failed to handle forced ephemeral:", error);
     }
   }
 
   /**
-   * Handles ephemeral messages in editReply by appending codeblock version
-   * This is called after editReply() to check if the message is ephemeral and append copyable text
+   * Handles ephemeral messages in editReply
+   * Reconstructs message with prelude + error message + codeblock when ephemeral detected
    */
   private static async handleEphemeralEditReply(interaction: SupportedInteraction, message: Message, content: ReplyContent, type: ReplyType, emoji: boolean): Promise<void> {
     try {
@@ -292,74 +257,37 @@ export class HelpieReplies {
 
       if (!isEphemeral) return; // Not ephemeral, we're good
 
-      // Message is ephemeral - append codeblock version
-      let textContent: string;
-
+      // Extract raw text content from the original content parameter
+      let rawText: string;
       if (typeof content === "object" && "title" in content && "message" in content) {
-        // For embed content, use title + message
-        textContent = `${content.title}\n\n${content.message}`;
+        rawText = content.message;
       } else {
-        // For plain text, strip emoji if present
-        textContent = content as string;
-        const emojiStr = getEmojiForType(type);
-        textContent = textContent.replace(emojiStr, "").trim();
+        rawText = content as string;
       }
 
-      // Strip prelude from textContent if it exists (for AI responses)
+      // Check if content has prelude and extract it
       const preludePattern = /^# Hey there! I'm Helpie, an AI designed to help you get answers quickly\.\n\n/;
-      textContent = textContent.replace(preludePattern, "");
+      const preludeMatch = rawText.match(preludePattern);
+      const hasPrelude = !!preludeMatch;
+      const preludeText = hasPrelude ? preludeMatch[0] : "";
+      const contentWithoutPrelude = rawText.replace(preludePattern, "");
 
-      // Create codeblock version
-      const codeblockVersion = `\n\nIt looks like helpie's message got hidden. Here's a copyable version:\n\`\`\`\n${textContent}\n\`\`\``;
+      // Reconstruct message: prelude (if exists) + error message + codeblock with content
+      const reconstructed = `${preludeText}Helpie was unable to send the message, copy here:\n\`\`\`\n${contentWithoutPrelude}\n\`\`\``;
 
-      // Check if we have character space (Discord limit is 2000)
-      const currentContent = message.content || "";
-      const embedDescription = message.embeds[0]?.description || "";
-      const totalCurrentLength = currentContent.length + embedDescription.length;
-      const newTotalLength = totalCurrentLength + codeblockVersion.length;
+      log.debug("Reconstructing ephemeral message with prelude and codeblock");
 
-      log.debug("Character lengths - current:", totalCurrentLength, "new:", newTotalLength);
-
-      if (newTotalLength <= 1900) {
-        // Leave buffer for safety
-        // Append to existing content
-        if (message.embeds.length > 0) {
-          // Edit embed to append codeblock
-          const existingEmbed = message.embeds[0];
-          const updatedEmbed = EmbedBuilder.from(existingEmbed);
-          updatedEmbed.setDescription((existingEmbed.description || "") + codeblockVersion);
-
-          log.debug("Appending codeblock to embed");
-
-          await interaction.editReply({
-            embeds: [updatedEmbed],
-          });
-        } else {
-          // Edit plain text to append codeblock
-          log.debug("Appending codeblock to plain text");
-
-          await interaction.editReply({
-            content: currentContent + codeblockVersion,
-          });
-        }
-      } else {
-        // Not enough space, replace entire message with codeblock version
-        const replacementContent = `${emoji ? getEmojiForType(type) + " " : ""}**${getDefaultTitle(type)}**\n\`\`\`\n${textContent}\n\`\`\``;
-
-        log.debug("Replacing entire message with codeblock version");
-
-        await interaction.editReply({
-          content: replacementContent,
-          embeds: [], // Clear embeds
-        });
-      }
+      await interaction.editReply({
+        content: reconstructed,
+        embeds: [], // Clear embeds
+      });
     } catch (error: any) {
       // Handle deleted message - silently ignore since this is just an enhancement
       if (error.code === 10008) {
         return; // User deleted message, nothing we can do
       }
       // Silently fail for other errors - don't break the command if this enhancement fails
-      console.error("Failed to handle ephemeral edit reply:", error);
+      log.error("Failed to handle ephemeral edit reply:", error);
     }
   }
 
