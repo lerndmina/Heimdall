@@ -201,8 +201,6 @@ export class HelpieReplies {
 
     // Check if content has prelude and extract it
     const preludePattern = /^# Hey there! I'm Helpie, an AI designed to help you get answers quickly\.\n\n/;
-    const preludeMatch = rawText.match(preludePattern);
-    const preludeText = preludeMatch ? preludeMatch[0] : "";
     const contentWithoutPrelude = rawText.replace(preludePattern, "");
 
     // Reconstruct message: prelude (if exists) + error message + codeblock with content
