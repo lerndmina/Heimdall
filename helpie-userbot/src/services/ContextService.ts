@@ -237,6 +237,7 @@ The following context is provided in priority order (Global → Guild → User).
 - Analyzing or describing what the user said
 - Providing alternative solutions not in the context
 - Suggesting approaches not explicitly documented
+- Using language like "the context says" or "according to the documentation". Just answer as if this is your knowledge base.
 
 --- CONTEXT FOLLOWS ---
 ${contextParts.join("\n\n---\n\n")}
