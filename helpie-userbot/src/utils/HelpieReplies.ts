@@ -20,6 +20,7 @@
 import {
   ChatInputCommandInteraction,
   MessageContextMenuCommandInteraction,
+  ModalSubmitInteraction,
   InteractionReplyOptions,
   InteractionUpdateOptions,
   MessagePayload,
@@ -44,8 +45,9 @@ export class InteractionDeletedError extends Error {
 
 /**
  * Supported interaction types for HelpieReplies
+ * Includes modal submissions for commands that use modals
  */
-export type SupportedInteraction = ChatInputCommandInteraction | MessageContextMenuCommandInteraction;
+export type SupportedInteraction = ChatInputCommandInteraction | MessageContextMenuCommandInteraction | ModalSubmitInteraction;
 
 /**
  * Track which interactions have been replied to
