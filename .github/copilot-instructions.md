@@ -618,7 +618,12 @@ await HelpieReplies.editSuccess(interaction, "Done!");
 
 ### AI Context System
 
-**Hierarchical context resolution** (Global → Guild → User):
+**Two types of context:**
+
+1. **Permanent Context (GitHub-based)** - Hierarchical resolution (Global → Guild → User)
+2. **Temporary Context (Redis-based)** - Message-specific, 5-minute TTL
+
+**Permanent Context (ContextService):**
 
 ```typescript
 import { ContextService } from "../services/ContextService";
@@ -637,6 +642,29 @@ await ContextService.setContext("global", githubRawUrl, ownerId);
 - **Redis**: Caches fetched content (10 min TTL)
 - **GitHub**: Content fetched from raw.githubusercontent.com or gist.githubusercontent.com
 
+**Temporary Context (TemporaryContextManager):**
+
+```typescript
+import TemporaryContextManager from "../utils/TemporaryContextManager";
+
+// Store message content temporarily (5-min TTL)
+await TemporaryContextManager.store(userId, messageId, content);
+
+// Get all temporary contexts for user (for AI processing)
+const contexts = await TemporaryContextManager.getAllForUser(userId);
+
+// Clear all temporary contexts after use
+await TemporaryContextManager.deleteAllForUser(userId);
+```
+
+**Temporary context features:**
+
+- Users right-click messages to add to temporary context
+- Context menu: "AI -> Add Context"
+- Automatically prepended to AI questions
+- Cleared after successful AI response
+- 5-minute TTL in Redis (key: `HelpieContext:{userId}:{messageId}`)
+
 **Context commands** (under `/helpie context`):
 
 - `set` - Set context URL (owner-only)
@@ -645,6 +673,7 @@ await ContextService.setContext("global", githubRawUrl, ownerId);
 - `refresh` - Force refresh from GitHub
 - `remove` - Delete context (owner-only)
 - `lookup` - View specific context by ID (owner-only)
+- `clear` - Clear all temporary stored contexts (user-scoped)
 
 ### AI Integration Pattern
 
@@ -665,8 +694,9 @@ await processAskQuestion({
 
 **Uses Vercel AI SDK:**
 
-- Model: `gpt-5-mini` (OpenAI)
+- Model: `gpt-4o-mini` (OpenAI)
 - Context injection into system prompt
+- Temporary contexts automatically prepended to questions
 - 2000 char limit (Discord constraint)
 
 ### Environment Variables (Helpie-specific)
@@ -682,6 +712,7 @@ MONGODB_URI: string;
 MONGODB_DATABASE: string; // Default: "helpie"
 REDIS_URI: string; // Default: "redis://localhost:6379"
 SYSTEM_PROMPT: string; // AI system prompt
+DEEPL_API_KEY: string; // For translation feature
 DEBUG_LOG: boolean;
 NODE_ENV: string;
 ```
@@ -695,6 +726,82 @@ bun run dev  # Nodemon with hot reload
 ```
 
 **Hot reload:** SimpleCommandHandler automatically reloads commands on file changes.
+
+### Additional Commands
+
+**Help Command:**
+
+- `/helpie help` - Dynamic help command showing all available commands with clickable links
+- Automatically fetches command structure from Discord API
+- Shows top-level commands, grouped subcommands, and context menu commands
+
+**Utility Commands:**
+
+- `/helpie ping` - Check bot latency and WebSocket ping
+- `/helpie uptime` - Shows bot uptime (owner-only)
+
+### Tags System
+
+**Reusable message templates** with autocomplete and usage tracking:
+
+```typescript
+import TagModel from "../../models/Tag";
+
+// Tags have two scopes: user (private) or global (owner-only)
+// Create tag
+const tag = new TagModel({
+  userId: interaction.user.id,
+  scope: "user", // or "global"
+  name: "tagname",
+  content: "Message content here",
+});
+await tag.save();
+
+// Find tag (checks global first, then user-specific)
+let tag = await TagModel.findOne({ scope: "global", name: name });
+if (!tag) {
+  tag = await TagModel.findOne({ userId: userId, scope: "user", name: name });
+}
+```
+
+**Tag Commands** (under `/helpie tags`):
+
+- `add` - Create a new tag (with `global` option for owners)
+- `list` - List all your tags with usage stats
+- `remove` - Delete a tag
+
+**Tag Usage:**
+
+- `/helpie tag <name>` - Send a tag by name with autocomplete
+- Optional `target` parameter to ping a user
+- Autocomplete shows matching tags (global + user tags)
+- Tracks usage count and last used timestamp
+
+**Tag Features:**
+
+- Name validation: lowercase, alphanumeric, dashes/underscores only
+- Max 100 chars for name, 2000 chars for content
+- Usage statistics (count, last used date)
+- Autocomplete integration for quick access
+- Context menu: "Tags -> Add Tag" for quick creation from messages
+
+### Translation Feature
+
+**DeepL-powered translation** via context menu:
+
+```typescript
+// Context menu: "Utils -> Translate"
+// Automatically detects source language and translates to English
+// Requires DEEPL_API_KEY environment variable
+```
+
+**Features:**
+
+- Right-click any message to translate
+- Supports message content and embeds
+- Auto-detects source language
+- Shows original and translated text side-by-side
+- Language detection included in response
 
 ### Context Menu Commands
 
@@ -712,12 +819,23 @@ export async function run(interaction: MessageContextMenuCommandInteraction, cli
 
 **Detection:** SimpleCommandHandler auto-detects context menu commands and registers separately (not under `/helpie`).
 
+**Available Context Menu Commands:**
+
+- **AI -> Ask** - Right-click message to ask Helpie about it
+- **AI -> Add Context** - Add message to temporary context (5-min TTL)
+- **AI -> Clear Context** - Clear temporary context for specific message
+- **Utils -> Translate** - Translate message to English using DeepL
+- **Tags -> Add Tag** - Quick tag creation from message content
+
 ### Key Files
 
 - `src/utils/SimpleCommandHandler.ts` - Command loader and registration
 - `src/utils/HelpieReplies.ts` - Universal reply system with emoji
-- `src/services/ContextService.ts` - AI context management
+- `src/services/ContextService.ts` - AI context management (permanent/GitHub-based)
+- `src/utils/TemporaryContextManager.ts` - Temporary context manager (Redis-based, 5-min TTL)
 - `src/utils/AskHelpie.ts` - Shared AI question processing logic
+- `src/models/Tag.ts` - Tag model for reusable message templates
+- `src/models/HelpieContext.ts` - Permanent context model
 - `src/index.ts` - Bot initialization
 
 ## Anti-Patterns to Avoid
@@ -733,6 +851,7 @@ export async function run(interaction: MessageContextMenuCommandInteraction, cli
 ❌ **Don't**: Use manual embeds in Helpie - always use HelpieReplies system
 ❌ **Don't**: Create `/helpie` command manually - SimpleCommandHandler does this automatically
 ❌ **Don't**: Use ContextService for non-context DB operations - it's only for AI context management
+❌ **Don't**: Confuse permanent contexts (ContextService) with temporary contexts (TemporaryContextManager) - they serve different purposes
 
 ## Docker Deployment
 
