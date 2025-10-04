@@ -15,7 +15,7 @@ export const data = new ContextMenuCommandBuilder()
   .setContexts([InteractionContextType.BotDM, InteractionContextType.Guild, InteractionContextType.PrivateChannel]);
 
 export const options: CommandOptions = {
-  deleted: false,
+  deleted: true, // Deleted to make room for new commands - use /helpie context clear instead
 };
 
 export async function run(interaction: MessageContextMenuCommandInteraction, client: Client) {
