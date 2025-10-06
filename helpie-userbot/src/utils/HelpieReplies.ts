@@ -28,8 +28,13 @@ import {
   Message,
   InteractionResponse,
   EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ButtonInteraction,
 } from "discord.js";
 import log from "./log";
+import { prelude } from "./AskHelpie";
 
 /**
  * Custom error for when a user deletes their message while the bot is processing
@@ -58,6 +63,18 @@ const repliedInteractions = new WeakSet<SupportedInteraction>();
  * Track which interactions were intentionally made ephemeral
  */
 const intentionalEphemeralInteractions = new WeakSet<SupportedInteraction>();
+
+/**
+ * Track the actual message content that was sent (before Discord's response)
+ * Maps interaction -> sent content for ephemeral reconstruction
+ */
+const sentMessageContent = new WeakMap<SupportedInteraction, string>();
+
+/**
+ * Track interaction IDs for mobile button functionality
+ * Maps interaction -> interaction ID for button custom ID
+ */
+const interactionIds = new WeakMap<SupportedInteraction, string>();
 
 /**
  * Animated emoji IDs for Helpie
@@ -194,32 +211,128 @@ function formatContent(content: string, type: ReplyType = "info", includeEmoji: 
  */
 export class HelpieReplies {
   /**
-   * Reconstructs an ephemeral message with prelude + error message + codeblock
-   * Extracts prelude from original content and formats as copyable codeblock
+   * Reconstructs an ephemeral message for forced ephemeral replies
+   * Returns the actual sent message content from WeakMap as-is
    */
-  private static reconstructEphemeralMessage(content: ReplyContent): string {
-    // Extract raw text content from the original content parameter
-    let rawText: string;
-    if (typeof content === "object" && "title" in content && "message" in content) {
-      rawText = content.message;
-    } else {
-      rawText = content as string;
+  private static reconstructEphemeralMessage(interaction: SupportedInteraction): string {
+    // Get the actual message content that was sent
+    const sentContent = sentMessageContent.get(interaction);
+
+    if (!sentContent) {
+      // Fallback - shouldn't happen, but handle gracefully
+      log.error("reconstructEphemeralMessage called but no sent content found in WeakMap");
+      return "Helpie was unable to send the message.";
     }
 
-    // Check if content has prelude and extract it
-    const preludePattern = /^# Hey there! I'm Helpie, an AI designed to help you get answers quickly\.\n\n/;
-    const contentWithoutPrelude = rawText.replace(preludePattern, "");
+    // Return the content as-is (prelude already included by caller if present)
+    return sentContent;
+  }
 
-    // Reconstruct message: prelude (if exists) + error message + codeblock with content
-    // return `${preludeText}Helpie was unable to send the message, copy here:\n\`\`\`\n${contentWithoutPrelude}\n\`\`\``;
-    return contentWithoutPrelude;
+  /**
+   * Creates a button for mobile users to get raw content
+   * Button custom ID contains the interaction ID for lookup
+   */
+  private static createMobileButton(interaction: SupportedInteraction): ActionRowBuilder<ButtonBuilder> {
+    // Store the interaction ID for later lookup
+    interactionIds.set(interaction, interaction.id);
+
+    const customId = `ephemeral-mobile:${interaction.id}`;
+    log.debug("Creating mobile button with custom ID:", customId);
+
+    const button = new ButtonBuilder().setCustomId(customId).setLabel("📱 I'm on Mobile").setStyle(ButtonStyle.Secondary);
+
+    const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
+
+    log.debug("Mobile button created successfully");
+
+    return actionRow;
+  }
+
+  /**
+   * Handles mobile button clicks - converts codeblock format to raw text
+   * Called from external button handler
+   */
+  static async handleMobileButton(buttonInteraction: ButtonInteraction): Promise<void> {
+    try {
+      // Extract the original interaction ID from the button custom ID
+      const customId = buttonInteraction.customId;
+      const interactionId = customId.replace("ephemeral-mobile:", "");
+
+      log.debug("Mobile button clicked for interaction:", interactionId);
+
+      // Get the content from the message itself (it's already there)
+      const message = buttonInteraction.message;
+      const currentContent = message.content;
+
+      log.debug("Current message content:", currentContent);
+      log.debug("Content length:", currentContent.length);
+
+      // Extract content from codeblock - try multiple patterns
+      // Pattern 1: Standard codeblock with newlines
+      let codeblockMatch = currentContent.match(/```\n([\s\S]*?)\n```/);
+
+      // Pattern 2: Codeblock without newlines before/after
+      if (!codeblockMatch) {
+        codeblockMatch = currentContent.match(/```([\s\S]*?)```/);
+      }
+
+      if (!codeblockMatch) {
+        log.error("No codeblock found in message. Content:", currentContent);
+        await buttonInteraction.reply({
+          content: "❌ Unable to extract content from codeblock. The message format may have changed. Please copy manually by long-pressing the message.",
+          flags: 64, // Ephemeral
+        });
+        return;
+      }
+
+      const rawContent = codeblockMatch[1].trim();
+
+      log.debug("Extracted raw content:", rawContent);
+      log.debug("Extracted content length:", rawContent.length);
+
+      if (!rawContent || rawContent.length === 0) {
+        await buttonInteraction.reply({
+          content: "❌ Extracted content is empty. Please copy manually.",
+          flags: 64, // Ephemeral
+        });
+        return;
+      }
+
+      // Update the message with just the raw content
+      await buttonInteraction.update({
+        content: rawContent,
+        components: [], // Remove the button
+      });
+
+      log.info("Successfully converted message to mobile-friendly format");
+    } catch (error: any) {
+      log.error("Failed to handle mobile button:", error);
+      log.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+      });
+
+      // Try to respond to the interaction if we haven't already
+      try {
+        if (!buttonInteraction.replied && !buttonInteraction.deferred) {
+          await buttonInteraction.reply({
+            content: "❌ An error occurred while processing your request. Please try copying manually.",
+            flags: 64, // Ephemeral
+          });
+        }
+      } catch (replyError) {
+        // Silently fail if we can't reply
+        log.error("Failed to send error message:", replyError);
+      }
+    }
   }
 
   /**
    * Handles forced ephemeral replies by Discord (userbot in large servers)
    * Reconstructs message when Discord forces ephemeral flag
    */
-  private static async handleForcedEphemeral(interaction: SupportedInteraction, response: InteractionResponse<boolean>, content: ReplyContent, intentionalEphemeral: boolean): Promise<void> {
+  private static async handleForcedEphemeral(interaction: SupportedInteraction, response: InteractionResponse<boolean>, intentionalEphemeral: boolean): Promise<void> {
     // If we intentionally made it ephemeral, don't modify
     if (intentionalEphemeral) return;
 
@@ -235,12 +348,31 @@ export class HelpieReplies {
       if (!isEphemeral) return; // Not forced ephemeral, we're good
 
       // Reconstruct and update the message
-      const reconstructed = HelpieReplies.reconstructEphemeralMessage(content);
+      const reconstructed = HelpieReplies.reconstructEphemeralMessage(interaction);
+
+      // Check if content already has prelude (AI responses)
+      const hasPrelude = reconstructed.startsWith(prelude); // Check for prelude
+
+      // Build message: if has prelude, show prelude + codeblock. Otherwise just codeblock.
+      const reconstructedWithMessage = hasPrelude
+        ? `${prelude}Helpie was unable to send the message, copy here:\n\`\`\`\n${reconstructed}\n\`\`\``
+        : `Helpie was unable to send the message, copy here:\n\`\`\`\n${reconstructed}\n\`\`\``;
+
+      log.debug("Reconstructed message length:", reconstructedWithMessage.length);
+      log.debug("Has prelude:", hasPrelude);
+
+      // Create mobile button
+      const mobileButton = HelpieReplies.createMobileButton(interaction);
+
+      log.debug("Adding mobile button to forced ephemeral message");
 
       await interaction.editReply({
-        content: reconstructed,
+        content: reconstructedWithMessage,
         embeds: [], // Clear embeds
+        components: [mobileButton],
       });
+
+      log.info("Forced ephemeral message updated with mobile button");
     } catch (error: any) {
       // Handle deleted message - silently ignore since this is just an enhancement
       if (error.code === 10008) {
@@ -255,7 +387,7 @@ export class HelpieReplies {
    * Handles ephemeral messages in editReply
    * Reconstructs message when ephemeral flag is detected
    */
-  private static async handleEphemeralEditReply(interaction: SupportedInteraction, message: Message, content: ReplyContent): Promise<void> {
+  private static async handleEphemeralEditReply(interaction: SupportedInteraction, message: Message): Promise<void> {
     try {
       // Check if message has ephemeral flag (64)
       const isEphemeral = (message.flags.bitfield & 64) === 64;
@@ -272,12 +404,31 @@ export class HelpieReplies {
       if (wasIntentionallyEphemeral) return; // Intentionally ephemeral, don't modify
 
       // Reconstruct and update the message
-      const reconstructed = HelpieReplies.reconstructEphemeralMessage(content);
+      const reconstructed = HelpieReplies.reconstructEphemeralMessage(interaction);
+
+      // Check if content already has prelude (AI responses)
+      const hasPrelude = reconstructed.startsWith("# Hey there! I'm Helpie");
+
+      // Build message: if has prelude, show prelude + codeblock. Otherwise just codeblock.
+      const reconstructedWithMessage = hasPrelude
+        ? `${prelude}Helpie was unable to send the message, copy here:\n\`\`\`\n${reconstructed}\n\`\`\``
+        : `Helpie was unable to send the message, copy here:\n\`\`\`\n${reconstructed}\n\`\`\``;
+
+      log.debug("Reconstructed message length (editReply):", reconstructedWithMessage.length);
+      log.debug("Has prelude:", hasPrelude);
+
+      // Create mobile button
+      const mobileButton = HelpieReplies.createMobileButton(interaction);
+
+      log.debug("Adding mobile button to ephemeral edit reply");
 
       await interaction.editReply({
-        content: reconstructed,
+        content: reconstructedWithMessage,
         embeds: [], // Clear embeds
+        components: [mobileButton],
       });
+
+      log.info("Ephemeral edit reply updated with mobile button");
     } catch (error: any) {
       // Handle deleted message - silently ignore since this is just an enhancement
       if (error.code === 10008) {
@@ -344,6 +495,9 @@ export class HelpieReplies {
         // Use embed for object content
         const embed = createEmbed(content.title, content.message, type, emoji);
 
+        // Store the actual message content (embed description) for ephemeral reconstruction
+        sentMessageContent.set(interaction, content.message);
+
         const response = await interaction.reply({
           content: "", // Clear any loading symbols
           embeds: [embed],
@@ -353,12 +507,15 @@ export class HelpieReplies {
         log.debug("Reply response received, calling handleForcedEphemeral...");
 
         // Check if reply was forced ephemeral by Discord (userbot in large server)
-        await HelpieReplies.handleForcedEphemeral(interaction, response, content, ephemeral);
+        await HelpieReplies.handleForcedEphemeral(interaction, response, ephemeral);
 
         return response;
       } else {
         // Use plain text for string content
         const formattedContent = formatContent(content as string, type, emoji);
+
+        // Store the actual formatted content for ephemeral reconstruction
+        sentMessageContent.set(interaction, formattedContent);
 
         const response = await interaction.reply({
           content: formattedContent,
@@ -368,7 +525,7 @@ export class HelpieReplies {
         log.debug("Reply response received, calling handleForcedEphemeral...");
 
         // Check if reply was forced ephemeral by Discord (userbot in large server)
-        await HelpieReplies.handleForcedEphemeral(interaction, response, content, ephemeral);
+        await HelpieReplies.handleForcedEphemeral(interaction, response, ephemeral);
 
         return response;
       }
@@ -400,6 +557,9 @@ export class HelpieReplies {
         // Use embed for object content
         const embed = createEmbed(content.title, content.message, type, emoji);
 
+        // Store the actual message content (embed description) for ephemeral reconstruction
+        sentMessageContent.set(interaction, content.message);
+
         const message = await interaction.editReply({
           content: "", // Clear any loading symbols
           embeds: [embed],
@@ -411,12 +571,15 @@ export class HelpieReplies {
         log.debug("Message flags as array:", message.flags.toArray());
 
         // Check if message is ephemeral and reconstruct if needed
-        await HelpieReplies.handleEphemeralEditReply(interaction, message, content);
+        await HelpieReplies.handleEphemeralEditReply(interaction, message);
 
         return message;
       } else {
         // Use plain text for string content
         const formattedContent = formatContent(content as string, type, emoji);
+
+        // Store the actual formatted content for ephemeral reconstruction
+        sentMessageContent.set(interaction, formattedContent);
 
         const message = await interaction.editReply({
           content: formattedContent,
@@ -428,7 +591,7 @@ export class HelpieReplies {
         log.debug("Message flags as array:", message.flags.toArray());
 
         // Check if message is ephemeral and reconstruct if needed
-        await HelpieReplies.handleEphemeralEditReply(interaction, message, content);
+        await HelpieReplies.handleEphemeralEditReply(interaction, message);
 
         return message;
       }

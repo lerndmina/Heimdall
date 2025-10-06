@@ -690,6 +690,16 @@ export class SimpleCommandHandler {
 
     // Setup interaction handling
     this.client.on("interactionCreate", async (interaction) => {
+      // Handle button interactions
+      if (interaction.isButton()) {
+        // Check if this is a mobile ephemeral button
+        if (interaction.customId.startsWith("ephemeral-mobile:")) {
+          const { default: HelpieReplies } = await import("./HelpieReplies");
+          await HelpieReplies.handleMobileButton(interaction);
+        }
+        return;
+      }
+
       // Handle slash commands
       if (interaction.isChatInputCommand()) {
         if (interaction.commandName === "helpie") {
@@ -713,7 +723,7 @@ export class SimpleCommandHandler {
       }
     });
 
-    log.info("Interaction handler registered for /helpie and context menu commands");
+    log.info("Interaction handler registered for /helpie, context menu commands, and buttons");
   }
 
   /**

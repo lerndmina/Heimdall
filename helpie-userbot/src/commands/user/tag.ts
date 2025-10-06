@@ -52,9 +52,13 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
     // Build content with optional user mention
     const content = targetUser ? `${targetUser} ${tag.content}` : tag.content;
 
-    // Send tag content first (not ephemeral - tags are meant to be shared)
-    await interaction.reply({
+    // Send tag content using HelpieReplies to handle forced ephemeral
+    // Tags are meant to be shared, so not ephemeral by default
+    await HelpieReplies.send(interaction, {
+      type: "info",
       content: content,
+      ephemeral: false,
+      emoji: false, // Don't add emoji to tag content
     });
 
     // Update usage stats atomically to avoid race conditions
