@@ -58,22 +58,69 @@ Cleared ${cacheCount} cached context${cacheCount !== 1 ? "s" : ""}.
 Processing ${contexts.length} context${contexts.length !== 1 ? "s" : ""} in background...
 
 ⚙️ This will re-fetch content from GitHub and regenerate vector embeddings.
-Check logs for completion status.`
+You'll receive updates when complete.`
     );
 
     // Wait for all processing to complete (in background)
     Promise.all(processPromises)
-      .then((results) => {
+      .then(async (results) => {
         const successful = results.filter((r) => r.success).length;
+        const failed = results.filter((r) => !r.success).length;
+
         log.info("Context refresh completed", {
           total: contexts.length,
           successful,
-          failed: contexts.length - successful,
+          failed,
           by: interaction.user.id,
         });
+
+        // Send completion follow-up
+        if (successful > 0 && failed === 0) {
+          await interaction
+            .followUp({
+              content: `✅ **All Contexts Refreshed Successfully**
+
+📦 Processed ${successful} context${successful !== 1 ? "s" : ""}
+💾 Vector embeddings regenerated
+
+All contexts are now up to date!`,
+              ephemeral: true,
+            })
+            .catch((err) => log.error("Failed to send refresh completion follow-up:", err));
+        } else if (successful > 0 && failed > 0) {
+          await interaction
+            .followUp({
+              content: `⚠️ **Context Refresh Partially Complete**
+
+✅ Successful: ${successful}
+❌ Failed: ${failed}
+
+Check logs for error details on failed contexts.`,
+              ephemeral: true,
+            })
+            .catch((err) => log.error("Failed to send refresh completion follow-up:", err));
+        } else {
+          await interaction
+            .followUp({
+              content: `❌ **Context Refresh Failed**
+
+All ${failed} context${failed !== 1 ? "s" : ""} failed to process.
+Check logs for error details.`,
+              ephemeral: true,
+            })
+            .catch((err) => log.error("Failed to send refresh completion follow-up:", err));
+        }
       })
-      .catch((error) => {
+      .catch(async (error) => {
         log.error("Context refresh error:", error);
+        await interaction
+          .followUp({
+            content: `❌ **Context Refresh Error**
+
+An unexpected error occurred. Check logs for details.`,
+            ephemeral: true,
+          })
+          .catch((err) => log.error("Failed to send error follow-up:", err));
       });
   } catch (error) {
     log.error("Error refreshing contexts:", error);

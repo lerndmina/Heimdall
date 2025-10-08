@@ -73,25 +73,63 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
     log.debug("Setting context", { scope, url, options: contextOptions });
     const context = await ContextService.setContext(scope, url, interaction.user.id, contextOptions);
 
-    // Trigger background processing for vector embeddings
+    // Trigger background processing for vector embeddings with progress updates
     const { ContextProcessingService } = await import("../../../services/ContextProcessingService");
+
+    // Process context and send follow-ups
     ContextProcessingService.processContext(context._id.toString())
-      .then((result) => {
+      .then(async (result) => {
         if (result.success) {
           log.info("Context processed successfully", {
             contextId: result.contextId,
             chunkCount: result.chunkCount,
             totalTokens: result.totalTokens,
           });
+
+          // Send success follow-up
+          await interaction
+            .followUp({
+              content: `✅ **Context Processing Complete**
+
+📦 Generated ${result.chunkCount} chunk${result.chunkCount !== 1 ? "s" : ""} from your document
+🎯 Total tokens: ${result.totalTokens?.toLocaleString() || "N/A"}
+💾 Vector embeddings saved to database
+
+Your context is now ready! Try \`/helpie ask\` to test it.`,
+              ephemeral: true,
+            })
+            .catch((err) => log.error("Failed to send success follow-up:", err));
         } else {
           log.error("Context processing failed:", result.error);
+
+          // Send error follow-up
+          await interaction
+            .followUp({
+              content: `❌ **Context Processing Failed**
+
+**Error:** ${result.error}
+
+The context was saved but embeddings could not be generated. Please check the logs or try refreshing with \`/helpie context refresh\`.`,
+              ephemeral: true,
+            })
+            .catch((err) => log.error("Failed to send error follow-up:", err));
         }
       })
-      .catch((error) => {
+      .catch(async (error) => {
         log.error("Context processing error:", error);
+
+        // Send error follow-up
+        await interaction
+          .followUp({
+            content: `❌ **Context Processing Error**
+
+An unexpected error occurred during processing. Check logs for details.`,
+            ephemeral: true,
+          })
+          .catch((err) => log.error("Failed to send error follow-up:", err));
       });
 
-    // Build response
+    // Build response (this edits the deferred message)
     let scopeDisplay = "Global";
     if (scope === "guild") {
       const guildId = targetGuild || interaction.guildId;
@@ -117,7 +155,7 @@ ${
     : "This context will apply to this specific user everywhere."
 }
 
-⚙️ Processing will take a few moments. Run \`/helpie ask\` to test when ready!`;
+⚙️ Processing will take a few moments. You'll receive an update when complete!`;
 
     await HelpieReplies.editSuccess(interaction, responseMessage);
 

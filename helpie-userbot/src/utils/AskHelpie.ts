@@ -45,14 +45,24 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
   try {
     log.debug("Processing AI request", { userId, message });
 
-    // Resolve relevant context chunks using vector search (NEW!)
+    // Resolve relevant context chunks using vector search
     const resolvedContext = await ContextService.resolveRelevantContextForAsk(message, userId, guildId || undefined);
 
     // Fetch any temporary contexts stored by the user (from "Add to Context" command)
     const temporaryContexts = await TemporaryContextManager.getAllForUser(userId);
 
-    // Inject permanent context (GitHub URLs) into system prompt if available
-    const systemPromptWithContext = resolvedContext ? `${env.SYSTEM_PROMPT}\n\n${resolvedContext}` : env.SYSTEM_PROMPT;
+    // If NO context found and no temporary contexts, return fallback immediately (don't waste tokens on AI)
+    if (!resolvedContext && temporaryContexts.length === 0) {
+      log.info("No context available - returning fallback response without AI call", { userId });
+
+      const fallbackMessage = `${prelude}Unfortunately, I'm not able to help you with this query. Support will be with you soon.`;
+
+      await HelpieReplies.editSuccess(interaction, fallbackMessage);
+      return;
+    }
+
+    // Context found - inject it with constraints
+    const systemPromptWithContext = `${env.SYSTEM_PROMPT}\n\n${resolvedContext}`;
 
     // Build the final message with temporary contexts prepended
     let finalMessage = message;

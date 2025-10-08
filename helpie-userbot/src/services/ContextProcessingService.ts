@@ -69,10 +69,15 @@ export class ContextProcessingService {
       // 5. Check if content changed (skip if same hash)
       if (context.contentHash === contentHash && context.isProcessed) {
         log.info("Content unchanged, skipping processing", { contextId });
+
+        // Calculate total tokens from existing chunks (estimate: chunks * avg chunk size)
+        const estimatedTokens = context.chunkCount * 500; // Average chunk size
+
         return {
           success: true,
           contextId,
           chunkCount: context.chunkCount,
+          totalTokens: estimatedTokens,
         };
       }
 
@@ -104,7 +109,7 @@ export class ContextProcessingService {
       await VectorSearchService.storeChunks(chunks, embeddings, contextId, context.scope, context.githubUrl, context.targetUserId, context.targetGuildId);
 
       // 10. Update context metadata in MongoDB
-      const totalTokens = chunks.reduce((sum, c) => c.tokenCount, 0);
+      const totalTokens = chunks.reduce((sum, c) => sum + c.tokenCount, 0);
       await HelpieContext.findByIdAndUpdate(contextId, {
         $set: {
           isProcessed: true,
@@ -154,13 +159,22 @@ export class ContextProcessingService {
    * Refreshes a context (re-fetches and re-processes)
    */
   static async refreshContext(contextId: string): Promise<ProcessingResult> {
-    log.info("Refreshing context", { contextId });
+    log.info("Refreshing context (deleting old embeddings)", { contextId });
+
+    // Delete old chunks from Qdrant
+    try {
+      await VectorSearchService.deleteContextChunks(contextId);
+      log.debug("Old chunks deleted from Qdrant", { contextId });
+    } catch (error) {
+      log.error("Failed to delete old chunks (continuing anyway):", error);
+    }
 
     // Mark as unprocessed to force re-processing
     await HelpieContext.findByIdAndUpdate(contextId, {
       $set: {
         isProcessed: false,
         contentHash: "", // Clear hash to force re-processing
+        chunkCount: 0,
       },
     });
 

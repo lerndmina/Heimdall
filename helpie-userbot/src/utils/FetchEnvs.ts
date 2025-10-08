@@ -33,7 +33,7 @@ function getter() {
     EMBEDDING_CHUNK_SIZE: parseInt(process.env.EMBEDDING_CHUNK_SIZE || "500"),
     EMBEDDING_CHUNK_OVERLAP: parseInt(process.env.EMBEDDING_CHUNK_OVERLAP || "50"),
     VECTOR_SEARCH_LIMIT: parseInt(process.env.VECTOR_SEARCH_LIMIT || "5"),
-    VECTOR_SCORE_THRESHOLD: parseFloat(process.env.VECTOR_SCORE_THRESHOLD || "0.7"),
+    VECTOR_SCORE_THRESHOLD: parseFloat(process.env.VECTOR_SCORE_THRESHOLD || "0.25"), // Lowered from 0.7 - embeddings rarely score that high
   };
 
   var missingKeys: string[] = [];

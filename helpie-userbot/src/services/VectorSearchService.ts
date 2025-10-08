@@ -71,16 +71,30 @@ export class VectorSearchService {
         } as QdrantPointPayload,
       }));
 
-      // Upsert points to Qdrant
-      await client.upsert(collectionName, {
-        wait: true,
-        points,
-      });
+      // Upsert points to Qdrant in batches to avoid size limits
+      const BATCH_SIZE = 100; // Qdrant recommends batches of 100-1000 points
+      let uploadedCount = 0;
+
+      for (let i = 0; i < points.length; i += BATCH_SIZE) {
+        const batch = points.slice(i, i + BATCH_SIZE);
+
+        await client.upsert(collectionName, {
+          wait: true,
+          points: batch,
+        });
+
+        uploadedCount += batch.length;
+        log.debug(`Uploaded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(points.length / BATCH_SIZE)}`, {
+          batchSize: batch.length,
+          totalUploaded: uploadedCount,
+        });
+      }
 
       log.info("Chunks stored in Qdrant", {
         contextId,
         scope,
         chunkCount: chunks.length,
+        uploadedCount,
         collectionName,
       });
     } catch (error) {
@@ -129,20 +143,34 @@ export class VectorSearchService {
         ],
       });
 
-      // Perform vector search
-      const results = await client.search(collectionName, {
+      log.debug("Qdrant filter being used", {
+        shouldFilters: JSON.stringify(shouldFilters, null, 2),
+      });
+
+      // First search WITHOUT score threshold to see all results
+      const allResults = await client.search(collectionName, {
         vector: questionEmbedding,
-        limit: limit * 2, // Get more results for better sorting
+        limit: limit * 2,
         filter: {
           should: shouldFilters,
         },
-        score_threshold: env.VECTOR_SCORE_THRESHOLD,
         with_payload: true,
       });
 
-      log.debug("Qdrant search completed", {
+      log.debug("Qdrant search (no threshold)", {
+        totalResults: allResults.length,
+        topScore: allResults[0]?.score,
+        scores: allResults.slice(0, 10).map((r) => r.score),
+      });
+
+      // Now apply threshold
+      const results = allResults.filter((r) => r.score >= env.VECTOR_SCORE_THRESHOLD);
+
+      log.debug("Qdrant search completed (after threshold)", {
         resultsFound: results.length,
+        threshold: env.VECTOR_SCORE_THRESHOLD,
         topScore: results[0]?.score,
+        filteredOut: allResults.length - results.length,
       });
 
       // Convert results and sort by scope priority + relevance
