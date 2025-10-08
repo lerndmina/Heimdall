@@ -89,6 +89,17 @@ export const start = async () => {
     log.warn("Bot will continue without Redis caching");
   }
 
+  // Initialize Qdrant (vector database for context embeddings)
+  log.info("Initializing Qdrant vector database...");
+  try {
+    const QdrantClient = (await import("./utils/QdrantClient")).default;
+    await QdrantClient.initialize();
+    log.info("Qdrant initialized successfully");
+  } catch (error) {
+    log.error("Failed to initialize Qdrant:", error);
+    log.warn("Context system will not work without Qdrant - please check QDRANT_URL and QDRANT_API_KEY");
+  }
+
   // Login to Discord (ready event will fire after this)
   log.info("Logging in to Discord...");
   await client.login(env.BOT_TOKEN).catch((error) => {
@@ -103,6 +114,11 @@ export const start = async () => {
   // Handle process termination
   process.on("SIGINT", async () => {
     log.info("Received SIGINT, shutting down gracefully...");
+
+    // Cleanup chunking service
+    const { ChunkingService } = await import("./services/ChunkingService");
+    ChunkingService.cleanup();
+
     if (redisClient.isReady) {
       await redisClient.quit();
       log.info("Redis client closed");
@@ -114,6 +130,11 @@ export const start = async () => {
 
   process.on("SIGTERM", async () => {
     log.info("Received SIGTERM, shutting down gracefully...");
+
+    // Cleanup chunking service
+    const { ChunkingService } = await import("./services/ChunkingService");
+    ChunkingService.cleanup();
+
     if (redisClient.isReady) {
       await redisClient.quit();
       log.info("Redis client closed");

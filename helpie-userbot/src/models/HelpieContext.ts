@@ -32,6 +32,13 @@ export interface IHelpieContext extends Document {
   // Usage tracking
   usageCount: number;
   lastUsed?: Date;
+
+  // Embedding status (for vector embeddings)
+  isProcessed: boolean; // Has content been chunked/embedded?
+  processingError?: string; // Error message if processing failed
+  chunkCount: number; // Total chunks created
+  lastProcessed?: Date; // When embeddings were last generated
+  contentHash: string; // SHA-256 of fetched content (for change detection)
 }
 
 const HelpieContextSchema = new Schema<IHelpieContext>({
@@ -92,6 +99,27 @@ const HelpieContextSchema = new Schema<IHelpieContext>({
   },
   lastUsed: {
     type: Date,
+  },
+
+  // Embedding status (for vector embeddings)
+  isProcessed: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  processingError: {
+    type: String,
+  },
+  chunkCount: {
+    type: Number,
+    default: 0,
+  },
+  lastProcessed: {
+    type: Date,
+  },
+  contentHash: {
+    type: String,
+    default: "",
   },
 });
 

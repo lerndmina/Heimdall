@@ -73,6 +73,24 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
     log.debug("Setting context", { scope, url, options: contextOptions });
     const context = await ContextService.setContext(scope, url, interaction.user.id, contextOptions);
 
+    // Trigger background processing for vector embeddings
+    const { ContextProcessingService } = await import("../../../services/ContextProcessingService");
+    ContextProcessingService.processContext(context._id.toString())
+      .then((result) => {
+        if (result.success) {
+          log.info("Context processed successfully", {
+            contextId: result.contextId,
+            chunkCount: result.chunkCount,
+            totalTokens: result.totalTokens,
+          });
+        } else {
+          log.error("Context processing failed:", result.error);
+        }
+      })
+      .catch((error) => {
+        log.error("Context processing error:", error);
+      });
+
     // Build response
     let scopeDisplay = "Global";
     if (scope === "guild") {
@@ -89,7 +107,7 @@ export async function run(interaction: ChatInputCommandInteraction, client: Clie
 
 **Scope:** ${scopeDisplay}
 ${name ? `**Name:** ${name}\n` : ""}**URL:** ${shortUrl}
-**Status:** Will be fetched on first use
+**Status:** Processing in background (chunking + embedding)
 
 ${
   scope === "global"
@@ -99,7 +117,7 @@ ${
     : "This context will apply to this specific user everywhere."
 }
 
-Run \`/helpie ask\` to test it!`;
+⚙️ Processing will take a few moments. Run \`/helpie ask\` to test when ready!`;
 
     await HelpieReplies.editSuccess(interaction, responseMessage);
 

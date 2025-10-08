@@ -45,8 +45,8 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
   try {
     log.debug("Processing AI request", { userId, message });
 
-    // Resolve applicable contexts (Global → Guild → User)
-    const resolvedContext = await ContextService.resolveContextForAsk(userId, guildId || undefined);
+    // Resolve relevant context chunks using vector search (NEW!)
+    const resolvedContext = await ContextService.resolveRelevantContextForAsk(message, userId, guildId || undefined);
 
     // Fetch any temporary contexts stored by the user (from "Add to Context" command)
     const temporaryContexts = await TemporaryContextManager.getAllForUser(userId);
