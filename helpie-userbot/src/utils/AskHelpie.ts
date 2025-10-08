@@ -104,11 +104,12 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
     log.debug("Final prompts constructed", {
       systemPromptLength: systemPromptWithContext.length,
       messageCount: messages.length,
+      model: env.OPENAI_ASK_MODEL,
     });
 
     // Generate AI response using Vercel AI SDK with messages array
     const { text } = await generateText({
-      model: openai("gpt-5-mini"),
+      model: openai(env.OPENAI_ASK_MODEL as any),
       system: systemPromptWithContext,
       messages,
     });

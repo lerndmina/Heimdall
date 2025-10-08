@@ -5,7 +5,7 @@
  * Preserves markdown structure and includes parent headers for context.
  */
 
-import { Tiktoken, encodingForModel } from "js-tiktoken";
+import { Tiktoken, TiktokenModel, encodingForModel } from "js-tiktoken";
 import log from "../utils/log";
 import fetchEnvs from "../utils/FetchEnvs";
 
@@ -28,7 +28,7 @@ export class ChunkingService {
   private static getEncoder(): Tiktoken {
     if (!this.encoder) {
       // Use cl100k_base encoding (used by gpt-4, gpt-3.5-turbo, and text-embedding-3-*)
-      this.encoder = encodingForModel("gpt-3.5-turbo");
+      this.encoder = encodingForModel(env.OPENAI_ASK_MODEL as TiktokenModel);
     }
     return this.encoder;
   }

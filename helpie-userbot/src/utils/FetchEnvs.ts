@@ -1,5 +1,7 @@
+import { OpenAIChatLanguageModel, OpenAIChatModelId } from "@ai-sdk/openai/internal";
 import { SnowflakeUtil } from "discord.js";
 import { configDotenv } from "dotenv";
+import { TiktokenModel } from "js-tiktoken";
 
 configDotenv(); // Load environment variables from .env file
 
@@ -17,6 +19,7 @@ function getter() {
       .filter((id) => id.length > 0),
     DEBUG_LOG: process.env.DEBUG_LOG === "true",
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+    OPENAI_ASK_MODEL: (process.env.OPENAI_ASK_MODEL || "gpt-5-mini") as OpenAIChatModelId | OpenAIChatLanguageModel | TiktokenModel,
     SYSTEM_PROMPT: process.env.SYSTEM_PROMPT || "You are Helpie, a helpful AI assistant integrated into Discord.",
     MONGODB_URI: process.env.MONGODB_URI || "",
     MONGODB_DATABASE: process.env.MONGODB_DATABASE || "helpie",
@@ -44,6 +47,7 @@ function getter() {
     "MONGODB_DATABASE",
     "DEBUG_LOG",
     "DEEPL_API_KEY",
+    "OPENAI_ASK_MODEL", // Optional - defaults to gpt-4o-mini
     // Qdrant port is optional (defaults to 443 for HTTPS)
     "QDRANT_PORT",
     // Embedding configs are optional (have defaults)
