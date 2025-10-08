@@ -203,29 +203,36 @@ export class ContextService {
       // 3. Assemble context from chunks
       const assembledContext = await VectorSearchService.assembleContextFromChunks(relevantChunks);
 
-      // 4. Wrap with SIMPLIFIED system constraints (shorter = more likely to be followed)
+      // 4. Wrap with STRICT system constraints
       return `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 CRITICAL: CONTEXT-ONLY MODE - DO NOT USE YOUR TRAINING DATA 🚨
+🚨 CRITICAL: READ-ONLY CONTEXT MODE 🚨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-RULES:
-1. Answer ONLY using the context below
-2. If the answer is NOT in the context → respond: "Unfortunately, I'm not able to help you with this query. Support will be with you soon."
-3. DO NOT infer, assume, or use general knowledge
-4. DO NOT combine information from different sections
-5. DO NOT mention "the documentation" or "the context"
+YOU ARE A SEARCH ASSISTANT - NOT A CONVERSATIONAL AI
 
-Answer naturally as if this information is your knowledge. Be direct and well-formatted.
+STRICT RULES:
+1. ✅ Answer ONLY from the exact context below - copy text directly if possible
+2. ❌ If answer is NOT in context → respond EXACTLY: "Unfortunately, I'm not able to help you with this query. Support will be with you soon."
+3. ❌ DO NOT ask follow-up questions
+4. ❌ DO NOT ask for clarification
+5. ❌ DO NOT ask users to "tell me more" or "let me know"
+6. ❌ DO NOT provide links unless they are COMPLETE URLs in the context (e.g., https://full-url.com)
+7. ❌ DO NOT make up or complete partial URLs
+8. ❌ DO NOT use general knowledge or training data
+9. ❌ DO NOT mention "documentation", "context", or "information provided"
+10. ✅ Be direct and factual - treat context as your ONLY knowledge
+
+This is a ONE-SHOT answer system. Give the answer or the fallback message. Nothing else.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- CONTEXT
+📚 CONTEXT (YOUR ONLY KNOWLEDGE SOURCE)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${assembledContext}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ REMEMBER: If not in context above = use fallback message
+⚠️ FINAL WARNING: No follow-ups. No questions. No made-up links. Answer or fallback.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
     } catch (error) {
