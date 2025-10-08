@@ -98,7 +98,7 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
 
     // Generate AI response using Vercel AI SDK with messages array
     const { text } = await generateText({
-      model: openai("gpt-4o-mini"),
+      model: openai("gpt-5-mini"),
       system: systemPromptWithContext,
       messages,
     });
@@ -111,7 +111,10 @@ export async function processAskQuestion(options: AskHelpieOptions): Promise<voi
       log.debug(`Cleared ${deletedCount} temporary context(s) for user ${userId} after use`);
     }
 
-    const responseWithPrelude = `${prelude}${text}`;
+    // Replace any raw urls with <url> to prevent embedding
+    const textWithLinksProcessed = text.replace(/(https?:\/\/[^\s]+)/g, "<$1>");
+
+    const responseWithPrelude = `${prelude}${textWithLinksProcessed}`;
 
     // Discord message content has a 2000 character limit
     const truncatedResponse = responseWithPrelude.length > 1900 ? responseWithPrelude.substring(0, 1900) + "..." : responseWithPrelude;
