@@ -222,6 +222,8 @@ STRICT RULES:
 8. ❌ DO NOT use general knowledge or training data
 9. ❌ DO NOT mention "documentation", "context", or "information provided"
 10. ✅ Be direct and factual - treat context as your ONLY knowledge
+11. If the context is insufficient to answer, use the fallback response. If the context is talking about something closely related but not exactly the same, still use the fallback response. For example if a user is asking a question about lunar_garages, this is different from the garages in jobscreator.
+12. If you have a choice between providing qbcore or esx, provide the qbcore answer unless otherwise specified by the user.
 
 This is a ONE-SHOT answer system. Give the answer or the fallback message. Nothing else.
 
