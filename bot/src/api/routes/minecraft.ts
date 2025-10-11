@@ -347,6 +347,32 @@ export function createMinecraftRoutes(client?: any, handler?: any): Router {
           return res.json(createSuccessResponse(response, req.requestId));
         }
 
+        // Check if player has confirmed their code but is waiting for approval
+        // This handles the case where the auth code has expired but confirmedAt is set
+        // A player is "waiting for approval" if they have confirmedAt but no whitelistedAt
+        if (player && player.confirmedAt && !player.whitelistedAt && !player.revokedAt) {
+          log.info(
+            `Player ${username} has confirmed code but is awaiting approval (confirmedAt: ${player.confirmedAt}, linkedAt: ${player.linkedAt}, whitelistedAt: ${player.whitelistedAt})`
+          );
+
+          const pendingMessage = config.authPendingMessage
+            .replace(/{username}/g, username)
+            .replace(/{serverHost}/g, config.serverHost)
+            .replace(/{serverPort}/g, config.serverPort.toString());
+
+          return res.json(
+            createSuccessResponse(
+              {
+                shouldBeWhitelisted: false,
+                hasAuth: true,
+                action: "kick_with_message",
+                kickMessage: pendingMessage,
+              },
+              req.requestId
+            )
+          );
+        }
+
         // Player doesn't exist or is unwhitelisted - check for pending auth
         // Try to find by username first, then by UUID from previous connection attempts
         let pendingAuth: any = null;
