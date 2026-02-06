@@ -1,0 +1,43 @@
+/**
+ * Reminders API Router Factory
+ *
+ * Mounted at: /api/guilds/:guildId/reminders
+ *
+ * Note: Reminders are user-scoped but mounted under guild routes for API
+ * consistency. The userId is passed as a query parameter or in the body.
+ */
+
+import { Router } from "express";
+import { createReminderListRoutes } from "./list.js";
+import { createReminderGetRoutes } from "./get.js";
+import { createReminderCreateRoutes } from "./create.js";
+import { createReminderUpdateRoutes } from "./update.js";
+import { createReminderDeleteRoutes } from "./delete.js";
+import type { ReminderService } from "../services/ReminderService.js";
+import type { LibAPI } from "../../lib/index.js";
+
+export interface RemindersApiDependencies {
+  reminderService: ReminderService;
+  lib: LibAPI;
+}
+
+export function createRemindersRouter(deps: RemindersApiDependencies): Router {
+  const router = Router({ mergeParams: true });
+
+  // GET    /api/guilds/:guildId/reminders?userId=...
+  router.use("/", createReminderListRoutes(deps));
+
+  // POST   /api/guilds/:guildId/reminders
+  router.use("/", createReminderCreateRoutes(deps));
+
+  // GET    /api/guilds/:guildId/reminders/:reminderId
+  router.use("/", createReminderGetRoutes(deps));
+
+  // PUT    /api/guilds/:guildId/reminders/:reminderId
+  router.use("/", createReminderUpdateRoutes(deps));
+
+  // DELETE /api/guilds/:guildId/reminders/:reminderId
+  router.use("/", createReminderDeleteRoutes(deps));
+
+  return router;
+}

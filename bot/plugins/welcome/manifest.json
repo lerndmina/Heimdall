@@ -1,0 +1,10 @@
+{
+  "name": "welcome",
+  "version": "1.0.0",
+  "description": "Welcome messages for new members with template variables",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": "/welcome"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "logging",
+  "version": "1.0.0",
+  "description": "Server event logging with per-category channels and subcategory toggles",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": "/logging"
+}

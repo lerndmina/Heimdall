@@ -1,0 +1,9 @@
+{
+  "name": "tickets",
+  "version": "1.0.0",
+  "description": "Support ticket system",
+  "dependencies": ["lib", "support-core"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": ["TICKET_TRANSCRIPT_WEBHOOK"]
+}

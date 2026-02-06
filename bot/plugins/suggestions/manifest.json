@@ -1,0 +1,10 @@
+{
+  "name": "suggestions",
+  "version": "1.0.0",
+  "description": "Community suggestion system with voting, categories, AI titles, and dual embed/forum modes",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": ["OPENAI_API_KEY"],
+  "apiRoutePrefix": "/suggestions"
+}

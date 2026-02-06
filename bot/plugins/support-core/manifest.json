@@ -1,0 +1,9 @@
+{
+  "name": "support-core",
+  "version": "1.0.0",
+  "description": "Core support system infrastructure for tickets and modmail",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": []
+}

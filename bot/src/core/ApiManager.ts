@@ -1,0 +1,235 @@
+/**
+ * ApiManager - Mounts plugin routes and generates OpenAPI docs
+ *
+ * Handles:
+ * - Express server setup
+ * - Plugin route mounting under /api/guilds/:guildId
+ * - OpenAPI/Swagger documentation generation
+ * - Health check endpoint
+ */
+
+import express, { Router, type Application, type Request, type Response, type NextFunction } from "express";
+import swaggerJSDoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
+import log from "../utils/logger";
+
+export interface PluginRouter {
+  /** Which plugin owns this router */
+  pluginName: string;
+  /** Route prefix (e.g., "/tickets") */
+  prefix: string;
+  /** Express router with route handlers */
+  router: Router;
+  /** Paths to swagger JSDoc files for documentation */
+  swaggerPaths?: string[];
+}
+
+export class ApiManager {
+  private app: Application;
+  private routers: PluginRouter[] = [];
+  private port: number;
+  private started = false;
+
+  constructor(port: number = 3001) {
+    this.port = port;
+    this.app = express();
+    this.setupMiddleware();
+  }
+
+  /**
+   * Setup base middleware
+   */
+  private setupMiddleware(): void {
+    // Request parsing
+    this.app.use(express.json({ limit: "10mb" }));
+    this.app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+    // Request logging
+    this.app.use((req: Request, _res: Response, next: NextFunction) => {
+      log.debug(`[API] ${req.method} ${req.path}`);
+      next();
+    });
+
+    // CORS - allow all origins for now (configure properly in production)
+    this.app.use((_req: Request, res: Response, next: NextFunction) => {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-API-Key");
+
+      // Handle OPTIONS preflight
+      if (_req.method === "OPTIONS") {
+        res.sendStatus(200);
+        return;
+      }
+
+      next();
+    });
+  }
+
+  /**
+   * Register a router from a plugin
+   */
+  registerRouter(pluginRouter: PluginRouter): void {
+    this.routers.push(pluginRouter);
+    log.debug(`Registered API router: ${pluginRouter.prefix} (plugin: ${pluginRouter.pluginName})`);
+  }
+
+  /**
+   * Mount all registered routers
+   */
+  private mountRouters(): void {
+    for (const { prefix, router, pluginName } of this.routers) {
+      // Mount under /api/guilds/:guildId{prefix} for guild-scoped routes
+      const fullPath = `/api/guilds/:guildId${prefix}`;
+      this.app.use(fullPath, router);
+      log.debug(`Mounted route: ${fullPath} (${pluginName})`);
+    }
+  }
+
+  /**
+   * Generate and mount OpenAPI/Swagger docs
+   */
+  private setupSwagger(): void {
+    const swaggerSpec = swaggerJSDoc({
+      definition: {
+        openapi: "3.1.0",
+        info: {
+          title: "Heimdall v1 API",
+          version: "1.0.0",
+          description: "Plugin-based Discord bot API",
+        },
+        servers: [{ url: "/" }],
+        components: {
+          securitySchemes: {
+            ApiKey: {
+              type: "apiKey",
+              in: "header",
+              name: "X-API-Key",
+            },
+          },
+          responses: {
+            Unauthorized: {
+              description: "Unauthorized - API key required",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Unauthorized" },
+                    },
+                  },
+                },
+              },
+            },
+            NotFound: {
+              description: "Resource not found",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      error: { type: "string", example: "Not found" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      apis: this.routers.flatMap((r) => r.swaggerPaths || []),
+    });
+
+    this.app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+    this.app.get("/api-docs.json", (_req: Request, res: Response) => res.json(swaggerSpec));
+
+    log.debug("Swagger documentation mounted at /api-docs");
+  }
+
+  /**
+   * Setup error handling middleware
+   */
+  private setupErrorHandling(): void {
+    // 404 handler
+    this.app.use((_req: Request, res: Response) => {
+      res.status(404).json({ error: "Not found" });
+    });
+
+    // Global error handler
+    this.app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+      log.error("[API] Unhandled error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    });
+  }
+
+  /**
+   * Start the API server
+   */
+  async start(): Promise<void> {
+    if (this.started) {
+      log.warn("API server already started");
+      return;
+    }
+
+    this.mountRouters();
+    this.setupSwagger();
+
+    // Health check endpoint
+    this.app.get("/", (_req: Request, res: Response) => {
+      res.json({ status: "ok", version: "1.0.0" });
+    });
+
+    // API health check
+    this.app.get("/api/health", (_req: Request, res: Response) => {
+      res.json({
+        status: "ok",
+        version: "1.0.0",
+        timestamp: new Date().toISOString(),
+        routers: this.routers.length,
+      });
+    });
+
+    this.setupErrorHandling();
+
+    return new Promise((resolve) => {
+      this.app.listen(this.port, () => {
+        this.started = true;
+        log.info(`✅ API server running on port ${this.port}`);
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Get Express app (for testing or custom middleware)
+   */
+  getApp(): Application {
+    return this.app;
+  }
+
+  /**
+   * Check if server is started
+   */
+  isStarted(): boolean {
+    return this.started;
+  }
+
+  /**
+   * Get stats about registered routers
+   */
+  getStats(): { routers: number; byPlugin: Record<string, string[]> } {
+    const byPlugin: Record<string, string[]> = {};
+
+    for (const router of this.routers) {
+      if (!byPlugin[router.pluginName]) {
+        byPlugin[router.pluginName] = [];
+      }
+      byPlugin[router.pluginName]!.push(router.prefix);
+    }
+
+    return {
+      routers: this.routers.length,
+      byPlugin,
+    };
+  }
+}

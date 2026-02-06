@@ -1,0 +1,10 @@
+{
+  "name": "minigames",
+  "version": "1.0.0",
+  "description": "Fun minigames including Connect4, TicTacToe, Dice gambling, and HeimdallCoin economy",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": ""
+}

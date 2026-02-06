@@ -1,0 +1,10 @@
+{
+  "name": "lib",
+  "version": "1.0.0",
+  "description": "Shared utilities library for Heimdall plugins",
+  "author": "lerndmina",
+  "dependencies": [],
+  "optionalDependencies": [],
+  "requiredEnvVars": [],
+  "optionalEnvVars": []
+}

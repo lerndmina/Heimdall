@@ -1,0 +1,9 @@
+{
+  "name": "ping",
+  "version": "1.0.0",
+  "description": "Simple ping command for testing",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": []
+}

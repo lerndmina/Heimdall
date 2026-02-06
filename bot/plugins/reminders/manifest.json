@@ -1,0 +1,10 @@
+{
+  "name": "reminders",
+  "version": "1.0.0",
+  "description": "Personal reminders with context-aware ticket/modmail integration, background delivery, and dashboard API",
+  "dependencies": ["lib"],
+  "optionalDependencies": ["tickets", "modmail"],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": "/reminders"
+}

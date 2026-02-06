@@ -1,0 +1,10 @@
+{
+  "name": "tempvc",
+  "version": "1.0.0",
+  "description": "Join-to-create temporary voice channel system",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": "/tempvc"
+}

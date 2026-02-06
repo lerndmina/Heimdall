@@ -1,0 +1,10 @@
+{
+  "name": "minecraft",
+  "version": "1.0.0",
+  "description": "Minecraft whitelist integration — account linking, RCON, role sync, leave revocation",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": "/minecraft"
+}

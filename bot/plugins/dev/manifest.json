@@ -1,0 +1,9 @@
+{
+  "name": "dev",
+  "version": "1.0.0",
+  "description": "Owner-only developer utilities (database tools, diagnostics)",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": []
+}

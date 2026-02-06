@@ -1,0 +1,104 @@
+# Heimdall Whitelist Plugin Configuration
+# This plugin integrates with your Heimdall Discord bot for dynamic whitelist management
+
+# Global Plugin Control
+# IMPORTANT: Plugin starts DISABLED by default for security
+# When disabled, ALL players can join without any whitelist checks
+# Set this to true only after configuring your API settings properly
+# You can also use '/hwl enable' command in-game
+enabled: false
+
+# Bot API Configuration
+api:
+  # The URL of your Heimdall bot API endpoint
+  # Example: http://localhost:3001 or https://your-bot-domain.com
+  baseUrl: "http://localhost:3001"
+
+  # Discord Guild (server) ID this Minecraft server is linked to
+  # Required: The bot needs this to look up the correct configuration
+  guildId: ""
+
+  # API key for authentication (matches DASHBOARD_API_KEY in bot env)
+  # IMPORTANT: Keep this secret! Anyone with this key can access your bot's API
+  apiKey: "12345123451234512345123451234512345123451234512345123451234512345123451234512345"
+
+  # How long to wait for API responses (in milliseconds)
+  timeout: 5000
+
+  # How many times to retry failed API calls
+  retries: 3
+
+  # Delay between retries (in milliseconds)
+  retryDelay: 1000
+
+# Server identification (sent to bot API)
+server:
+  # Unique identifier for this server (will be auto-generated if not set)
+  serverId: ""
+
+  # Server name to display in Discord
+  displayName: "My Minecraft Server"
+
+# Message Configuration
+messages:
+  # Message shown when player is not whitelisted and has no pending auth
+  notWhitelisted: "§cYou are not whitelisted on this server!\n§7Please link your Discord account first.\n§eJoin our Discord: discord.gg/yourserver"
+
+  # Message shown when player has a pending auth code
+  authCodeRequired: "§eYour auth code: §a{code}\n§7Please confirm this code in Discord using §b/confirm-code {code}"
+
+  # Message shown when player has been whitelisted
+  whitelistSuccess: "§aYou have been whitelisted! Welcome to the server!"
+
+  # Message shown when API is unavailable
+  apiError: "§cWhitelist system is temporarily unavailable. Please try again later."
+
+  # Message shown to admins on reload
+  reloaded: "§aHeimdall Whitelist plugin reloaded successfully!"
+
+  # Message shown on status command
+  status: "§7Heimdall Whitelist Status:\n§7API URL: §f{url}\n§7Server ID: §f{serverId}\n§7Last Check: §f{lastCheck}"
+
+# Logging Configuration
+logging:
+  # Enable debug logging
+  debug: false
+
+  # Log all API requests
+  logRequests: true
+
+  # Log whitelist decisions
+  logDecisions: true
+
+# Performance Settings
+performance:
+  # Cache whitelist decisions for this many seconds
+  cacheTimeout: 30
+
+  # Maximum concurrent API requests
+  maxConcurrentRequests: 5
+
+# Whitelist Cache Settings
+cache:
+  # Enable/disable caching (can be toggled via role sync settings)
+  enabled: true
+
+  # How long to cache whitelist decisions (in minutes)
+  # This reduces API calls for repeat connections
+  cacheWindow: 60
+
+  # How long to extend cache when a player joins (in minutes)
+  # Since they successfully joined, extend their cache
+  extendOnJoin: 120
+
+  # How long to extend cache when a player leaves (in minutes)
+  # Since they were allowed to play, extend their cache
+  extendOnLeave: 180
+
+  # How often to clean up expired cache entries (in minutes)
+  cleanupInterval: 30
+
+# Role Sync Settings
+roleSync:
+  # Enable role synchronization with Discord
+  enabled: false

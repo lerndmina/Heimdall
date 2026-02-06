@@ -1,0 +1,32 @@
+name: HeimdallWhitelist
+version: 2.0.0
+main: com.heimdall.whitelist.paper.HeimdallPaperPlugin
+api-version: "1.21"
+description: Dynamic whitelist integration with Heimdall Discord bot
+author: Lerndmina
+website: https://github.com/lerndmina/Heimdall
+softdepend: [LuckPerms]
+folia-supported: false
+
+commands:
+  hwl:
+    description: Heimdall Whitelist commands
+    usage: /hwl <reload|status|test>
+    permission: heimdall.admin
+    aliases: [heimdallwhitelist]
+  linkdiscord:
+    description: Link your Minecraft account to Discord
+    usage: /linkdiscord
+    permission: heimdall.linkdiscord
+    aliases: [link]
+
+permissions:
+  heimdall.admin:
+    description: Admin commands for Heimdall Whitelist
+    default: op
+  heimdall.bypass:
+    description: Bypass whitelist checks
+    default: op
+  heimdall.linkdiscord:
+    description: Link Minecraft account to Discord
+    default: true

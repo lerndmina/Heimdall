@@ -1,0 +1,10 @@
+{
+  "name": "modmail",
+  "version": "1.0.0",
+  "description": "DM-based modmail support system with forum threads and webhook relay",
+  "dependencies": ["lib", "support-core"],
+  "optionalDependencies": [],
+  "requiredEnv": ["ENCRYPTION_KEY"],
+  "optionalEnv": ["OPENROUTER_API_KEY"],
+  "apiRoutePrefix": "/modmail"
+}

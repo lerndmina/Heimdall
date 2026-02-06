@@ -1,0 +1,10 @@
+{
+  "name": "tags",
+  "version": "1.0.0",
+  "description": "Guild-specific text tags with CRUD, usage tracking, and autocomplete",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": "/tags"
+}
