@@ -97,12 +97,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
 
                 // Fire RCON commands asynchronously (don't block the response)
                 if (syncResult.operation && (syncResult.operation.groupsAdded.length > 0 || syncResult.operation.groupsRemoved.length > 0)) {
-                  RconService.applyRoleSyncViaRcon(
-                    guildId as string,
-                    username,
-                    syncResult.operation.groupsAdded,
-                    syncResult.operation.groupsRemoved,
-                  )
+                  RconService.applyRoleSyncViaRcon(guildId as string, username, syncResult.operation.groupsAdded, syncResult.operation.groupsRemoved)
                     .then((result) => {
                       if (result.success) {
                         log.info(`RCON role sync for ${username}: +${syncResult.operation!.groupsAdded.join(",")} -${syncResult.operation!.groupsRemoved.join(",")}`);

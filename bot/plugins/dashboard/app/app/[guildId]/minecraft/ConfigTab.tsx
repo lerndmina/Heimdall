@@ -366,6 +366,18 @@ function ConfigWizard({ guildId, draft, setDraft, step, setStep, saving, saveErr
 
   const canNext = () => {
     if (step === 0) return draft.serverName.trim() !== "" && draft.serverIp.trim() !== "";
+    if (step === 2) {
+      // All role mappings must be fully filled out
+      const hasIncompleteMapping = draft.roleMappings.some((m) => !m.discordRoleId || !m.minecraftGroup.trim());
+      if (hasIncompleteMapping) return false;
+
+      // RCON mode requires RCON to be enabled and configured
+      if (draft.roleSyncMode === "rcon") {
+        if (!draft.rconEnabled) return false;
+        if (!draft.rconPassword || draft.rconPassword === "") return false;
+        if (draft.rconPort < 1 || draft.rconPort > 65535) return false;
+      }
+    }
     return true;
   };
 
@@ -674,7 +686,13 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
 
           {draft.roleSyncMode === "rcon" && !draft.rconEnabled && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-              ⚠️ RCON must be enabled for immediate role sync. Enable RCON in the section below.
+              ⚠️ RCON must be enabled and configured to use immediate role sync. Enable RCON below and fill in the connection details to continue.
+            </div>
+          )}
+
+          {draft.roleSyncMode === "rcon" && draft.rconEnabled && (!draft.rconPassword || draft.rconPassword === "") && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+              ⚠️ RCON password is required. Fill in the RCON connection details below to continue.
             </div>
           )}
 
@@ -689,44 +707,51 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
               </div>
 
               {/* Mappings */}
-              {draft.roleMappings.map((mapping, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center">
-                  {/* Discord Role Combobox */}
-                  <Combobox
-                    options={guildRoles.map((r) => ({ value: r.id, label: r.name }))}
-                    value={mapping.discordRoleId}
-                    onChange={(v) => updateMapping(i, "discordRoleId", v)}
-                    placeholder="Select a role…"
-                    searchPlaceholder="Search roles…"
-                    emptyMessage="No roles found."
-                    loading={rolesLoading}
-                  />
+              {draft.roleMappings.map((mapping, i) => {
+                const missingRole = !mapping.discordRoleId;
+                const missingGroup = !mapping.minecraftGroup.trim();
+                return (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center">
+                    {/* Discord Role Combobox */}
+                    <Combobox
+                      options={guildRoles.map((r) => ({ value: r.id, label: r.name }))}
+                      value={mapping.discordRoleId}
+                      onChange={(v) => updateMapping(i, "discordRoleId", v)}
+                      placeholder="Select a role…"
+                      searchPlaceholder="Search roles…"
+                      emptyMessage="No roles found."
+                      loading={rolesLoading}
+                      error={missingRole && !missingGroup}
+                    />
 
-                  {/* Minecraft Group Text Input */}
-                  <input
-                    type="text"
-                    value={mapping.minecraftGroup}
-                    onChange={(e) => updateMapping(i, "minecraftGroup", e.target.value)}
-                    placeholder="e.g. vip, admin, member"
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                  />
+                    {/* Minecraft Group Text Input */}
+                    <input
+                      type="text"
+                      value={mapping.minecraftGroup}
+                      onChange={(e) => updateMapping(i, "minecraftGroup", e.target.value)}
+                      placeholder="e.g. vip, admin, member"
+                      className={`w-full rounded-lg border bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none transition focus:ring-1 ${
+                        missingGroup && !missingRole ? "border-red-500 focus:border-red-500 focus:ring-red-500/30" : "border-zinc-700 focus:border-primary-500 focus:ring-primary-500"
+                      }`}
+                    />
 
-                  {/* Remove Button */}
-                  <button
-                    onClick={() => removeMapping(i)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400"
-                    title="Remove mapping">
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+                    {/* Remove Button */}
+                    <button
+                      onClick={() => removeMapping(i)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400"
+                      title="Remove mapping">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
 
               {/* Add Button */}
               <button

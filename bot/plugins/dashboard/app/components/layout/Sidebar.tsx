@@ -45,9 +45,7 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
           {items.map((item) => {
             const normalizedHref = item.href.replace(/\/+$/, "") || "/";
             const isGuildRoot = normalizedHref === guildRoot;
-            const isActive = isGuildRoot
-              ? normalizedPathname === normalizedHref
-              : normalizedPathname === normalizedHref || normalizedPathname.startsWith(normalizedHref + "/");
+            const isActive = isGuildRoot ? normalizedPathname === normalizedHref : normalizedPathname === normalizedHref || normalizedPathname.startsWith(normalizedHref + "/");
             return (
               <li key={item.href}>
                 <Link

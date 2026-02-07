@@ -25,6 +25,7 @@ interface ComboboxProps {
   emptyMessage?: string;
   disabled?: boolean;
   loading?: boolean;
+  error?: boolean;
 }
 
 export default function Combobox({
@@ -36,6 +37,7 @@ export default function Combobox({
   emptyMessage = "No results found.",
   disabled = false,
   loading = false,
+  error = false,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -118,7 +120,7 @@ export default function Combobox({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm outline-none transition ${
-          open ? "border-primary-500 ring-1 ring-primary-500" : "border-zinc-700 hover:border-zinc-600"
+          error ? "border-red-500 ring-1 ring-red-500/30" : open ? "border-primary-500 ring-1 ring-primary-500" : "border-zinc-700 hover:border-zinc-600"
         } bg-zinc-800/50 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
         <span className={selectedLabel ? "text-zinc-100" : "text-zinc-500"}>{loading ? "Loading…" : selectedLabel || placeholder}</span>
         {/* Chevron */}
