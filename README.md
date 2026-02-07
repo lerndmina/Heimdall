@@ -55,24 +55,24 @@ The project consists of two main components:
 ### 🔌 Built-in Plugins
 
 #### Community Management
-- **Tickets** - Full-featured support ticket system
-- **Modmail** - DM-based modmail with forum thread integration
-- **Logging** - Comprehensive server event logging with per-category channels
-- **Welcome** - Customizable welcome messages for new members
-- **Suggestions** - Community suggestion and voting system
-- **Tags** - Custom tag system for frequently shared information
+- **Tickets** - Support ticket system
+- **Modmail** - DM-based modmail support system with forum threads and webhook relay
+- **Logging** - Server event logging with per-category channels and subcategory toggles
+- **Welcome** - Welcome messages for new members with template variables
+- **Suggestions** - Community suggestion system with voting, categories, AI titles, and dual embed/forum modes
+- **Tags** - Guild-specific text tags with CRUD, usage tracking, and autocomplete
 
 #### Utilities
-- **Reminders** - Schedule reminders for users
-- **TempVC** - Join-to-create temporary voice channels
-- **Minigames** - Interactive games (Connect4, TicTacToe, Dice) + HeimdallCoin economy
-- **Dev** - Developer utilities and debugging tools
-- **Ping** - Bot health check and latency monitoring
+- **Reminders** - Personal reminders with context-aware ticket/modmail integration, background delivery, and dashboard API
+- **TempVC** - Join-to-create temporary voice channel system
+- **Minigames** - Fun minigames including Connect4, TicTacToe, Dice gambling, and HeimdallCoin economy
+- **Dev** - Owner-only developer utilities (database tools, diagnostics)
+- **Ping** - Simple ping command for testing
 
 #### Integration
-- **Minecraft** - Account linking, dynamic whitelist, RCON, role sync, leave revocation
-- **Support-Core** - Shared infrastructure for tickets and modmail systems
-- **Lib** - Shared utilities library for all plugins
+- **Minecraft** - Minecraft whitelist integration — account linking, RCON, role sync, leave revocation
+- **Support-Core** - Core support system infrastructure for tickets and modmail
+- **Lib** - Shared utilities library for Heimdall plugins
 
 ### 🎮 Minecraft Features
 
@@ -236,6 +236,11 @@ API_PORT=3001
 
 # Optional - Misc
 NANOID_LENGTH=12
+
+# Optional - Plugin Features
+OPENAI_API_KEY=           # For suggestions plugin AI title generation
+OPENROUTER_API_KEY=       # For modmail plugin AI suggestions
+TICKET_TRANSCRIPT_WEBHOOK= # For tickets plugin transcript logging
 ```
 
 ### Getting Your Discord Bot Token
@@ -279,7 +284,7 @@ Most plugins support per-guild configuration through Discord commands. After inv
 ## Available Plugins
 
 ### Tickets Plugin
-Full-featured support ticket system with categories, transcripts, and role-based access.
+Support ticket system with categories, transcripts, and role-based access.
 
 **Commands:**
 - `/ticket create` - Create a new support ticket
@@ -288,17 +293,18 @@ Full-featured support ticket system with categories, transcripts, and role-based
 - `/ticket remove <user>` - Remove user from ticket
 
 ### Modmail Plugin
-DM-based modmail system that creates forum threads for each conversation.
+DM-based modmail support system with forum threads and webhook relay.
 
 **Features:**
 - Users DM the bot to create modmail threads
 - Staff respond via Discord forum threads
-- All messages are relayed bidirectionally
+- All messages are relayed bidirectionally via webhook
 - Optional AI response suggestions (OpenRouter integration)
 - Full conversation transcripts
+- Auto-close toggle and forum tag helpers
 
 ### Minecraft Plugin
-Integrates Discord with Minecraft servers for account linking and whitelist management.
+Minecraft whitelist integration with account linking, RCON, role sync, and leave revocation.
 
 **Commands:**
 - `/link-minecraft <username>` - Start linking your Minecraft account
@@ -312,7 +318,7 @@ Integrates Discord with Minecraft servers for account linking and whitelist mana
 - `/minecraft-manage` - Open management dashboard
 
 ### Logging Plugin
-Comprehensive event logging with per-category channel configuration.
+Server event logging with per-category channels and subcategory toggles.
 
 **Logged Events:**
 - Message edits and deletions
@@ -323,7 +329,7 @@ Comprehensive event logging with per-category channel configuration.
 - Moderation actions
 
 ### TempVC Plugin
-Join-to-create temporary voice channels with full user control.
+Join-to-create temporary voice channel system with full user control.
 
 **Features:**
 - Join designated channel to create your own VC
@@ -332,7 +338,7 @@ Join-to-create temporary voice channels with full user control.
 - Customizable creation channel
 
 ### Welcome Plugin
-Customizable welcome messages for new members.
+Welcome messages for new members with template variables.
 
 **Features:**
 - Welcome messages in designated channel
@@ -341,25 +347,59 @@ Customizable welcome messages for new members.
 - Variable support (`{user}`, `{server}`, `{memberCount}`)
 
 ### Minigames Plugin
-Interactive games and economy system.
+Fun minigames including Connect4, TicTacToe, Dice gambling, and HeimdallCoin economy.
 
 **Games:**
 - `/connect4 <opponent>` - Play Connect Four
 - `/tictactoe <opponent>` - Play Tic-Tac-Toe
-- `/dice [sides]` - Roll dice
+- `/dice [sides]` - Roll dice (gambling)
 
 **Economy:**
 - `/balance` - Check your HeimdallCoin balance
 - `/daily` - Claim daily coins
 - `/leaderboard` - View richest users
 
-### Other Plugins
+### Suggestions Plugin
+Community suggestion system with voting, categories, AI titles, and dual embed/forum modes.
 
-- **Reminders**: Schedule reminders with `/remind <time> <message>`
-- **Tags**: Create reusable text snippets with `/tag <name>`
-- **Suggestions**: Submit and vote on suggestions with `/suggest <idea>`
-- **Dev**: Developer tools for bot maintenance (owner only)
-- **Ping**: Check bot latency with `/ping`
+**Features:**
+- Submit suggestions with `/suggest`
+- Voting system with upvote/downvote
+- Organize by categories
+- AI-generated titles (optional OpenAI integration)
+- Support for both embed and forum thread modes
+
+### Tags Plugin
+Guild-specific text tags with CRUD, usage tracking, and autocomplete.
+
+**Commands:**
+- `/tag <name>` - Display a tag
+- `/tag create <name> <content>` - Create a new tag
+- `/tag edit <name> <content>` - Edit existing tag
+- `/tag delete <name>` - Delete a tag
+- Usage tracking and autocomplete support
+
+### Reminders Plugin
+Personal reminders with context-aware ticket/modmail integration, background delivery, and dashboard API.
+
+**Features:**
+- `/remind <time> <message>` - Set a reminder
+- Context-aware: remembers if set in a ticket or modmail thread
+- Background delivery service ensures reminders are sent
+- Dashboard API for managing reminders
+
+### Dev Plugin
+Owner-only developer utilities (database tools, diagnostics).
+
+**Features:**
+- Database management tools
+- MongoDB import/export utilities
+- Diagnostic commands
+- Bot maintenance utilities
+- Owner-only access
+
+### Ping Plugin
+Simple ping command for testing bot latency and responsiveness.
 
 ---
 
