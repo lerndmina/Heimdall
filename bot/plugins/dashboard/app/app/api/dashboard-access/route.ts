@@ -1,0 +1,43 @@
+/**
+ * Dashboard access proxy — checks which guilds have dashboard permission
+ * overrides for the current user's roles.
+ *
+ * Forwards to bot API POST /api/dashboard-access.
+ */
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+
+const API_PORT = process.env.API_PORT || "3001";
+const API_BASE = `http://localhost:${API_PORT}`;
+const API_KEY = process.env.INTERNAL_API_KEY!;
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+
+    const res = await fetch(`${API_BASE}/api/dashboard-access`, {
+      method: "POST",
+      headers: {
+        "X-API-Key": API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId: session.user.id,
+        guildIds: body.guildIds,
+      }),
+    });
+
+    const data = await res.text();
+    return new NextResponse(data, {
+      status: res.status,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch {
+    return NextResponse.json({ success: false, error: "Failed to connect to bot API" }, { status: 502 });
+  }
+}

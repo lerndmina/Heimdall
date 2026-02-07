@@ -263,6 +263,59 @@ export class ApiManager {
       res.json({ success: true, data: { mutualIds } });
     });
 
+    // Dashboard access check — which of the given guilds does the user have dashboard permissions in?
+    // Takes a userId + guildIds array, checks if the user has any role with dashboard permission
+    // overrides configured in each guild.
+    this.app.post("/api/dashboard-access", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { userId, guildIds } = req.body as { userId?: string; guildIds?: string[] };
+      if (!userId || !Array.isArray(guildIds)) {
+        res.status(400).json({ success: false, error: "userId and guildIds[] are required" });
+        return;
+      }
+
+      try {
+        // Find all guilds that have any dashboard permission overrides configured
+        const allPerms = await DashboardPermission.find({ guildId: { $in: guildIds } }).lean();
+
+        // Group by guildId
+        const permsByGuild = new Map<string, Array<{ discordRoleId: string }>>();
+        for (const perm of allPerms) {
+          const list = permsByGuild.get(perm.guildId) ?? [];
+          list.push({ discordRoleId: perm.discordRoleId });
+          permsByGuild.set(perm.guildId, list);
+        }
+
+        // For each guild with overrides, check if the user has any of those roles
+        const accessibleGuildIds: string[] = [];
+
+        for (const [guildId, rolePerms] of permsByGuild) {
+          if (!this.client) continue;
+          const guild = this.client.guilds.cache.get(guildId);
+          if (!guild) continue;
+
+          const member = await this.thingGetter?.getMember(guild, userId);
+          if (!member) continue;
+
+          const memberRoleIds = member.roles.cache.map((r) => r.id);
+          const hasOverriddenRole = rolePerms.some((p) => memberRoleIds.includes(p.discordRoleId));
+          if (hasOverriddenRole) {
+            accessibleGuildIds.push(guildId);
+          }
+        }
+
+        res.json({ success: true, data: { accessibleGuildIds } });
+      } catch (err) {
+        log.error("[API] Error checking dashboard access:", err);
+        res.status(500).json({ success: false, error: "Database error" });
+      }
+    });
+
     // Guild status check — is the bot in this guild?
     this.app.get("/api/guilds/:guildId/status", (req: Request, res: Response) => {
       const key = req.header("X-API-Key");

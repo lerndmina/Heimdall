@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getUserGuilds } from "@/lib/guildCache";
 import { resolvePermissions, type RoleOverrides, type MemberInfo } from "@/lib/permissions";
 
 const API_PORT = process.env.API_PORT || "3001";
@@ -32,12 +33,13 @@ async function fetchBotApi<T>(path: string): Promise<T | null> {
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
   const session = await auth();
-  if (!session?.user?.id) {
+  if (!session?.user?.id || !session.accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { guildId } = await params;
-  const hasAccess = session.guilds?.some((g) => g.id === guildId);
+  const guilds = await getUserGuilds(session.accessToken, session.user.id);
+  const hasAccess = guilds.some((g) => g.id === guildId);
   if (!hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

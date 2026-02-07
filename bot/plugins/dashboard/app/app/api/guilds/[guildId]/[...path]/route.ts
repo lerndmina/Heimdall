@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getUserGuilds } from "@/lib/guildCache";
 import { resolveRouteAction } from "@/lib/routePermissions";
 import { resolvePermissions, type RoleOverrides, type MemberInfo } from "@/lib/permissions";
 
@@ -60,14 +61,15 @@ interface RouteParams {
 async function proxyRequest(req: NextRequest, { params }: RouteParams) {
   // Check auth
   const session = await auth();
-  if (!session?.user?.id) {
+  if (!session?.user?.id || !session.accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { guildId, path: pathSegments } = await params;
 
-  // Verify user has access to this guild
-  const hasAccess = session.guilds?.some((g) => g.id === guildId);
+  // Verify user has access to this guild via the guild cache
+  const guilds = await getUserGuilds(session.accessToken, session.user.id);
+  const hasAccess = guilds.some((g) => g.id === guildId);
   if (!hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

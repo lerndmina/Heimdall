@@ -1,11 +1,12 @@
 /**
- * Guild Selector — grid of accessible guilds from the user's session.
- * Server component: fetches the session on the server, passes guilds
- * and the bot's client ID to the client-side GuildGrid.
+ * Guild Selector — grid of accessible guilds.
+ * Server component shell; GuildGrid fetches guilds client-side
+ * via the /api/guilds endpoint (backed by in-memory cache).
  */
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import GuildGrid from "./GuildGrid";
+import LogoutButton from "./LogoutButton";
 
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID!;
 
@@ -19,21 +20,18 @@ export default async function GuildSelectorPage() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
       {/* Header */}
-      <div className="mb-8 space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Select a Server</h1>
-        <p className="text-zinc-400">
-          Choose a server to manage. Only servers where you have <span className="text-zinc-300">Manage Server</span> permission are shown.
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Select a Server</h1>
+          <p className="text-zinc-400">
+            Choose a server to manage. Servers where you have <span className="text-zinc-300">Manage Server</span> permission or dashboard access are shown.
+          </p>
+        </div>
+        <LogoutButton user={session.user} />
       </div>
 
       {/* Guild grid */}
-      {session.guilds.length === 0 ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-12 text-center">
-          <p className="text-zinc-400">You don&apos;t have permission to manage any servers with Heimdall.</p>
-        </div>
-      ) : (
-        <GuildGrid guilds={session.guilds} clientId={DISCORD_CLIENT_ID} />
-      )}
+      <GuildGrid clientId={DISCORD_CLIENT_ID} />
     </main>
   );
 }

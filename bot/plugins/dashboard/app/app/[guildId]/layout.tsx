@@ -5,6 +5,7 @@
  */
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { getUserGuilds } from "@/lib/guildCache";
 import GuildLayoutShell from "./GuildLayoutShell";
 
 const API_PORT = process.env.API_PORT || "3001";
@@ -36,12 +37,13 @@ interface GuildLayoutProps {
 
 export default async function GuildLayout({ children, params }: GuildLayoutProps) {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  if (!session?.user || !session.accessToken) redirect("/login");
 
   const { guildId } = await params;
 
-  // Find the guild in the user's session
-  const guild = session.guilds?.find((g) => g.id === guildId);
+  // Fetch the user's guilds from the cache (or Discord API)
+  const guilds = await getUserGuilds(session.accessToken, session.user.id);
+  const guild = guilds.find((g) => g.id === guildId);
   if (!guild) {
     redirect("/");
   }

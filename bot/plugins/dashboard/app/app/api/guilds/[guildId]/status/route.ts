@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getUserGuilds } from "@/lib/guildCache";
 
 const API_PORT = process.env.API_PORT || "3001";
 const API_BASE = `http://localhost:${API_PORT}`;
@@ -15,14 +16,15 @@ interface RouteParams {
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
   const session = await auth();
-  if (!session?.user?.id) {
+  if (!session?.user?.id || !session.accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { guildId } = await params;
 
-  // Verify user has access to this guild
-  const hasAccess = session.guilds?.some((g) => g.id === guildId);
+  // Verify user has access to this guild via the guild cache
+  const guilds = await getUserGuilds(session.accessToken, session.user.id);
+  const hasAccess = guilds.some((g) => g.id === guildId);
   if (!hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

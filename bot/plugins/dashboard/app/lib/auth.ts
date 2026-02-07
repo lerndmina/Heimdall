@@ -8,9 +8,6 @@ import Discord from "next-auth/providers/discord";
 /** Discord OAuth scopes */
 const DISCORD_SCOPES = "identify guilds";
 
-/** Permission bit for Manage Guild */
-const MANAGE_GUILD = 0x20n;
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Discord({
@@ -28,34 +25,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account) {
         token.accessToken = account.access_token ?? "";
         token.userId = account.providerAccountId;
-
-        // Fetch user's guilds from Discord API
-        try {
-          const res = await fetch("https://discord.com/api/v10/users/@me/guilds", {
-            headers: { Authorization: `Bearer ${account.access_token}` },
-          });
-
-          if (res.ok) {
-            const guilds = await res.json();
-
-            // Filter to guilds where user has ManageGuild permission
-            token.guilds = guilds
-              .filter((g: { permissions: string }) => {
-                const perms = BigInt(g.permissions);
-                // Owner flag (0x8) or ManageGuild (0x20)
-                return (perms & 0x8n) !== 0n || (perms & MANAGE_GUILD) !== 0n;
-              })
-              .map((g: { id: string; name: string; icon: string | null }) => ({
-                id: g.id,
-                name: g.name,
-                icon: g.icon,
-              }));
-          } else {
-            token.guilds = [];
-          }
-        } catch {
-          token.guilds = [];
-        }
       }
       return token;
     },
@@ -63,7 +32,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       session.user.id = token.userId;
       session.accessToken = token.accessToken;
-      session.guilds = token.guilds;
       return session;
     },
 
