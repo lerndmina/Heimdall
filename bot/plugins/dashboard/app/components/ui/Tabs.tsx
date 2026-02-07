@@ -32,7 +32,7 @@ export default function Tabs({ tabs, defaultTab, className = "" }: TabsProps) {
             key={tab.id}
             onClick={() => setActiveId(tab.id)}
             className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeId === tab.id ? "border-brand-500 text-brand-400" : "border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-600"
+              activeId === tab.id ? "border-primary-500 text-primary-400" : "border-transparent text-zinc-400 hover:text-zinc-200 hover:border-zinc-600"
             }`}>
             {tab.icon}
             {tab.label}

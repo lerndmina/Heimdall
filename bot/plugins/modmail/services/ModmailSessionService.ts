@@ -22,7 +22,13 @@ export interface ModmailSession {
 
   // Creation Data
   categoryId: string;
-  initialMessage: string;
+  initialMessage: string; // Preview text (for review panel display)
+
+  // Original message reference — used to re-fetch the DM (preserving attachments)
+  initialMessageRef?: { channelId: string; messageId: string };
+
+  // Messages the user sent while answering form questions (before thread existed)
+  queuedMessageRefs: Array<{ channelId: string; messageId: string }>;
 
   // Question Flow
   currentStep: number; // Index in formFields array we are processing
@@ -49,6 +55,7 @@ export interface CreateSessionData {
   userDisplayName: string;
   categoryId: string;
   initialMessage: string;
+  initialMessageRef?: { channelId: string; messageId: string };
 }
 
 /**
@@ -79,6 +86,8 @@ export class ModmailSessionService {
       userDisplayName: data.userDisplayName,
       categoryId: data.categoryId,
       initialMessage: data.initialMessage,
+      initialMessageRef: data.initialMessageRef,
+      queuedMessageRefs: [],
       currentStep: 0,
       currentModalPage: 0,
       totalModalPages: 0,
@@ -197,6 +206,21 @@ export class ModmailSessionService {
       this.logger.error(`Failed to get user session for ${userId}:`, error);
       return null;
     }
+  }
+
+  /**
+   * Queue a message reference sent by the user while the form wizard is active.
+   * These messages will be forwarded to the thread after creation.
+   */
+  async queueMessage(sessionId: string, ref: { channelId: string; messageId: string }): Promise<boolean> {
+    const session = await this.getSession(sessionId);
+    if (!session) return false;
+
+    session.queuedMessageRefs.push(ref);
+
+    return this.updateSession(sessionId, {
+      queuedMessageRefs: session.queuedMessageRefs,
+    });
   }
 
   /**

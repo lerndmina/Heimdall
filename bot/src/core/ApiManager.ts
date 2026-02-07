@@ -12,7 +12,7 @@ import express, { Router, type Application, type Request, type Response, type Ne
 import type { Server } from "http";
 import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
-import type { Client } from "discord.js";
+import { ChannelType, type Client } from "discord.js";
 import log from "../utils/logger";
 
 export interface PluginRouter {
@@ -213,6 +213,29 @@ export class ApiManager {
       });
     });
 
+    // Mutual guild check — which of the given guilds is the bot in?
+    this.app.post("/api/mutual-guilds", (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      if (!this.client) {
+        res.status(503).json({ success: false, error: "Bot not ready" });
+        return;
+      }
+
+      const { guildIds } = req.body as { guildIds?: string[] };
+      if (!Array.isArray(guildIds)) {
+        res.status(400).json({ success: false, error: "guildIds must be an array" });
+        return;
+      }
+
+      const mutualIds = guildIds.filter((id) => this.client!.guilds.cache.has(id));
+      res.json({ success: true, data: { mutualIds } });
+    });
+
     // Guild status check — is the bot in this guild?
     this.app.get("/api/guilds/:guildId/status", (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
@@ -236,6 +259,39 @@ export class ApiManager {
           memberCount: guild?.memberCount ?? null,
         },
       });
+    });
+
+    // Guild text channels — for channel pickers in the dashboard
+    this.app.get("/api/guilds/:guildId/channels", (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { guildId } = req.params;
+      if (!this.client) {
+        res.status(503).json({ success: false, error: "Bot not ready" });
+        return;
+      }
+
+      const guild = this.client.guilds.cache.get(guildId);
+      if (!guild) {
+        res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Guild not found" } });
+        return;
+      }
+
+      const channels = guild.channels.cache
+        .filter((ch) => ch.type === ChannelType.GuildText)
+        .sort((a, b) => a.position - b.position)
+        .map((ch) => ({
+          id: ch.id,
+          name: ch.name,
+          category: ch.parent?.name ?? null,
+          categoryId: ch.parentId ?? null,
+        }));
+
+      res.json({ success: true, data: { channels } });
     });
 
     this.setupErrorHandling();

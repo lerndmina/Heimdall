@@ -196,6 +196,27 @@ async function handleExistingModmail(client: HeimdallClient, pluginAPI: ModmailP
 async function startNewModmailFlow(client: HeimdallClient, pluginAPI: ModmailPluginAPI, message: Message): Promise<void> {
   const userId = message.author.id;
 
+  // Check if user has an active modmail session (answering form questions).
+  // If so, queue this message so it is forwarded after thread creation.
+  const activeSessionId = await pluginAPI.sessionService.getUserActiveSession(userId);
+  if (activeSessionId) {
+    const queued = await pluginAPI.sessionService.queueMessage(activeSessionId, {
+      channelId: message.channel.id,
+      messageId: message.id,
+    });
+    if (queued) {
+      try {
+        await message.react("📝");
+      } catch {
+        // Ignore reaction failures
+      }
+      log.debug(`Queued DM message ${message.id} for active session ${activeSessionId}`);
+      return;
+    }
+    // If queuing failed (e.g. session expired between check and queue), fall through
+    // to normal flow.
+  }
+
   // Prevent duplicate flows
   if (activeFlows.has(userId)) {
     try {
@@ -346,6 +367,10 @@ async function handleSingleCategory(
     userDisplayName: displayName,
     categoryId: category.id,
     initialMessage: cleanContent,
+    initialMessageRef: {
+      channelId: message.channel.id,
+      messageId: message.id,
+    },
   });
 
   // Check if category has form fields
@@ -624,6 +649,10 @@ async function handleCategorySelected(
     userDisplayName: displayName,
     categoryId: category.id,
     initialMessage: cleanContent,
+    initialMessageRef: {
+      channelId: originalMessage.channel.id,
+      messageId: originalMessage.id,
+    },
   });
 
   // Check if category has form fields
@@ -660,6 +689,8 @@ async function createModmailDirectly(client: HeimdallClient, pluginAPI: ModmailP
       userId: message.author.id,
       userDisplayName: session.userDisplayName,
       initialMessage: session.initialMessage,
+      initialMessageRef: session.initialMessageRef,
+      queuedMessageRefs: session.queuedMessageRefs,
       categoryId,
       createdVia: "dm",
     });
@@ -729,6 +760,8 @@ async function createModmailFromInteraction(
       userId: originalMessage.author.id,
       userDisplayName: session.userDisplayName,
       initialMessage: session.initialMessage,
+      initialMessageRef: session.initialMessageRef,
+      queuedMessageRefs: session.queuedMessageRefs,
       categoryId,
       createdVia: "dm",
     });

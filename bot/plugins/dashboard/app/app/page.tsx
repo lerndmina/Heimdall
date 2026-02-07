@@ -1,10 +1,13 @@
 /**
  * Guild Selector — grid of accessible guilds from the user's session.
- * Server component: fetches the session on the server and renders the guild list.
+ * Server component: fetches the session on the server, passes guilds
+ * and the bot's client ID to the client-side GuildGrid.
  */
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import GuildGrid from "./GuildGrid";
+
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID!;
 
 export default async function GuildSelectorPage() {
   const session = await auth();
@@ -29,7 +32,7 @@ export default async function GuildSelectorPage() {
           <p className="text-zinc-400">You don&apos;t have permission to manage any servers with Heimdall.</p>
         </div>
       ) : (
-        <GuildGrid guilds={session.guilds} />
+        <GuildGrid guilds={session.guilds} clientId={DISCORD_CLIENT_ID} />
       )}
     </main>
   );

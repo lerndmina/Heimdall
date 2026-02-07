@@ -89,9 +89,26 @@ export class ModmailFlowService {
     // Use sanitized content if provided, otherwise fall back to raw content
     const contentToSend = sanitizedContent ?? message.content;
 
-    // Process attachments
-    const attachmentUrls = [...message.attachments.values()].map((a) => a.url);
+    // Process attachments with size checking
+    const allAttachments = [...message.attachments.values()];
     const attachments = this.processAttachments(message.attachments.values());
+    const maxSizeBytes = ((config as any).maxAttachmentSizeMB ?? 25) * 1024 * 1024;
+    const attachmentsAllowed = (config as any).allowAttachments !== false;
+
+    const validAttachmentUrls: string[] = [];
+    const oversizedWarnings: string[] = [];
+
+    for (const attachment of allAttachments) {
+      if (!attachmentsAllowed) {
+        oversizedWarnings.push(`• **${attachment.name}** – attachments are disabled for this server`);
+        continue;
+      }
+      if (attachment.size > maxSizeBytes) {
+        oversizedWarnings.push(`• **${attachment.name}** (${formatFileSize(attachment.size)}) exceeds the **${(config as any).maxAttachmentSizeMB ?? 25} MB** limit`);
+        continue;
+      }
+      validAttachmentUrls.push(attachment.url);
+    }
 
     try {
       // Send via webhook with user identity (using sanitized content to prevent mass mention pings)
@@ -100,9 +117,17 @@ export class ModmailFlowService {
         username: modmail.userDisplayName as string,
         avatarURL: user?.displayAvatarURL(),
         embeds: message.embeds.length > 0 ? message.embeds : undefined,
-        files: attachmentUrls,
+        files: validAttachmentUrls.length > 0 ? validAttachmentUrls : undefined,
         threadId: modmail.forumThreadId as string,
       });
+
+      // Post a staff-only warning if any attachments were skipped
+      if (oversizedWarnings.length > 0) {
+        await webhook.send({
+          content: `⚠️ The following attachment(s) from the user could not be forwarded:\n${oversizedWarnings.join("\n")}`,
+          threadId: modmail.forumThreadId as string,
+        }).catch(() => {});
+      }
 
       // Add to message history (store original content for accurate records)
       await this.addMessageToModmail(modmail, {

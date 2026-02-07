@@ -9,15 +9,16 @@
  * - Cleanup on failure
  */
 
-import type { Client, ForumChannel, ThreadChannel } from "discord.js";
+import type { Client, ForumChannel, ThreadChannel, Message, Attachment } from "discord.js";
 import { ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { ModmailService, CreateModmailData } from "./ModmailService.js";
 import type { ModmailCategoryService } from "./ModmailCategoryService.js";
-import Modmail, { type IModmail, ModmailStatus } from "../models/Modmail.js";
+import Modmail, { type IModmail, ModmailStatus, MessageType, MessageContext, type MessageAttachment } from "../models/Modmail.js";
 import type { IModmailConfig, ModmailCategory } from "../models/ModmailConfig.js";
 import type { PluginLogger } from "../../../src/types/Plugin.js";
 import type { LibAPI } from "../../lib/index.js";
 import type { Document } from "mongoose";
+import type { ModmailFlowService } from "./ModmailFlowService.js";
 
 /** Staff tips shown randomly in the opening embed of new modmail threads */
 const STAFF_TIPS: string[] = [
@@ -46,10 +47,22 @@ export interface ModmailCreationResult {
   };
 }
 
+/** Discord DM file-size limit for bots (8 MB) */
+const DM_FILE_SIZE_LIMIT = 8 * 1024 * 1024;
+
+/** Format bytes into a human-readable size string */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 /**
  * ModmailCreationService - Full creation flow for modmail conversations
  */
 export class ModmailCreationService {
+  private flowService: ModmailFlowService | null = null;
+
   constructor(
     private client: Client,
     private modmailService: ModmailService,
@@ -57,6 +70,13 @@ export class ModmailCreationService {
     private lib: LibAPI,
     private logger: PluginLogger,
   ) {}
+
+  /**
+   * Set the flow service reference (avoids circular dependency at construction time)
+   */
+  setFlowService(flowService: ModmailFlowService): void {
+    this.flowService = flowService;
+  }
 
   /**
    * Create a new modmail conversation with forum thread
@@ -118,13 +138,18 @@ export class ModmailCreationService {
       modmailDoc.forumThreadId = thread.id;
       await modmailDoc.save();
 
-      // 7. Send welcome message in thread
+      // 7. Send welcome message in thread (re-fetches original DM to preserve attachments)
       let welcomeMessageSent = false;
       try {
-        await this.sendWelcomeMessage(modmailDoc, thread, config, category);
+        await this.sendWelcomeMessage(modmailDoc, thread, config, category, data.initialMessageRef);
         welcomeMessageSent = true;
       } catch (welcomeError) {
         this.logger.warn(`Failed to send welcome message for modmail ${modmailDoc.modmailId}:`, welcomeError);
+      }
+
+      // 8. Forward any messages the user sent while answering form questions
+      if (data.queuedMessageRefs && data.queuedMessageRefs.length > 0 && this.flowService) {
+        await this.forwardQueuedMessages(modmailDoc, data.queuedMessageRefs);
       }
 
       this.logger.info(`Created modmail ${modmailDoc.modmailId} with thread ${thread.id}`);
@@ -312,33 +337,138 @@ export class ModmailCreationService {
 
   /**
    * Send welcome message in the thread
-   * Posts the user's initial message via webhook and pings staff roles
+   * Re-fetches the original DM to preserve attachments, then posts via webhook.
+   * Falls back to stored text if the original message was deleted.
    */
-  async sendWelcomeMessage(modmail: IModmail, thread: ThreadChannel, config: IModmailConfig, category: ModmailCategory): Promise<void> {
+  async sendWelcomeMessage(
+    modmail: IModmail & Document,
+    thread: ThreadChannel,
+    config: IModmailConfig,
+    category: ModmailCategory,
+    initialMessageRef?: { channelId: string; messageId: string },
+  ): Promise<void> {
     // Get webhook for sending user's initial message
     const webhook = await this.modmailService.getWebhook(config, category.id);
     const user = await this.lib.thingGetter.getUser(modmail.userId as string);
 
-    // Send user's initial message via webhook (with user identity)
-    const initialMessage = modmail.messages[0];
-    if (initialMessage && webhook) {
+    const storedMessage = modmail.messages[0];
+    if (!webhook) return;
+
+    // Try to re-fetch the original DM so we get attachments
+    let originalDm: Message | null = null;
+    if (initialMessageRef) {
       try {
-        await webhook.send({
-          content: initialMessage.content || "*No message content*",
-          username: modmail.userDisplayName as string,
-          avatarURL: user?.displayAvatarURL(),
-          threadId: thread.id,
-        });
-      } catch (webhookError) {
-        this.logger.warn(`Failed to send initial message via webhook for modmail ${modmail.modmailId}:`, webhookError);
-        // Fallback to regular message
-        await thread.send({
-          content: `**${modmail.userDisplayName}**: ${initialMessage.content || "*No message content*"}`,
-        });
+        const dmChannel = await this.client.channels.fetch(initialMessageRef.channelId);
+        if (dmChannel?.isTextBased()) {
+          originalDm = await dmChannel.messages.fetch(initialMessageRef.messageId);
+        }
+      } catch {
+        this.logger.debug(`Could not re-fetch original DM ${initialMessageRef.messageId} – it may have been deleted`);
       }
     }
 
+    // Build content & file list from the fetched message (or fall back to stored text)
+    const content = originalDm?.content ?? storedMessage?.content ?? "*No message content*";
+    const attachmentUrls: string[] = [];
+    const attachmentData: MessageAttachment[] = [];
+    const oversizedWarnings: string[] = [];
+
+    if (originalDm && originalDm.attachments.size > 0) {
+      const maxSizeBytes = ((config as any).maxAttachmentSizeMB ?? 25) * 1024 * 1024;
+      const attachmentsAllowed = (config as any).allowAttachments !== false;
+
+      for (const attachment of originalDm.attachments.values()) {
+        // Record attachment metadata regardless
+        attachmentData.push({
+          discordId: attachment.id,
+          filename: attachment.name,
+          url: attachment.url,
+          proxyUrl: attachment.proxyURL,
+          size: attachment.size,
+          contentType: attachment.contentType || undefined,
+          spoiler: attachment.spoiler,
+        });
+
+        if (!attachmentsAllowed) {
+          oversizedWarnings.push(`• **${attachment.name}** – attachments are disabled for this server`);
+          continue;
+        }
+
+        if (attachment.size > maxSizeBytes) {
+          oversizedWarnings.push(`• **${attachment.name}** (${formatFileSize(attachment.size)}) exceeds the **${(config as any).maxAttachmentSizeMB ?? 25} MB** limit`);
+          continue;
+        }
+
+        attachmentUrls.push(attachment.url);
+      }
+
+      // Update the stored message entry with attachment metadata
+      if (storedMessage) {
+        storedMessage.attachments = attachmentData;
+        await modmail.save();
+      }
+    }
+
+    try {
+      await webhook.send({
+        content: content || "*No message content*",
+        username: modmail.userDisplayName as string,
+        avatarURL: user?.displayAvatarURL(),
+        files: attachmentUrls.length > 0 ? attachmentUrls : undefined,
+        threadId: thread.id,
+      });
+
+      // Post a staff-only warning if any attachments were skipped
+      if (oversizedWarnings.length > 0) {
+        await thread.send({
+          content: `⚠️ The following attachment(s) from the user's initial message could not be forwarded:\n${oversizedWarnings.join("\n")}`,
+        });
+      }
+    } catch (webhookError) {
+      this.logger.warn(`Failed to send initial message via webhook for modmail ${modmail.modmailId}:`, webhookError);
+      // Fallback to regular message
+      await thread.send({
+        content: `**${modmail.userDisplayName}**: ${content || "*No message content*"}`,
+      });
+    }
+
     // Staff role mentions are now included in the thread starter message (createForumThread)
+  }
+
+  /**
+   * Forward messages that were queued while the user was answering form questions.
+   * Re-fetches each message from the DM channel and relays via the flow service.
+   */
+  private async forwardQueuedMessages(
+    modmail: IModmail & Document,
+    queuedRefs: Array<{ channelId: string; messageId: string }>,
+  ): Promise<void> {
+    if (!this.flowService) return;
+
+    const modmailId = modmail.modmailId as string;
+    this.logger.debug(`Forwarding ${queuedRefs.length} queued message(s) to modmail ${modmailId}`);
+
+    for (const ref of queuedRefs) {
+      try {
+        const dmChannel = await this.client.channels.fetch(ref.channelId);
+        if (!dmChannel?.isTextBased()) continue;
+
+        const message = await dmChannel.messages.fetch(ref.messageId);
+        if (!message) continue;
+
+        const success = await this.flowService.relayUserMessageToThread(modmailId, message);
+        if (success) {
+          // React to the queued message to indicate it was delivered
+          try {
+            await message.react("📨");
+          } catch {
+            // Ignore reaction failures
+          }
+        }
+      } catch (error) {
+        this.logger.debug(`Could not forward queued message ${ref.messageId}: may have been deleted`);
+      }
+    }
   }
 
   /**

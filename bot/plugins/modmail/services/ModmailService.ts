@@ -25,6 +25,10 @@ export interface CreateModmailData {
   userId: string;
   userDisplayName: string;
   initialMessage: string;
+  /** Original DM message reference for re-fetching (preserves attachments) */
+  initialMessageRef?: { channelId: string; messageId: string };
+  /** Message refs queued while the user was answering form questions */
+  queuedMessageRefs?: Array<{ channelId: string; messageId: string }>;
   categoryId?: string;
   formResponses?: FormResponse[];
   createdVia?: "dm" | "command" | "button" | "api";

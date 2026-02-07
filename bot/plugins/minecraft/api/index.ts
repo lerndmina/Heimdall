@@ -12,6 +12,7 @@ import { createPlayersRoutes } from "./players.js";
 import { createRconRoutes } from "./rcon.js";
 import { createRequestsRoutes } from "./requests.js";
 import { createRoleSyncRoutes } from "./rolesync.js";
+import { createStatusRoutes } from "./status.js";
 import type { MinecraftPluginAPI } from "../index.js";
 
 /** @deprecated Use createRouter instead */
@@ -41,6 +42,9 @@ export function createRouter(api: MinecraftPluginAPI): Router {
 
   // GET/POST /api/guilds/:guildId/minecraft/role-sync
   router.use("/", createRoleSyncRoutes(deps));
+
+  // GET    /api/guilds/:guildId/minecraft/status
+  router.use("/status", createStatusRoutes(deps));
 
   return router;
 }

@@ -505,6 +505,8 @@ export class ModmailQuestionHandler {
       userDisplayName: session.userDisplayName,
       categoryId: session.categoryId,
       initialMessage: session.initialMessage,
+      initialMessageRef: session.initialMessageRef,
+      queuedMessageRefs: session.queuedMessageRefs,
       formResponses,
       createdVia: "dm",
     });

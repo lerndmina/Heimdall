@@ -97,6 +97,9 @@ export async function onLoad(context: PluginContext): Promise<ModmailPluginAPI> 
   // Initialize flow service
   const flowService = new ModmailFlowService(client, modmailService, lib, logger);
 
+  // Wire up flow service reference in creation service (avoids circular dep at construction)
+  creationService.setFlowService(flowService);
+
   // Initialize question handler
   const questionHandler = new ModmailQuestionHandler(client, sessionService, creationService, lib, logger);
 
