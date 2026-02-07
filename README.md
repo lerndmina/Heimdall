@@ -238,9 +238,9 @@ API_PORT=3001
 NANOID_LENGTH=12
 
 # Optional - Plugin Features
-OPENAI_API_KEY=           # For suggestions plugin AI title generation
-OPENROUTER_API_KEY=       # For modmail plugin AI suggestions
-TICKET_TRANSCRIPT_WEBHOOK= # For tickets plugin transcript logging
+OPENAI_API_KEY=           # For AI title generation in suggestions plugin
+OPENROUTER_API_KEY=       # For AI suggestions in modmail plugin
+TICKET_TRANSCRIPT_WEBHOOK= # For transcript logging in tickets plugin
 ```
 
 ### Getting Your Discord Bot Token
