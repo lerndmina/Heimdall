@@ -123,10 +123,12 @@ export class ModmailFlowService {
 
       // Post a staff-only warning if any attachments were skipped
       if (oversizedWarnings.length > 0) {
-        await webhook.send({
-          content: `⚠️ The following attachment(s) from the user could not be forwarded:\n${oversizedWarnings.join("\n")}`,
-          threadId: modmail.forumThreadId as string,
-        }).catch(() => {});
+        await webhook
+          .send({
+            content: `⚠️ The following attachment(s) from the user could not be forwarded:\n${oversizedWarnings.join("\n")}`,
+            threadId: modmail.forumThreadId as string,
+          })
+          .catch(() => {});
       }
 
       // Add to message history (store original content for accurate records)

@@ -76,11 +76,7 @@ export function createStatusRoutes(_deps: MinecraftApiDependencies): Router {
         return;
       }
 
-      const server = await McServerStatus.findOneAndUpdate(
-        { id: serverName.toLowerCase() },
-        { id: serverName.toLowerCase(), guildId, serverIp, serverPort, serverName },
-        { upsert: true, new: true },
-      );
+      const server = await McServerStatus.findOneAndUpdate({ id: serverName.toLowerCase() }, { id: serverName.toLowerCase(), guildId, serverIp, serverPort, serverName }, { upsert: true, new: true });
 
       res.status(201).json({ success: true, data: { server: server.toObject() } });
     } catch (error) {

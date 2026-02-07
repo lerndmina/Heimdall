@@ -439,10 +439,7 @@ export class ModmailCreationService {
    * Forward messages that were queued while the user was answering form questions.
    * Re-fetches each message from the DM channel and relays via the flow service.
    */
-  private async forwardQueuedMessages(
-    modmail: IModmail & Document,
-    queuedRefs: Array<{ channelId: string; messageId: string }>,
-  ): Promise<void> {
+  private async forwardQueuedMessages(modmail: IModmail & Document, queuedRefs: Array<{ channelId: string; messageId: string }>): Promise<void> {
     if (!this.flowService) return;
 
     const modmailId = modmail.modmailId as string;
