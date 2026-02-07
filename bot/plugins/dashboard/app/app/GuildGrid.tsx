@@ -6,10 +6,13 @@
  *
  * Shows guilds where the user has Discord admin/manage perms OR dashboard
  * permission overrides. Refresh re-fetches everything fresh.
+ *
+ * Distinguishes between "no guilds" (legitimate) and "fetch failed" (transient)
+ * to prevent first-load false-negatives. Auto-retries once on failure.
  */
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import GuildIcon from "@/components/ui/GuildIcon";
 import Spinner from "@/components/ui/Spinner";
@@ -18,6 +21,10 @@ import { cache } from "@/lib/cache";
 /** Discord permission bits */
 const ADMINISTRATOR = 0x8n;
 const MANAGE_GUILD = 0x20n;
+
+/** How many times to auto-retry when the initial load returns empty due to errors */
+const MAX_AUTO_RETRIES = 2;
+const RETRY_DELAY_MS = 2_000;
 
 interface Guild {
   id: string;
@@ -52,18 +59,23 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
   const [dashboardAccessIds, setDashboardAccessIds] = useState<Set<string> | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  /** Fetch guilds from the server-side cached endpoint */
-  const fetchGuilds = useCallback(async () => {
+  // Track whether any fetch errored (vs returned legitimate empty data)
+  const [hadFetchError, setHadFetchError] = useState(false);
+  const retryCountRef = useRef(0);
+
+  /** Fetch guilds from the server-side cached endpoint. Returns { guilds, ok }. */
+  const fetchGuilds = useCallback(async (): Promise<{ guilds: Guild[]; ok: boolean }> => {
     try {
       const res = await fetch("/api/guilds");
+      if (!res.ok) return { guilds: [], ok: false };
       const body = await res.json();
       if (body.success && Array.isArray(body.data?.guilds)) {
-        return body.data.guilds as Guild[];
+        return { guilds: body.data.guilds as Guild[], ok: true };
       }
+      return { guilds: [], ok: false };
     } catch {
-      // ignore
+      return { guilds: [], ok: false };
     }
-    return [];
   }, []);
 
   /** Which guilds the user has Discord admin/manage perms for */
@@ -80,14 +92,14 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
     return ids;
   }, [guilds]);
 
-  const fetchMutuals = useCallback(async (guildList: Guild[], skipCache = false) => {
+  const fetchMutuals = useCallback(async (guildList: Guild[], skipCache = false): Promise<boolean> => {
     const ids = guildList.map((g) => g.id);
 
     if (!skipCache) {
       const cached = cache.get<string[]>(MUTUAL_CACHE_KEY);
       if (cached) {
         setMutualIds(new Set(cached));
-        return;
+        return true;
       }
     }
 
@@ -103,22 +115,27 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
         const mutuals: string[] = body.data.mutualIds;
         cache.set(MUTUAL_CACHE_KEY, mutuals, CACHE_TTL);
         setMutualIds(new Set(mutuals));
+        return true;
       } else {
+        // Bot API responded but unexpected shape — assume all mutual (generous)
         setMutualIds(new Set(ids));
+        return false;
       }
     } catch {
+      // Bot API unreachable — assume all mutual (generous) but flag error
       setMutualIds(new Set(ids));
+      return false;
     }
   }, []);
 
-  const fetchDashboardAccess = useCallback(async (guildList: Guild[], skipCache = false) => {
+  const fetchDashboardAccess = useCallback(async (guildList: Guild[], skipCache = false): Promise<boolean> => {
     const ids = guildList.map((g) => g.id);
 
     if (!skipCache) {
       const cached = cache.get<string[]>(ACCESS_CACHE_KEY);
       if (cached) {
         setDashboardAccessIds(new Set(cached));
-        return;
+        return true;
       }
     }
 
@@ -134,31 +151,63 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
         const accessible: string[] = body.data.accessibleGuildIds;
         cache.set(ACCESS_CACHE_KEY, accessible, CACHE_TTL);
         setDashboardAccessIds(new Set(accessible));
+        return true;
       } else {
         setDashboardAccessIds(new Set());
+        return false;
       }
     } catch {
+      // Bot API unreachable — flag error, don't cache empty result
       setDashboardAccessIds(new Set());
+      return false;
     }
   }, []);
 
-  /** Initial load */
-  useEffect(() => {
-    (async () => {
-      const guildList = await fetchGuilds();
+  /** Load all data, returns whether everything succeeded */
+  const loadAll = useCallback(
+    async (skipCache = false): Promise<boolean> => {
+      const { guilds: guildList, ok: guildsOk } = await fetchGuilds();
       setGuilds(guildList);
-      await Promise.all([fetchMutuals(guildList), fetchDashboardAccess(guildList)]);
+
+      const [mutualsOk, accessOk] = await Promise.all([fetchMutuals(guildList, skipCache), fetchDashboardAccess(guildList, skipCache)]);
+
+      const allOk = guildsOk && mutualsOk && accessOk;
+      setHadFetchError(!allOk);
+      return allOk;
+    },
+    [fetchGuilds, fetchMutuals, fetchDashboardAccess],
+  );
+
+  /** Initial load with auto-retry on failure */
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const ok = await loadAll();
+
+      // If the load had errors and we got no visible guilds, auto-retry
+      // (handles first-load failures due to bot startup, rate limits, etc.)
+      if (!ok && !cancelled && retryCountRef.current < MAX_AUTO_RETRIES) {
+        retryCountRef.current++;
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        if (!cancelled) {
+          await loadAll(true); // skip localStorage cache on retry
+        }
+      }
     })();
-  }, [fetchGuilds, fetchMutuals, fetchDashboardAccess]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadAll]);
 
   /** Refresh button handler — bypasses all caches */
   const handleRefresh = async () => {
     setIsRefreshing(true);
     cache.invalidate(MUTUAL_CACHE_KEY);
     cache.invalidate(ACCESS_CACHE_KEY);
-    const guildList = await fetchGuilds();
-    setGuilds(guildList);
-    await Promise.all([fetchMutuals(guildList, true), fetchDashboardAccess(guildList, true)]);
+    retryCountRef.current = 0;
+    await loadAll(true);
     setIsRefreshing(false);
   };
 
@@ -204,7 +253,22 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
           </button>
         </div>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-12 text-center">
-          <p className="text-zinc-400">You don&apos;t have permission to manage any servers with Heimdall.</p>
+          {hadFetchError ? (
+            <div className="space-y-3">
+              <p className="text-zinc-300">Could not load your servers — the bot may still be starting up.</p>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50">
+                <svg className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {isRefreshing ? "Retrying…" : "Try Again"}
+              </button>
+            </div>
+          ) : (
+            <p className="text-zinc-400">You don&apos;t have permission to manage any servers with Heimdall.</p>
+          )}
         </div>
       </div>
     );

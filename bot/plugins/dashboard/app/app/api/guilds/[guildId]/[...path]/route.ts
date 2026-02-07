@@ -98,6 +98,11 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
 
       const resolved = resolvePermissions(memberData, roleOverrides);
 
+      // If dashboard access is denied entirely, block all requests
+      if (resolved.denyAccess) {
+        return NextResponse.json({ error: "Dashboard access denied for your role" }, { status: 403 });
+      }
+
       if (!resolved.has(requiredAction)) {
         return NextResponse.json({ error: "You do not have permission to perform this action", requiredAction }, { status: 403 });
       }

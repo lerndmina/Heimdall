@@ -32,6 +32,8 @@ export interface ResolvedPermissions {
   getAll(): Record<string, boolean>;
   /** Check if the user has at least one allowed action in a category */
   hasAnyInCategory(categoryKey: string): boolean;
+  /** Whether access to the dashboard itself is denied via _deny_access override */
+  denyAccess: boolean;
 }
 
 /**
@@ -46,6 +48,14 @@ function toMap(input: Map<string, "allow" | "deny"> | Record<string, "allow" | "
  * Resolve effective permissions for a user given their member info and
  * the permission overrides for each of their roles.
  */
+/**
+ * Reserved override key — when set to "deny" on a role, the admin bypass
+ * is stripped for members holding that role (they are treated as non-admin
+ * for dashboard purposes). This lets guild owners lock admins out of the
+ * dashboard without revoking their Discord admin perms.
+ */
+export const DENY_ACCESS_KEY = "_deny_access";
+
 export function resolvePermissions(member: MemberInfo, roleOverridesList: RoleOverrides[]): ResolvedPermissions {
   // Build the full list of action keys from the registry
   const allActions: string[] = [];
@@ -65,17 +75,22 @@ export function resolvePermissions(member: MemberInfo, roleOverridesList: RoleOv
   // (a) Guild owner → allow everything, unconditionally
   if (member.isOwner) {
     for (const key of allActions) resolved[key] = true;
-    return createResult(resolved, categoryActions);
+    return createResult(resolved, categoryActions, false);
   }
 
   // Collect all override maps
   const overrideMaps = roleOverridesList.map((r) => toMap(r.overrides));
 
+  // Check if any of the user's role overrides deny dashboard access entirely.
+  // When _deny_access is "deny", the admin privilege is revoked for dashboard purposes.
+  const denyAccess = overrideMaps.some((m) => m.get(DENY_ACCESS_KEY) === "deny");
+  const effectiveAdmin = member.isAdministrator && !denyAccess;
+
   for (const actionKey of allActions) {
     const [categoryKey] = actionKey.split(".");
 
-    // Determine default: Administrators start with allow, others with deny
-    let defaultValue: boolean = member.isAdministrator;
+    // Determine default: Administrators start with allow (unless access denied), others with deny
+    let defaultValue: boolean = effectiveAdmin;
 
     // (c) Check action-level overrides across all roles
     let hasActionLevel = false;
@@ -121,11 +136,12 @@ export function resolvePermissions(member: MemberInfo, roleOverridesList: RoleOv
     resolved[actionKey] = defaultValue;
   }
 
-  return createResult(resolved, categoryActions);
+  return createResult(resolved, categoryActions, denyAccess);
 }
 
-function createResult(resolved: Record<string, boolean>, categoryActions: Record<string, string[]>): ResolvedPermissions {
+function createResult(resolved: Record<string, boolean>, categoryActions: Record<string, string[]>, denyAccess: boolean): ResolvedPermissions {
   return {
+    denyAccess,
     has(actionKey: string): boolean {
       return resolved[actionKey] === true;
     },

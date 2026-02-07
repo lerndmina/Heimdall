@@ -76,6 +76,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       hideDeniedFeatures: settingsData?.settings?.hideDeniedFeatures ?? false,
       isOwner: memberData.isOwner,
       isAdministrator: memberData.isAdministrator,
+      denyAccess: resolved.denyAccess,
     },
   });
 }

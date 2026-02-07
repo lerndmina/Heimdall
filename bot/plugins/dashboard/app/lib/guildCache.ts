@@ -4,6 +4,10 @@
  * Fetches guilds from the Discord API using the user's OAuth access token,
  * caches results in memory with a short TTL so permission/role changes
  * are reflected without requiring re-login.
+ *
+ * Concurrent requests for the same user are deduplicated — only one Discord
+ * API call is made and all callers share the result. This prevents rate-limit
+ * 403s when multiple proxy routes fire simultaneously (e.g. after a restart).
  */
 
 interface CachedGuild {
@@ -20,6 +24,9 @@ interface CacheEntry {
 
 /** In-memory cache keyed by userId */
 const guildCache = new Map<string, CacheEntry>();
+
+/** In-flight fetch promises keyed by userId — prevents duplicate Discord API calls */
+const inflightRequests = new Map<string, Promise<CachedGuild[]>>();
 
 /** Cache TTL — 2 minutes */
 const CACHE_TTL = 2 * 60_000;
@@ -39,22 +46,11 @@ function cleanup() {
 }
 
 /**
- * Get the user's Discord guilds, using cache when available.
- *
- * @param accessToken  The user's Discord OAuth access token (from JWT)
- * @param userId       The user's Discord ID (cache key)
- * @returns Array of guilds with id, name, icon, and raw permissions string
+ * Actually fetch guilds from Discord API (not deduplicated — internal use only).
  */
-export async function getUserGuilds(accessToken: string, userId: string): Promise<CachedGuild[]> {
-  cleanup();
-
-  // Check cache
+async function fetchGuildsFromDiscord(accessToken: string, userId: string): Promise<CachedGuild[]> {
   const cached = guildCache.get(userId);
-  if (cached && Date.now() < cached.expiresAt) {
-    return cached.guilds;
-  }
 
-  // Fetch fresh from Discord API
   try {
     const res = await fetch("https://discord.com/api/v10/users/@me/guilds", {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -81,6 +77,40 @@ export async function getUserGuilds(accessToken: string, userId: string): Promis
     if (cached) return cached.guilds;
     return [];
   }
+}
+
+/**
+ * Get the user's Discord guilds, using cache when available.
+ *
+ * Concurrent calls for the same user are deduplicated so only one
+ * Discord API request is made — all callers share the same result.
+ *
+ * @param accessToken  The user's Discord OAuth access token (from JWT)
+ * @param userId       The user's Discord ID (cache key)
+ * @returns Array of guilds with id, name, icon, and raw permissions string
+ */
+export async function getUserGuilds(accessToken: string, userId: string): Promise<CachedGuild[]> {
+  cleanup();
+
+  // Check cache first
+  const cached = guildCache.get(userId);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.guilds;
+  }
+
+  // If there's already an in-flight request for this user, piggy-back on it
+  const inflight = inflightRequests.get(userId);
+  if (inflight) {
+    return inflight;
+  }
+
+  // Start a new fetch and register it so concurrent callers share it
+  const promise = fetchGuildsFromDiscord(accessToken, userId).finally(() => {
+    inflightRequests.delete(userId);
+  });
+
+  inflightRequests.set(userId, promise);
+  return promise;
 }
 
 /**

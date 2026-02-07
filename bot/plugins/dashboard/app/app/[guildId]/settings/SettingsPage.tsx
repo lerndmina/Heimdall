@@ -4,10 +4,13 @@
  * Two sections:
  * 1. General settings (hideDeniedFeatures toggle)
  * 2. Role permissions editor (role list + Discord-style permission grid)
+ *
+ * Changes are batched locally. A Discord-style save bar appears at the bottom
+ * when there are unsaved changes, preventing navigation until saved or cancelled.
  */
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import Toggle from "@/components/ui/Toggle";
 import Combobox from "@/components/ui/Combobox";
@@ -15,7 +18,9 @@ import TriStateSlider, { type TriState } from "@/components/ui/TriStateSlider";
 import Spinner from "@/components/ui/Spinner";
 import { fetchApi } from "@/lib/api";
 import { permissionCategories } from "@/lib/permissionDefs";
+import { DENY_ACCESS_KEY } from "@/lib/permissions";
 import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useUnsavedChanges } from "@/components/providers/UnsavedChangesProvider";
 
 interface Role {
   id: string;
@@ -51,6 +56,31 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
+  // ── Dirty-state tracking ─────────────────────────────────
+  // Pending local overrides that haven't been saved yet (keyed by roleId)
+  const [pendingOverrides, setPendingOverrides] = useState<Map<string, Record<string, "allow" | "deny">>>(new Map());
+  // Snapshot of what the server has (keyed by roleId) — set after every load/save
+  const savedOverridesRef = useRef<Map<string, Record<string, "allow" | "deny">>>(new Map());
+
+  const hasPendingChanges = pendingOverrides.size > 0;
+  const { setDirty } = useUnsavedChanges();
+
+  // Sync dirty state to the global provider (for sidebar nav blocking)
+  useEffect(() => {
+    setDirty(hasPendingChanges);
+    return () => setDirty(false);
+  }, [hasPendingChanges, setDirty]);
+
+  // Block browser navigation (close tab, refresh) when dirty
+  useEffect(() => {
+    if (!hasPendingChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasPendingChanges]);
+
   // ── Load data ────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -62,8 +92,18 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
       ]);
 
       if (rolesRes.success && rolesRes.data) setRoles(rolesRes.data.roles);
-      if (permsRes.success && permsRes.data) setPermDocs(permsRes.data.permissions);
+      if (permsRes.success && permsRes.data) {
+        setPermDocs(permsRes.data.permissions);
+        // Snapshot the saved state
+        const snap = new Map<string, Record<string, "allow" | "deny">>();
+        for (const doc of permsRes.data.permissions) {
+          snap.set(doc.discordRoleId, { ...doc.overrides });
+        }
+        savedOverridesRef.current = snap;
+      }
       if (settingsRes.success && settingsRes.data) setHideDeniedFeatures(settingsRes.data.settings.hideDeniedFeatures);
+      // Clear any pending changes on fresh load
+      setPendingOverrides(new Map());
     } catch {
       showToast("Failed to load settings", "error");
     } finally {
@@ -82,7 +122,9 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
   }
 
   const selectedDoc = permDocs.find((d) => d.discordRoleId === selectedRoleId);
-  const overrides = selectedDoc?.overrides ?? {};
+  // Merge saved overrides with any pending (unsaved) changes for the selected role
+  const savedOverrides = selectedDoc?.overrides ?? {};
+  const overrides = pendingOverrides.has(selectedRoleId) ? pendingOverrides.get(selectedRoleId)! : savedOverrides;
 
   function getActionState(categoryKey: string, actionKey: string): TriState {
     const fullKey = `${categoryKey}.${actionKey}`;
@@ -127,40 +169,75 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
     return { state: "inherit", mixed: false };
   }
 
-  // ── Save overrides ──────────────────────────────────────
-  async function saveOverrides(roleId: string, newOverrides: Record<string, "allow" | "deny">) {
+  // ── Stage overrides locally (no API call) ────────────────
+  function stageOverrides(roleId: string, newOverrides: Record<string, "allow" | "deny">) {
+    // Check if new overrides actually differ from what's saved
+    const saved = savedOverridesRef.current.get(roleId) ?? {};
+    const isDifferent = JSON.stringify(newOverrides) !== JSON.stringify(saved);
+
+    setPendingOverrides((prev) => {
+      const next = new Map(prev);
+      if (isDifferent) {
+        next.set(roleId, newOverrides);
+      } else {
+        next.delete(roleId);
+      }
+      return next;
+    });
+  }
+
+  // ── Save ALL pending changes to the API ─────────────────
+  async function saveAllPending() {
+    if (pendingOverrides.size === 0) return;
     setSaving(true);
-    const role = roles.find((r) => r.id === roleId);
     try {
-      const res = await fetchApi(guildId, `dashboard-permissions/${roleId}`, {
-        method: "PUT",
-        body: JSON.stringify({ roleName: role?.name ?? roleId, overrides: newOverrides }),
-      });
-      if (res.success) {
-        setPermDocs((prev) => {
-          const idx = prev.findIndex((d) => d.discordRoleId === roleId);
-          const updated: PermissionDoc = {
-            guildId,
-            discordRoleId: roleId,
-            roleName: role?.name ?? roleId,
-            overrides: newOverrides,
-          };
-          if (idx >= 0) {
-            const copy = [...prev];
-            copy[idx] = updated;
-            return copy;
-          }
-          return [...prev, updated];
-        });
+      const entries = Array.from(pendingOverrides.entries());
+      const results = await Promise.all(
+        entries.map(([roleId, newOverrides]) => {
+          const role = roles.find((r) => r.id === roleId);
+          return fetchApi(guildId, `dashboard-permissions/${roleId}`, {
+            method: "PUT",
+            body: JSON.stringify({ roleName: role?.name ?? roleId, overrides: newOverrides }),
+          }).then((res) => ({ roleId, newOverrides, roleName: role?.name ?? roleId, success: res.success }));
+        }),
+      );
+
+      let allOk = true;
+      for (const { roleId, newOverrides, roleName, success } of results) {
+        if (success) {
+          // Update permDocs + snapshot
+          setPermDocs((prev) => {
+            const idx = prev.findIndex((d) => d.discordRoleId === roleId);
+            const updated: PermissionDoc = { guildId, discordRoleId: roleId, roleName, overrides: newOverrides };
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = updated;
+              return copy;
+            }
+            return [...prev, updated];
+          });
+          savedOverridesRef.current.set(roleId, { ...newOverrides });
+        } else {
+          allOk = false;
+        }
+      }
+
+      if (allOk) {
+        setPendingOverrides(new Map());
         showToast("Permissions saved", "success");
       } else {
-        showToast("Failed to save permissions", "error");
+        showToast("Some permissions failed to save", "error");
       }
     } catch {
       showToast("Failed to save permissions", "error");
     } finally {
       setSaving(false);
     }
+  }
+
+  // ── Cancel all pending changes ──────────────────────────
+  function cancelPending() {
+    setPendingOverrides(new Map());
   }
 
   function setActionState(categoryKey: string, actionKey: string, state: TriState) {
@@ -171,7 +248,7 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
     } else {
       newOverrides[fullKey] = state;
     }
-    saveOverrides(selectedRoleId, newOverrides);
+    stageOverrides(selectedRoleId, newOverrides);
   }
 
   function setCategoryState(categoryKey: string, state: TriState) {
@@ -191,7 +268,7 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
     } else {
       newOverrides[categoryKey] = state;
     }
-    saveOverrides(selectedRoleId, newOverrides);
+    stageOverrides(selectedRoleId, newOverrides);
   }
 
   // ── Delete role overrides ────────────────────────────────
@@ -335,12 +412,24 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
                   <Combobox
                     options={availableRoles.map((r) => ({ value: r.id, label: r.name }))}
                     value=""
-                    onChange={(roleId) => {
+                    onChange={async (roleId) => {
                       setSelectedRoleId(roleId);
-                      // Create empty overrides for the role
+                      // Create empty overrides for the role on the server
                       const role = roles.find((r) => r.id === roleId);
                       if (role && !configuredRoleIds.has(roleId)) {
-                        saveOverrides(roleId, {});
+                        try {
+                          const res = await fetchApi(guildId, `dashboard-permissions/${roleId}`, {
+                            method: "PUT",
+                            body: JSON.stringify({ roleName: role.name, overrides: {} }),
+                          });
+                          if (res.success) {
+                            const doc: PermissionDoc = { guildId, discordRoleId: roleId, roleName: role.name, overrides: {} };
+                            setPermDocs((prev) => [...prev, doc]);
+                            savedOverridesRef.current.set(roleId, {});
+                          }
+                        } catch {
+                          showToast("Failed to add role", "error");
+                        }
                       }
                     }}
                     placeholder="Select a role…"
@@ -356,10 +445,15 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
                     const role = roles.find((r) => r.id === doc.discordRoleId);
                     const isSelected = doc.discordRoleId === selectedRoleId;
                     return (
-                      <button
+                      <div
                         key={doc.discordRoleId}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setSelectedRoleId(doc.discordRoleId)}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition ${
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") setSelectedRoleId(doc.discordRoleId);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition cursor-pointer ${
                           isSelected ? "bg-primary-500/10 text-primary-400" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
                         }`}>
                         <div className="flex items-center gap-2">
@@ -382,7 +476,7 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
                             />
                           </svg>
                         </button>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -396,11 +490,24 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {saving && (
-                      <div className="flex items-center gap-2 text-xs text-zinc-500">
-                        <Spinner /> Saving…
-                      </div>
-                    )}
+                    {/* Deny Dashboard Access toggle */}
+                    <div className="rounded-lg border border-red-900/50 bg-red-950/20 px-4 py-3">
+                      <Toggle
+                        label="Deny Dashboard Access"
+                        description="When enabled, members with only this role cannot access the dashboard — even if the role has Discord Administrator permissions. Other role overrides can still grant access."
+                        checked={overrides[DENY_ACCESS_KEY] === "deny"}
+                        onChange={(checked) => {
+                          const newOverrides = { ...overrides };
+                          if (checked) {
+                            newOverrides[DENY_ACCESS_KEY] = "deny";
+                          } else {
+                            delete (newOverrides as Record<string, string>)[DENY_ACCESS_KEY];
+                          }
+                          stageOverrides(selectedRoleId, newOverrides);
+                        }}
+                      />
+                    </div>
+
                     {permissionCategories.map((cat) => {
                       const isExpanded = expandedCategories.has(cat.key);
                       const { state: catState, mixed } = getCategoryState(cat.key);
@@ -448,6 +555,29 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Bottom spacer so content isn't hidden behind the save bar */}
+      {hasPendingChanges && <div className="h-20" />}
+
+      {/* Discord-style save bar */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-50 flex items-center justify-between border-t border-zinc-700 bg-zinc-900/95 px-6 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] backdrop-blur transition-transform duration-300 ease-out ${
+          hasPendingChanges ? "translate-y-0" : "translate-y-full"
+        }`}>
+        <p className="text-sm text-zinc-300">Careful — you have unsaved changes!</p>
+        <div className="flex items-center gap-3">
+          <button onClick={cancelPending} disabled={saving} className="rounded-md px-4 py-1.5 text-sm font-medium text-zinc-300 transition hover:text-zinc-100 hover:underline disabled:opacity-50">
+            Reset
+          </button>
+          <button
+            onClick={saveAllPending}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50">
+            {saving && <Spinner />}
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

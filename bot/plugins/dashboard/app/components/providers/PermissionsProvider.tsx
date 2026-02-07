@@ -15,6 +15,8 @@ export interface PermissionsContextValue {
   isOwner: boolean;
   /** Whether the current user has Discord Administrator */
   isAdministrator: boolean;
+  /** Whether dashboard access is denied via _deny_access override */
+  denyAccess: boolean;
   /** Whether permissions have been loaded */
   loaded: boolean;
   /** Force refresh permissions from the server */
@@ -39,6 +41,7 @@ export default function PermissionsProvider({ guildId, children }: PermissionsPr
   const [hideDeniedFeatures, setHideDeniedFeatures] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [isAdministrator, setIsAdministrator] = useState(false);
+  const [denyAccess, setDenyAccess] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -51,6 +54,7 @@ export default function PermissionsProvider({ guildId, children }: PermissionsPr
         setHideDeniedFeatures(json.data.hideDeniedFeatures ?? false);
         setIsOwner(json.data.isOwner ?? false);
         setIsAdministrator(json.data.isAdministrator ?? false);
+        setDenyAccess(json.data.denyAccess ?? false);
       }
     } catch {
       // Silently fail — user will see default (no permissions)
@@ -64,5 +68,5 @@ export default function PermissionsProvider({ guildId, children }: PermissionsPr
     refresh();
   }, [refresh]);
 
-  return <PermissionsContext.Provider value={{ permissions, hideDeniedFeatures, isOwner, isAdministrator, loaded, refresh }}>{children}</PermissionsContext.Provider>;
+  return <PermissionsContext.Provider value={{ permissions, hideDeniedFeatures, isOwner, isAdministrator, denyAccess, loaded, refresh }}>{children}</PermissionsContext.Provider>;
 }
