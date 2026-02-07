@@ -1,12 +1,13 @@
 /**
  * POST /api/guilds/:guildId/minecraft/test-rcon
  *
- * Test RCON connection to the Minecraft server (placeholder).
+ * Test RCON connection to the Minecraft server.
  */
 
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { MinecraftApiDependencies } from "./index.js";
 import MinecraftConfig from "../models/MinecraftConfig.js";
+import { RconService } from "../services/RconService.js";
 
 export function createRconRoutes(deps: MinecraftApiDependencies): Router {
   const router = Router({ mergeParams: true });
@@ -24,14 +25,28 @@ export function createRconRoutes(deps: MinecraftApiDependencies): Router {
         return;
       }
 
-      // RCON test is a placeholder — actual implementation requires a
-      // Minecraft RCON library and network connectivity to the MC server.
+      if (!config.rconPassword) {
+        res.status(400).json({
+          success: false,
+          error: { code: "NOT_CONFIGURED", message: "RCON password is not set" },
+        });
+        return;
+      }
+
+      const conn = {
+        host: config.rconHost || config.serverHost || "localhost",
+        port: config.rconPort || 25575,
+        password: config.rconPassword,
+      };
+
+      const result = await RconService.testConnection(conn);
+
       res.json({
-        success: true,
+        success: result.success,
         data: {
-          message: "RCON test is not yet implemented. Check server connectivity manually.",
-          host: config.rconHost,
-          port: config.rconPort,
+          message: result.message,
+          host: conn.host,
+          port: conn.port,
         },
       });
     } catch (error) {

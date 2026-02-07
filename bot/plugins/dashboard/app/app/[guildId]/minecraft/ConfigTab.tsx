@@ -14,11 +14,20 @@ import Spinner from "@/components/ui/Spinner";
 import TextInput from "@/components/ui/TextInput";
 import NumberInput from "@/components/ui/NumberInput";
 import Toggle from "@/components/ui/Toggle";
+import DayTimePicker from "@/components/ui/DayTimePicker";
+import Combobox from "@/components/ui/Combobox";
 import { fetchApi } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+interface RoleMappingEntry {
+  discordRoleId: string;
+  discordRoleName: string;
+  minecraftGroup: string;
+  enabled: boolean;
+}
 
 interface MinecraftConfig {
   guildId: string;
@@ -27,6 +36,7 @@ interface MinecraftConfig {
   whitelistScheduleType: "immediate" | "delay" | "scheduled_day";
   whitelistDelayMinutes: number;
   whitelistScheduledDay: number;
+  whitelistScheduledHour: number;
   serverName: string;
   serverIp: string;
   serverPort: number;
@@ -38,6 +48,10 @@ interface MinecraftConfig {
   maxPlayersPerUser: number;
   requireDiscordLink: boolean;
   enableRoleSync: boolean;
+  roleSyncMode: "off" | "on_join" | "rcon";
+  roleMappings: RoleMappingEntry[];
+  rconAddCommand: string;
+  rconRemoveCommand: string;
   enableMinecraftPlugin: boolean;
   enableAutoRevoke: boolean;
   enableAutoRestore: boolean;
@@ -49,6 +63,7 @@ const DEFAULT_CONFIG: Omit<MinecraftConfig, "guildId"> = {
   whitelistScheduleType: "immediate",
   whitelistDelayMinutes: 0,
   whitelistScheduledDay: 0,
+  whitelistScheduledHour: 0,
   serverName: "",
   serverIp: "",
   serverPort: 25565,
@@ -60,6 +75,10 @@ const DEFAULT_CONFIG: Omit<MinecraftConfig, "guildId"> = {
   maxPlayersPerUser: 1,
   requireDiscordLink: false,
   enableRoleSync: false,
+  roleSyncMode: "off",
+  roleMappings: [],
+  rconAddCommand: "lp user {player} parent add {group}",
+  rconRemoveCommand: "lp user {player} parent remove {group}",
   enableMinecraftPlugin: false,
   enableAutoRevoke: false,
   enableAutoRestore: false,
@@ -181,6 +200,7 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
   if (wizardOpen) {
     return (
       <ConfigWizard
+        guildId={guildId}
         draft={draft}
         setDraft={setDraft}
         step={wizardStep}
@@ -258,7 +278,7 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
                     ? "Immediately"
                     : config.whitelistScheduleType === "delay"
                       ? `After ${config.whitelistDelayMinutes} minute(s)`
-                      : `Every ${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][config.whitelistScheduledDay]}`
+                      : `Every ${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][config.whitelistScheduledDay]} at ${String(Math.floor((config.whitelistScheduledHour ?? 0) / 60)).padStart(2, "0")}:${String((config.whitelistScheduledHour ?? 0) % 60).padStart(2, "0")} UTC`
                 }
               />
             )}
@@ -276,7 +296,13 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
         <CardContent>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <FieldDisplay label="Role Sync">
-              <StatusBadge variant={config.enableRoleSync ? "success" : "neutral"}>{config.enableRoleSync ? "Enabled" : "Disabled"}</StatusBadge>
+              <StatusBadge variant={config.enableRoleSync ? "success" : "neutral"}>
+                {config.roleSyncMode === "rcon"
+                  ? `RCON (${config.roleMappings?.length ?? 0} mapping${(config.roleMappings?.length ?? 0) === 1 ? "" : "s"})`
+                  : config.roleSyncMode === "on_join"
+                    ? `On Join (${config.roleMappings?.length ?? 0} mapping${(config.roleMappings?.length ?? 0) === 1 ? "" : "s"})`
+                    : "Disabled"}
+              </StatusBadge>
             </FieldDisplay>
             <FieldDisplay label="Auto Revoke on Leave">
               <StatusBadge variant={config.enableAutoRevoke ? "warning" : "neutral"}>{config.enableAutoRevoke ? "Enabled" : "Disabled"}</StatusBadge>
@@ -323,6 +349,7 @@ const STEPS = [
 ] as const;
 
 interface WizardProps {
+  guildId: string;
   draft: Omit<MinecraftConfig, "guildId">;
   setDraft: React.Dispatch<React.SetStateAction<Omit<MinecraftConfig, "guildId">>>;
   step: number;
@@ -334,7 +361,7 @@ interface WizardProps {
   isEdit: boolean;
 }
 
-function ConfigWizard({ draft, setDraft, step, setStep, saving, saveError, onSave, onCancel, isEdit }: WizardProps) {
+function ConfigWizard({ guildId, draft, setDraft, step, setStep, saving, saveError, onSave, onCancel, isEdit }: WizardProps) {
   const update = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
   const canNext = () => {
@@ -379,7 +406,7 @@ function ConfigWizard({ draft, setDraft, step, setStep, saving, saveError, onSav
         <CardContent>
           {step === 0 && <StepServer draft={draft} update={update} />}
           {step === 1 && <StepWhitelist draft={draft} update={update} />}
-          {step === 2 && <StepAdvanced draft={draft} update={update} />}
+          {step === 2 && <StepAdvanced guildId={guildId} draft={draft} update={update} />}
           {step === 3 && <StepReview draft={draft} />}
         </CardContent>
       </Card>
@@ -459,8 +486,6 @@ function StepServer({ draft, update }: StepProps) {
 }
 
 function StepWhitelist({ draft, update }: StepProps) {
-  const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
   return (
     <div className="space-y-5">
       <Toggle
@@ -474,11 +499,13 @@ function StepWhitelist({ draft, update }: StepProps) {
         <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
           <p className="text-sm font-medium text-zinc-300">Whitelist Schedule</p>
           <div className="space-y-2">
-            {([
-              { value: "immediate" as const, label: "Immediately", desc: "Whitelist as soon as they link their account" },
-              { value: "delay" as const, label: "After a delay", desc: "Wait a set amount of time before whitelisting" },
-              { value: "scheduled_day" as const, label: "On a scheduled day", desc: "Whitelist on the next occurrence of a chosen day" },
-            ] as const).map((opt) => (
+            {(
+              [
+                { value: "immediate" as const, label: "Immediately", desc: "Whitelist as soon as they link their account" },
+                { value: "delay" as const, label: "After a delay", desc: "Wait a set amount of time before whitelisting" },
+                { value: "scheduled_day" as const, label: "On a scheduled day", desc: "Whitelist on the next occurrence of a chosen day" },
+              ] as const
+            ).map((opt) => (
               <label
                 key={opt.value}
                 className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
@@ -511,37 +538,29 @@ function StepWhitelist({ draft, update }: StepProps) {
               />
               {draft.whitelistDelayMinutes >= 60 && (
                 <p className="mt-1 text-xs text-zinc-500">
-                  ≈ {draft.whitelistDelayMinutes >= 1440
-                    ? `${(draft.whitelistDelayMinutes / 1440).toFixed(1)} day(s)`
-                    : `${(draft.whitelistDelayMinutes / 60).toFixed(1)} hour(s)`}
+                  ≈ {draft.whitelistDelayMinutes >= 1440 ? `${(draft.whitelistDelayMinutes / 1440).toFixed(1)} day(s)` : `${(draft.whitelistDelayMinutes / 60).toFixed(1)} hour(s)`}
                 </p>
               )}
             </div>
           )}
 
           {draft.whitelistScheduleType === "scheduled_day" && (
-            <div className="pl-6 space-y-1.5">
-              <label className="block text-sm font-medium text-zinc-200">Day of the Week</label>
-              <p className="text-xs text-zinc-500">Players registered before this day will be whitelisted on the next occurrence</p>
-              <select
-                value={draft.whitelistScheduledDay}
-                onChange={(e) => update("whitelistScheduledDay", Number(e.target.value))}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
-                {DAYS.map((day, i) => (
-                  <option key={day} value={i}>
-                    {day}
-                  </option>
-                ))}
-              </select>
+            <div className="pl-6">
+              <DayTimePicker
+                label="Day & Time"
+                description="Players registered before this day will be whitelisted on the next occurrence"
+                day={draft.whitelistScheduledDay}
+                timeMinutes={draft.whitelistScheduledHour}
+                onDayChange={(v) => update("whitelistScheduledDay", v)}
+                onTimeChange={(v) => update("whitelistScheduledHour", v)}
+              />
             </div>
           )}
         </div>
       )}
 
       {!draft.autoWhitelist && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 px-4 py-3 text-xs text-zinc-400">
-          💡 With auto-whitelist off, all whitelist requests require manual staff approval.
-        </div>
+        <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 px-4 py-3 text-xs text-zinc-400">💡 With auto-whitelist off, all whitelist requests require manual staff approval.</div>
       )}
 
       <NumberInput
@@ -557,7 +576,43 @@ function StepWhitelist({ draft, update }: StepProps) {
   );
 }
 
-function StepAdvanced({ draft, update }: StepProps) {
+function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string }) {
+  // Fetch guild roles when role sync is enabled
+  const [guildRoles, setGuildRoles] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+
+  useEffect(() => {
+    if (draft.roleSyncMode === "off") return;
+    setRolesLoading(true);
+    fetchApi<{ roles: { id: string; name: string; color: string }[] }>(guildId, "roles")
+      .then((res) => {
+        if (res.success && res.data) setGuildRoles(res.data.roles);
+      })
+      .finally(() => setRolesLoading(false));
+  }, [draft.roleSyncMode, guildId]);
+
+  const addMapping = () => {
+    update("roleMappings", [...draft.roleMappings, { discordRoleId: "", discordRoleName: "", minecraftGroup: "", enabled: true }]);
+  };
+
+  const removeMapping = (index: number) => {
+    update(
+      "roleMappings",
+      draft.roleMappings.filter((_, i) => i !== index),
+    );
+  };
+
+  const updateMapping = (index: number, field: keyof RoleMappingEntry, value: string | boolean) => {
+    const updated = [...draft.roleMappings];
+    updated[index] = { ...updated[index]!, [field]: value };
+    // When selecting a role, also store the name
+    if (field === "discordRoleId") {
+      const role = guildRoles.find((r) => r.id === value);
+      if (role) updated[index]!.discordRoleName = role.name;
+    }
+    update("roleMappings", updated);
+  };
+
   return (
     <div className="space-y-6">
       {/* Leave / Rejoin */}
@@ -583,12 +638,133 @@ function StepAdvanced({ draft, update }: StepProps) {
       <div>
         <p className="mb-3 text-sm font-medium text-zinc-300">Role Sync</p>
         <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
-          <Toggle
-            label="Enable Role Sync"
-            description="Sync Discord roles to Minecraft permission groups on player login"
-            checked={draft.enableRoleSync}
-            onChange={(v) => update("enableRoleSync", v)}
-          />
+          <div>
+            <p className="text-sm font-medium text-zinc-200">Role Sync Mode</p>
+            <p className="text-xs text-zinc-500 mb-3">Choose how Discord roles are synced to Minecraft permission groups</p>
+            <div className="space-y-2">
+              {[
+                { value: "off" as const, label: "Disabled", desc: "No role synchronization" },
+                { value: "on_join" as const, label: "On Join (Plugin)", desc: "The Java plugin syncs roles via LuckPerms when a player connects" },
+                { value: "rcon" as const, label: "Immediately (RCON)", desc: "The bot sends RCON commands to sync roles as soon as Discord roles change" },
+              ].map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
+                    draft.roleSyncMode === opt.value ? "border-primary-500 bg-primary-600/10" : "border-zinc-700 hover:border-zinc-600"
+                  }`}>
+                  <input
+                    type="radio"
+                    name="roleSyncMode"
+                    checked={draft.roleSyncMode === opt.value}
+                    onChange={() => {
+                      update("roleSyncMode", opt.value);
+                      update("enableRoleSync", opt.value !== "off");
+                      if (opt.value === "off") update("roleMappings", []);
+                    }}
+                    className="mt-0.5 accent-primary-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-zinc-200">{opt.label}</p>
+                    <p className="text-xs text-zinc-500">{opt.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {draft.roleSyncMode === "rcon" && !draft.rconEnabled && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+              ⚠️ RCON must be enabled for immediate role sync. Enable RCON in the section below.
+            </div>
+          )}
+
+          {/* Role Mapping Table */}
+          {draft.roleSyncMode !== "off" && (
+            <div className="space-y-3 pt-2">
+              {/* Header */}
+              <div className="grid grid-cols-[1fr_1fr_auto] gap-3 px-1">
+                <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Discord Role</p>
+                <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Minecraft Group</p>
+                <div className="w-8" />
+              </div>
+
+              {/* Mappings */}
+              {draft.roleMappings.map((mapping, i) => (
+                <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center">
+                  {/* Discord Role Combobox */}
+                  <Combobox
+                    options={guildRoles.map((r) => ({ value: r.id, label: r.name }))}
+                    value={mapping.discordRoleId}
+                    onChange={(v) => updateMapping(i, "discordRoleId", v)}
+                    placeholder="Select a role…"
+                    searchPlaceholder="Search roles…"
+                    emptyMessage="No roles found."
+                    loading={rolesLoading}
+                  />
+
+                  {/* Minecraft Group Text Input */}
+                  <input
+                    type="text"
+                    value={mapping.minecraftGroup}
+                    onChange={(e) => updateMapping(i, "minecraftGroup", e.target.value)}
+                    placeholder="e.g. vip, admin, member"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                  />
+
+                  {/* Remove Button */}
+                  <button
+                    onClick={() => removeMapping(i)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400"
+                    title="Remove mapping">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+
+              {/* Add Button */}
+              <button
+                onClick={addMapping}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-400 transition hover:border-primary-500 hover:text-primary-400">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Role Mapping
+              </button>
+
+              {draft.roleMappings.length === 0 && <p className="text-xs text-zinc-500">No role mappings configured. Add one to map a Discord role to a Minecraft permission group.</p>}
+            </div>
+          )}
+
+          {/* RCON Command Templates — only shown in RCON mode */}
+          {draft.roleSyncMode === "rcon" && (
+            <div className="space-y-3 pt-2 border-t border-zinc-700/50">
+              <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">RCON Command Templates</p>
+              <p className="text-xs text-zinc-500">
+                Use <code className="text-zinc-400">{"{player}"}</code> and <code className="text-zinc-400">{"{group}"}</code> as placeholders.
+              </p>
+              <TextInput
+                label="Add Group Command"
+                description="Command to add a permission group to a player"
+                value={draft.rconAddCommand}
+                onChange={(v) => update("rconAddCommand", v)}
+                placeholder="lp user {player} parent add {group}"
+              />
+              <TextInput
+                label="Remove Group Command"
+                description="Command to remove a permission group from a player"
+                value={draft.rconRemoveCommand}
+                onChange={(v) => update("rconRemoveCommand", v)}
+                placeholder="lp user {player} parent remove {group}"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -649,7 +825,7 @@ function StepReview({ draft }: { draft: Omit<MinecraftConfig, "guildId"> }) {
                   ? "Immediately"
                   : draft.whitelistScheduleType === "delay"
                     ? `After ${draft.whitelistDelayMinutes} minute(s)`
-                    : `Every ${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][draft.whitelistScheduledDay]}`
+                    : `Every ${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][draft.whitelistScheduledDay]} at ${String(Math.floor(draft.whitelistScheduledHour / 60)).padStart(2, "0")}:${String(draft.whitelistScheduledHour % 60).padStart(2, "0")} UTC`
               }
             />
           )}
@@ -659,7 +835,26 @@ function StepReview({ draft }: { draft: Omit<MinecraftConfig, "guildId"> }) {
         <ReviewSection title="Advanced">
           <ReviewRow label="Auto Revoke on Leave" value={draft.enableAutoRevoke ? "Yes" : "No"} />
           <ReviewRow label="Auto Restore on Rejoin" value={draft.enableAutoRestore ? "Yes" : "No"} />
-          <ReviewRow label="Role Sync" value={draft.enableRoleSync ? "Yes" : "No"} />
+          <ReviewRow
+            label="Role Sync"
+            value={
+              draft.roleSyncMode === "rcon"
+                ? `RCON — Immediate (${draft.roleMappings.length} mapping${draft.roleMappings.length === 1 ? "" : "s"})`
+                : draft.roleSyncMode === "on_join"
+                  ? `On Join — Plugin (${draft.roleMappings.length} mapping${draft.roleMappings.length === 1 ? "" : "s"})`
+                  : "Disabled"
+            }
+          />
+          {draft.roleSyncMode !== "off" && draft.roleMappings.length > 0 && (
+            <div className="mt-2 space-y-1 rounded border border-zinc-700/50 bg-zinc-900/50 p-2">
+              {draft.roleMappings.map((m, i) => (
+                <div key={i} className="flex items-center justify-between text-xs">
+                  <span className="text-zinc-400">{m.discordRoleName || "Unknown Role"}</span>
+                  <span className="font-mono text-zinc-300">→ {m.minecraftGroup || "—"}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <ReviewRow label="RCON" value={draft.rconEnabled ? `${draft.rconHost || draft.serverIp}:${draft.rconPort}` : "Disabled"} />
           <ReviewRow label="Cache Timeout" value={`${draft.cacheTimeout}s`} />
         </ReviewSection>

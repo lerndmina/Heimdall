@@ -9,6 +9,8 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import type { MinecraftApiDependencies } from "./index.js";
 import MinecraftConfig from "../models/MinecraftConfig.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
+import { RconService } from "../services/RconService.js";
+import { RoleSyncService } from "../services/RoleSyncService.js";
 import { createLogger } from "../../../src/core/Logger.js";
 
 const log = createLogger("minecraft:api:connection");
@@ -87,11 +89,44 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
             const syncResult = await deps.roleSyncService.calculateRoleSync(guildId as string, player._id.toString(), currentGroups || []);
 
             if (syncResult) {
-              roleSync = {
-                enabled: syncResult.enabled,
-                targetGroups: syncResult.targetGroups,
-                managedGroups: syncResult.managedGroups,
-              };
+              const mode = config.roleSync.mode || "on_join";
+
+              if (mode === "rcon") {
+                // Bot handles role sync via RCON — tell the plugin NOT to sync
+                roleSync = { enabled: false };
+
+                // Fire RCON commands asynchronously (don't block the response)
+                if (syncResult.operation && (syncResult.operation.groupsAdded.length > 0 || syncResult.operation.groupsRemoved.length > 0)) {
+                  RconService.applyRoleSyncViaRcon(
+                    guildId as string,
+                    username,
+                    syncResult.operation.groupsAdded,
+                    syncResult.operation.groupsRemoved,
+                  )
+                    .then((result) => {
+                      if (result.success) {
+                        log.info(`RCON role sync for ${username}: +${syncResult.operation!.groupsAdded.join(",")} -${syncResult.operation!.groupsRemoved.join(",")}`);
+                      } else {
+                        log.error(`RCON role sync failed for ${username}:`, result.results);
+                      }
+                      // Log the operation regardless
+                      return RoleSyncService.logRoleSync(guildId as string, syncResult.operation!);
+                    })
+                    .catch((err) => log.error("RCON role sync error:", err));
+                }
+              } else {
+                // "on_join" mode — Java plugin handles sync via LuckPerms
+                roleSync = {
+                  enabled: syncResult.enabled,
+                  targetGroups: syncResult.targetGroups,
+                  managedGroups: syncResult.managedGroups,
+                };
+
+                // Log the operation if there were changes
+                if (syncResult.operation) {
+                  RoleSyncService.logRoleSync(guildId as string, syncResult.operation).catch((err) => log.error("Role sync log error:", err));
+                }
+              }
             }
           } catch (error) {
             log.error("Role sync calculation failed:", error);

@@ -294,6 +294,39 @@ export class ApiManager {
       res.json({ success: true, data: { channels } });
     });
 
+    // Guild roles — for role pickers in the dashboard
+    this.app.get("/api/guilds/:guildId/roles", (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { guildId } = req.params;
+      if (!this.client) {
+        res.status(503).json({ success: false, error: "Bot not ready" });
+        return;
+      }
+
+      const guild = this.client.guilds.cache.get(guildId);
+      if (!guild) {
+        res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Guild not found" } });
+        return;
+      }
+
+      const roles = guild.roles.cache
+        .filter((r) => r.id !== guild.id) // exclude @everyone
+        .sort((a, b) => b.position - a.position) // highest first
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          color: r.hexColor,
+          position: r.position,
+        }));
+
+      res.json({ success: true, data: { roles } });
+    });
+
     this.setupErrorHandling();
 
     return new Promise((resolve) => {

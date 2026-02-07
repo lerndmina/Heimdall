@@ -46,6 +46,7 @@ const MinecraftConfigSchema = new Schema(
       type: { type: String, enum: ["immediate", "delay", "scheduled_day"], default: "immediate" },
       delayMinutes: { type: Number, default: 0, min: 0 },
       scheduledDay: { type: Number, default: 0, min: 0, max: 6 },
+      scheduledHour: { type: Number, default: 0, min: 0, max: 1439 },
     },
     maxPlayersPerUser: { type: Number, default: 1, min: 1, max: 10 },
 
@@ -83,7 +84,12 @@ const MinecraftConfigSchema = new Schema(
     // Role sync
     roleSync: {
       enabled: { type: Boolean, default: false },
+      /** 'on_join' = Java plugin handles via LuckPerms on login, 'rcon' = Bot sends RCON commands immediately */
+      mode: { type: String, enum: ["on_join", "rcon"], default: "on_join" },
       enableCaching: { type: Boolean, default: true },
+      /** LuckPerms command templates for RCON sync. {player} and {group} are replaced at runtime. */
+      rconAddCommand: { type: String, default: "lp user {player} parent add {group}" },
+      rconRemoveCommand: { type: String, default: "lp user {player} parent remove {group}" },
       roleMappings: [
         {
           discordRoleId: { type: String, required: true },

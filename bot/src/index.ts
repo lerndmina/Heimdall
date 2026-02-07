@@ -80,7 +80,7 @@ async function connectRedis(url: string): Promise<RedisClientType> {
 // Phase 3: Discord client configuration
 // ============================================================================
 
-const baseClient = new Client({
+const CLIENT_OPTIONS = {
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
@@ -91,7 +91,9 @@ const baseClient = new Client({
     GatewayIntentBits.GuildVoiceStates,
   ],
   partials: [Partials.Channel, Partials.Message, Partials.User, Partials.GuildMember],
-});
+} as const;
+
+let baseClient = new Client(CLIENT_OPTIONS);
 
 // Export client for use by plugins and other modules
 export let client: HeimdallClient;
@@ -299,8 +301,17 @@ async function restart(): Promise<void> {
     await mongoose.disconnect();
     log.debug("MongoDB disconnected");
 
-    // Re-attach the ready handler for the new session
+    // Create a fresh client instance — discord.js destroy() is terminal,
+    // login() will hang on a destroyed client.
+    baseClient = new Client(CLIENT_OPTIONS);
+    log.debug("New Discord client created");
+
+    // Re-attach the ready handler and error handler for the new client
     baseClient.once(Events.ClientReady, onReady);
+    baseClient.on(Events.Error, (error) => {
+      log.error("Discord client error:", error);
+      captureException(error, { context: "Discord Client Error" });
+    });
 
     log.info("🔄 All modules unloaded, restarting...");
 

@@ -136,7 +136,7 @@ export class RoleSyncService {
     }
   }
 
-  /** Handle Discord role change event — update tracking, actual sync on next MC login */
+  /** Handle Discord role change event — update tracking, and if RCON mode, sync immediately */
   async handleDiscordRoleChange(guildId: string, discordId: string): Promise<void> {
     try {
       const config = await MinecraftConfig.findOne({ guildId }).lean();
@@ -149,6 +149,44 @@ export class RoleSyncService {
       await MinecraftPlayer.findByIdAndUpdate(player._id, { lastDiscordRoles: currentDiscordRoles });
 
       log.debug(`Updated Discord roles tracking for ${player.minecraftUsername}`);
+
+      // If RCON mode, apply changes immediately
+      if (config.roleSync.mode === "rcon") {
+        const targetGroups = RoleSyncService.getTargetGroups(currentDiscordRoles, config.roleSync.roleMappings);
+        const managedGroups = config.roleSync.roleMappings.filter((m) => m.enabled).map((m) => m.minecraftGroup);
+        const currentMcGroups = (player.lastMinecraftGroups || []).filter((g: string) => managedGroups.includes(g));
+
+        const comparison = RoleSyncService.compareGroups(currentMcGroups, targetGroups);
+
+        if (comparison.toAdd.length > 0 || comparison.toRemove.length > 0) {
+          const { RconService } = await import("./RconService.js");
+          const result = await RconService.applyRoleSyncViaRcon(guildId, player.minecraftUsername, comparison.toAdd, comparison.toRemove);
+
+          const operation: RoleSyncOperation = {
+            playerId: (player._id as any).toString(),
+            minecraftUsername: player.minecraftUsername,
+            discordId: player.discordId ?? undefined,
+            syncTrigger: "discord_role_change",
+            discordRolesBefore: player.lastDiscordRoles || [],
+            discordRolesAfter: currentDiscordRoles,
+            minecraftGroupsBefore: currentMcGroups,
+            minecraftGroupsAfter: targetGroups,
+            groupsAdded: comparison.toAdd,
+            groupsRemoved: comparison.toRemove,
+            success: result.success,
+            error: result.success ? undefined : "RCON command(s) failed",
+          };
+
+          await RoleSyncService.logRoleSync(guildId, operation);
+
+          if (result.success) {
+            // Update stored MC groups after successful sync
+            await MinecraftPlayer.findByIdAndUpdate(player._id, { lastMinecraftGroups: targetGroups, lastRoleSyncAt: new Date() });
+          }
+
+          log.info(`RCON role sync (Discord change) for ${player.minecraftUsername}: +${comparison.toAdd.join(",")} -${comparison.toRemove.join(",")}, success=${result.success}`);
+        }
+      }
     } catch (error) {
       log.error("handleDiscordRoleChange failed:", error);
     }

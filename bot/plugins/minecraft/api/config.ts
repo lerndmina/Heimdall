@@ -33,16 +33,39 @@ function dashboardToModel(data: Record<string, any>): Record<string, any> {
     mapped.roleSync.enabled = mapped.enableRoleSync;
     delete mapped.enableRoleSync;
   }
+  if ("roleSyncMode" in mapped) {
+    if (!mapped.roleSync) mapped.roleSync = {};
+    mapped.roleSync.mode = mapped.roleSyncMode === "off" ? "on_join" : mapped.roleSyncMode;
+    // If mode is "off", disable role sync entirely
+    if (mapped.roleSyncMode === "off") mapped.roleSync.enabled = false;
+    delete mapped.roleSyncMode;
+  }
+  if ("roleMappings" in mapped) {
+    if (!mapped.roleSync) mapped.roleSync = {};
+    mapped.roleSync.roleMappings = mapped.roleMappings;
+    delete mapped.roleMappings;
+  }
+  if ("rconAddCommand" in mapped) {
+    if (!mapped.roleSync) mapped.roleSync = {};
+    mapped.roleSync.rconAddCommand = mapped.rconAddCommand;
+    delete mapped.rconAddCommand;
+  }
+  if ("rconRemoveCommand" in mapped) {
+    if (!mapped.roleSync) mapped.roleSync = {};
+    mapped.roleSync.rconRemoveCommand = mapped.rconRemoveCommand;
+    delete mapped.rconRemoveCommand;
+  }
   if ("requireDiscordLink" in mapped) {
     mapped.requireConfirmation = mapped.requireDiscordLink;
     delete mapped.requireDiscordLink;
   }
   // Map whitelist schedule fields into nested object
-  if ("whitelistScheduleType" in mapped || "whitelistDelayMinutes" in mapped || "whitelistScheduledDay" in mapped) {
+  if ("whitelistScheduleType" in mapped || "whitelistDelayMinutes" in mapped || "whitelistScheduledDay" in mapped || "whitelistScheduledHour" in mapped) {
     mapped.whitelistSchedule = {
       type: mapped.whitelistScheduleType ?? "immediate",
       delayMinutes: mapped.whitelistDelayMinutes ?? 0,
       scheduledDay: mapped.whitelistScheduledDay ?? 0,
+      scheduledHour: mapped.whitelistScheduledHour ?? 0,
     };
     // When autoWhitelist is off, staff approval is implicit
     if (!mapped.autoWhitelist) mapped.requireApproval = true;
@@ -50,6 +73,7 @@ function dashboardToModel(data: Record<string, any>): Record<string, any> {
     delete mapped.whitelistScheduleType;
     delete mapped.whitelistDelayMinutes;
     delete mapped.whitelistScheduledDay;
+    delete mapped.whitelistScheduledHour;
   }
   if ("cacheTimeout" in mapped) {
     mapped.authCodeExpiry = mapped.cacheTimeout;
@@ -70,6 +94,7 @@ function modelToDashboard(config: Record<string, any>): Record<string, any> {
     whitelistScheduleType: config.whitelistSchedule?.type ?? "immediate",
     whitelistDelayMinutes: config.whitelistSchedule?.delayMinutes ?? 0,
     whitelistScheduledDay: config.whitelistSchedule?.scheduledDay ?? 0,
+    whitelistScheduledHour: config.whitelistSchedule?.scheduledHour ?? 0,
     serverName: config.serverName ?? "",
     serverIp: config.serverHost ?? "",
     serverPort: config.serverPort ?? 25565,
@@ -81,6 +106,15 @@ function modelToDashboard(config: Record<string, any>): Record<string, any> {
     maxPlayersPerUser: config.maxPlayersPerUser ?? 1,
     requireDiscordLink: config.requireConfirmation ?? true,
     enableRoleSync: config.roleSync?.enabled ?? false,
+    roleSyncMode: config.roleSync?.enabled ? (config.roleSync?.mode ?? "on_join") : "off",
+    roleMappings: (config.roleSync?.roleMappings ?? []).map((m: any) => ({
+      discordRoleId: m.discordRoleId ?? "",
+      discordRoleName: m.discordRoleName ?? "",
+      minecraftGroup: m.minecraftGroup ?? "",
+      enabled: m.enabled ?? true,
+    })),
+    rconAddCommand: config.roleSync?.rconAddCommand ?? "lp user {player} parent add {group}",
+    rconRemoveCommand: config.roleSync?.rconRemoveCommand ?? "lp user {player} parent remove {group}",
     enableMinecraftPlugin: config.enableMinecraftPlugin ?? false,
     enableAutoRevoke: config.leaveRevocation?.enabled ?? false,
     enableAutoRestore: config.autoLinkOnJoin ?? false,

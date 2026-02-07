@@ -25,6 +25,8 @@ interface SidebarProps {
 export default function Sidebar({ guildId, guildName, guildIcon, items }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const normalizedPathname = pathname?.replace(/\/+$/, "") || "/";
+  const guildRoot = `/${guildId}`;
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-zinc-800 bg-zinc-900/50">
@@ -41,7 +43,11 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
       <nav className="flex-1 overflow-y-auto p-3">
         <ul className="space-y-1">
           {items.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            const normalizedHref = item.href.replace(/\/+$/, "") || "/";
+            const isGuildRoot = normalizedHref === guildRoot;
+            const isActive = isGuildRoot
+              ? normalizedPathname === normalizedHref
+              : normalizedPathname === normalizedHref || normalizedPathname.startsWith(normalizedHref + "/");
             return (
               <li key={item.href}>
                 <Link
