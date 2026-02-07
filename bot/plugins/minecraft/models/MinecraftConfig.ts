@@ -19,7 +19,11 @@ const MinecraftConfigSchema = new Schema(
     guildId: { type: String, required: true, unique: true, index: true },
     enabled: { type: Boolean, default: false },
     autoLinkOnJoin: { type: Boolean, default: true },
-    staffRoleId: { type: String, required: true },
+    staffRoleId: { type: String },
+
+    // Server identity
+    serverName: { type: String, default: "" },
+    enableMinecraftPlugin: { type: Boolean, default: false },
 
     // Server connection
     serverHost: { type: String, required: true },
@@ -37,6 +41,17 @@ const MinecraftConfigSchema = new Schema(
     requireConfirmation: { type: Boolean, default: true },
     allowUsernameChange: { type: Boolean, default: true },
     autoWhitelist: { type: Boolean, default: false },
+    requireApproval: { type: Boolean, default: false },
+    whitelistSchedule: {
+      type: { type: String, enum: ["immediate", "delay", "scheduled_day"], default: "immediate" },
+      delayMinutes: { type: Number, default: 0, min: 0 },
+      scheduledDay: { type: Number, default: 0, min: 0, max: 6 },
+    },
+    maxPlayersPerUser: { type: Number, default: 1, min: 1, max: 10 },
+
+    // Linking panel channel (where the persistent "Link Account" panel is posted)
+    linkPanelChannelId: { type: String },
+    linkPanelMessageId: { type: String },
 
     // Leave revocation
     leaveRevocation: {

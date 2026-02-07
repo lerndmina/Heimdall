@@ -327,6 +327,22 @@ export class ApiManager {
   }
 
   /**
+   * Stop the API server
+   */
+  async stop(): Promise<void> {
+    if (!this.server) return;
+    return new Promise((resolve, reject) => {
+      this.server!.close((err) => {
+        if (err) return reject(err);
+        this.server = null;
+        this.started = false;
+        log.debug("API server stopped");
+        resolve();
+      });
+    });
+  }
+
+  /**
    * Get stats about registered routers
    */
   getStats(): { routers: number; byPlugin: Record<string, string[]> } {

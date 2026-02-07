@@ -61,10 +61,14 @@ export interface CreateSessionData {
 /**
  * ModmailSessionService - Ephemeral session management for form wizard
  */
+/** Result of a queueMessage attempt */
+export type QueueMessageResult = "queued" | "full" | "expired";
+
 export class ModmailSessionService {
   private readonly SESSION_TTL = 900; // 15 minutes in seconds
   private readonly SESSION_PREFIX = "modmail:session:";
   private readonly USER_SESSION_PREFIX = "modmail:session:user:";
+  private readonly MAX_QUEUED_MESSAGES = 10;
 
   constructor(
     private redis: RedisClientType,
@@ -161,6 +165,14 @@ export class ModmailSessionService {
       }
 
       await this.redis.setEx(key, remainingTTL, JSON.stringify(updated));
+
+      // Keep the user → session pointer TTL in sync so it doesn't expire before the session
+      const userKey = this.getUserSessionKey(updated.userId);
+      const currentPointer = await this.redis.get(userKey);
+      if (currentPointer === sessionId) {
+        await this.redis.expire(userKey, remainingTTL);
+      }
+
       return true;
     } catch (error) {
       this.logger.error(`Failed to update modmail session ${sessionId}:`, error);
@@ -209,18 +221,49 @@ export class ModmailSessionService {
   }
 
   /**
-   * Queue a message reference sent by the user while the form wizard is active.
-   * These messages will be forwarded to the thread after creation.
+   * Atomically queue a message reference into an active session.
+   *
+   * Uses a Lua script so that concurrent DMs don't race on the
+   * read → push → write cycle and silently drop each other's entries.
+   *
+   * Returns:
+   *  - `"queued"`  – ref was appended successfully
+   *  - `"full"`    – queue has reached MAX_QUEUED_MESSAGES
+   *  - `"expired"` – session no longer exists in Redis
    */
-  async queueMessage(sessionId: string, ref: { channelId: string; messageId: string }): Promise<boolean> {
-    const session = await this.getSession(sessionId);
-    if (!session) return false;
+  async queueMessage(sessionId: string, ref: { channelId: string; messageId: string }): Promise<QueueMessageResult> {
+    const key = this.getSessionKey(sessionId);
 
-    session.queuedMessageRefs.push(ref);
+    // Lua: atomically read session JSON, push ref, write back.
+    // Returns 1 = queued, 0 = full, -1 = expired/missing
+    const luaScript = `
+      local raw = redis.call('GET', KEYS[1])
+      if not raw then return -1 end
+      local session = cjson.decode(raw)
+      if not session.queuedMessageRefs then
+        session.queuedMessageRefs = {}
+      end
+      if #session.queuedMessageRefs >= tonumber(ARGV[2]) then return 0 end
+      table.insert(session.queuedMessageRefs, cjson.decode(ARGV[1]))
+      local ttl = redis.call('TTL', KEYS[1])
+      if ttl <= 0 then return -1 end
+      redis.call('SETEX', KEYS[1], ttl, cjson.encode(session))
+      return 1
+    `;
 
-    return this.updateSession(sessionId, {
-      queuedMessageRefs: session.queuedMessageRefs,
-    });
+    try {
+      const result = (await this.redis.eval(luaScript, {
+        keys: [key],
+        arguments: [JSON.stringify(ref), String(this.MAX_QUEUED_MESSAGES)],
+      })) as number;
+
+      if (result === 1) return "queued";
+      if (result === 0) return "full";
+      return "expired";
+    } catch (error) {
+      this.logger.error(`Failed to queue message for session ${sessionId}:`, error);
+      return "expired";
+    }
   }
 
   /**

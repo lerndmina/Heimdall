@@ -21,6 +21,7 @@ import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import mongoose from "mongoose";
 import { createClient, type RedisClientType } from "redis";
 import * as path from "path";
+import * as readline from "readline";
 import { fileURLToPath } from "url";
 import { envLoader } from "./utils/env";
 import log from "./utils/logger";
@@ -113,7 +114,7 @@ let interactionHandler: InteractionHandler;
 // Phase 4: Ready event handler
 // ============================================================================
 
-baseClient.once(Events.ClientReady, async (readyClient) => {
+async function onReady(readyClient: Client<true>): Promise<void> {
   log.info(`✅ Ready! Serving ${readyClient.guilds.cache.size} guilds as ${readyClient.user.tag}`);
 
   // Set last restart time in Redis
@@ -192,7 +193,9 @@ baseClient.once(Events.ClientReady, async (readyClient) => {
     log.error("Failed to start API server:", error);
     captureException(error, { context: "API Server Start" });
   }
-});
+}
+
+baseClient.once(Events.ClientReady, onReady);
 
 // ============================================================================
 // Phase 5: Error handling
@@ -256,6 +259,95 @@ async function shutdown(signal: string): Promise<void> {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// ============================================================================
+// Phase 6b: Stdin command interface
+// ============================================================================
+
+const rl = readline.createInterface({ input: process.stdin, terminal: false });
+
+async function restart(): Promise<void> {
+  log.info("♻️  Restarting bot...");
+
+  try {
+    // Unload all plugins (reverse order)
+    if (pluginLoader) {
+      await pluginLoader.unloadAll();
+      pluginLoader = null;
+      log.debug("Plugins unloaded");
+    }
+
+    // Stop API server
+    if (apiManager?.isStarted()) {
+      await apiManager.stop();
+      log.debug("API server stopped");
+    }
+
+    // Remove all listeners from the client (events, interactions, etc.)
+    baseClient.removeAllListeners();
+    log.debug("All client listeners removed");
+
+    // Destroy Discord client session
+    baseClient.destroy();
+    log.debug("Discord client destroyed");
+
+    // Close database connections
+    if (redis) {
+      await redis.quit();
+      log.debug("Redis disconnected");
+    }
+    await mongoose.disconnect();
+    log.debug("MongoDB disconnected");
+
+    // Re-attach the ready handler for the new session
+    baseClient.once(Events.ClientReady, onReady);
+
+    log.info("🔄 All modules unloaded, restarting...");
+
+    // Re-run the full startup sequence
+    await start();
+  } catch (error) {
+    log.error("Error during restart:", error);
+    captureException(error, { context: "Bot Restart" });
+  }
+}
+
+rl.on("line", async (line: string) => {
+  const input = line.trim().toLowerCase();
+  if (!input) return;
+
+  switch (input) {
+    case "stop":
+    case "quit":
+    case "exit":
+      await shutdown("stdin");
+      break;
+
+    case "restart":
+    case "reload":
+      await restart();
+      break;
+
+    case "status": {
+      const guilds = baseClient.guilds?.cache?.size ?? 0;
+      const plugins = pluginLoader?.getAllPlugins().size ?? 0;
+      const uptime = process.uptime();
+      const h = Math.floor(uptime / 3600);
+      const m = Math.floor((uptime % 3600) / 60);
+      const s = Math.floor(uptime % 60);
+      log.info(`📊 Status — Guilds: ${guilds} | Plugins: ${plugins} | Uptime: ${h}h ${m}m ${s}s | Memory: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1)} MB`);
+      break;
+    }
+
+    case "help":
+      log.info("📖 Available commands: stop, restart, status, help");
+      break;
+
+    default:
+      log.warn(`Unknown command: "${input}". Type "help" for available commands.`);
+      break;
+  }
+});
 
 // ============================================================================
 // Phase 7: Startup sequence

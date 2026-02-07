@@ -200,21 +200,41 @@ async function startNewModmailFlow(client: HeimdallClient, pluginAPI: ModmailPlu
   // If so, queue this message so it is forwarded after thread creation.
   const activeSessionId = await pluginAPI.sessionService.getUserActiveSession(userId);
   if (activeSessionId) {
-    const queued = await pluginAPI.sessionService.queueMessage(activeSessionId, {
+    const result = await pluginAPI.sessionService.queueMessage(activeSessionId, {
       channelId: message.channel.id,
       messageId: message.id,
     });
-    if (queued) {
-      try {
-        await message.react("📝");
-      } catch {
-        // Ignore reaction failures
-      }
-      log.debug(`Queued DM message ${message.id} for active session ${activeSessionId}`);
-      return;
+
+    switch (result) {
+      case "queued":
+        try {
+          await message.react("📝");
+        } catch {
+          // Ignore reaction failures
+        }
+        log.debug(`Queued DM message ${message.id} for active session ${activeSessionId}`);
+        return;
+
+      case "full":
+        try {
+          await message.reply({
+            embeds: [
+              ModmailEmbeds.warning(
+                "Too Many Messages",
+                "You've sent too many messages while your modmail is being set up. Please finish answering the questions first, then your messages will be forwarded.",
+              ),
+            ],
+          });
+        } catch {
+          // Ignore DM send failures
+        }
+        return;
+
+      case "expired":
+        // Session expired between the pointer check and the queue attempt.
+        // Fall through to normal flow — the user will start fresh.
+        break;
     }
-    // If queuing failed (e.g. session expired between check and queue), fall through
-    // to normal flow.
   }
 
   // Prevent duplicate flows

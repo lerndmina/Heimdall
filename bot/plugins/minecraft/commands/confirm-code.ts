@@ -89,9 +89,15 @@ export async function execute(context: CommandContext): Promise<void> {
 
   // Handle existing-player link (immediate whitelist)
   if (pendingAuth.isExistingPlayerLink && pendingAuth.whitelistedAt) {
-    const conflict = await MinecraftPlayer.findOne({ guildId, discordId, linkedAt: { $ne: null } }).lean();
-    if (conflict) {
-      const embed = pluginAPI.lib.createEmbedBuilder().setColor(0xff0000).setTitle("❌ Already Linked").setDescription(`Your Discord account is already linked to **${conflict.minecraftUsername}**.`);
+    // Check max accounts limit
+    const maxAccounts = mcConfig.maxPlayersPerUser ?? 1;
+    const linkedCount = await MinecraftPlayer.countDocuments({ guildId, discordId, linkedAt: { $ne: null } });
+    if (linkedCount >= maxAccounts) {
+      const embed = pluginAPI.lib
+        .createEmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle("❌ Account Limit Reached")
+        .setDescription(`You've reached the maximum of **${maxAccounts}** linked account${maxAccounts > 1 ? "s" : ""}.\n\n` + `Use \`/minecraft-status\` to manage your accounts.`);
       await interaction.editReply({ embeds: [embed] });
       return;
     }
@@ -121,29 +127,45 @@ export async function execute(context: CommandContext): Promise<void> {
     return;
   }
 
-  // Normal link (requires approval)
+  // Normal link
   pendingAuth.linkedAt = new Date();
+
+  // Auto-whitelist if configured
+  if (mcConfig.autoWhitelist) {
+    pendingAuth.whitelistedAt = new Date();
+    pendingAuth.approvedBy = "auto";
+  }
+
   await pendingAuth.save();
 
-  const approvalMessage = mcConfig.autoWhitelist
-    ? "Your account will be automatically approved shortly."
-    : "Your request is now **pending staff approval**. Staff will review your request manually and approve it when they're available.";
-
-  const embed = pluginAPI.lib
-    .createEmbedBuilder()
-    .setColor(0xffff00)
-    .setTitle("✅ Code Confirmed")
-    .setDescription(
-      `**Authentication Successful!**\n\n` +
+  if (mcConfig.autoWhitelist) {
+    const embed = pluginAPI.lib
+      .createEmbedBuilder()
+      .setColor(0x00ff00)
+      .setTitle("✅ Account Linked & Whitelisted!")
+      .setDescription(
         `Your Discord account is now linked to **${pendingAuth.minecraftUsername}**.\n\n` +
-        `⏳ ${approvalMessage}\n\n` +
-        `**What happens next:**\n` +
-        `• Staff will review your request in the queue\n` +
-        `• You'll get a DM notification when approved\n` +
-        `• Then you can join the Minecraft server!\n\n` +
-        `Use \`/minecraft-status\` to check your current status.`,
-    )
-    .setFooter({ text: "Please wait patiently for staff approval" });
+          `✅ You've been automatically whitelisted and can join the server now!\n\n` +
+          `**Server:** \`${mcConfig.serverHost}:${mcConfig.serverPort}\`\n\n` +
+          `Use \`/minecraft-status\` to view your account details.`,
+      );
+    await interaction.editReply({ embeds: [embed] });
+  } else {
+    const approvalMessage = mcConfig.requireApproval
+      ? "Your request is now **pending staff approval**. Staff will review and approve it when available."
+      : "Your account has been linked. Staff will process your whitelist request.";
 
-  await interaction.editReply({ embeds: [embed] });
+    const embed = pluginAPI.lib
+      .createEmbedBuilder()
+      .setColor(0xffff00)
+      .setTitle("✅ Code Confirmed")
+      .setDescription(
+        `**Authentication Successful!**\n\n` +
+          `Your Discord account is now linked to **${pendingAuth.minecraftUsername}**.\n\n` +
+          `⏳ ${approvalMessage}\n\n` +
+          `Use \`/minecraft-status\` to check your current status.`,
+      )
+      .setFooter({ text: "You'll receive a notification when your request is processed" });
+    await interaction.editReply({ embeds: [embed] });
+  }
 }

@@ -111,14 +111,33 @@ export async function execute(context: CommandContext): Promise<void> {
     return;
   }
 
-  // Check if already linked to a different MC account
-  const existingPlayer = await MinecraftPlayer.findOne({ guildId, discordId, linkedAt: { $ne: null } }).lean();
-  if (existingPlayer) {
+  // Check if already linked — enforce maxPlayersPerUser
+  const maxAccounts = mcConfig.maxPlayersPerUser ?? 1;
+  const linkedAccounts = await MinecraftPlayer.find({ guildId, discordId, linkedAt: { $ne: null } }).lean();
+
+  if (linkedAccounts.length >= maxAccounts) {
+    const accountList = linkedAccounts.map((p) => `• **${p.minecraftUsername}**`).join("\n");
+    const embed = pluginAPI.lib
+      .createEmbedBuilder()
+      .setColor(0xff0000)
+      .setTitle("❌ Account Limit Reached")
+      .setDescription(
+        `You've reached the maximum of **${maxAccounts}** linked Minecraft account${maxAccounts > 1 ? "s" : ""}.\n\n` +
+          `**Your linked accounts:**\n${accountList}\n\n` +
+          (maxAccounts > 1 ? `Use \`/minecraft-status\` to manage your accounts, or unlink one to add a new one.` : `Use \`/minecraft-status\` to see your current status.`),
+      );
+    await interaction.editReply({ embeds: [embed] });
+    return;
+  }
+
+  // Check if this specific MC username is already linked to this user
+  const alreadyLinkedSameUsername = linkedAccounts.find((p) => p.minecraftUsername.toLowerCase() === minecraftUsername);
+  if (alreadyLinkedSameUsername) {
     const embed = pluginAPI.lib
       .createEmbedBuilder()
       .setColor(0xff0000)
       .setTitle("❌ Already Linked")
-      .setDescription(`Your Discord account is already linked to **${existingPlayer.minecraftUsername}**.\n\n` + `Use \`/minecraft-status\` to see your current status.`);
+      .setDescription(`You're already linked to **${alreadyLinkedSameUsername.minecraftUsername}**.\n\nUse \`/minecraft-status\` to see your accounts.`);
     await interaction.editReply({ embeds: [embed] });
     return;
   }
@@ -164,6 +183,15 @@ export async function execute(context: CommandContext): Promise<void> {
     return;
   }
 
+  const approvalNote = mcConfig.autoWhitelist
+    ? `✅ **Auto-whitelist is on** — you'll be whitelisted automatically once you confirm your code.`
+    : mcConfig.requireApproval
+      ? `⏰ **Staff approval required** — after confirming your code, staff will review your request.`
+      : `✅ You'll be whitelisted once you confirm your code.`;
+
+  const accountNote =
+    linkedAccounts.length > 0 ? `\n\n📋 This will be your **${linkedAccounts.length + 1}${linkedAccounts.length === 1 ? "nd" : linkedAccounts.length === 2 ? "rd" : "th"}** linked account.` : "";
+
   const embed = pluginAPI.lib
     .createEmbedBuilder()
     .setColor(0xffff00)
@@ -173,9 +201,8 @@ export async function execute(context: CommandContext): Promise<void> {
         `**Next Steps:**\n` +
         `1. Try joining the Minecraft server: \`${mcConfig.serverHost}:${mcConfig.serverPort}\`\n` +
         `2. You'll be kicked with your authentication code\n` +
-        `3. Come back here and use \`/confirm-code <your-code>\`\n` +
-        `4. **Wait for staff approval** - This may take some time\n\n` +
-        `⏰ **Important:** Staff must manually approve your whitelist request before you can join the server.\n\n` +
+        `3. Come back here and use \`/confirm-code <your-code>\`\n\n` +
+        `${approvalNote}${accountNote}\n\n` +
         `**Your request expires:** <t:${Math.floor(expiresAt.getTime() / 1000)}:R>`,
     )
     .setFooter({ text: "Your authentication code will be shown when you try to join" });

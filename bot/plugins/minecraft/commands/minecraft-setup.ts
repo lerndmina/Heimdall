@@ -25,6 +25,12 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) => sub.setName("config").setDescription("View current configuration"))
   .addSubcommand((sub) =>
     sub
+      .setName("panel")
+      .setDescription("Send the Minecraft linking panel to a channel")
+      .addChannelOption((opt) => opt.setName("channel").setDescription("Channel to post the linking panel in").setRequired(true)),
+  )
+  .addSubcommand((sub) =>
+    sub
       .setName("messages")
       .setDescription("Customize authentication and kick messages")
       .addStringOption((opt) =>
@@ -125,7 +131,7 @@ export async function execute(context: CommandContext): Promise<void> {
       return;
     }
 
-    const staffRole = interaction.guild?.roles.cache.get(mcConfig.staffRoleId);
+    const staffRole = mcConfig.staffRoleId ? interaction.guild?.roles.cache.get(mcConfig.staffRoleId) : null;
 
     const embed = pluginAPI.lib
       .createEmbedBuilder()
@@ -140,6 +146,29 @@ export async function execute(context: CommandContext): Promise<void> {
         { name: "Code Expiry", value: `${mcConfig.authCodeExpiry} seconds`, inline: true },
       );
     await interaction.editReply({ embeds: [embed] });
+  }
+
+  if (subcommand === "panel") {
+    const channel = interaction.options.getChannel("channel", true);
+
+    const result = await pluginAPI.panelService.sendPanel(channel.id, guildId, undefined);
+
+    if (result.success) {
+      const embed = pluginAPI.lib
+        .createEmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle("✅ Panel Sent")
+        .setDescription(`The Minecraft linking panel has been posted to <#${channel.id}>.\n\n[Jump to panel](${result.messageUrl})`);
+      await interaction.editReply({ embeds: [embed] });
+    } else {
+      const embed = pluginAPI.lib
+        .createEmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle("❌ Failed to Send Panel")
+        .setDescription(result.error || "An error occurred.");
+      await interaction.editReply({ embeds: [embed] });
+    }
+    return;
   }
 
   if (subcommand === "messages") {

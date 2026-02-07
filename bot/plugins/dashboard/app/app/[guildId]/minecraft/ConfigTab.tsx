@@ -24,6 +24,9 @@ interface MinecraftConfig {
   guildId: string;
   enabled: boolean;
   autoWhitelist: boolean;
+  whitelistScheduleType: "immediate" | "delay" | "scheduled_day";
+  whitelistDelayMinutes: number;
+  whitelistScheduledDay: number;
   serverName: string;
   serverIp: string;
   serverPort: number;
@@ -33,7 +36,6 @@ interface MinecraftConfig {
   rconPassword?: string | null;
   cacheTimeout: number;
   maxPlayersPerUser: number;
-  requireApproval: boolean;
   requireDiscordLink: boolean;
   enableRoleSync: boolean;
   enableMinecraftPlugin: boolean;
@@ -43,7 +45,10 @@ interface MinecraftConfig {
 
 const DEFAULT_CONFIG: Omit<MinecraftConfig, "guildId"> = {
   enabled: true,
-  autoWhitelist: true,
+  autoWhitelist: false,
+  whitelistScheduleType: "immediate",
+  whitelistDelayMinutes: 0,
+  whitelistScheduledDay: 0,
   serverName: "",
   serverIp: "",
   serverPort: 25565,
@@ -52,9 +57,8 @@ const DEFAULT_CONFIG: Omit<MinecraftConfig, "guildId"> = {
   rconPort: 25575,
   rconPassword: null,
   cacheTimeout: 300,
-  maxPlayersPerUser: 10,
-  requireApproval: true,
-  requireDiscordLink: true,
+  maxPlayersPerUser: 1,
+  requireDiscordLink: false,
   enableRoleSync: false,
   enableMinecraftPlugin: false,
   enableAutoRevoke: false,
@@ -147,7 +151,7 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
   const openEditWizard = () => {
     if (!config) return;
     const { guildId: _, ...rest } = config;
-    setDraft({ ...rest, rconPassword: rest.rconPassword ?? "" });
+    setDraft({ ...DEFAULT_CONFIG, ...rest, rconPassword: rest.rconPassword ?? "" });
     setWizardStep(0);
     setSaveError(null);
     setWizardOpen(true);
@@ -228,12 +232,12 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
         </div>
         <CardContent>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <FieldDisplay label="Server Name" value={config.serverName} />
-            <FieldDisplay label="Address" value={`${config.serverIp}:${config.serverPort}`} />
+            <FieldDisplay label="Server Name" value={config.serverName || "—"} />
+            <FieldDisplay label="Address" value={`${config.serverIp || "—"}:${config.serverPort ?? 25565}`} />
             <FieldDisplay label="Minecraft Plugin">
               <StatusBadge variant={config.enableMinecraftPlugin ? "success" : "neutral"}>{config.enableMinecraftPlugin ? "Connected" : "Not connected"}</StatusBadge>
             </FieldDisplay>
-            <FieldDisplay label="Cache Timeout" value={`${config.cacheTimeout}s`} />
+            <FieldDisplay label="Cache Timeout" value={`${config.cacheTimeout ?? 300}s`} />
           </div>
         </CardContent>
       </Card>
@@ -243,16 +247,25 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
         <CardTitle>Whitelist Settings</CardTitle>
         <CardContent>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <FieldDisplay label="Auto Whitelist">
-              <StatusBadge variant={config.autoWhitelist ? "success" : "neutral"}>{config.autoWhitelist ? "On" : "Off"}</StatusBadge>
+            <FieldDisplay label="Whitelist Mode">
+              <StatusBadge variant={config.autoWhitelist ? "success" : "warning"}>{config.autoWhitelist ? "Auto Whitelist" : "Staff Approval"}</StatusBadge>
             </FieldDisplay>
-            <FieldDisplay label="Require Approval">
-              <StatusBadge variant={config.requireApproval ? "warning" : "neutral"}>{config.requireApproval ? "Required" : "Not required"}</StatusBadge>
-            </FieldDisplay>
+            {config.autoWhitelist && (
+              <FieldDisplay
+                label="Schedule"
+                value={
+                  config.whitelistScheduleType === "immediate"
+                    ? "Immediately"
+                    : config.whitelistScheduleType === "delay"
+                      ? `After ${config.whitelistDelayMinutes} minute(s)`
+                      : `Every ${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][config.whitelistScheduledDay]}`
+                }
+              />
+            )}
             <FieldDisplay label="Require Discord Link">
-              <StatusBadge variant={config.requireDiscordLink ? "info" : "neutral"}>{config.requireDiscordLink ? "Required" : "Not required"}</StatusBadge>
+              <StatusBadge variant={config.requireDiscordLink ? "success" : "neutral"}>{config.requireDiscordLink ? "Required" : "Not required"}</StatusBadge>
             </FieldDisplay>
-            <FieldDisplay label="Max Players Per User" value={String(config.maxPlayersPerUser)} />
+            <FieldDisplay label="Max Accounts Per User" value={String(config.maxPlayersPerUser ?? 10)} />
           </div>
         </CardContent>
       </Card>
@@ -272,7 +285,9 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
               <StatusBadge variant={config.enableAutoRestore ? "success" : "neutral"}>{config.enableAutoRestore ? "Enabled" : "Disabled"}</StatusBadge>
             </FieldDisplay>
             <FieldDisplay label="RCON">
-              <StatusBadge variant={config.rconEnabled ? "success" : "neutral"}>{config.rconEnabled ? `Enabled (${config.rconHost || config.serverIp}:${config.rconPort})` : "Disabled"}</StatusBadge>
+              <StatusBadge variant={config.rconEnabled ? "success" : "neutral"}>
+                {config.rconEnabled ? `Enabled (${config.rconHost || config.serverIp || "—"}:${config.rconPort ?? 25575})` : "Disabled"}
+              </StatusBadge>
             </FieldDisplay>
           </div>
         </CardContent>
@@ -349,10 +364,11 @@ function ConfigWizard({ draft, setDraft, step, setStep, saving, saveError, onSav
         {STEPS.map((s, i) => (
           <button
             key={s.id}
-            onClick={() => i < step && setStep(i)}
-            className={`flex-1 rounded-full py-1 text-xs font-medium transition ${
-              i === step ? "bg-primary-600 text-white" : i < step ? "bg-primary-600/30 text-primary-400 cursor-pointer" : "bg-zinc-800 text-zinc-500"
-            }`}>
+            onClick={() => setStep(i)}
+            disabled={i > step && !canNext()}
+            className={`flex-1 rounded-full py-1 text-xs font-medium transition cursor-pointer ${
+              i === step ? "bg-primary-600 text-white" : i < step ? "bg-primary-600/30 text-primary-400 hover:bg-primary-600/50" : "bg-zinc-800 text-zinc-500 hover:bg-zinc-700"
+            } disabled:cursor-not-allowed disabled:opacity-50`}>
             {s.label}
           </button>
         ))}
@@ -428,11 +444,11 @@ function StepServer({ draft, update }: StepProps) {
         <NumberInput label="Server Port" description="Minecraft server port (default: 25565)" value={draft.serverPort} onChange={(v) => update("serverPort", v)} min={1} max={65535} />
       </div>
       <div className="border-t border-zinc-800 pt-5">
-        <Toggle label="Enable Plugin" description="Master switch — enable the Minecraft integration for this server" checked={draft.enabled} onChange={(v) => update("enabled", v)} />
+        <Toggle label="Enable" description="Enable the Minecraft configuration for this server" checked={draft.enabled} onChange={(v) => update("enabled", v)} />
       </div>
       <div>
         <Toggle
-          label="Minecraft Java Plugin"
+          label="Enable Minecraft Plugin"
           description="Enable if you have the Heimdall companion Java plugin installed on your MC server"
           checked={draft.enableMinecraftPlugin}
           onChange={(v) => update("enableMinecraftPlugin", v)}
@@ -443,29 +459,100 @@ function StepServer({ draft, update }: StepProps) {
 }
 
 function StepWhitelist({ draft, update }: StepProps) {
+  const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
   return (
     <div className="space-y-5">
-      <Toggle label="Auto Whitelist" description="Automatically whitelist players when they link their account" checked={draft.autoWhitelist} onChange={(v) => update("autoWhitelist", v)} />
       <Toggle
-        label="Require Staff Approval"
-        description="Whitelist requests must be approved by a staff member before taking effect"
-        checked={draft.requireApproval}
-        onChange={(v) => update("requireApproval", v)}
+        label="Auto Whitelist"
+        description={draft.autoWhitelist ? "Players are whitelisted automatically based on the schedule below" : "Staff must manually approve each whitelist request"}
+        checked={draft.autoWhitelist}
+        onChange={(v) => update("autoWhitelist", v)}
       />
-      <Toggle
-        label="Require Discord Link"
-        description="Players must have a linked Discord account to be whitelisted"
-        checked={draft.requireDiscordLink}
-        onChange={(v) => update("requireDiscordLink", v)}
-      />
+
+      {draft.autoWhitelist && (
+        <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+          <p className="text-sm font-medium text-zinc-300">Whitelist Schedule</p>
+          <div className="space-y-2">
+            {([
+              { value: "immediate" as const, label: "Immediately", desc: "Whitelist as soon as they link their account" },
+              { value: "delay" as const, label: "After a delay", desc: "Wait a set amount of time before whitelisting" },
+              { value: "scheduled_day" as const, label: "On a scheduled day", desc: "Whitelist on the next occurrence of a chosen day" },
+            ] as const).map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
+                  draft.whitelistScheduleType === opt.value ? "border-primary-500 bg-primary-600/10" : "border-zinc-700 hover:border-zinc-600"
+                }`}>
+                <input
+                  type="radio"
+                  name="whitelistSchedule"
+                  checked={draft.whitelistScheduleType === opt.value}
+                  onChange={() => update("whitelistScheduleType", opt.value)}
+                  className="mt-0.5 accent-primary-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-zinc-200">{opt.label}</p>
+                  <p className="text-xs text-zinc-500">{opt.desc}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {draft.whitelistScheduleType === "delay" && (
+            <div className="pl-6">
+              <NumberInput
+                label="Delay (minutes)"
+                description="How long to wait after registration before auto-whitelisting"
+                value={draft.whitelistDelayMinutes}
+                onChange={(v) => update("whitelistDelayMinutes", v)}
+                min={1}
+                max={10080}
+              />
+              {draft.whitelistDelayMinutes >= 60 && (
+                <p className="mt-1 text-xs text-zinc-500">
+                  ≈ {draft.whitelistDelayMinutes >= 1440
+                    ? `${(draft.whitelistDelayMinutes / 1440).toFixed(1)} day(s)`
+                    : `${(draft.whitelistDelayMinutes / 60).toFixed(1)} hour(s)`}
+                </p>
+              )}
+            </div>
+          )}
+
+          {draft.whitelistScheduleType === "scheduled_day" && (
+            <div className="pl-6 space-y-1.5">
+              <label className="block text-sm font-medium text-zinc-200">Day of the Week</label>
+              <p className="text-xs text-zinc-500">Players registered before this day will be whitelisted on the next occurrence</p>
+              <select
+                value={draft.whitelistScheduledDay}
+                onChange={(e) => update("whitelistScheduledDay", Number(e.target.value))}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
+                {DAYS.map((day, i) => (
+                  <option key={day} value={i}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!draft.autoWhitelist && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 px-4 py-3 text-xs text-zinc-400">
+          💡 With auto-whitelist off, all whitelist requests require manual staff approval.
+        </div>
+      )}
+
       <NumberInput
-        label="Max Players Per User"
-        description="Maximum number of Minecraft accounts a single Discord user can link"
+        label="Max Accounts Per User"
+        description="Maximum number of Minecraft accounts a single Discord user can link (most servers use 1)"
         value={draft.maxPlayersPerUser}
         onChange={(v) => update("maxPlayersPerUser", v)}
         min={1}
-        max={100}
+        max={10}
       />
+      {draft.maxPlayersPerUser > 1 && <p className="text-xs text-zinc-500">💡 Users will be able to manage their linked accounts via the Minecraft panel in Discord.</p>}
     </div>
   );
 }
@@ -553,10 +640,20 @@ function StepReview({ draft }: { draft: Omit<MinecraftConfig, "guildId"> }) {
         </ReviewSection>
 
         <ReviewSection title="Whitelist">
-          <ReviewRow label="Auto Whitelist" value={draft.autoWhitelist ? "Yes" : "No"} />
-          <ReviewRow label="Require Approval" value={draft.requireApproval ? "Yes" : "No"} />
-          <ReviewRow label="Require Discord Link" value={draft.requireDiscordLink ? "Yes" : "No"} />
-          <ReviewRow label="Max Players/User" value={String(draft.maxPlayersPerUser)} />
+          <ReviewRow label="Mode" value={draft.autoWhitelist ? "Auto Whitelist" : "Staff Approval"} />
+          {draft.autoWhitelist && (
+            <ReviewRow
+              label="Schedule"
+              value={
+                draft.whitelistScheduleType === "immediate"
+                  ? "Immediately"
+                  : draft.whitelistScheduleType === "delay"
+                    ? `After ${draft.whitelistDelayMinutes} minute(s)`
+                    : `Every ${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][draft.whitelistScheduledDay]}`
+              }
+            />
+          )}
+          <ReviewRow label="Max Accounts/User" value={String(draft.maxPlayersPerUser)} />
         </ReviewSection>
 
         <ReviewSection title="Advanced">

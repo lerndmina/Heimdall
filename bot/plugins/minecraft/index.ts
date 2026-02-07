@@ -24,6 +24,7 @@ import "./models/McServerStatus.js";
 // Import services
 import { RoleSyncService } from "./services/RoleSyncService.js";
 import { MinecraftLeaveService } from "./services/MinecraftLeaveService.js";
+import { MinecraftPanelService } from "./services/MinecraftPanelService.js";
 
 /** Public API exposed to other plugins and event handlers */
 export interface MinecraftPluginAPI extends PluginAPI {
@@ -31,9 +32,11 @@ export interface MinecraftPluginAPI extends PluginAPI {
   lib: LibAPI;
   roleSyncService: RoleSyncService;
   leaveService: typeof MinecraftLeaveService;
+  panelService: MinecraftPanelService;
 }
 
 let roleSyncService: RoleSyncService;
+let panelService: MinecraftPanelService;
 
 export async function onLoad(context: PluginContext): Promise<MinecraftPluginAPI> {
   const { client, logger, dependencies } = context;
@@ -44,6 +47,8 @@ export async function onLoad(context: PluginContext): Promise<MinecraftPluginAPI
 
   // Initialize services
   roleSyncService = new RoleSyncService(lib);
+  panelService = new MinecraftPanelService(lib, lib.componentCallbackService, logger);
+  panelService.initialize();
 
   logger.debug("✅ Minecraft plugin loaded");
 
@@ -52,6 +57,7 @@ export async function onLoad(context: PluginContext): Promise<MinecraftPluginAPI
     lib,
     roleSyncService,
     leaveService: MinecraftLeaveService,
+    panelService,
   };
 }
 
