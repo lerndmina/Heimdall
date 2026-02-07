@@ -14,6 +14,7 @@ export enum LoggingCategory {
   MESSAGES = "messages",
   USERS = "users",
   MODERATION = "moderation",
+  AUDIT = "audit",
 }
 
 export enum MessageSubcategory {
@@ -31,6 +32,11 @@ export enum ModerationSubcategory {
   BANS = "bans",
   UNBANS = "unbans",
   TIMEOUTS = "timeouts",
+}
+
+export enum AuditSubcategory {
+  DASHBOARD_PERMISSIONS = "dashboard_permissions",
+  DASHBOARD_SETTINGS = "dashboard_settings",
 }
 
 // ── Schema ───────────────────────────────────────────────

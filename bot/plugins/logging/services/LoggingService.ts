@@ -6,7 +6,7 @@ import { ChannelType, PermissionFlagsBits, type TextChannel } from "discord.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import type { LibAPI } from "../../lib/index.js";
-import LoggingConfig, { LoggingCategory, MessageSubcategory, UserSubcategory, ModerationSubcategory, type ILoggingConfig } from "../models/LoggingConfig.js";
+import LoggingConfig, { LoggingCategory, MessageSubcategory, UserSubcategory, ModerationSubcategory, AuditSubcategory, type ILoggingConfig } from "../models/LoggingConfig.js";
 
 const log = createLogger("logging:service");
 
@@ -69,6 +69,9 @@ export class LoggingService {
         subcategories.set(ModerationSubcategory.BANS, true);
         subcategories.set(ModerationSubcategory.UNBANS, true);
         subcategories.set(ModerationSubcategory.TIMEOUTS, true);
+      } else if (category === LoggingCategory.AUDIT) {
+        subcategories.set(AuditSubcategory.DASHBOARD_PERMISSIONS, true);
+        subcategories.set(AuditSubcategory.DASHBOARD_SETTINGS, true);
       }
 
       let config = await LoggingConfig.findOne({ guildId });

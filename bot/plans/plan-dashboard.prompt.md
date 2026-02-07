@@ -24,6 +24,6 @@ A three-state (deny / inherit / allow) permissions system mirroring Discord's ch
 
 ### Further Considerations
 
-1. **Permission caching strategy** — The proxy will cache member roles + guild overrides for ~30s to avoid per-request Discord API + MongoDB calls. Should the permissions page have a "refresh permissions" button for when an admin just changed roles, or is a 30s TTL sufficient?
+1. **Permission caching strategy** — The proxy caches member roles + guild overrides for ~30s server-side. A **"Refresh Permissions"** button is available on the settings page header for admins to force-reload after role changes. ✅ Implemented.
 
-2. **Audit logging** — Should permission changes (who granted/denied what to which role) be logged to the guild's logging channel if the logging plugin is enabled, or is MongoDB timestamps on the model sufficient for now?
+2. **Audit logging** — Permission changes (upsert, delete) and settings changes are logged to the guild's audit logging channel if the logging plugin is enabled with the `audit` category configured. A new `AUDIT` logging category with `dashboard_permissions` and `dashboard_settings` subcategories was added. ✅ Implemented.

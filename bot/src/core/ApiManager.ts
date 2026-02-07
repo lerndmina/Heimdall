@@ -12,10 +12,11 @@ import express, { Router, type Application, type Request, type Response, type Ne
 import type { Server } from "http";
 import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
-import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
+import { ChannelType, PermissionFlagsBits, EmbedBuilder, TextChannel, type Client } from "discord.js";
 import log from "../utils/logger";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
 import DashboardSettings from "../../plugins/dashboard/models/DashboardSettings.js";
+import LoggingConfig, { LoggingCategory } from "../../plugins/logging/models/LoggingConfig.js";
 
 export interface PluginRouter {
   /** Which plugin owns this router */
@@ -43,6 +44,27 @@ export class ApiManager {
    */
   setClient(client: Client): void {
     this.client = client;
+  }
+
+  /**
+   * Send an audit log embed to the guild's configured audit logging channel.
+   * Silently no-ops if the logging plugin isn't configured for this guild.
+   */
+  private async sendAuditLog(guildId: string, embed: EmbedBuilder): Promise<void> {
+    if (!this.client) return;
+    try {
+      const config = await LoggingConfig.findOne({ guildId, globalEnabled: true });
+      if (!config) return;
+      const auditCat = config.categories.find((c: any) => c.category === LoggingCategory.AUDIT && c.enabled);
+      if (!auditCat) return;
+      const guild = this.client.guilds.cache.get(guildId);
+      if (!guild) return;
+      const channel = guild.channels.cache.get(auditCat.channelId);
+      if (!channel?.isTextBased()) return;
+      await (channel as TextChannel).send({ embeds: [embed] });
+    } catch (err) {
+      log.error("[API] Failed to send audit log:", err);
+    }
   }
 
   constructor(port: number = 3001, apiKey: string) {
@@ -399,6 +421,18 @@ export class ApiManager {
           { upsert: true, new: true },
         ).lean();
         res.json({ success: true, data: { permission: doc } });
+
+        // Audit log
+        const overrideEntries = Object.entries(overrides);
+        const summary = overrideEntries.length > 0 ? overrideEntries.map(([k, v]) => `\`${k}\`: **${v}**`).join("\n") : "*All overrides cleared*";
+        this.sendAuditLog(
+          guildId,
+          new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle("🛡️ Dashboard Permissions Updated")
+            .addFields({ name: "Role", value: `${roleName ?? roleId} (<@&${roleId}>)`, inline: true }, { name: "Overrides", value: summary.slice(0, 1024) })
+            .setTimestamp(),
+        );
       } catch (err) {
         log.error("[API] Error upserting dashboard permission:", err);
         res.status(500).json({ success: false, error: "Database error" });
@@ -416,6 +450,16 @@ export class ApiManager {
       try {
         await DashboardPermission.deleteOne({ guildId, discordRoleId: roleId });
         res.json({ success: true });
+
+        // Audit log
+        this.sendAuditLog(
+          guildId,
+          new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle("🛡️ Dashboard Permissions Removed")
+            .addFields({ name: "Role", value: `<@&${roleId}>`, inline: true })
+            .setTimestamp(),
+        );
       } catch (err) {
         log.error("[API] Error deleting dashboard permission:", err);
         res.status(500).json({ success: false, error: "Database error" });
@@ -454,6 +498,20 @@ export class ApiManager {
       try {
         const doc = await DashboardSettings.findOneAndUpdate({ guildId }, { $set: { hideDeniedFeatures: !!hideDeniedFeatures } }, { upsert: true, new: true }).lean();
         res.json({ success: true, data: { settings: doc } });
+
+        // Audit log
+        this.sendAuditLog(
+          guildId,
+          new EmbedBuilder()
+            .setColor(0xffa500)
+            .setTitle("⚙️ Dashboard Settings Updated")
+            .addFields({
+              name: "Hide Denied Features",
+              value: hideDeniedFeatures ? "Enabled" : "Disabled",
+              inline: true,
+            })
+            .setTimestamp(),
+        );
       } catch (err) {
         log.error("[API] Error updating dashboard settings:", err);
         res.status(500).json({ success: false, error: "Database error" });

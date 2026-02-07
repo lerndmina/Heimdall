@@ -11,6 +11,10 @@ import * as path from "path";
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 
+// Register Mongoose models
+import "./models/DashboardPermission.js";
+import "./models/DashboardSettings.js";
+
 export interface DashboardPluginAPI extends PluginAPI {
   version: string;
   /** Port the dashboard is listening on */

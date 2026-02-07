@@ -13,6 +13,8 @@ export interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
+  /** When true, the item is shown grayed out with a lock icon */
+  locked?: boolean;
 }
 
 interface SidebarProps {
@@ -46,6 +48,21 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
             const normalizedHref = item.href.replace(/\/+$/, "") || "/";
             const isGuildRoot = normalizedHref === guildRoot;
             const isActive = isGuildRoot ? normalizedPathname === normalizedHref : normalizedPathname === normalizedHref || normalizedPathname.startsWith(normalizedHref + "/");
+
+            if (item.locked) {
+              return (
+                <li key={item.href + item.label}>
+                  <Link href={item.href} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 cursor-not-allowed opacity-50">
+                    <span className="h-5 w-5 shrink-0">{item.icon}</span>
+                    {item.label}
+                    <svg className="ml-auto h-4 w-4 shrink-0 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </Link>
+                </li>
+              );
+            }
+
             return (
               <li key={item.href}>
                 <Link
