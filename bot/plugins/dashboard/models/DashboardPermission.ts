@@ -41,8 +41,7 @@ DashboardPermissionSchema.index({ guildId: 1, discordRoleId: 1 }, { unique: true
 
 type IDashboardPermission = InferSchemaType<typeof DashboardPermissionSchema>;
 
-const DashboardPermission = (mongoose.models.DashboardPermission ||
-  model<IDashboardPermission>("DashboardPermission", DashboardPermissionSchema)) as Model<IDashboardPermission>;
+const DashboardPermission = (mongoose.models.DashboardPermission || model<IDashboardPermission>("DashboardPermission", DashboardPermissionSchema)) as Model<IDashboardPermission>;
 
 export default DashboardPermission;
 export type { IDashboardPermission };

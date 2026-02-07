@@ -134,9 +134,7 @@ export function resolveRouteAction(method: string, pathSegments: string[]): stri
   // 3. Try with trailing wildcard removed (e.g. "POST /minecraft/players/*/approve")
   //    This handles 3+ segment paths like /players/123/approve
   for (let wildcardPos = 0; wildcardPos < pathSegments.length; wildcardPos++) {
-    const pattern = pathSegments
-      .map((seg, i) => (i === wildcardPos ? "*" : seg))
-      .join("/");
+    const pattern = pathSegments.map((seg, i) => (i === wildcardPos ? "*" : seg)).join("/");
     const key = `${upperMethod} /${pattern}`;
     if (routeMap[key]) return routeMap[key];
   }

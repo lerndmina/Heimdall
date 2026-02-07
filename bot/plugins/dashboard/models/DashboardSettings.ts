@@ -29,8 +29,7 @@ const DashboardSettingsSchema = new Schema(
 
 type IDashboardSettings = InferSchemaType<typeof DashboardSettingsSchema>;
 
-const DashboardSettings = (mongoose.models.DashboardSettings ||
-  model<IDashboardSettings>("DashboardSettings", DashboardSettingsSchema)) as Model<IDashboardSettings>;
+const DashboardSettings = (mongoose.models.DashboardSettings || model<IDashboardSettings>("DashboardSettings", DashboardSettingsSchema)) as Model<IDashboardSettings>;
 
 export default DashboardSettings;
 export type { IDashboardSettings };

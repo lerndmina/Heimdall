@@ -452,11 +452,7 @@ export class ApiManager {
       const { guildId } = req.params;
       const { hideDeniedFeatures } = req.body as { hideDeniedFeatures?: boolean };
       try {
-        const doc = await DashboardSettings.findOneAndUpdate(
-          { guildId },
-          { $set: { hideDeniedFeatures: !!hideDeniedFeatures } },
-          { upsert: true, new: true },
-        ).lean();
+        const doc = await DashboardSettings.findOneAndUpdate({ guildId }, { $set: { hideDeniedFeatures: !!hideDeniedFeatures } }, { upsert: true, new: true }).lean();
         res.json({ success: true, data: { settings: doc } });
       } catch (err) {
         log.error("[API] Error updating dashboard settings:", err);
