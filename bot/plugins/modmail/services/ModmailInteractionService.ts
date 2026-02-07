@@ -221,11 +221,7 @@ export class ModmailInteractionService {
       await this.handleCategorySelect(interaction);
     });
 
-    // Multi-select question answer (for form fields)
-    this.componentCallbackService.registerPersistentHandler("modmail.question.select", async (interaction) => {
-      if (!interaction.isStringSelectMenu()) return;
-      await this.handleQuestionSelect(interaction);
-    });
+    // modmail.question.select is registered by ModmailQuestionHandler constructor
 
     // "I Need More Help" button - cancels resolve timer, sends SOS embed
     this.componentCallbackService.registerPersistentHandler("modmail.user.reopen", async (interaction) => {

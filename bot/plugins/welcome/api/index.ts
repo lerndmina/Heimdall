@@ -10,15 +10,13 @@ import { createConfigUpdateRoutes } from "./config-update.js";
 import { createConfigDeleteRoutes } from "./config-delete.js";
 import { createTestRoutes } from "./test.js";
 import { createVariablesRoutes } from "./variables.js";
-import type { WelcomeService } from "../services/WelcomeService.js";
-import type { LibAPI } from "../../lib/index.js";
+import type { WelcomePluginAPI } from "../index.js";
 
-export interface WelcomeApiDependencies {
-  welcomeService: WelcomeService;
-  lib: LibAPI;
-}
+/** @deprecated Use createRouter instead */
+export type WelcomeApiDependencies = Pick<WelcomePluginAPI, "welcomeService" | "lib">;
 
-export function createWelcomeRouter(deps: WelcomeApiDependencies): Router {
+export function createRouter(api: WelcomePluginAPI): Router {
+  const deps = { welcomeService: api.welcomeService, lib: api.lib };
   const router = Router({ mergeParams: true });
 
   // GET    /api/guilds/:guildId/welcome/config

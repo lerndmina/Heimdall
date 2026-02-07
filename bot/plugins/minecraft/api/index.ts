@@ -12,15 +12,13 @@ import { createPlayersRoutes } from "./players.js";
 import { createRconRoutes } from "./rcon.js";
 import { createRequestsRoutes } from "./requests.js";
 import { createRoleSyncRoutes } from "./rolesync.js";
-import type { RoleSyncService } from "../services/RoleSyncService.js";
-import type { LibAPI } from "../../lib/index.js";
+import type { MinecraftPluginAPI } from "../index.js";
 
-export interface MinecraftApiDependencies {
-  roleSyncService: RoleSyncService;
-  lib: LibAPI;
-}
+/** @deprecated Use createRouter instead */
+export type MinecraftApiDependencies = Pick<MinecraftPluginAPI, "roleSyncService" | "lib">;
 
-export function createMinecraftRouter(deps: MinecraftApiDependencies): Router {
+export function createRouter(api: MinecraftPluginAPI): Router {
+  const deps = { roleSyncService: api.roleSyncService, lib: api.lib };
   const router = Router({ mergeParams: true });
 
   // GET/PUT  /api/guilds/:guildId/minecraft/config

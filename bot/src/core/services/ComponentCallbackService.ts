@@ -140,7 +140,7 @@ export class ComponentCallbackService {
 
       this.loaded = true;
 
-      log.info(`[ComponentCallbackService] Loaded ${components.length} persistent components from MongoDB`);
+      log.debug(`[ComponentCallbackService] Loaded ${components.length} persistent components from MongoDB`);
     } catch (error) {
       log.error("[ComponentCallbackService] Failed to load persistent components:", error);
       throw error;
@@ -166,12 +166,12 @@ export class ComponentCallbackService {
 
     if (stored) {
       const executionTime = Date.now() - startTime;
-      log.info(`[ComponentCallbackService] 🔄 Executing ephemeral ${componentType}: ${customId} (user: ${userId}, guild: ${guildId}, time: ${executionTime}ms)`);
+      log.debug(`[ComponentCallbackService] 🔄 Executing ephemeral ${componentType}: ${customId} (user: ${userId}, guild: ${guildId}, time: ${executionTime}ms)`);
 
       try {
         await stored.callback(interaction);
         const totalTime = Date.now() - startTime;
-        log.info(`[ComponentCallbackService] ✅ Ephemeral ${componentType} completed: ${customId} (time: ${totalTime}ms)`);
+        log.debug(`[ComponentCallbackService] ✅ Ephemeral ${componentType} completed: ${customId} (time: ${totalTime}ms)`);
         return true;
       } catch (error) {
         const totalTime = Date.now() - startTime;
@@ -251,12 +251,12 @@ export class ComponentCallbackService {
         return true;
       }
 
-      log.info(`[ComponentCallbackService] 🔄 Executing persistent ${componentType}: ${customId} -> "${handlerId}" (user: ${userId}, guild: ${guildId}, time: ${executionTime}ms)`);
+      log.debug(`[ComponentCallbackService] 🔄 Executing persistent ${componentType}: ${customId} -> "${handlerId}" (user: ${userId}, guild: ${guildId}, time: ${executionTime}ms)`);
 
       try {
         await handler(interaction);
         const totalTime = Date.now() - startTime;
-        log.info(`[ComponentCallbackService] ✅ Persistent ${componentType} completed: ${customId} -> "${handlerId}" (time: ${totalTime}ms)`);
+        log.debug(`[ComponentCallbackService] ✅ Persistent ${componentType} completed: ${customId} -> "${handlerId}" (time: ${totalTime}ms)`);
         return true;
       } catch (error) {
         const totalTime = Date.now() - startTime;

@@ -74,7 +74,7 @@ export async function onLoad(context: PluginContext): Promise<LibAPI> {
 
   // Initialize ThingGetter with the Discord client
   thingGetterInstance = new ThingGetter(client);
-  logger.info("ThingGetter initialized");
+  logger.debug("ThingGetter initialized");
 
   // Initialize component builders with the callback service
   HeimdallButtonBuilder.setCallbackService(componentCallbackService);
@@ -83,9 +83,9 @@ export async function onLoad(context: PluginContext): Promise<LibAPI> {
   HeimdallUserSelectMenuBuilder.setCallbackService(componentCallbackService);
   HeimdallChannelSelectMenuBuilder.setCallbackService(componentCallbackService);
   HeimdallMentionableSelectMenuBuilder.setCallbackService(componentCallbackService);
-  logger.info("Component builders initialized with callback service");
+  logger.debug("Component builders initialized with callback service");
 
-  logger.info("Library plugin loaded successfully");
+  logger.debug("Library plugin loaded successfully");
 
   return {
     version: "1.0.0",

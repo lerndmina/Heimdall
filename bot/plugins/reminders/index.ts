@@ -9,7 +9,6 @@
  * - Auto-detect ticket/modmail context when creating reminders in those channels
  */
 
-import path from "path";
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 
@@ -18,9 +17,6 @@ import "./models/Reminder.js";
 
 // Import service
 import { ReminderService } from "./services/ReminderService.js";
-
-// Import API router factory
-import { createRemindersRouter } from "./api/index.js";
 
 /** Public API exposed to other plugins */
 export interface RemindersPluginAPI extends PluginAPI {
@@ -32,7 +28,7 @@ export interface RemindersPluginAPI extends PluginAPI {
 let reminderService: ReminderService;
 
 export async function onLoad(context: PluginContext): Promise<RemindersPluginAPI> {
-  const { client, apiManager, logger, pluginPath, dependencies } = context;
+  const { client, logger, dependencies } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI | undefined;
@@ -43,15 +39,6 @@ export async function onLoad(context: PluginContext): Promise<RemindersPluginAPI
 
   // Start background polling
   reminderService.start();
-
-  // Register API routes
-  const router = createRemindersRouter({ reminderService, lib });
-  apiManager.registerRouter({
-    pluginName: "reminders",
-    prefix: "/reminders",
-    router,
-    swaggerPaths: [path.join(pluginPath, "api", "*.ts")],
-  });
 
   logger.info("✅ Reminders plugin loaded (polling active)");
 
@@ -70,3 +57,4 @@ export async function onDisable(logger: PluginLogger): Promise<void> {
 }
 
 export const commands = "./commands";
+export const api = "./api";

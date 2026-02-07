@@ -8,7 +8,6 @@
  * - Dashboard API routes for config CRUD
  */
 
-import path from "path";
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 
@@ -18,9 +17,6 @@ import "./models/LoggingConfig.js";
 // Import services
 import { LoggingService } from "./services/LoggingService.js";
 import { LoggingEventService } from "./services/LoggingEventService.js";
-
-// Import API router factory
-import { createLoggingRouter } from "./api/index.js";
 
 /** Public API exposed to other plugins and event handlers */
 export interface LoggingPluginAPI extends PluginAPI {
@@ -34,7 +30,7 @@ let loggingService: LoggingService;
 let eventService: LoggingEventService;
 
 export async function onLoad(context: PluginContext): Promise<LoggingPluginAPI> {
-  const { client, apiManager, logger, pluginPath, dependencies } = context;
+  const { client, logger, dependencies } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI | undefined;
@@ -43,15 +39,6 @@ export async function onLoad(context: PluginContext): Promise<LoggingPluginAPI> 
   // Initialize services
   loggingService = new LoggingService(client, lib);
   eventService = new LoggingEventService(loggingService, lib);
-
-  // Register API routes
-  const router = createLoggingRouter({ loggingService, lib });
-  apiManager.registerRouter({
-    pluginName: "logging",
-    prefix: "/logging",
-    router,
-    swaggerPaths: [path.join(pluginPath, "api", "*.ts")],
-  });
 
   logger.info("✅ Logging plugin loaded");
 
@@ -72,3 +59,4 @@ export async function onDisable(logger: PluginLogger): Promise<void> {
 }
 
 export const commands = "./commands";
+export const api = "./api";

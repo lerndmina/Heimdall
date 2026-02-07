@@ -55,7 +55,7 @@ const env = envLoader.loadGlobalEnv();
 async function connectMongoDB(uri: string, database: string): Promise<typeof mongoose> {
   log.debug("Connecting to MongoDB...");
   await mongoose.connect(uri, { dbName: database });
-  log.info("✅ MongoDB connected");
+  log.debug("✅ MongoDB connected");
   return mongoose;
 }
 
@@ -70,7 +70,7 @@ async function connectRedis(url: string): Promise<RedisClientType> {
   redis.on("reconnecting", () => log.warn("Redis reconnecting..."));
 
   await redis.connect();
-  log.info("✅ Redis connected");
+  log.debug("✅ Redis connected");
 
   return redis;
 }
@@ -182,6 +182,9 @@ baseClient.once(Events.ClientReady, async (readyClient) => {
     captureException(error, { context: "Command Registration" });
   }
 
+  // Give API manager access to the Discord client for guild status checks
+  apiManager.setClient(readyClient);
+
   // Start API server
   try {
     await apiManager.start();
@@ -290,9 +293,9 @@ async function start(): Promise<void> {
     eventManager = new EventManager(baseClient as HeimdallClient);
 
     // API manager
-    apiManager = new ApiManager(env.API_PORT ?? 3001);
+    apiManager = new ApiManager(env.API_PORT ?? 3001, env.INTERNAL_API_KEY);
 
-    log.info("✅ Core services initialized");
+    log.debug("✅ Core services initialized");
 
     // Login to Discord — plugins are loaded in the ready event handler
     // so that all Discord caches and API access are available during init.

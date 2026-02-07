@@ -9,8 +9,10 @@
  */
 
 import express, { Router, type Application, type Request, type Response, type NextFunction } from "express";
+import type { Server } from "http";
 import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
+import type { Client } from "discord.js";
 import log from "../utils/logger";
 
 export interface PluginRouter {
@@ -29,9 +31,21 @@ export class ApiManager {
   private routers: PluginRouter[] = [];
   private port: number;
   private started = false;
+  private apiKey: string;
+  private server: Server | null = null;
+  private client: Client | null = null;
 
-  constructor(port: number = 3001) {
+  /**
+   * Set the Discord client reference (called after client is ready).
+   * Enables guild-level status checks.
+   */
+  setClient(client: Client): void {
+    this.client = client;
+  }
+
+  constructor(port: number = 3001, apiKey: string) {
     this.port = port;
+    this.apiKey = apiKey;
     this.app = express();
     this.setupMiddleware();
   }
@@ -78,6 +92,16 @@ export class ApiManager {
    * Mount all registered routers
    */
   private mountRouters(): void {
+    // API key auth middleware — applied to all guild-scoped routes
+    this.app.use("/api/guilds", (req: Request, res: Response, next: NextFunction) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      next();
+    });
+
     for (const { prefix, router, pluginName } of this.routers) {
       // Mount under /api/guilds/:guildId{prefix} for guild-scoped routes
       const fullPath = `/api/guilds/:guildId${prefix}`;
@@ -189,15 +213,47 @@ export class ApiManager {
       });
     });
 
+    // Guild status check — is the bot in this guild?
+    this.app.get("/api/guilds/:guildId/status", (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const { guildId } = req.params;
+      if (!this.client) {
+        res.status(503).json({ success: false, error: "Bot not ready" });
+        return;
+      }
+
+      const guild = this.client.guilds.cache.get(guildId);
+      res.json({
+        success: true,
+        data: {
+          botInGuild: !!guild,
+          guildName: guild?.name ?? null,
+          memberCount: guild?.memberCount ?? null,
+        },
+      });
+    });
+
     this.setupErrorHandling();
 
     return new Promise((resolve) => {
-      this.app.listen(this.port, () => {
+      this.server = this.app.listen(this.port, () => {
         this.started = true;
         log.info(`✅ API server running on port ${this.port}`);
         resolve();
       });
     });
+  }
+
+  /**
+   * Get the underlying HTTP server (for WebSocket upgrades, etc.)
+   */
+  getServer(): Server | null {
+    return this.server;
   }
 
   /**

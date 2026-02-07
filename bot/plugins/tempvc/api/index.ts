@@ -10,15 +10,13 @@ import { createConfigUpdateRoutes } from "./config-update.js";
 import { createActiveListRoutes } from "./active-list.js";
 import { createStatsRoutes } from "./stats.js";
 import { createChannelDeleteRoutes } from "./channel-delete.js";
-import type { TempVCService } from "../services/TempVCService.js";
-import type { LibAPI } from "../../lib/index.js";
+import type { TempVCPluginAPI } from "../index.js";
 
-export interface TempVCApiDependencies {
-  tempVCService: TempVCService;
-  lib: LibAPI;
-}
+/** @deprecated Use createRouter instead */
+export type TempVCApiDependencies = Pick<TempVCPluginAPI, "tempVCService" | "lib">;
 
-export function createTempVCRouter(deps: TempVCApiDependencies): Router {
+export function createRouter(api: TempVCPluginAPI): Router {
+  const deps = { tempVCService: api.tempVCService, lib: api.lib };
   const router = Router({ mergeParams: true });
 
   router.use("/config", createConfigRoutes(deps));

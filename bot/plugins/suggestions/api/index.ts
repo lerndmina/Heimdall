@@ -12,15 +12,13 @@ import { createSuggestionStatusRoutes } from "./suggestion-status.js";
 import { createSuggestionStatsRoutes } from "./suggestion-stats.js";
 import { createOpenerRoutes } from "./openers.js";
 import { createCategoryRoutes } from "./categories.js";
-import type { SuggestionService } from "../services/SuggestionService.js";
-import type { LibAPI } from "../../lib/index.js";
+import type { SuggestionsPluginAPI } from "../index.js";
 
-export interface SuggestionsApiDependencies {
-  suggestionService: SuggestionService;
-  lib: LibAPI;
-}
+/** @deprecated Use createRouter instead */
+export type SuggestionsApiDependencies = Pick<SuggestionsPluginAPI, "suggestionService" | "lib">;
 
-export function createSuggestionsRouter(deps: SuggestionsApiDependencies): Router {
+export function createRouter(api: SuggestionsPluginAPI): Router {
+  const deps = { suggestionService: api.suggestionService, lib: api.lib };
   const router = Router({ mergeParams: true });
 
   // GET/PUT   /api/guilds/:guildId/suggestions/config

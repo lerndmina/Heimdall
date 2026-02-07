@@ -9,7 +9,6 @@
  * - Dashboard API routes for config CRUD, testing, and variable listing
  */
 
-import path from "path";
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 
@@ -18,9 +17,6 @@ import "./models/WelcomeMessage.js";
 
 // Import service
 import { WelcomeService } from "./services/WelcomeService.js";
-
-// Import API router factory
-import { createWelcomeRouter } from "./api/index.js";
 
 /** Public API exposed to other plugins and event handlers */
 export interface WelcomePluginAPI extends PluginAPI {
@@ -32,7 +28,7 @@ export interface WelcomePluginAPI extends PluginAPI {
 let welcomeService: WelcomeService;
 
 export async function onLoad(context: PluginContext): Promise<WelcomePluginAPI> {
-  const { client, apiManager, logger, pluginPath, dependencies } = context;
+  const { client, logger, dependencies } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI | undefined;
@@ -40,15 +36,6 @@ export async function onLoad(context: PluginContext): Promise<WelcomePluginAPI> 
 
   // Initialize service
   welcomeService = new WelcomeService(client, lib);
-
-  // Register API routes
-  const router = createWelcomeRouter({ welcomeService, lib });
-  apiManager.registerRouter({
-    pluginName: "welcome",
-    prefix: "/welcome",
-    router,
-    swaggerPaths: [path.join(pluginPath, "api", "*.ts")],
-  });
 
   logger.info("✅ Welcome plugin loaded");
 
@@ -65,3 +52,4 @@ export async function onDisable(logger: PluginLogger): Promise<void> {
 
 export const commands = "./commands";
 export const events = "./events";
+export const api = "./api";

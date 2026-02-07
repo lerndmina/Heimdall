@@ -38,7 +38,7 @@ export interface SuggestionCategory {
 
 const SuggestionCategorySchema = new Schema<SuggestionCategory>(
   {
-    id: { type: String, default: () => nanoid(8), unique: true },
+    id: { type: String, default: () => nanoid(8) },
     name: { type: String, required: true, maxlength: 50 },
     description: { type: String, required: true, maxlength: 200 },
     emoji: { type: String, maxlength: 100 },

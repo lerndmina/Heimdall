@@ -9,7 +9,6 @@
  * - Dashboard API routes
  */
 
-import path from "path";
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 
@@ -21,21 +20,19 @@ import "./models/ActiveTempChannels.js";
 import { TempVCService } from "./services/TempVCService.js";
 import { TempVCInteractionHandler } from "./services/TempVCInteractionHandler.js";
 
-// Import API router factory
-import { createTempVCRouter } from "./api/index.js";
-
 /** Public API exposed to other plugins */
 export interface TempVCPluginAPI extends PluginAPI {
   version: string;
   tempVCService: TempVCService;
   interactionHandler: TempVCInteractionHandler;
+  lib: LibAPI;
 }
 
 let tempVCService: TempVCService;
 let interactionHandler: TempVCInteractionHandler;
 
 export async function onLoad(context: PluginContext): Promise<TempVCPluginAPI> {
-  const { client, redis, apiManager, logger, pluginPath, dependencies } = context;
+  const { client, redis, logger, dependencies } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI | undefined;
@@ -51,21 +48,13 @@ export async function onLoad(context: PluginContext): Promise<TempVCPluginAPI> {
   // Register persistent interaction handlers
   await interactionHandler.initialize();
 
-  // Register API routes
-  const router = createTempVCRouter({ tempVCService, lib });
-  apiManager.registerRouter({
-    pluginName: "tempvc",
-    prefix: "/tempvc",
-    router,
-    swaggerPaths: [path.join(pluginPath, "api", "*.ts")],
-  });
-
   logger.info("✅ TempVC plugin loaded");
 
   return {
     version: "1.0.0",
     tempVCService,
     interactionHandler,
+    lib,
   };
 }
 
@@ -75,3 +64,4 @@ export async function onDisable(logger: PluginLogger): Promise<void> {
 
 export const commands = "./commands";
 export const events = "./events";
+export const api = "./api";

@@ -12,7 +12,6 @@
  * - Discord ↔ Minecraft role synchronization
  */
 
-import path from "path";
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 
@@ -26,9 +25,6 @@ import "./models/McServerStatus.js";
 import { RoleSyncService } from "./services/RoleSyncService.js";
 import { MinecraftLeaveService } from "./services/MinecraftLeaveService.js";
 
-// Import API router factory
-import { createMinecraftRouter } from "./api/index.js";
-
 /** Public API exposed to other plugins and event handlers */
 export interface MinecraftPluginAPI extends PluginAPI {
   version: string;
@@ -40,7 +36,7 @@ export interface MinecraftPluginAPI extends PluginAPI {
 let roleSyncService: RoleSyncService;
 
 export async function onLoad(context: PluginContext): Promise<MinecraftPluginAPI> {
-  const { client, apiManager, logger, pluginPath, dependencies } = context;
+  const { client, logger, dependencies } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI | undefined;
@@ -49,16 +45,7 @@ export async function onLoad(context: PluginContext): Promise<MinecraftPluginAPI
   // Initialize services
   roleSyncService = new RoleSyncService(lib);
 
-  // Register API routes
-  const router = createMinecraftRouter({ roleSyncService, lib });
-  apiManager.registerRouter({
-    pluginName: "minecraft",
-    prefix: "/minecraft",
-    router,
-    swaggerPaths: [path.join(pluginPath, "api", "*.ts")],
-  });
-
-  logger.info("✅ Minecraft plugin loaded");
+  logger.debug("✅ Minecraft plugin loaded");
 
   return {
     version: "1.0.0",
@@ -74,3 +61,4 @@ export async function onDisable(logger: PluginLogger): Promise<void> {
 
 export const commands = "./commands";
 export const events = "./events";
+export const api = "./api";

@@ -110,7 +110,7 @@ export async function onLoad(context: PluginContext): Promise<ModmailPluginAPI> 
   const backgroundService = new BackgroundModmailService(client, modmailService, lib.thingGetter, lib, logger);
   backgroundService.start();
 
-  logger.info("modmail plugin loaded");
+  logger.debug("modmail plugin loaded");
 
   // Create API object
   pluginAPI = {
@@ -139,9 +139,10 @@ export async function onDisable(logger: PluginLogger): Promise<void> {
     pluginAPI.backgroundService.stop();
   }
   pluginAPI = null;
-  logger.info("modmail plugin disabled");
+  logger.debug("modmail plugin disabled");
 }
 
 // Command and event paths for plugin loader
 export const commands = "./commands";
 export const events = "./events";
+export const api = "./api";

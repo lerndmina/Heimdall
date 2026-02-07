@@ -17,7 +17,7 @@ export const once = true;
 export const pluginName = "minecraft";
 
 export async function execute(client: Client<true>): Promise<void> {
-  log.info("Starting checkservers — looking for persistent mcstatus servers");
+  log.debug("Starting checkservers — looking for persistent mcstatus servers");
 
   const servers = await McServerStatus.find({ persistData: { $ne: null } }).lean();
 
@@ -30,7 +30,7 @@ export async function execute(client: Client<true>): Promise<void> {
     }
   }
 
-  log.info(`Checkservers complete — started ${started} persistent loops out of ${servers.length} servers`);
+  log.debug(`Checkservers complete — started ${started} persistent loops out of ${servers.length} servers`);
 }
 
 /**
@@ -50,7 +50,7 @@ export async function beginPersistentLoop(client: Client, server: IMcServerStatu
 
   const { channelId, messageId } = server.persistData;
 
-  log.info(`Starting persistent loop for ${server.serverName} (${server.serverIp}:${server.serverPort})`);
+  log.debug(`Starting persistent loop for ${server.serverName} (${server.serverIp}:${server.serverPort})`);
 
   // Resolve channel
   const channel = await client.channels.fetch(channelId).catch(() => null);

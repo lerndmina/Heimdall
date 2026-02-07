@@ -132,6 +132,7 @@ class EnvLoader {
       MONGODB_DATABASE: process.env.MONGODB_DATABASE || "heimdall_v1",
       REDIS_URL: process.env.REDIS_URL || "",
       ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || "",
+      INTERNAL_API_KEY: process.env.INTERNAL_API_KEY || "",
       DEBUG_LOG: process.env.DEBUG_LOG === "true",
       SENTRY_DSN: process.env.SENTRY_DSN || undefined,
       SENTRY_ENABLED: process.env.SENTRY_ENABLED !== "false",
@@ -142,7 +143,7 @@ class EnvLoader {
 
     // Validate required global envs
     const missingKeys: string[] = [];
-    const requiredKeys: (keyof GlobalEnv)[] = ["BOT_TOKEN", "OWNER_IDS", "MONGODB_URI", "REDIS_URL", "ENCRYPTION_KEY"];
+    const requiredKeys: (keyof GlobalEnv)[] = ["BOT_TOKEN", "OWNER_IDS", "MONGODB_URI", "REDIS_URL", "ENCRYPTION_KEY", "INTERNAL_API_KEY"];
 
     for (const key of requiredKeys) {
       const value = env[key];

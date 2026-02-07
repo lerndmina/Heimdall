@@ -8,13 +8,9 @@
  * - TicketArchiveConfig model for archive settings
  */
 
-import path from "path";
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 import type { SupportCoreAPI } from "../support-core/index.js";
-
-// Import API router
-import { createTicketsRouter } from "./api/index.js";
 
 // Import services
 import { TicketCategoryService } from "./services/TicketCategoryService.js";
@@ -115,6 +111,9 @@ export { InteractionFlow };
 export interface TicketsAPI extends PluginAPI {
   version: string;
 
+  // Lib dependency
+  lib: LibAPI;
+
   // Models (for other plugins if needed)
   models: {
     Ticket: typeof Ticket;
@@ -172,7 +171,7 @@ export interface TicketsAPI extends PluginAPI {
 }
 
 export async function onLoad(context: PluginContext): Promise<TicketsAPI> {
-  const { logger, redis, client, dependencies, apiManager, manifest, pluginPath } = context;
+  const { logger, redis, client, dependencies } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI;
@@ -207,24 +206,12 @@ export async function onLoad(context: PluginContext): Promise<TicketsAPI> {
   reminderService.start();
   archiveCleanupService.start();
 
-  // Register API routes
-  const router = createTicketsRouter({
-    categoryService,
-    lifecycleService,
-    lib,
-  });
-
-  apiManager.registerRouter({
-    pluginName: manifest.name,
-    prefix: "/tickets",
-    router,
-    swaggerPaths: [path.join(pluginPath, "api", "*.ts")],
-  });
-
   logger.info("tickets plugin loaded (models + services + handlers + background + API)");
 
   return {
     version: "1.0.0",
+
+    lib,
 
     models: {
       Ticket,
@@ -289,3 +276,4 @@ export async function onDisable(logger: PluginLogger): Promise<void> {
 // Command and event paths for plugin loader
 export const commands = "./commands";
 export const events = "./events";
+export const api = "./api";

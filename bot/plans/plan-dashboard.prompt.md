@@ -1,95 +1,112 @@
 # Plan: Next.js Dashboard Plugin
 
-Dashboard plugin runs on its own port (e.g., 3000), contacts the bot API at its port (3001) using `INTERNAL_API_KEY` via `X-API-Key` header. plugin-bot extracted to its own repo. Next.js deps scoped to plugin-bot's `package.json`.
+Dashboard plugin runs on its own port (e.g., 3000), contacts the bot API at its port (3001) using `INTERNAL_API_KEY` via `X-API-Key` header. Next.js deps in the bot's `package.json`.
 
 ## Steps
 
-### Step 1 — Extract plugin-bot to its own repository
+### Step 1 — Extract plugin-bot to its own repository ✅
 
-It's already fully independent — zero `@heimdall/*` imports, own logger, own core services, not referenced by root scripts or the Dockerfile. Move the directory contents to a new repo root, delete the stale `bun.lock`, run `bun install` fresh, create a standalone Dockerfile (simple: `bun install` → copy source → `CMD tsx src/index.ts`). No code changes required.
+Done — bot now lives in its own folder.
 
-### Step 2 — Add API auth to `ApiManager`
+### Step 2 — Add API auth + auto-mount API routes
 
-In `src/core/ApiManager.ts`:
+Two sub-tasks:
 
-- Add `INTERNAL_API_KEY` to `GlobalEnv` in `src/types/Env.ts` and `src/utils/env.ts`.
-- Create an Express middleware that validates `X-API-Key` header against `INTERNAL_API_KEY` and apply it to all guild-scoped routes (before `mountRouters`).
-- Health/swagger routes stay unprotected.
-- Expose `getServer(): http.Server` by storing the return value of `app.listen()` (currently discarded at line ~200) — needed for WebSocket upgrade in Step 5.
+#### 2a — API key auth middleware
 
-### Step 3 — Fix modmail API mounting
+- Add `INTERNAL_API_KEY` to `GlobalEnv` in `src/types/Env.ts` and `src/utils/env.ts` as a **required** env var.
+- Create an Express middleware in `ApiManager` that validates `X-API-Key` header against `INTERNAL_API_KEY` and apply it to all guild-scoped routes (before `mountRouters`).
+- Health (`/`, `/api/health`) and Swagger (`/api-docs`) routes stay unprotected.
+- Expose `getServer(): http.Server` by storing the return value of `app.listen()` (currently discarded) — needed for WebSocket upgrade later.
 
-In `plugins/modmail/index.ts`:
+#### 2b — Auto-mount plugin API routes in PluginLoader
 
-- Import `createModmailRouter` from the existing `plugins/modmail/api/index.ts`.
-- Call `apiManager.registerRouter({ pluginName: 'modmail', prefix: '/modmail', router, swaggerPaths })` in `onLoad`.
-- Pass required services to the router factory.
+Currently all 8 plugins with API routes (logging, minecraft, reminders, suggestions, tags, tempvc, tickets, welcome) manually import their router factory and call `apiManager.registerRouter(...)` in `onLoad`. Modmail has an `api/` directory but never mounts it — a bug.
 
-### Step 4 — Create `plugins/dashboard/` plugin scaffold
+**Refactor:**
 
-- `manifest.json` depends on `lib` (required) with optional deps on `minecraft`, `modmail`, `tickets`, etc.
+- Add `export const api = "./api"` convention to `PluginModule` interface in `src/types/Plugin.ts`.
+- Add `loadPluginApi()` method to `PluginLoader` that:
+  1. Imports the plugin's `api/index.ts`.
+  2. Calls the exported `createXxxRouter(deps)` factory. The factory receives the plugin's API object (returned from `onLoad`) as deps — each factory already expects its own `ApiDependencies` interface.
+  3. Calls `apiManager.registerRouter({ pluginName, prefix: manifest.apiRoutePrefix, router, swaggerPaths })`.
+- Call `loadPluginApi()` after commands/events in `loadPlugin()`, gated on `module.api` existing.
+- Remove the manual `apiManager.registerRouter(...)` boilerplate from all 9 plugin `onLoad` functions (logging, minecraft, modmail, reminders, suggestions, tags, tempvc, tickets, welcome).
+- Each plugin's `api/index.ts` factory function must accept the plugin's own API object as its deps argument. Standardize the convention: `export function createRouter(deps: PluginAPI): Router`.
+- Modmail's router is fixed automatically by this — it already has `api/index.ts` with `createModmailRouter`, it just needs `export const api = "./api"` and `apiRoutePrefix` in its manifest (already present).
+
+### Step 3 — Create `plugins/dashboard/` plugin scaffold
+
+- `manifest.json`:
+  - `dependencies`: `["lib"]`
+  - `optionalDependencies`: `["minecraft", "modmail", "tickets", "suggestions", "tags", "logging", "welcome", "tempvc", "reminders"]`
+  - `requiredEnv`: `["INTERNAL_API_KEY", "NEXTAUTH_SECRET", "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET"]`
+  - `optionalEnv`: `["DASHBOARD_PORT"]`
 - `index.ts` `onLoad`:
   - Create Next.js app via `next({ dev: NODE_ENV !== 'production', dir: path.join(pluginPath, 'app') })`.
   - Call `app.prepare()`.
   - Create `http.createServer(app.getRequestHandler())`.
-  - Listen on `DASHBOARD_PORT` (default 3000).
+  - Listen on `DASHBOARD_PORT` (default 3000, loaded via `context.getEnv("DASHBOARD_PORT")`).
   - Store the server reference for `onDisable` to call `server.close()`.
-- Add `next`, `react`, `react-dom`, `next-auth@beta` to plugin-bot's `package.json`.
+- Add `next`, `react`, `react-dom`, `next-auth@beta` to the bot's `package.json`.
 
-### Step 5 — Build the Next.js app at `plugins/dashboard/app/`
+### Step 4 — Build the Next.js app at `plugins/dashboard/app/` (scaffold)
+
+Start small — get guild selector + minecraft views scaffolded so we can iterate on design.
 
 #### Auth
 
 - NextAuth v5 Discord OAuth, JWT sessions (no DB adapter).
 - Stores `userId`, `accessToken`, guild list (filtered to ManageGuild permission).
+- Env vars `NEXTAUTH_SECRET`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` loaded via manifest `requiredEnv`.
 
 #### Proxy API
 
 - `app/api/guilds/[guildId]/[...path]/route.ts` — catch-all.
-- Validates NextAuth session → checks `DashboardPermission` for read/write → forwards to `http://localhost:{API_PORT}/api/guilds/{guildId}/{path}` with `X-API-Key` header.
+- Validates NextAuth session → forwards to `http://localhost:{API_PORT}/api/guilds/{guildId}/{path}` with `X-API-Key` header.
+- Permission checks deferred to a later step.
 
-#### WebSocket
+#### Pages (scaffold)
+
+- **Guild Selector** — `app/(dashboard)/page.tsx`: grid of accessible guilds from session.
+- **Guild Layout** — `app/(dashboard)/[guildId]/layout.tsx`: sidebar with feature links, guild header.
+- **Minecraft** — `app/(dashboard)/[guildId]/minecraft/page.tsx`: tabbed view scaffold.
+  - **Players** — DataTable placeholder with search.
+  - **Config** — settings form placeholder.
+  - **Server Status** — server list placeholder.
+
+#### Shared Components
+
+- `GuildProvider`, `DataTable`, `StatusBadge`, basic shadcn primitives.
+- Designed for other plugin pages to slot in later.
+
+### Step 5 — WebSocket support (future)
 
 - Socket.IO server attached to the dashboard's own `http.createServer` (dashboard port handles both Next.js + WS).
 - Authenticated with session token, guild-scoped event rooms.
 - Bot-side emits events via the existing `ModmailWebSocketService` pattern — pass the Socket.IO server instance to it.
 
-#### DashboardPermission model
+### Step 6 — DashboardPermission model + command (future)
 
 - Schema: `{ guildId, userId, permissions: Map<feature, 'read' | 'write' | 'none'> }`.
 - Guild owner defaults to all `write`, ManageGuild users default to all `read`.
 - CRUD via `/api/guilds/:guildId/dashboard/permissions` API route.
 - `/permissions` slash command for guild admins to manage access from Discord.
-
-### Step 6 — Build frontend pages
-
-Using shadcn/ui + Tailwind + TanStack Query.
-
-#### Guild Selector
-
-- `app/(dashboard)/page.tsx`: grid of accessible guilds from session.
-
-#### Guild Layout
-
-- `app/(dashboard)/[guildId]/layout.tsx`: sidebar (feature links gated by ≥ read permission), guild header.
-
-#### Minecraft Management
-
-- `app/(dashboard)/[guildId]/minecraft/page.tsx`: tabbed view.
-  - **Players** — DataTable with search, approve/reject/link/unlink actions.
-  - **Config** — setup settings, custom messages.
-  - **Server Status** — monitored servers list, add/remove.
-
-#### Shared Components
-
-- `PermissionGuard`, `GuildProvider`, `DataTable`, `StatusBadge`, shadcn primitives.
-- Designed for other plugin pages to slot in later.
+- Proxy API route in Step 4 gates requests by permission level.
 
 ## Design Decisions
 
-### Dependencies in plugin-bot's `package.json`
+### Dependencies in bot's `package.json`
 
-Put `next`, `react`, `react-dom`, and `next-auth` directly in plugin-bot's `package.json`. The dashboard is a plugin but it's not optional in the same way Minecraft is — you either deploy with a dashboard or you don't. Keeping deps at the top level avoids a nested install step and simplifies the Dockerfile build stage. If we later want to make it truly optional, a plugin-level `package.json` with a pre-install hook is the escape hatch.
+Put `next`, `react`, `react-dom`, and `next-auth` directly in the bot's `package.json`. The dashboard is a plugin but it's not optional in the same way Minecraft is — you either deploy with a dashboard or you don't. Keeping deps at the top level avoids a nested install step and simplifies the Dockerfile build stage. If we later want to make it truly optional, a plugin-level `package.json` with a pre-install hook is the escape hatch.
+
+### API route auto-mounting
+
+All plugins follow the same router factory pattern (`api/index.ts` exports `createXxxRouter(deps)`). Rather than each plugin manually importing and registering its router, `PluginLoader` handles it automatically when a plugin exports `api = "./api"`. This eliminates boilerplate, fixes the modmail bug, and makes adding API routes to new plugins trivial.
+
+### `INTERNAL_API_KEY` as static env var
+
+The `INTERNAL_API_KEY` is a user-provided secret in `.env`, required globally. Both the API middleware and the dashboard plugin read it — the API validates incoming requests, the dashboard sends it with outgoing requests. This is simpler and more transparent than auto-generation.
 
 ### WebSocket architecture
 
@@ -107,6 +124,6 @@ Dashboard runs on its own port (3000) via `http.createServer()`. This avoids HMR
 
 Per-feature read/write permissions stored in bot's MongoDB (not a separate DB). Two permission levels per feature: `read` (view data) and `write` (modify data). Defaults derived from Discord guild permissions — guild owner gets all `write`, ManageGuild users get all `read`. Custom overrides stored in `DashboardPermission` model. No separate permission DB needed.
 
-### Extraction from monorepo
+### Incremental build approach
 
-plugin-bot is already fully independent — zero `@heimdall/*` imports, own logger, own core services, not in root scripts or Dockerfile. Extraction is a directory move + fresh `bun install` + new Dockerfile. No code changes.
+Scaffold the dashboard with guild selector + minecraft views first. Get the design and data flow working before building out remaining plugin pages, WebSocket support, and permission model.

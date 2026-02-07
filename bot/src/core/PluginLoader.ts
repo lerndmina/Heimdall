@@ -285,7 +285,7 @@ export class PluginLoader {
         // Also store in client.plugins for easy access
         this.client.plugins.set(name, loaded.api);
 
-        log.info(`✅ Loaded plugin: ${name}`);
+        log.debug(`✅ Loaded plugin: ${name}`);
       } catch (error) {
         log.error(`❌ Failed to load plugin ${name}:`, error);
 
@@ -355,6 +355,11 @@ export class PluginLoader {
       await this.loadPluginEvents(manifest.name, pluginPath, module.events);
     }
 
+    // Auto-mount API routes if path is specified and manifest has apiRoutePrefix
+    if (module.api) {
+      await this.loadPluginApi(manifest.name, pluginPath, module.api, manifest.apiRoutePrefix, api);
+    }
+
     return {
       manifest,
       path: pluginPath,
@@ -379,13 +384,39 @@ export class PluginLoader {
     const files = this.scanDirectory(fullPath, [".ts", ".js"]);
 
     for (const file of files) {
+      // Skip helper files prefixed with _ (e.g., _autocomplete.ts)
+      const fileName = path.basename(file);
+      if (fileName.startsWith("_")) continue;
+
       try {
         const commandModule = await import(file);
 
-        // Validate required exports
-        if (!commandModule.data || !commandModule.execute) {
-          log.warn(`Command file ${file} missing data or execute export, skipping`);
+        // Must have at least data
+        if (!commandModule.data) {
+          log.warn(`Command file ${file} missing data export, skipping`);
           continue;
+        }
+
+        let execute = commandModule.execute;
+
+        // If no execute, auto-discover subcommand router at subcommands/{commandName}/index.ts
+        if (!execute) {
+          const commandName = commandModule.data.name ?? commandModule.data.toJSON?.().name;
+          if (commandName) {
+            const subcommandPath = path.join(pluginPath, "subcommands", commandName, "index.ts");
+            if (fs.existsSync(subcommandPath)) {
+              const subModule = await import(subcommandPath);
+              execute = subModule.execute;
+              if (execute) {
+                log.debug(`Auto-discovered subcommand router for /${commandName}`);
+              }
+            }
+          }
+
+          if (!execute) {
+            log.warn(`Command file ${file} missing execute export and no subcommand router found, skipping`);
+            continue;
+          }
         }
 
         const config = commandModule.config ?? {};
@@ -396,11 +427,11 @@ export class PluginLoader {
             pluginName,
             cooldown: config.cooldown,
           },
-          execute: commandModule.execute,
+          execute,
           autocomplete: commandModule.autocomplete,
         });
 
-        log.info(`Loaded command: ${commandModule.data.name} from plugin ${pluginName}`);
+        log.debug(`Loaded command: ${commandModule.data.name} from plugin ${pluginName}`);
       } catch (error) {
         log.error(`Failed to load command from ${file}:`, error);
       }
@@ -437,10 +468,68 @@ export class PluginLoader {
           execute: eventModule.execute,
         });
 
-        log.info(`Loaded event: ${String(eventModule.event)} from plugin ${pluginName}`);
+        log.debug(`Loaded event: ${String(eventModule.event)} from plugin ${pluginName}`);
       } catch (error) {
         log.error(`Failed to load event from ${file}:`, error);
       }
+    }
+  }
+
+  /**
+   * Auto-mount API routes from a plugin's api directory.
+   *
+   * Expects the api/index.ts to export:
+   *   export function createRouter(api: PluginAPI): Router
+   *
+   * The plugin's API object (returned from onLoad) is passed as the deps argument.
+   * Swagger paths are derived automatically from all .ts files in the api directory.
+   */
+  private async loadPluginApi(pluginName: string, pluginPath: string, apiPath: string, routePrefix: string | undefined, pluginApi: PluginAPI): Promise<void> {
+    const fullPath = path.join(pluginPath, apiPath);
+
+    if (!fs.existsSync(fullPath)) {
+      log.warn(`Plugin ${pluginName} api path does not exist: ${apiPath}`);
+      return;
+    }
+
+    if (!routePrefix) {
+      log.warn(`Plugin ${pluginName} exports api but has no apiRoutePrefix in manifest, skipping API mount`);
+      return;
+    }
+
+    const indexPath = path.join(fullPath, "index.ts");
+    if (!fs.existsSync(indexPath)) {
+      // Try .js fallback
+      const jsPath = path.join(fullPath, "index.js");
+      if (!fs.existsSync(jsPath)) {
+        log.warn(`Plugin ${pluginName} api directory has no index.ts or index.js, skipping API mount`);
+        return;
+      }
+    }
+
+    try {
+      const apiModule = await import(indexPath);
+
+      if (typeof apiModule.createRouter !== "function") {
+        log.warn(`Plugin ${pluginName} api/index.ts does not export createRouter(), skipping API mount`);
+        return;
+      }
+
+      const router = apiModule.createRouter(pluginApi);
+
+      // Derive swagger paths from all .ts files in the api directory
+      const swaggerPaths = this.scanDirectory(fullPath, [".ts", ".js"]).map((f) => f.replace(/\\/g, "/"));
+
+      this.apiManager.registerRouter({
+        pluginName,
+        prefix: routePrefix,
+        router,
+        swaggerPaths,
+      });
+
+      log.info(`Mounted API routes: ${routePrefix} (${pluginName})`);
+    } catch (error) {
+      log.error(`Failed to load API routes for ${pluginName}:`, error);
     }
   }
 

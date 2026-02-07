@@ -10,15 +10,13 @@ import { createConfigUpdateRoutes } from "./config-update.js";
 import { createConfigDeleteRoutes } from "./config-delete.js";
 import { createTestRoutes } from "./test.js";
 import { createEventsRoutes } from "./events.js";
-import type { LoggingService } from "../services/LoggingService.js";
-import type { LibAPI } from "../../lib/index.js";
+import type { LoggingPluginAPI } from "../index.js";
 
-export interface LoggingApiDependencies {
-  loggingService: LoggingService;
-  lib: LibAPI;
-}
+/** @deprecated Use createRouter instead */
+export type LoggingApiDependencies = Pick<LoggingPluginAPI, "loggingService" | "lib">;
 
-export function createLoggingRouter(deps: LoggingApiDependencies): Router {
+export function createRouter(api: LoggingPluginAPI): Router {
+  const deps = { loggingService: api.loggingService, lib: api.lib };
   const router = Router({ mergeParams: true });
 
   // GET    /api/guilds/:guildId/logging/config

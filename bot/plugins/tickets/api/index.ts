@@ -10,23 +10,27 @@ import { createTicketsRoutes } from "./tickets.js";
 import { createCategoriesRoutes } from "./categories.js";
 import { createOpenersRoutes } from "./openers.js";
 import { createArchiveConfigRoutes } from "./archive-config.js";
-import type { TicketCategoryService } from "../services/TicketCategoryService.js";
-import type { TicketLifecycleService } from "../services/TicketLifecycleService.js";
-import type { LibAPI } from "../../lib/index.js";
+import type { TicketsAPI } from "../index.js";
 
 /**
  * Dependencies required by API routes
+ * @deprecated Use createRouter instead
  */
 export interface ApiDependencies {
-  categoryService: TicketCategoryService;
-  lifecycleService: TicketLifecycleService;
-  lib: LibAPI;
+  categoryService: TicketsAPI["categoryService"];
+  lifecycleService: TicketsAPI["lifecycleService"];
+  lib: TicketsAPI["lib"];
 }
 
 /**
  * Create the main tickets router with all sub-routes
  */
-export function createTicketsRouter(deps: ApiDependencies): Router {
+export function createRouter(api: TicketsAPI): Router {
+  const deps = {
+    categoryService: api.categoryService,
+    lifecycleService: api.lifecycleService,
+    lib: api.lib,
+  };
   const router = Router({ mergeParams: true });
 
   // Mount sub-routers

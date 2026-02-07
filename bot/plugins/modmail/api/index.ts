@@ -6,9 +6,7 @@
  */
 
 import { Router } from "express";
-import type { ModmailService } from "../services/ModmailService.js";
-import type { ModmailCategoryService } from "../services/ModmailCategoryService.js";
-import type { LibAPI } from "../../lib/index.js";
+import type { ModmailPluginAPI } from "../index.js";
 
 import { conversationsRoute } from "./conversations.js";
 import { conversationDetailsRoute } from "./conversation-details.js";
@@ -16,22 +14,25 @@ import { configGetRoute } from "./config-get.js";
 import { configUpdateRoute } from "./config-update.js";
 import { statsRoute } from "./stats.js";
 
-/**
- * Dependencies required by API routes
- */
+/** @deprecated Use createRouter instead */
 export interface ApiDependencies {
-  modmailService: ModmailService;
-  categoryService: ModmailCategoryService;
-  lib: LibAPI;
+  modmailService: ModmailPluginAPI["modmailService"];
+  categoryService: ModmailPluginAPI["categoryService"];
+  lib: ModmailPluginAPI["lib"];
 }
 
 /**
  * Create the modmail API router
  *
- * @param deps - Service dependencies for route handlers
+ * @param api - Modmail plugin API
  * @returns Express router with all modmail routes
  */
-export function createModmailRouter(deps: ApiDependencies): Router {
+export function createRouter(api: ModmailPluginAPI): Router {
+  const deps: ApiDependencies = {
+    modmailService: api.modmailService,
+    categoryService: api.categoryService,
+    lib: api.lib,
+  };
   const router = Router({ mergeParams: true }); // mergeParams to access :guildId from parent
 
   // GET /conversations - List conversations with pagination and filtering

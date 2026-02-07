@@ -12,6 +12,8 @@ export interface GlobalEnv {
   MONGODB_DATABASE: string;
   REDIS_URL: string;
   ENCRYPTION_KEY: string;
+  /** Shared secret for internal API auth (X-API-Key header) */
+  INTERNAL_API_KEY: string;
   DEBUG_LOG: boolean;
   SENTRY_DSN?: string;
   SENTRY_ENABLED?: boolean;

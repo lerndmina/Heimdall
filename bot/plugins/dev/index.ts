@@ -3,10 +3,10 @@ import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plu
 export const commands = "./commands";
 
 export async function onLoad(context: PluginContext): Promise<PluginAPI> {
-  context.logger.info("Dev plugin loaded");
+  context.logger.debug("Dev plugin loaded");
   return { version: "1.0.0" };
 }
 
 export async function onDisable(logger: PluginLogger): Promise<void> {
-  logger.info("Dev plugin disabled");
+  logger.debug("Dev plugin disabled");
 }

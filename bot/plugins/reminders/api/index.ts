@@ -13,15 +13,13 @@ import { createReminderGetRoutes } from "./get.js";
 import { createReminderCreateRoutes } from "./create.js";
 import { createReminderUpdateRoutes } from "./update.js";
 import { createReminderDeleteRoutes } from "./delete.js";
-import type { ReminderService } from "../services/ReminderService.js";
-import type { LibAPI } from "../../lib/index.js";
+import type { RemindersPluginAPI } from "../index.js";
 
-export interface RemindersApiDependencies {
-  reminderService: ReminderService;
-  lib: LibAPI;
-}
+/** @deprecated Use createRouter instead */
+export type RemindersApiDependencies = Pick<RemindersPluginAPI, "reminderService" | "lib">;
 
-export function createRemindersRouter(deps: RemindersApiDependencies): Router {
+export function createRouter(api: RemindersPluginAPI): Router {
+  const deps = { reminderService: api.reminderService, lib: api.lib };
   const router = Router({ mergeParams: true });
 
   // GET    /api/guilds/:guildId/reminders?userId=...

@@ -11,15 +11,13 @@ import { createTagCreateRoutes } from "./create.js";
 import { createTagUpdateRoutes } from "./update.js";
 import { createTagDeleteRoutes } from "./delete.js";
 import { createTagUseRoutes } from "./use.js";
-import type { TagService } from "../services/TagService.js";
-import type { LibAPI } from "../../lib/index.js";
+import type { TagsPluginAPI } from "../index.js";
 
-export interface TagsApiDependencies {
-  tagService: TagService;
-  lib: LibAPI;
-}
+/** @deprecated Use createRouter instead */
+export type TagsApiDependencies = Pick<TagsPluginAPI, "tagService" | "lib">;
 
-export function createTagsRouter(deps: TagsApiDependencies): Router {
+export function createRouter(api: TagsPluginAPI): Router {
+  const deps = { tagService: api.tagService, lib: api.lib };
   const router = Router({ mergeParams: true });
 
   // GET    /api/guilds/:guildId/tags

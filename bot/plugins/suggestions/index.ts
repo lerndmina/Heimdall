@@ -14,7 +14,6 @@
  * - Dashboard API routes for config/suggestions/categories/openers CRUD
  */
 
-import path from "path";
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 import type { GuildEnvService } from "../../src/core/services/GuildEnvService.js";
@@ -28,9 +27,6 @@ import "./models/SuggestionOpener.js";
 // Import services
 import { SuggestionService } from "./services/SuggestionService.js";
 
-// Import API router factory
-import { createSuggestionsRouter } from "./api/index.js";
-
 /** Public API exposed to other plugins and event handlers */
 export interface SuggestionsPluginAPI extends PluginAPI {
   version: string;
@@ -43,7 +39,7 @@ export interface SuggestionsPluginAPI extends PluginAPI {
 let suggestionService: SuggestionService;
 
 export async function onLoad(context: PluginContext): Promise<SuggestionsPluginAPI> {
-  const { client, apiManager, logger, pluginPath, dependencies, guildEnvService, componentCallbackService } = context;
+  const { client, logger, dependencies, guildEnvService, componentCallbackService } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI | undefined;
@@ -52,15 +48,6 @@ export async function onLoad(context: PluginContext): Promise<SuggestionsPluginA
   // Initialize service
   suggestionService = new SuggestionService(client, lib, guildEnvService, componentCallbackService);
   await suggestionService.initialize();
-
-  // Register API routes
-  const router = createSuggestionsRouter({ suggestionService, lib });
-  apiManager.registerRouter({
-    pluginName: "suggestions",
-    prefix: "/suggestions",
-    router,
-    swaggerPaths: [path.join(pluginPath, "api", "*.ts")],
-  });
 
   logger.info("✅ Suggestions plugin loaded");
 
@@ -78,3 +65,4 @@ export async function onDisable(logger: PluginLogger): Promise<void> {
 }
 
 export const commands = "./commands";
+export const api = "./api";

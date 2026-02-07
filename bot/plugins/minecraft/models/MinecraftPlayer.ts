@@ -59,8 +59,7 @@ MinecraftPlayerSchema.index({ guildId: 1, minecraftUuid: 1 }, { unique: true, pa
 MinecraftPlayerSchema.index({ guildId: 1, minecraftUsername: 1 }, { unique: true });
 MinecraftPlayerSchema.index({ guildId: 1, discordId: 1 }, { sparse: true });
 MinecraftPlayerSchema.index({ guildId: 1, whitelistedAt: 1 });
-MinecraftPlayerSchema.index({ authCode: 1 }, { sparse: true, unique: true });
-MinecraftPlayerSchema.index({ guildId: 1, authCode: 1, expiresAt: 1 });
+MinecraftPlayerSchema.index({ guildId: 1, authCode: 1, expiresAt: 1 }, { sparse: true });
 MinecraftPlayerSchema.index({ guildId: 1, linkedAt: 1, whitelistedAt: 1 });
 
 // ── Virtuals ───────────────────────────────────────────────────

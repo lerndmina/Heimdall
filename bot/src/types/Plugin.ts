@@ -128,7 +128,7 @@ export interface PluginModule {
   /** Path to events directory (relative to plugin) */
   events?: string;
 
-  /** Path to API routes directory (relative to plugin) */
+  /** Path to API routes directory (relative to plugin) — must contain index.ts exporting createRouter(api) */
   api?: string;
 }
 
