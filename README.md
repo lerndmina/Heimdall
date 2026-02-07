@@ -570,7 +570,7 @@ Ensure all required variables are set (see Configuration section).
 **Check database connections**
 ```bash
 # Test MongoDB
-mongo $MONGODB_URI
+mongosh $MONGODB_URI
 
 # Test Redis
 redis-cli -u $REDIS_URL ping
