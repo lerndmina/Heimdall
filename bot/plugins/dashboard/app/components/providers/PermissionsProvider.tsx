@@ -4,7 +4,7 @@
  */
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 
 export interface PermissionsContextValue {
   /** Resolved permission map: action key → boolean */
@@ -60,9 +60,9 @@ export default function PermissionsProvider({ guildId, children }: PermissionsPr
   }, [guildId]);
 
   // Load on first render
-  useState(() => {
+  useEffect(() => {
     refresh();
-  });
+  }, [refresh]);
 
   return <PermissionsContext.Provider value={{ permissions, hideDeniedFeatures, isOwner, isAdministrator, loaded, refresh }}>{children}</PermissionsContext.Provider>;
 }

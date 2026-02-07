@@ -14,6 +14,7 @@ import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import { ChannelType, PermissionFlagsBits, EmbedBuilder, TextChannel, type Client } from "discord.js";
 import log from "../utils/logger";
+import { ThingGetter } from "../../plugins/lib/utils/ThingGetter.js";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
 import DashboardSettings from "../../plugins/dashboard/models/DashboardSettings.js";
 import LoggingConfig, { LoggingCategory } from "../../plugins/logging/models/LoggingConfig.js";
@@ -37,6 +38,7 @@ export class ApiManager {
   private apiKey: string;
   private server: Server | null = null;
   private client: Client | null = null;
+  private thingGetter: ThingGetter | null = null;
 
   /**
    * Set the Discord client reference (called after client is ready).
@@ -44,6 +46,7 @@ export class ApiManager {
    */
   setClient(client: Client): void {
     this.client = client;
+    this.thingGetter = new ThingGetter(client);
   }
 
   /**
@@ -352,7 +355,7 @@ export class ApiManager {
     });
 
     // ── Member info (roles, isOwner, isAdministrator) ──────────
-    this.app.get("/api/guilds/:guildId/members/:userId", (req: Request, res: Response) => {
+    this.app.get("/api/guilds/:guildId/members/:userId", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
       if (!key || key !== this.apiKey) {
         res.status(401).json({ error: "Unauthorized" });
@@ -363,14 +366,15 @@ export class ApiManager {
         res.status(503).json({ success: false, error: "Bot not ready" });
         return;
       }
-      const guild = this.client.guilds.cache.get(guildId);
+      const guild = await this.thingGetter!.getGuild(guildId);
       if (!guild) {
         res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Guild not found" } });
         return;
       }
-      const member = guild.members.cache.get(userId);
+
+      const member = await this.thingGetter!.getMember(guild, userId);
       if (!member) {
-        res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Member not found in cache" } });
+        res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Member not found" } });
         return;
       }
 

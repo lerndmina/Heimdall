@@ -5,6 +5,7 @@
 "use client";
 
 import { useGuild } from "@/components/providers/GuildProvider";
+import PermissionGate from "@/components/guards/PermissionGate";
 import Tabs from "@/components/ui/Tabs";
 import PlayersTab from "./PlayersTab";
 import ConfigTab from "./ConfigTab";
@@ -63,13 +64,15 @@ export default function MinecraftPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Minecraft</h1>
-        <p className="text-zinc-400">Manage players, whitelist, and server configuration.</p>
-      </div>
+    <PermissionGate category="minecraft">
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Minecraft</h1>
+          <p className="text-zinc-400">Manage players, whitelist, and server configuration.</p>
+        </div>
 
-      <Tabs tabs={tabs} defaultTab="players" />
-    </div>
+        <Tabs tabs={tabs} defaultTab="players" />
+      </div>
+    </PermissionGate>
   );
 }
