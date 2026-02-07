@@ -1,129 +1,29 @@
-# Plan: Next.js Dashboard Plugin
+## Plan: Discord-Style Guild Dashboard Permissions
 
-Dashboard plugin runs on its own port (e.g., 3000), contacts the bot API at its port (3001) using `INTERNAL_API_KEY` via `X-API-Key` header. Next.js deps in the bot's `package.json`.
+A three-state (deny / inherit / allow) permissions system mirroring Discord's channel permissions. Permissions are grouped by **feature category** with **granular per-action control**. Action-level overrides always take precedence over category-level — a deny on a category with an allow on a specific action grants that action; an allow on a category with a deny on a specific action blocks that action. Multi-role conflicts use deny-wins (matching Discord). Guild owners always have full access; Discord Administrators get full access unless explicitly restricted.
 
-## Steps
+### Steps
 
-### Step 1 — Extract plugin-bot to its own repository ✅
+1. **Create `DashboardPermission` and `DashboardSettings` Mongoose models** in bot/plugins/dashboard/models/. `DashboardPermission`: `guildId` + `discordRoleId` (compound unique), `roleName`, `overrides: Map<string, "allow" | "deny">` — keys are category-level (`minecraft`) or action-level (`minecraft.manage_config`). `DashboardSettings`: `guildId` (unique), `hideDeniedFeatures: boolean` (default `false` — show locked features; when `true`, hide inaccessible sidebar items entirely). Only owners/admins with `dashboard.manage_permissions` can toggle this.
 
-Done — bot now lives in its own folder.
+2. **Define a static permission registry** in bot/plugins/dashboard/app/lib/permissionDefs.ts. Array of categories each with `key`, `label`, `description`, and `actions[]` (`key`, `label`, `description`). Categories: `dashboard` (`manage_permissions`, `manage_settings`), `minecraft` (`view_players`, `manage_players`, `manage_config`, `approve_whitelist`, `manage_status`, `use_rcon`), `tickets` (`view_tickets`, `manage_tickets`, `manage_categories`, `manage_openers`), `modmail` (`view_conversations`, `manage_config`), `suggestions` (`view_suggestions`, `manage_suggestions`, `manage_config`, `manage_categories`), `tags` (`view_tags`, `manage_tags`), `logging` (`view_config`, `manage_config`), `welcome` (`view_config`, `manage_config`), `tempvc` (`view_config`, `manage_config`), `reminders` (`view_reminders`, `manage_reminders`).
 
-### Step 2 — Add API auth + auto-mount API routes
+3. **Define a static route-to-action map** in bot/plugins/dashboard/app/lib/routePermissions.ts. A `Record<string, string>` mapping `"METHOD /path/pattern"` → action key. E.g. `"GET /minecraft/players"` → `"minecraft.view_players"`, `"PUT /minecraft/config"` → `"minecraft.manage_config"`, `"POST /minecraft/players/*/approve"` → `"minecraft.approve_whitelist"`, `"GET /dashboard-permissions"` → `"dashboard.manage_permissions"`. A `resolveRouteAction(method, pathSegments)` function matches the request against patterns and returns the required action key.
 
-Two sub-tasks:
+4. **Add a bot-side `/guilds/:guildId/members/:userId` endpoint** in ApiManager.ts. Returns `{ roleIds: string[], isOwner: boolean, isAdministrator: boolean }`. Fetched from Discord guild cache. Used by the proxy on every request for fresh role data.
 
-#### 2a — API key auth middleware
+5. **Add bot-side CRUD routes for permissions and settings** — `/guilds/:guildId/dashboard-permissions` (`GET /`, `PUT /:roleId`, `DELETE /:roleId`) and `/guilds/:guildId/dashboard-settings` (`GET /`, `PUT /`) mounted in ApiManager.ts. Themselves gated by the proxy's permission check on `dashboard.manage_permissions` / `dashboard.manage_settings`.
 
-- Add `INTERNAL_API_KEY` to `GlobalEnv` in `src/types/Env.ts` and `src/utils/env.ts` as a **required** env var.
-- Create an Express middleware in `ApiManager` that validates `X-API-Key` header against `INTERNAL_API_KEY` and apply it to all guild-scoped routes (before `mountRouters`).
-- Health (`/`, `/api/health`) and Swagger (`/api-docs`) routes stay unprotected.
-- Expose `getServer(): http.Server` by storing the return value of `app.listen()` (currently discarded) — needed for WebSocket upgrade later.
+6. **Create a `resolvePermissions` helper** in bot/plugins/dashboard/app/lib/permissions.ts. Resolution logic: **(a)** Guild owner → allow everything, always, unconditionally. **(b)** Collect all `overrides` maps from roles the user has. **(c)** For each action key in the registry: first check if any role has an explicit action-level entry — if so, deny-wins across roles at that level; if no action-level entry exists, fall back to category-level entries and apply deny-wins there; if neither exists, inherit. **(d)** Discord Administrators: before step (c), default every action to `allow`, then apply overrides on top — so Administrators have full access unless explicitly denied. Returns a `{ has(actionKey): boolean, getAll(): Record<string, boolean>, hasAnyInCategory(categoryKey): boolean }` object.
 
-#### 2b — Auto-mount plugin API routes in PluginLoader
+7. **Gate the API proxy** in [bot/plugins/dashboard/app/app/api/guilds/[guildId]/[...path]/route.ts](bot/plugins/dashboard/app/app/api/guilds/%5BguildId%5D/%5B...path%5D/route.ts). On each request: resolve the route to an action key via the static map, fetch member data (`/members/:userId`), fetch guild permission overrides + settings (cache both ~30s), run `resolvePermissions`, return 403 if denied. Pass `X-User-Permissions` header downstream so pages can conditionally render edit controls.
 
-Currently all 8 plugins with API routes (logging, minecraft, reminders, suggestions, tags, tempvc, tickets, welcome) manually import their router factory and call `apiManager.registerRouter(...)` in `onLoad`. Modmail has an `api/` directory but never mounts it — a bug.
+8. **Build the Permissions settings page** at [bot/plugins/dashboard/app/app/[guildId]/settings/](bot/plugins/dashboard/app/app/%5BguildId%5D/settings/). Two sections: **(a)** General settings — `hideDeniedFeatures` toggle (hide vs show-locked sidebar items). **(b)** Role permissions — left panel: role list (add via `Combobox`, click to select); right panel: Discord-style permission list grouped by category. Each category header has its own three-state slider (✕ / ─ / ✓) and an expand/collapse. Each action row shows name + description on the left, three-state slider on the right. Category slider shows mixed state (─) when its actions differ. Only accessible to users with `dashboard.manage_permissions`.
 
-**Refactor:**
+9. **Update sidebar rendering** in [bot/plugins/dashboard/app/app/[guildId]/GuildLayoutShell.tsx](bot/plugins/dashboard/app/app/%5BguildId%5D/GuildLayoutShell.tsx). Fetch the user's resolved permissions + `hideDeniedFeatures` setting on mount. If `hideDeniedFeatures` is `true`, filter out nav items where the user has zero allowed actions in that category. If `false`, show all items but render inaccessible ones grayed out with a lock icon; clicking navigates to a "no access" placeholder page.
 
-- Add `export const api = "./api"` convention to `PluginModule` interface in `src/types/Plugin.ts`.
-- Add `loadPluginApi()` method to `PluginLoader` that:
-  1. Imports the plugin's `api/index.ts`.
-  2. Calls the exported `createXxxRouter(deps)` factory. The factory receives the plugin's API object (returned from `onLoad`) as deps — each factory already expects its own `ApiDependencies` interface.
-  3. Calls `apiManager.registerRouter({ pluginName, prefix: manifest.apiRoutePrefix, router, swaggerPaths })`.
-- Call `loadPluginApi()` after commands/events in `loadPlugin()`, gated on `module.api` existing.
-- Remove the manual `apiManager.registerRouter(...)` boilerplate from all 9 plugin `onLoad` functions (logging, minecraft, modmail, reminders, suggestions, tags, tempvc, tickets, welcome).
-- Each plugin's `api/index.ts` factory function must accept the plugin's own API object as its deps argument. Standardize the convention: `export function createRouter(deps: PluginAPI): Router`.
-- Modmail's router is fixed automatically by this — it already has `api/index.ts` with `createModmailRouter`, it just needs `export const api = "./api"` and `apiRoutePrefix` in its manifest (already present).
+### Further Considerations
 
-### Step 3 — Create `plugins/dashboard/` plugin scaffold
+1. **Permission caching strategy** — The proxy will cache member roles + guild overrides for ~30s to avoid per-request Discord API + MongoDB calls. Should the permissions page have a "refresh permissions" button for when an admin just changed roles, or is a 30s TTL sufficient?
 
-- `manifest.json`:
-  - `dependencies`: `["lib"]`
-  - `optionalDependencies`: `["minecraft", "modmail", "tickets", "suggestions", "tags", "logging", "welcome", "tempvc", "reminders"]`
-  - `requiredEnv`: `["INTERNAL_API_KEY", "NEXTAUTH_SECRET", "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET"]`
-  - `optionalEnv`: `["DASHBOARD_PORT"]`
-- `index.ts` `onLoad`:
-  - Create Next.js app via `next({ dev: NODE_ENV !== 'production', dir: path.join(pluginPath, 'app') })`.
-  - Call `app.prepare()`.
-  - Create `http.createServer(app.getRequestHandler())`.
-  - Listen on `DASHBOARD_PORT` (default 3000, loaded via `context.getEnv("DASHBOARD_PORT")`).
-  - Store the server reference for `onDisable` to call `server.close()`.
-- Add `next`, `react`, `react-dom`, `next-auth@beta` to the bot's `package.json`.
-
-### Step 4 — Build the Next.js app at `plugins/dashboard/app/` (scaffold)
-
-Start small — get guild selector + minecraft views scaffolded so we can iterate on design.
-
-#### Auth
-
-- NextAuth v5 Discord OAuth, JWT sessions (no DB adapter).
-- Stores `userId`, `accessToken`, guild list (filtered to ManageGuild permission).
-- Env vars `NEXTAUTH_SECRET`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` loaded via manifest `requiredEnv`.
-
-#### Proxy API
-
-- `app/api/guilds/[guildId]/[...path]/route.ts` — catch-all.
-- Validates NextAuth session → forwards to `http://localhost:{API_PORT}/api/guilds/{guildId}/{path}` with `X-API-Key` header.
-- Permission checks deferred to a later step.
-
-#### Pages (scaffold)
-
-- **Guild Selector** — `app/(dashboard)/page.tsx`: grid of accessible guilds from session.
-- **Guild Layout** — `app/(dashboard)/[guildId]/layout.tsx`: sidebar with feature links, guild header.
-- **Minecraft** — `app/(dashboard)/[guildId]/minecraft/page.tsx`: tabbed view scaffold.
-  - **Players** — DataTable placeholder with search.
-  - **Config** — settings form placeholder.
-  - **Server Status** — server list placeholder.
-
-#### Shared Components
-
-- `GuildProvider`, `DataTable`, `StatusBadge`, basic shadcn primitives.
-- Designed for other plugin pages to slot in later.
-
-### Step 5 — WebSocket support (future)
-
-- Socket.IO server attached to the dashboard's own `http.createServer` (dashboard port handles both Next.js + WS).
-- Authenticated with session token, guild-scoped event rooms.
-- Bot-side emits events via the existing `ModmailWebSocketService` pattern — pass the Socket.IO server instance to it.
-
-### Step 6 — DashboardPermission model + command (future)
-
-- Schema: `{ guildId, userId, permissions: Map<feature, 'read' | 'write' | 'none'> }`.
-- Guild owner defaults to all `write`, ManageGuild users default to all `read`.
-- CRUD via `/api/guilds/:guildId/dashboard/permissions` API route.
-- `/permissions` slash command for guild admins to manage access from Discord.
-- Proxy API route in Step 4 gates requests by permission level.
-
-## Design Decisions
-
-### Dependencies in bot's `package.json`
-
-Put `next`, `react`, `react-dom`, and `next-auth` directly in the bot's `package.json`. The dashboard is a plugin but it's not optional in the same way Minecraft is — you either deploy with a dashboard or you don't. Keeping deps at the top level avoids a nested install step and simplifies the Dockerfile build stage. If we later want to make it truly optional, a plugin-level `package.json` with a pre-install hook is the escape hatch.
-
-### API route auto-mounting
-
-All plugins follow the same router factory pattern (`api/index.ts` exports `createXxxRouter(deps)`). Rather than each plugin manually importing and registering its router, `PluginLoader` handles it automatically when a plugin exports `api = "./api"`. This eliminates boilerplate, fixes the modmail bug, and makes adding API routes to new plugins trivial.
-
-### `INTERNAL_API_KEY` as static env var
-
-The `INTERNAL_API_KEY` is a user-provided secret in `.env`, required globally. Both the API middleware and the dashboard plugin read it — the API validates incoming requests, the dashboard sends it with outgoing requests. This is simpler and more transparent than auto-generation.
-
-### WebSocket architecture
-
-Attach Socket.IO to the dashboard's own `http.createServer` (Option B). The dashboard already owns a port and the WS is only consumed by dashboard clients. The bot-side just needs to emit events — the existing `ModmailWebSocketService` pattern works (pass the Socket.IO server instance to it).
-
-### Dockerfile changes
-
-The new standalone Dockerfile needs a build stage: `next build` inside `plugins/dashboard/app/` during container build, then `onLoad` starts Next.js in production mode pointing at the `.next` output. Add `EXPOSE 3000 3001` for both ports.
-
-### Separate port (not mounted on Express)
-
-Dashboard runs on its own port (3000) via `http.createServer()`. This avoids HMR WebSocket conflicts in dev mode, avoids needing `basePath` configuration, and gives clean separation. The Next.js backend contacts the bot API at `localhost:3001` with `X-API-Key` for all data.
-
-### Permission model
-
-Per-feature read/write permissions stored in bot's MongoDB (not a separate DB). Two permission levels per feature: `read` (view data) and `write` (modify data). Defaults derived from Discord guild permissions — guild owner gets all `write`, ManageGuild users get all `read`. Custom overrides stored in `DashboardPermission` model. No separate permission DB needed.
-
-### Incremental build approach
-
-Scaffold the dashboard with guild selector + minecraft views first. Get the design and data flow working before building out remaining plugin pages, WebSocket support, and permission model.
+2. **Audit logging** — Should permission changes (who granted/denied what to which role) be logged to the guild's logging channel if the logging plugin is enabled, or is MongoDB timestamps on the model sufficient for now?

@@ -12,8 +12,10 @@ import express, { Router, type Application, type Request, type Response, type Ne
 import type { Server } from "http";
 import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
-import { ChannelType, type Client } from "discord.js";
+import { ChannelType, PermissionFlagsBits, type Client } from "discord.js";
 import log from "../utils/logger";
+import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
+import DashboardSettings from "../../plugins/dashboard/models/DashboardSettings.js";
 
 export interface PluginRouter {
   /** Which plugin owns this router */
@@ -325,6 +327,141 @@ export class ApiManager {
         }));
 
       res.json({ success: true, data: { roles } });
+    });
+
+    // ── Member info (roles, isOwner, isAdministrator) ──────────
+    this.app.get("/api/guilds/:guildId/members/:userId", (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const { guildId, userId } = req.params;
+      if (!this.client) {
+        res.status(503).json({ success: false, error: "Bot not ready" });
+        return;
+      }
+      const guild = this.client.guilds.cache.get(guildId);
+      if (!guild) {
+        res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Guild not found" } });
+        return;
+      }
+      const member = guild.members.cache.get(userId);
+      if (!member) {
+        res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Member not found in cache" } });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          roleIds: member.roles.cache.map((r) => r.id),
+          isOwner: guild.ownerId === userId,
+          isAdministrator: member.permissions.has(PermissionFlagsBits.Administrator),
+        },
+      });
+    });
+
+    // ── Dashboard Permissions CRUD ─────────────────────────────
+    // GET all role overrides for a guild
+    this.app.get("/api/guilds/:guildId/dashboard-permissions", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      try {
+        const docs = await DashboardPermission.find({ guildId: req.params.guildId }).lean();
+        res.json({ success: true, data: { permissions: docs } });
+      } catch (err) {
+        log.error("[API] Error fetching dashboard permissions:", err);
+        res.status(500).json({ success: false, error: "Database error" });
+      }
+    });
+
+    // PUT upsert overrides for a specific role
+    this.app.put("/api/guilds/:guildId/dashboard-permissions/:roleId", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const { guildId, roleId } = req.params;
+      const { roleName, overrides } = req.body as { roleName?: string; overrides?: Record<string, "allow" | "deny"> };
+      if (!overrides || typeof overrides !== "object") {
+        res.status(400).json({ success: false, error: "overrides is required" });
+        return;
+      }
+      try {
+        const doc = await DashboardPermission.findOneAndUpdate(
+          { guildId, discordRoleId: roleId },
+          { $set: { roleName: roleName ?? roleId, overrides: new Map(Object.entries(overrides)) } },
+          { upsert: true, new: true },
+        ).lean();
+        res.json({ success: true, data: { permission: doc } });
+      } catch (err) {
+        log.error("[API] Error upserting dashboard permission:", err);
+        res.status(500).json({ success: false, error: "Database error" });
+      }
+    });
+
+    // DELETE overrides for a specific role
+    this.app.delete("/api/guilds/:guildId/dashboard-permissions/:roleId", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const { guildId, roleId } = req.params;
+      try {
+        await DashboardPermission.deleteOne({ guildId, discordRoleId: roleId });
+        res.json({ success: true });
+      } catch (err) {
+        log.error("[API] Error deleting dashboard permission:", err);
+        res.status(500).json({ success: false, error: "Database error" });
+      }
+    });
+
+    // ── Dashboard Settings CRUD ────────────────────────────────
+    // GET settings for a guild
+    this.app.get("/api/guilds/:guildId/dashboard-settings", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      try {
+        const doc = await DashboardSettings.findOne({ guildId: req.params.guildId }).lean();
+        res.json({
+          success: true,
+          data: { settings: doc ?? { guildId: req.params.guildId, hideDeniedFeatures: false } },
+        });
+      } catch (err) {
+        log.error("[API] Error fetching dashboard settings:", err);
+        res.status(500).json({ success: false, error: "Database error" });
+      }
+    });
+
+    // PUT update settings
+    this.app.put("/api/guilds/:guildId/dashboard-settings", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const { guildId } = req.params;
+      const { hideDeniedFeatures } = req.body as { hideDeniedFeatures?: boolean };
+      try {
+        const doc = await DashboardSettings.findOneAndUpdate(
+          { guildId },
+          { $set: { hideDeniedFeatures: !!hideDeniedFeatures } },
+          { upsert: true, new: true },
+        ).lean();
+        res.json({ success: true, data: { settings: doc } });
+      } catch (err) {
+        log.error("[API] Error updating dashboard settings:", err);
+        res.status(500).json({ success: false, error: "Database error" });
+      }
     });
 
     this.setupErrorHandling();
