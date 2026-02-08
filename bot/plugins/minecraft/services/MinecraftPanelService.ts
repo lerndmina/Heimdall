@@ -283,16 +283,26 @@ export class MinecraftPanelService {
       const expiresAt = new Date(Date.now() + (mcConfig.authCodeExpiry || 300) * 1000);
       const member = await interaction.guild?.members.fetch(discordId).catch(() => null);
 
-      await MinecraftPlayer.create({
-        guildId,
-        discordId,
-        minecraftUsername,
-        authCode,
-        expiresAt,
-        discordUsername: interaction.user.username,
-        discordDisplayName: member?.displayName || interaction.user.globalName || interaction.user.username,
-        source: "linked",
-      });
+      // Upsert — if an unclaimed record already exists, update it instead of failing on duplicate key
+      await MinecraftPlayer.findOneAndUpdate(
+        {
+          guildId,
+          minecraftUsername: { $regex: new RegExp(`^${minecraftUsername}$`, "i") },
+        },
+        {
+          $set: {
+            discordId,
+            authCode,
+            expiresAt,
+            codeShownAt: undefined,
+            linkedAt: undefined,
+            discordUsername: interaction.user.username,
+            discordDisplayName: member?.displayName || interaction.user.globalName || interaction.user.username,
+            source: "linked",
+          },
+        },
+        { upsert: true, new: true },
+      );
 
       const embed = this.lib
         .createEmbedBuilder()
