@@ -7,14 +7,15 @@
 
 import https from "https";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import ffmpeg from "fluent-ffmpeg";
 import { createLogger } from "../../../src/core/Logger.js";
 
 const log = createLogger("vc-transcription");
 
-/** Temporary directory for audio processing */
-const TEMP_DIR = path.join(process.cwd(), ".tmp-transcription");
+/** Temporary directory for audio processing — use /tmp for Docker compatibility (non-root user) */
+const TEMP_DIR = path.join(os.tmpdir(), "heimdall-transcription");
 
 function ensureTempDir(): void {
   if (!fs.existsSync(TEMP_DIR)) {
