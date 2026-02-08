@@ -8,9 +8,16 @@
  * - Modals → awaitModalSubmit pattern (handled inline)
  */
 
-import { Events, type Interaction, type ChatInputCommandInteraction, type AutocompleteInteraction } from "discord.js";
+import {
+  Events,
+  type Interaction,
+  type ChatInputCommandInteraction,
+  type AutocompleteInteraction,
+  type MessageContextMenuCommandInteraction,
+  type UserContextMenuCommandInteraction,
+} from "discord.js";
 import type { HeimdallClient } from "../types/Client";
-import type { CommandManager, CommandContext, AutocompleteContext } from "./CommandManager";
+import type { CommandManager, CommandContext, AutocompleteContext, ContextMenuCommandContext } from "./CommandManager";
 import type { ComponentCallbackService } from "./services/ComponentCallbackService";
 import type { PluginAPI } from "../types/Plugin";
 import log from "../utils/logger";
@@ -71,6 +78,12 @@ export class InteractionHandler {
       return;
     }
 
+    // Context menu commands (message & user)
+    if (interaction.isContextMenuCommand()) {
+      await this.handleContextMenuCommand(interaction as MessageContextMenuCommandInteraction | UserContextMenuCommandInteraction);
+      return;
+    }
+
     // Autocomplete
     if (interaction.isAutocomplete()) {
       await this.handleAutocomplete(interaction);
@@ -117,6 +130,54 @@ export class InteractionHandler {
       });
 
       // Try to respond if not already responded
+      const reply = {
+        content: "❌ An error occurred while executing this command.",
+        ephemeral: true,
+      };
+
+      if (interaction.deferred) {
+        await interaction.editReply(reply).catch(() => {});
+      } else if (!interaction.replied) {
+        await interaction.reply(reply).catch(() => {});
+      }
+    }
+  }
+
+  /**
+   * Handle context menu command execution
+   */
+  private async handleContextMenuCommand(interaction: MessageContextMenuCommandInteraction | UserContextMenuCommandInteraction): Promise<void> {
+    const commandName = interaction.commandName;
+    const command = this.commandManager.getContextMenuCommand(commandName);
+
+    if (!command) {
+      log.warn(`Unknown context menu command: ${commandName}`);
+      await interaction
+        .reply({
+          content: "❌ This command is not available.",
+          ephemeral: true,
+        })
+        .catch(() => {});
+      return;
+    }
+
+    const context: ContextMenuCommandContext = {
+      interaction,
+      client: this.client,
+      getPluginAPI: <T = PluginAPI>(name: string) => this.client.plugins.get(name) as T | undefined,
+    };
+
+    try {
+      await command.execute(context);
+    } catch (error) {
+      log.error(`Context menu command ${commandName} execution failed:`, error);
+      captureException(error, {
+        context: "Context Menu Command Execution",
+        command: commandName,
+        guild: interaction.guildId,
+        user: interaction.user.id,
+      });
+
       const reply = {
         content: "❌ An error occurred while executing this command.",
         ephemeral: true,

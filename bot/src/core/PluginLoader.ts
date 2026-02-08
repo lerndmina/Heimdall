@@ -351,6 +351,11 @@ export class PluginLoader {
       await this.loadPluginCommands(manifest.name, pluginPath, module.commands);
     }
 
+    // Load context menu commands if path is specified
+    if (module.contextMenuCommands) {
+      await this.loadPluginContextMenuCommands(manifest.name, pluginPath, module.contextMenuCommands);
+    }
+
     // Load events if path is specified
     if (module.events) {
       await this.loadPluginEvents(manifest.name, pluginPath, module.events);
@@ -435,6 +440,54 @@ export class PluginLoader {
         log.debug(`Loaded command: ${commandModule.data.name} from plugin ${pluginName}`);
       } catch (error) {
         log.error(`Failed to load command from ${file}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Load context menu commands from a plugin's context menu commands directory
+   */
+  private async loadPluginContextMenuCommands(pluginName: string, pluginPath: string, contextMenuCommandsPath: string): Promise<void> {
+    const fullPath = path.join(pluginPath, contextMenuCommandsPath);
+
+    if (!fs.existsSync(fullPath)) {
+      log.warn(`Plugin ${pluginName} contextMenuCommands path does not exist: ${contextMenuCommandsPath}`);
+      return;
+    }
+
+    const files = this.scanDirectory(fullPath, [".ts", ".js"]);
+
+    for (const file of files) {
+      const fileName = path.basename(file);
+      if (fileName.startsWith("_")) continue;
+
+      try {
+        const commandModule = await import(pathToFileURL(file).href);
+
+        if (!commandModule.data) {
+          log.warn(`Context menu command file ${file} missing data export, skipping`);
+          continue;
+        }
+
+        if (!commandModule.execute) {
+          log.warn(`Context menu command file ${file} missing execute export, skipping`);
+          continue;
+        }
+
+        const config = commandModule.config ?? {};
+
+        this.commandManager.registerContextMenuCommand({
+          data: commandModule.data.toJSON ? commandModule.data.toJSON() : commandModule.data,
+          config: {
+            pluginName,
+            cooldown: config.cooldown,
+          },
+          execute: commandModule.execute,
+        });
+
+        log.debug(`Loaded context menu command: ${commandModule.data.name} from plugin ${pluginName}`);
+      } catch (error) {
+        log.error(`Failed to load context menu command from ${file}:`, error);
       }
     }
   }

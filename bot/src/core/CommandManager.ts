@@ -7,7 +7,14 @@
  * - Guild-scoped registration for instant updates during development
  */
 
-import { REST, Routes, type RESTPostAPIChatInputApplicationCommandsJSONBody } from "discord.js";
+import {
+  REST,
+  Routes,
+  type RESTPostAPIChatInputApplicationCommandsJSONBody,
+  type RESTPostAPIContextMenuApplicationCommandsJSONBody,
+  type MessageContextMenuCommandInteraction,
+  type UserContextMenuCommandInteraction,
+} from "discord.js";
 import type { HeimdallClient } from "../types/Client";
 import type { PluginAPI } from "../types/Plugin";
 import log from "../utils/logger";
@@ -30,8 +37,21 @@ export interface PluginCommand {
   autocomplete?: (context: AutocompleteContext) => Promise<void>;
 }
 
+export interface PluginContextMenuCommand {
+  data: RESTPostAPIContextMenuApplicationCommandsJSONBody;
+  config: PluginCommandConfig;
+  execute: (context: ContextMenuCommandContext) => Promise<void>;
+}
+
 export interface CommandContext {
   interaction: import("discord.js").ChatInputCommandInteraction;
+  client: HeimdallClient;
+  /** Get a loaded plugin's API by name */
+  getPluginAPI: <T = PluginAPI>(pluginName: string) => T | undefined;
+}
+
+export interface ContextMenuCommandContext {
+  interaction: MessageContextMenuCommandInteraction | UserContextMenuCommandInteraction;
   client: HeimdallClient;
   /** Get a loaded plugin's API by name */
   getPluginAPI: <T = PluginAPI>(pluginName: string) => T | undefined;
@@ -41,6 +61,7 @@ export class CommandManager {
   private rest: REST;
   private client: HeimdallClient;
   private commands: Map<string, PluginCommand> = new Map();
+  private contextMenuCommands: Map<string, PluginContextMenuCommand> = new Map();
 
   constructor(client: HeimdallClient, botToken: string) {
     this.client = client;
@@ -60,6 +81,18 @@ export class CommandManager {
   }
 
   /**
+   * Register a context menu command from a plugin
+   */
+  registerContextMenuCommand(command: PluginContextMenuCommand): void {
+    const name = command.data.name;
+    if (this.contextMenuCommands.has(name)) {
+      log.warn(`Context menu command "${name}" already registered, overwriting`);
+    }
+    this.contextMenuCommands.set(name, command);
+    log.debug(`Registered context menu command: ${name} (plugin: ${command.config.pluginName})`);
+  }
+
+  /**
    * Get command by name
    */
   getCommand(name: string): PluginCommand | undefined {
@@ -67,10 +100,24 @@ export class CommandManager {
   }
 
   /**
+   * Get context menu command by name
+   */
+  getContextMenuCommand(name: string): PluginContextMenuCommand | undefined {
+    return this.contextMenuCommands.get(name);
+  }
+
+  /**
    * Get all registered commands
    */
   getAllCommands(): Map<string, PluginCommand> {
     return this.commands;
+  }
+
+  /**
+   * Get all registered context menu commands
+   */
+  getAllContextMenuCommands(): Map<string, PluginContextMenuCommand> {
+    return this.contextMenuCommands;
   }
 
   /**
@@ -90,7 +137,10 @@ export class CommandManager {
       throw new Error("Client not ready - cannot register guild commands");
     }
 
-    const commandData = Array.from(this.commands.values()).map((cmd) => cmd.data);
+    const commandData: (RESTPostAPIChatInputApplicationCommandsJSONBody | RESTPostAPIContextMenuApplicationCommandsJSONBody)[] = [
+      ...Array.from(this.commands.values()).map((cmd) => cmd.data),
+      ...Array.from(this.contextMenuCommands.values()).map((cmd) => cmd.data),
+    ];
 
     if (commandData.length === 0) {
       log.debug(`No commands to register for guild ${guildId}`);
@@ -159,9 +209,11 @@ export class CommandManager {
   /**
    * Get stats about registered commands
    */
-  getStats(): { total: number } {
+  getStats(): { total: number; slashCommands: number; contextMenuCommands: number } {
     return {
-      total: this.commands.size,
+      total: this.commands.size + this.contextMenuCommands.size,
+      slashCommands: this.commands.size,
+      contextMenuCommands: this.contextMenuCommands.size,
     };
   }
 }

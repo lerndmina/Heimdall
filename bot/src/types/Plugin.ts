@@ -125,6 +125,9 @@ export interface PluginModule {
   /** Path to commands directory (relative to plugin) */
   commands?: string;
 
+  /** Path to context menu commands directory (relative to plugin) */
+  contextMenuCommands?: string;
+
   /** Path to events directory (relative to plugin) */
   events?: string;
 

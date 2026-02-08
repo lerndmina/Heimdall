@@ -133,6 +133,15 @@ export const permissionCategories: PermissionCategory[] = [
       { key: "manage_config", label: "Manage Configuration", description: "Edit transcription mode, provider, model, filters, and API keys." },
     ],
   },
+  {
+    key: "attachment-blocker",
+    label: "Attachment Blocker",
+    description: "Configure attachment blocking rules and channel overrides.",
+    actions: [
+      { key: "view_config", label: "View Configuration", description: "View the current attachment blocker configuration and channel overrides." },
+      { key: "manage_config", label: "Manage Configuration", description: "Edit global settings, channel overrides, and opener overrides." },
+    ],
+  },
 ];
 
 /**
