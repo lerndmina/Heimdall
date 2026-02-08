@@ -55,8 +55,8 @@ interface ChannelOverride {
 // ── Component ────────────────────────────────────────────
 
 export default function AttachmentBlockerPage({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["attachment-blocker.manage_config"] === true;
+  const { permissions, isOwner, isBotOwner, isAdministrator } = usePermissions();
+  const canManage = isOwner || isBotOwner || isAdministrator || permissions["attachment-blocker.manage_config"] === true;
 
   const [config, setConfig] = useState<GuildConfig | null>(null);
   const [channels, setChannels] = useState<ChannelOverride[]>([]);

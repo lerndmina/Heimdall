@@ -33,6 +33,18 @@ export function usePermissions(): PermissionsContextValue {
   return ctx;
 }
 
+/**
+ * Convenience hook — checks whether the current user can manage a feature.
+ * Always grants access to guild owners, bot owners, and Discord administrators,
+ * then falls back to the granular permission key.
+ *
+ * Usage: `const canManage = useCanManage("modmail.manage_config");`
+ */
+export function useCanManage(permissionKey: string): boolean {
+  const { permissions, isOwner, isBotOwner, isAdministrator } = usePermissions();
+  return isOwner || isBotOwner || isAdministrator || permissions[permissionKey] === true;
+}
+
 interface PermissionsProviderProps {
   guildId: string;
   children: ReactNode;
