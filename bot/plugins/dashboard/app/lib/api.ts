@@ -47,7 +47,41 @@ export async function fetchApi<T = unknown>(guildId: string, path: string, optio
     ...fetchOptions,
   });
 
-  const data = (await res.json()) as ApiResponse<T>;
+  let data: ApiResponse<T>;
+  
+  try {
+    data = (await res.json()) as ApiResponse<T>;
+  } catch {
+    // If JSON parsing fails, create error response based on HTTP status
+    data = {
+      success: false,
+      error: {
+        code: res.status === 403 ? "FORBIDDEN" : res.status === 401 ? "UNAUTHORIZED" : "PARSE_ERROR",
+        message: res.status === 403 ? "Access denied" : res.status === 401 ? "Unauthorized" : "Failed to parse response",
+      },
+    };
+    return data;
+  }
+
+  // If HTTP status indicates error, ensure error object includes proper code
+  if (!res.ok) {
+    // Create error object if it doesn't exist
+    if (!data.error) {
+      data.error = {
+        code: "UNKNOWN",
+        message: `HTTP ${res.status}: ${res.statusText}`,
+      };
+    }
+    
+    // Override error code based on HTTP status
+    if (res.status === 403) {
+      data.error.code = "FORBIDDEN";
+    } else if (res.status === 401) {
+      data.error.code = "UNAUTHORIZED";
+    }
+    
+    data.success = false;
+  }
 
   // Write to cache on success
   if (cacheKey && data.success) {
