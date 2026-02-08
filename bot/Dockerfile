@@ -65,7 +65,10 @@ COPY plugins ./plugins
 FROM oven/bun:1-alpine AS runner
 
 # Install runtime dependencies
-RUN apk add --no-cache ffmpeg
+# - ffmpeg: audio format conversion for voice transcription
+# - wget: GNU wget (replaces BusyBox wget which lacks --no-config for nodejs-whisper model downloads)
+# - libstdc++: required by compiled whisper.cpp binary
+RUN apk add --no-cache ffmpeg wget libstdc++
 
 # Security: Run as non-root user
 RUN addgroup --system --gid 1001 nodejs && \
