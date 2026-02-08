@@ -38,11 +38,11 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
       let player = await MinecraftPlayer.findOne({ guildId, minecraftUuid: uuid });
 
       if (!player) {
-        // Check by username (may be a pending auth from /link-minecraft)
+        // Check by username (may be a pending auth from /link-minecraft — no UUID yet)
         player = await MinecraftPlayer.findOne({
           guildId,
           minecraftUsername: { $regex: new RegExp(`^${username}$`, "i") },
-          minecraftUuid: { $exists: false },
+          $or: [{ minecraftUuid: { $exists: false } }, { minecraftUuid: null }],
         });
 
         if (player) {
@@ -68,14 +68,18 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
         player.lastConnectionAttempt = new Date();
         await player.save();
       } else {
-        // First-time connection — create record for potential linking
-        player = await MinecraftPlayer.create({
-          guildId,
-          minecraftUuid: uuid,
-          minecraftUsername: username,
-          lastConnectionAttempt: new Date(),
-          source: "existing",
+        // Unknown player with no record — don't create a phantom record.
+        // They need to use /link-minecraft in Discord first.
+        const message = config.authRejectionMessage || "§cYou are not whitelisted. Use /link-minecraft in Discord to get started.";
+
+        res.json({
+          success: true,
+          data: {
+            whitelisted: false,
+            message: message.replace("{player}", username),
+          },
         });
+        return;
       }
 
       // Check whitelist status

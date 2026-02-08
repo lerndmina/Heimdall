@@ -272,7 +272,7 @@ async function handleLinkAction(btnInteraction: ButtonInteraction, guildId: stri
       return;
     }
 
-    // Clean up any expired pending auths
+    // Clean up any expired pending auths (owned by this user, not unclaimed records)
     await MinecraftPlayer.deleteMany({
       guildId,
       discordId,
@@ -293,16 +293,27 @@ async function handleLinkAction(btnInteraction: ButtonInteraction, guildId: stri
     const member = await btnInteraction.guild?.members.fetch(discordId).catch(() => null);
 
     try {
-      await MinecraftPlayer.create({
-        guildId,
-        discordId,
-        minecraftUsername,
-        authCode,
-        expiresAt,
-        discordUsername: btnInteraction.user.username,
-        discordDisplayName: member?.displayName || btnInteraction.user.globalName || btnInteraction.user.username,
-        source: "linked",
-      });
+      // Upsert — if an unclaimed record already exists (e.g. from import or previous
+      // server join), update it with auth data instead of failing on duplicate key.
+      await MinecraftPlayer.findOneAndUpdate(
+        {
+          guildId,
+          minecraftUsername: { $regex: new RegExp(`^${minecraftUsername}$`, "i") },
+        },
+        {
+          $set: {
+            discordId,
+            authCode,
+            expiresAt,
+            codeShownAt: undefined,
+            linkedAt: undefined,
+            discordUsername: btnInteraction.user.username,
+            discordDisplayName: member?.displayName || btnInteraction.user.globalName || btnInteraction.user.username,
+            source: "linked",
+          },
+        },
+        { upsert: true, new: true },
+      );
     } catch (error) {
       log.error("Failed to create pending auth:", error);
       const embed = lib.createEmbedBuilder().setColor(0xff0000).setTitle("❌ Error").setDescription("Failed to create authentication request. Please try again later.");
