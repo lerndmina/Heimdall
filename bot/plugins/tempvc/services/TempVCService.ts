@@ -156,13 +156,13 @@ export class TempVCService {
       await this.markNumberUsed(guild.id, config.categoryId, await this.getCurrentNumber(guild.id, config.categoryId));
     }
 
-    // Add to active channels
-    await this.addToActiveChannels(guild.id, newChannel.id);
+    // Add to active channels (with opener mapping)
+    await this.addToActiveChannels(guild.id, newChannel.id, config.channelId);
 
     // Send control panel inside the channel
     await this.sendControlPanel(newChannel, member.id);
 
-    log.info(`Created temp channel ${newChannel.id} for user ${member.id} in guild ${guild.id}`);
+    log.info(`Created temp channel ${newChannel.id} for user ${member.id} in guild ${guild.id} (opener: ${config.channelId})`);
     return newChannel;
   }
 
@@ -248,17 +248,45 @@ export class TempVCService {
   }
 
   /**
-   * Add channel to active tracking
+   * Add channel to active tracking with opener mapping
    */
-  async addToActiveChannels(guildId: string, channelId: string): Promise<void> {
-    await ActiveTempChannels.findOneAndUpdate({ guildId }, { $addToSet: { channelIds: channelId }, $set: { updatedAt: new Date() } }, { upsert: true });
+  async addToActiveChannels(guildId: string, channelId: string, openerChannelId?: string): Promise<void> {
+    const update: Record<string, unknown> = {
+      $addToSet: { channelIds: channelId },
+      $set: { updatedAt: new Date() } as Record<string, unknown>,
+    };
+    if (openerChannelId) {
+      (update.$set as Record<string, unknown>)[`openerMap.${channelId}`] = openerChannelId;
+    }
+    await ActiveTempChannels.findOneAndUpdate({ guildId }, update, { upsert: true });
   }
 
   /**
-   * Remove channel from active tracking
+   * Remove channel from active tracking and clean up opener mapping
    */
   async removeFromActiveChannels(guildId: string, channelId: string): Promise<void> {
-    await ActiveTempChannels.findOneAndUpdate({ guildId }, { $pull: { channelIds: channelId }, $set: { updatedAt: new Date() } });
+    await ActiveTempChannels.findOneAndUpdate(
+      { guildId },
+      {
+        $pull: { channelIds: channelId },
+        $unset: { [`openerMap.${channelId}`]: "" },
+        $set: { updatedAt: new Date() },
+      },
+    );
+  }
+
+  /**
+   * Look up which opener spawned a given temp channel.
+   * Returns the opener channelId or null if not found.
+   */
+  async getOpenerForChannel(guildId: string, channelId: string): Promise<string | null> {
+    const doc = await ActiveTempChannels.findOne({ guildId, channelIds: channelId }).lean();
+    if (!doc) return null;
+    const map = doc.openerMap as Map<string, string> | Record<string, string> | undefined;
+    if (!map) return null;
+    // .lean() returns a POJO so openerMap is a plain object, not a Map
+    if (map instanceof Map) return map.get(channelId) ?? null;
+    return (map as Record<string, string>)[channelId] ?? null;
   }
 
   // ==================== Redis Channel Numbering ====================

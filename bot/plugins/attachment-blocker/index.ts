@@ -15,6 +15,7 @@ import type { LibAPI } from "../lib/index.js";
 // Import models to register with Mongoose
 import "./models/AttachmentBlockerConfig.js";
 import "./models/AttachmentBlockerChannel.js";
+import "./models/AttachmentBlockerOpener.js";
 
 // Import service
 import { AttachmentBlockerService } from "./services/AttachmentBlockerService.js";

@@ -20,6 +20,16 @@ const ActiveTempChannelsSchema = new Schema({
     default: [],
     index: true,
   },
+  /**
+   * Maps each active temp channel to the opener that spawned it.
+   * Key: temp channelId, Value: opener channelId
+   * Used by attachment-blocker to resolve opener-level rules.
+   */
+  openerMap: {
+    type: Map,
+    of: String,
+    default: new Map(),
+  },
   updatedAt: {
     type: Date,
     default: Date.now,

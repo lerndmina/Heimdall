@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Per-channel and guild-wide attachment type whitelist with optional timeout enforcement",
   "dependencies": ["lib"],
-  "optionalDependencies": [],
+  "optionalDependencies": ["tempvc"],
   "requiredEnv": [],
   "optionalEnv": [],
   "apiRoutePrefix": "/attachment-blocker"

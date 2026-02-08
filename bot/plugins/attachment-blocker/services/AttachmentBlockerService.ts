@@ -13,6 +13,7 @@ import type { HeimdallClient } from "../../../src/types/Client.js";
 import type { LibAPI } from "../../lib/index.js";
 import AttachmentBlockerConfig, { type IAttachmentBlockerConfig } from "../models/AttachmentBlockerConfig.js";
 import AttachmentBlockerChannel, { type IAttachmentBlockerChannel } from "../models/AttachmentBlockerChannel.js";
+import AttachmentBlockerOpener, { type IAttachmentBlockerOpener } from "../models/AttachmentBlockerOpener.js";
 import { AttachmentType, isMimeTypeAllowed, AttachmentTypeLabels } from "../utils/attachment-types.js";
 import { detectDisallowedLinks, getDetectedLinkTypes } from "../utils/link-detection.js";
 
@@ -21,6 +22,7 @@ const log = createLogger("attachment-blocker:service");
 const CACHE_TTL = 300; // 5 minutes in seconds
 const GUILD_CACHE_PREFIX = "attachment-blocker:guild:";
 const CHANNEL_CACHE_PREFIX = "attachment-blocker:channel:";
+const OPENER_CACHE_PREFIX = "attachment-blocker:opener:";
 
 /** The resolved (merged) config for a specific channel */
 export interface EffectiveConfig {
@@ -32,6 +34,7 @@ export interface EffectiveConfig {
 
 type GuildConfigDoc = IAttachmentBlockerConfig & { _id: any; createdAt: Date; updatedAt: Date };
 type ChannelConfigDoc = IAttachmentBlockerChannel & { _id: any; createdAt: Date; updatedAt: Date };
+type OpenerConfigDoc = IAttachmentBlockerOpener & { _id: any; createdAt: Date; updatedAt: Date };
 
 export class AttachmentBlockerService {
   private client: HeimdallClient;
@@ -148,11 +151,73 @@ export class AttachmentBlockerService {
     return result.deletedCount;
   }
 
+  // ── Opener Config CRUD (TempVC integration) ────────────
+
+  async getOpenerConfig(openerChannelId: string): Promise<OpenerConfigDoc | null> {
+    try {
+      const cached = await this.redis.get(`${OPENER_CACHE_PREFIX}${openerChannelId}`);
+      if (cached) return JSON.parse(cached);
+    } catch {
+      /* cache miss */
+    }
+
+    const config = (await AttachmentBlockerOpener.findOne({ openerChannelId }).lean()) as OpenerConfigDoc | null;
+    if (config) {
+      try {
+        await this.redis.setEx(`${OPENER_CACHE_PREFIX}${openerChannelId}`, CACHE_TTL, JSON.stringify(config));
+      } catch {
+        /* cache write failure non-critical */
+      }
+    }
+    return config;
+  }
+
+  async getOpenerConfigs(guildId: string): Promise<OpenerConfigDoc[]> {
+    return AttachmentBlockerOpener.find({ guildId }).lean() as Promise<OpenerConfigDoc[]>;
+  }
+
+  async upsertOpenerConfig(
+    guildId: string,
+    openerChannelId: string,
+    data: {
+      allowedTypes?: AttachmentType[];
+      timeoutDuration?: number | null;
+      enabled?: boolean;
+      createdBy: string;
+    },
+  ): Promise<OpenerConfigDoc> {
+    const updateData: Record<string, unknown> = {
+      guildId,
+      openerChannelId,
+      createdBy: data.createdBy,
+    };
+
+    if (data.allowedTypes !== undefined) updateData.allowedTypes = data.allowedTypes;
+    if (data.timeoutDuration !== undefined) updateData.timeoutDuration = data.timeoutDuration ?? undefined;
+    if (data.enabled !== undefined) updateData.enabled = data.enabled;
+
+    const config = (await AttachmentBlockerOpener.findOneAndUpdate({ openerChannelId }, { $set: updateData }, { upsert: true, new: true }).lean()) as OpenerConfigDoc;
+
+    await this.invalidateOpenerCache(openerChannelId);
+    return config;
+  }
+
+  async deleteOpenerConfig(openerChannelId: string): Promise<boolean> {
+    const result = await AttachmentBlockerOpener.deleteOne({ openerChannelId });
+    await this.invalidateOpenerCache(openerChannelId);
+    return result.deletedCount > 0;
+  }
+
   // ── Effective Config Resolution ────────────────────────
 
   /**
    * Resolve the effective config for a channel by merging guild defaults
-   * with any per-channel overrides.
+   * with any per-channel overrides, or opener-level rules for temp VCs.
+   *
+   * Resolution order:
+   * 1. Per-channel override (explicit — highest priority)
+   * 2. TempVC opener override (if channel is an active temp VC)
+   * 3. Guild defaults (fallback)
    */
   async resolveEffectiveConfig(guildId: string, channelId: string): Promise<EffectiveConfig> {
     const [guildConfig, channelConfig] = await Promise.all([this.getGuildConfig(guildId), this.getChannelConfig(channelId)]);
@@ -167,23 +232,55 @@ export class AttachmentBlockerService {
       };
     }
 
-    // No channel override → use guild defaults
-    if (!channelConfig) {
+    // Explicit per-channel override takes highest priority
+    if (channelConfig) {
       return {
-        enabled: guildConfig.enabled,
-        allowedTypes: guildConfig.defaultAllowedTypes as AttachmentType[],
-        timeoutDuration: guildConfig.defaultTimeoutDuration,
-        isChannelOverride: false,
+        enabled: channelConfig.enabled && guildConfig.enabled,
+        allowedTypes: (channelConfig.allowedTypes && channelConfig.allowedTypes.length > 0 ? channelConfig.allowedTypes : guildConfig.defaultAllowedTypes) as AttachmentType[],
+        timeoutDuration: channelConfig.timeoutDuration ?? guildConfig.defaultTimeoutDuration,
+        isChannelOverride: true,
       };
     }
 
-    // Merge: channel values take priority when explicitly set
+    // Check if this is a temp VC — resolve opener rules
+    const openerConfig = await this.resolveOpenerConfig(guildId, channelId, guildConfig);
+    if (openerConfig) return openerConfig;
+
+    // No overrides → use guild defaults
     return {
-      enabled: channelConfig.enabled && guildConfig.enabled,
-      allowedTypes: (channelConfig.allowedTypes && channelConfig.allowedTypes.length > 0 ? channelConfig.allowedTypes : guildConfig.defaultAllowedTypes) as AttachmentType[],
-      timeoutDuration: channelConfig.timeoutDuration ?? guildConfig.defaultTimeoutDuration,
-      isChannelOverride: true,
+      enabled: guildConfig.enabled,
+      allowedTypes: guildConfig.defaultAllowedTypes as AttachmentType[],
+      timeoutDuration: guildConfig.defaultTimeoutDuration,
+      isChannelOverride: false,
     };
+  }
+
+  /**
+   * If channelId is an active temp VC, look up which opener spawned it
+   * and return the opener's attachment rules merged with guild defaults.
+   */
+  private async resolveOpenerConfig(guildId: string, channelId: string, guildConfig: GuildConfigDoc): Promise<EffectiveConfig | null> {
+    try {
+      // Get tempvc plugin to check opener mapping
+      const tempvcPlugin = this.client.plugins?.get("tempvc") as { tempVCService: { getOpenerForChannel(guildId: string, channelId: string): Promise<string | null> } } | undefined;
+      if (!tempvcPlugin?.tempVCService) return null;
+
+      const openerId = await tempvcPlugin.tempVCService.getOpenerForChannel(guildId, channelId);
+      if (!openerId) return null;
+
+      const openerConfig = await this.getOpenerConfig(openerId);
+      if (!openerConfig) return null;
+
+      return {
+        enabled: openerConfig.enabled && guildConfig.enabled,
+        allowedTypes: (openerConfig.allowedTypes && openerConfig.allowedTypes.length > 0 ? openerConfig.allowedTypes : guildConfig.defaultAllowedTypes) as AttachmentType[],
+        timeoutDuration: openerConfig.timeoutDuration ?? guildConfig.defaultTimeoutDuration,
+        isChannelOverride: true,
+      };
+    } catch (error) {
+      log.debug("Failed to resolve opener config (tempvc plugin may not be loaded):", error);
+      return null;
+    }
   }
 
   // ── Enforcement ────────────────────────────────────────
@@ -316,6 +413,14 @@ export class AttachmentBlockerService {
   private async invalidateChannelCache(channelId: string): Promise<void> {
     try {
       await this.redis.del(`${CHANNEL_CACHE_PREFIX}${channelId}`);
+    } catch {
+      /* non-critical */
+    }
+  }
+
+  private async invalidateOpenerCache(openerChannelId: string): Promise<void> {
+    try {
+      await this.redis.del(`${OPENER_CACHE_PREFIX}${openerChannelId}`);
     } catch {
       /* non-critical */
     }

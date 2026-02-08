@@ -354,6 +354,12 @@ export class SuggestionService {
         return;
       }
 
+      // Cancel doesn't need permission check
+      if (action !== "cancel" && !(await this.checkManagePermission(interaction, suggestion.channelId))) {
+        await interaction.reply({ content: "❌ You need the **Manage Messages** permission in the suggestion channel to manage suggestions.", ephemeral: true });
+        return;
+      }
+
       switch (action) {
         case "approve":
           await this.updateSuggestionStatus(interaction, suggestion, SuggestionStatus.Approved);
@@ -376,8 +382,33 @@ export class SuggestionService {
     }
   }
 
+  /** Check if the user has ManageMessages in the suggestion's channel */
+  private async checkManagePermission(interaction: ButtonInteraction, channelId: string): Promise<boolean> {
+    try {
+      const channel = await this.client.channels.fetch(channelId);
+      if (!channel || !('permissionsFor' in channel)) return false;
+      const member = interaction.guild?.members.cache.get(interaction.user.id) ?? (await interaction.guild?.members.fetch(interaction.user.id));
+      if (!member) return false;
+      const perms = (channel as TextChannel | ForumChannel).permissionsFor(member);
+      return perms?.has(PermissionFlagsBits.ManageMessages) ?? false;
+    } catch {
+      return false;
+    }
+  }
+
   /** Show management menu */
   private async showManagementMenu(interaction: ButtonInteraction, suggestionId: string): Promise<void> {
+    const suggestion = await Suggestion.findOne({ id: suggestionId });
+    if (!suggestion) {
+      await interaction.reply({ content: "This suggestion no longer exists.", ephemeral: true });
+      return;
+    }
+
+    if (!(await this.checkManagePermission(interaction, suggestion.channelId))) {
+      await interaction.reply({ content: "❌ You need the **Manage Messages** permission in the suggestion channel to manage suggestions.", ephemeral: true });
+      return;
+    }
+
     const buttons = createManagementButtons(this.lib, suggestionId);
     await Promise.all([...buttons.components.map((button) => (button as any).ready())]);
     await interaction.reply({ content: "Select an action:", components: [buttons], ephemeral: true });

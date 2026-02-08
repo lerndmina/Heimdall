@@ -10,6 +10,9 @@ import { createConfigUpdateRoutes } from "./config-update.js";
 import { createChannelsGetRoutes } from "./channels-get.js";
 import { createChannelsUpdateRoutes } from "./channels-update.js";
 import { createChannelsDeleteRoutes } from "./channels-delete.js";
+import { createOpenersGetRoutes } from "./openers-get.js";
+import { createOpenersUpdateRoutes } from "./openers-update.js";
+import { createOpenersDeleteRoutes } from "./openers-delete.js";
 import type { AttachmentBlockerPluginAPI } from "../index.js";
 
 export type AttachmentBlockerApiDependencies = Pick<AttachmentBlockerPluginAPI, "service" | "lib">;
@@ -29,6 +32,13 @@ export function createRouter(api: AttachmentBlockerPluginAPI): Router {
   router.use("/channels", createChannelsGetRoutes(deps));
   router.use("/channels", createChannelsUpdateRoutes(deps));
   router.use("/channels", createChannelsDeleteRoutes(deps));
+
+  // GET    /api/guilds/:guildId/attachment-blocker/openers
+  // PUT    /api/guilds/:guildId/attachment-blocker/openers/:openerChannelId
+  // DELETE /api/guilds/:guildId/attachment-blocker/openers/:openerChannelId
+  router.use("/openers", createOpenersGetRoutes(deps));
+  router.use("/openers", createOpenersUpdateRoutes(deps));
+  router.use("/openers", createOpenersDeleteRoutes(deps));
 
   return router;
 }
