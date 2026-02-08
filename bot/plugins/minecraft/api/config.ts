@@ -121,6 +121,7 @@ function modelToDashboard(config: Record<string, any>): Record<string, any> {
     enableMinecraftPlugin: config.enableMinecraftPlugin ?? false,
     enableAutoRevoke: config.leaveRevocation?.enabled ?? false,
     enableAutoRestore: config.autoLinkOnJoin ?? false,
+    allowSelfUnlink: config.allowSelfUnlink ?? true,
     defaultDashboardTab: config.defaultDashboardTab ?? "players",
   };
 }

@@ -1,0 +1,239 @@
+/**
+ * Config API routes for VC Transcription
+ *
+ * GET  /config        — Get guild transcription config
+ * PUT  /config        — Update guild transcription config
+ * DELETE /config      — Delete (reset) guild transcription config
+ */
+
+import { Router, type Request, type Response } from "express";
+import VoiceTranscriptionConfig from "../models/VoiceTranscriptionConfig.js";
+import {
+  TranscriptionMode,
+  WhisperProvider,
+  FilterMode,
+  LOCAL_WHISPER_MODELS,
+  OPENAI_WHISPER_MODELS,
+} from "../types/index.js";
+import { createLogger } from "../../../src/core/Logger.js";
+import type { VCTranscriptionPluginAPI } from "../index.js";
+
+const log = createLogger("vc-transcription");
+
+export function createConfigRoutes(api: VCTranscriptionPluginAPI): Router {
+  const router = Router({ mergeParams: true });
+
+  /**
+   * GET /config — Get current transcription config for the guild
+   */
+  router.get("/config", async (req: Request, res: Response) => {
+    const { guildId } = req.params;
+
+    try {
+      const config = await VoiceTranscriptionConfig.findOne({ guildId });
+
+      if (!config) {
+        return res.json({
+          success: true,
+          data: {
+            guildId,
+            mode: TranscriptionMode.DISABLED,
+            whisperProvider: WhisperProvider.LOCAL,
+            whisperModel: "base.en",
+            roleFilter: { mode: FilterMode.DISABLED, roles: [] },
+            channelFilter: { mode: FilterMode.DISABLED, channels: [] },
+            hasApiKey: false,
+          },
+        });
+      }
+
+      // Check if OpenAI API key is configured (without revealing it)
+      let hasApiKey = false;
+      try {
+        hasApiKey = await api.guildEnvService.hasEnv(guildId, "VC_TRANSCRIPTION_OPENAI_KEY");
+      } catch {
+        // GuildEnvService may not be available
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          guildId: config.guildId,
+          mode: config.mode,
+          whisperProvider: config.whisperProvider,
+          whisperModel: config.whisperModel,
+          roleFilter: config.roleFilter,
+          channelFilter: config.channelFilter,
+          hasApiKey,
+        },
+      });
+    } catch (error) {
+      log.error("Failed to get transcription config:", error);
+      return res.status(500).json({ success: false, error: { message: "Failed to fetch config" } });
+    }
+  });
+
+  /**
+   * PUT /config — Update transcription config
+   */
+  router.put("/config", async (req: Request, res: Response) => {
+    const { guildId } = req.params;
+    const { mode, whisperProvider, whisperModel, roleFilter, channelFilter } = req.body;
+
+    try {
+      const update: Record<string, unknown> = {};
+
+      // Validate and set mode
+      if (mode !== undefined) {
+        if (!Object.values(TranscriptionMode).includes(mode)) {
+          return res.status(400).json({
+            success: false,
+            error: { message: `Invalid mode. Must be one of: ${Object.values(TranscriptionMode).join(", ")}` },
+          });
+        }
+        update.mode = mode;
+      }
+
+      // Validate and set provider
+      if (whisperProvider !== undefined) {
+        if (!Object.values(WhisperProvider).includes(whisperProvider)) {
+          return res.status(400).json({
+            success: false,
+            error: { message: `Invalid provider. Must be one of: ${Object.values(WhisperProvider).join(", ")}` },
+          });
+        }
+        update.whisperProvider = whisperProvider;
+      }
+
+      // Validate model against the (new or existing) provider
+      if (whisperModel !== undefined) {
+        const effectiveProvider = (whisperProvider as WhisperProvider) || undefined;
+        // Need to check against current config if provider isn't being updated
+        let providerToCheck = effectiveProvider;
+        if (!providerToCheck) {
+          const existing = await VoiceTranscriptionConfig.findOne({ guildId });
+          providerToCheck = existing?.whisperProvider || WhisperProvider.LOCAL;
+        }
+
+        const validModels =
+          providerToCheck === WhisperProvider.OPENAI
+            ? OPENAI_WHISPER_MODELS
+            : LOCAL_WHISPER_MODELS;
+
+        if (!(validModels as readonly string[]).includes(whisperModel)) {
+          return res.status(400).json({
+            success: false,
+            error: { message: `Invalid model for ${providerToCheck}. Must be one of: ${validModels.join(", ")}` },
+          });
+        }
+        update.whisperModel = whisperModel;
+      }
+
+      // Validate role filter
+      if (roleFilter !== undefined) {
+        if (roleFilter.mode && !Object.values(FilterMode).includes(roleFilter.mode)) {
+          return res.status(400).json({
+            success: false,
+            error: { message: `Invalid role filter mode. Must be one of: ${Object.values(FilterMode).join(", ")}` },
+          });
+        }
+        if (roleFilter.roles && !Array.isArray(roleFilter.roles)) {
+          return res.status(400).json({
+            success: false,
+            error: { message: "roleFilter.roles must be an array of role IDs" },
+          });
+        }
+        update.roleFilter = {
+          mode: roleFilter.mode || FilterMode.DISABLED,
+          roles: roleFilter.roles || [],
+        };
+      }
+
+      // Validate channel filter
+      if (channelFilter !== undefined) {
+        if (channelFilter.mode && !Object.values(FilterMode).includes(channelFilter.mode)) {
+          return res.status(400).json({
+            success: false,
+            error: { message: `Invalid channel filter mode. Must be one of: ${Object.values(FilterMode).join(", ")}` },
+          });
+        }
+        if (channelFilter.channels && !Array.isArray(channelFilter.channels)) {
+          return res.status(400).json({
+            success: false,
+            error: { message: "channelFilter.channels must be an array of channel IDs" },
+          });
+        }
+        update.channelFilter = {
+          mode: channelFilter.mode || FilterMode.DISABLED,
+          channels: channelFilter.channels || [],
+        };
+      }
+
+      if (Object.keys(update).length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: { message: "No valid fields provided to update" },
+        });
+      }
+
+      const config = await VoiceTranscriptionConfig.findOneAndUpdate(
+        { guildId },
+        update,
+        { upsert: true, new: true, runValidators: true },
+      );
+
+      // Check API key status
+      let hasApiKey = false;
+      try {
+        hasApiKey = await api.guildEnvService.hasEnv(guildId, "VC_TRANSCRIPTION_OPENAI_KEY");
+      } catch {
+        // ignore
+      }
+
+      log.info(`VC transcription config updated for guild ${guildId}`);
+
+      return res.json({
+        success: true,
+        data: {
+          guildId: config.guildId,
+          mode: config.mode,
+          whisperProvider: config.whisperProvider,
+          whisperModel: config.whisperModel,
+          roleFilter: config.roleFilter,
+          channelFilter: config.channelFilter,
+          hasApiKey,
+        },
+      });
+    } catch (error) {
+      log.error("Failed to update transcription config:", error);
+      return res.status(500).json({ success: false, error: { message: "Failed to update config" } });
+    }
+  });
+
+  /**
+   * DELETE /config — Reset transcription config for the guild
+   */
+  router.delete("/config", async (req: Request, res: Response) => {
+    const { guildId } = req.params;
+
+    try {
+      await VoiceTranscriptionConfig.deleteOne({ guildId });
+
+      // Also clean up the API key
+      try {
+        await api.guildEnvService.deleteEnv(guildId, "VC_TRANSCRIPTION_OPENAI_KEY");
+      } catch {
+        // ignore
+      }
+
+      log.info(`VC transcription config deleted for guild ${guildId}`);
+
+      return res.json({ success: true, data: { deleted: true } });
+    } catch (error) {
+      log.error("Failed to delete transcription config:", error);
+      return res.status(500).json({ success: false, error: { message: "Failed to delete config" } });
+    }
+  });
+
+  return router;
+}

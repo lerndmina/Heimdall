@@ -170,6 +170,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
 
   // Reason modal
   const [reasonModal, setReasonModal] = useState<{ playerId: string; action: "reject" | "revoke"; username: string } | null>(null);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ playerId: string; username: string } | null>(null);
   const [reason, setReason] = useState("");
 
   // Import whitelist modal
@@ -399,6 +400,20 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
       );
     }
     setReasonModal(null);
+  };
+
+  const openDeleteConfirmModal = (player: Player) => {
+    setDeleteConfirmModal({ playerId: player._id, username: player.minecraftUsername });
+    setOpenMenu(null);
+  };
+
+  const submitDeletePermanent = async () => {
+    if (!deleteConfirmModal) return;
+    const { playerId, username } = deleteConfirmModal;
+    await doAction(playerId, `minecraft/players/${playerId}/permanent`, "DELETE", undefined, {
+      description: `Permanently deleted ${username}`,
+    });
+    setDeleteConfirmModal(null);
   };
 
   const openActionMenu = (rowId: string, target: HTMLButtonElement) => {
@@ -938,6 +953,10 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   Restore
                 </MenuButton>
               )}
+              <div className="my-1 border-t border-zinc-700/30" />
+              <MenuButton onClick={() => openDeleteConfirmModal(activeMenuRow)} color="red">
+                🗑 Delete Record
+              </MenuButton>
             </div>,
             document.body,
           )}
@@ -1402,6 +1421,31 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 disabled={!reason.trim() || actionLoading === reasonModal.playerId}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed">
                 {actionLoading === reasonModal.playerId ? "Processing…" : reasonModal.action === "reject" ? "Reject" : "Revoke"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-red-700/40 bg-zinc-900 p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-red-400">🗑 Delete Record — {deleteConfirmModal.username}</h3>
+            <p className="mt-2 text-sm text-zinc-400">
+              This will <span className="font-semibold text-red-400">permanently delete</span> the player record for <span className="font-semibold text-zinc-200">{deleteConfirmModal.username}</span>.
+              This action cannot be undone.
+            </p>
+            <p className="mt-2 text-sm text-zinc-500">The player will need to re-link their account from scratch if they want to rejoin.</p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button onClick={() => setDeleteConfirmModal(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
+                Cancel
+              </button>
+              <button
+                onClick={submitDeletePermanent}
+                disabled={actionLoading === deleteConfirmModal.playerId}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                {actionLoading === deleteConfirmModal.playerId ? "Deleting…" : "Delete Permanently"}
               </button>
             </div>
           </div>

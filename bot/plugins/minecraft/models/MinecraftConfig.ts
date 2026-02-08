@@ -49,6 +49,7 @@ const MinecraftConfigSchema = new Schema(
       scheduledHour: { type: Number, default: 0, min: 0, max: 1439 },
     },
     maxPlayersPerUser: { type: Number, default: 1, min: 1, max: 10 },
+    allowSelfUnlink: { type: Boolean, default: true },
 
     // Linking panel channel (where the persistent "Link Account" panel is posted)
     linkPanelChannelId: { type: String },

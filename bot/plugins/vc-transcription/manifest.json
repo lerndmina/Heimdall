@@ -1,0 +1,10 @@
+{
+  "name": "vc-transcription",
+  "version": "1.0.0",
+  "description": "Voice message transcription using local Whisper (whisper.cpp) or OpenAI Whisper API with role/channel filters",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": ["ENCRYPTION_KEY"],
+  "apiRoutePrefix": "/vc-transcription"
+}

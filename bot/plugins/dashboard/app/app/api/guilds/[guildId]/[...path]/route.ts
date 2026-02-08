@@ -9,6 +9,7 @@ import { auth } from "@/lib/auth";
 import { getUserGuilds } from "@/lib/guildCache";
 import { resolveRouteAction } from "@/lib/routePermissions";
 import { resolvePermissions, type RoleOverrides, type MemberInfo } from "@/lib/permissions";
+import { checkBotOwner } from "@/lib/botOwner";
 
 const API_PORT = process.env.API_PORT || "3001";
 const API_BASE = `http://localhost:${API_PORT}`;
@@ -86,8 +87,11 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Could not verify member permissions" }, { status: 403 });
     }
 
-    // Guild owner bypasses all checks
-    if (!memberData.isOwner) {
+    // Bot owners bypass all permission checks (same as guild owner)
+    const isBotOwner = await checkBotOwner(session.user.id);
+
+    // Guild owner or bot owner bypasses all checks
+    if (!memberData.isOwner && !isBotOwner) {
       // Fetch guild permission overrides
       const permData = await fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny"> }> }>(
         `/api/guilds/${guildId}/dashboard-permissions`,

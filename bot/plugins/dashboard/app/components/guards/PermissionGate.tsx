@@ -17,7 +17,7 @@ interface PermissionGateProps {
 }
 
 export default function PermissionGate({ category, children }: PermissionGateProps) {
-  const { permissions, isOwner, loaded } = usePermissions();
+  const { permissions, isOwner, isBotOwner, loaded } = usePermissions();
 
   if (!loaded) {
     return (
@@ -27,8 +27,8 @@ export default function PermissionGate({ category, children }: PermissionGatePro
     );
   }
 
-  // Guild owners bypass all permission checks
-  if (isOwner) return <>{children}</>;
+  // Guild owners and bot owners bypass all permission checks
+  if (isOwner || isBotOwner) return <>{children}</>;
 
   // Check if the user has any permission in the category
   const hasAccess = Object.entries(permissions).some(([key, val]) => key.startsWith(category + ".") && val === true);

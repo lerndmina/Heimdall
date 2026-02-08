@@ -13,6 +13,8 @@ export interface PermissionsContextValue {
   hideDeniedFeatures: boolean;
   /** Whether the current user is the guild owner */
   isOwner: boolean;
+  /** Whether the current user is a bot owner (listed in OWNER_IDS) */
+  isBotOwner: boolean;
   /** Whether the current user has Discord Administrator */
   isAdministrator: boolean;
   /** Whether dashboard access is denied via _deny_access override */
@@ -40,6 +42,7 @@ export default function PermissionsProvider({ guildId, children }: PermissionsPr
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [hideDeniedFeatures, setHideDeniedFeatures] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [isBotOwner, setIsBotOwner] = useState(false);
   const [isAdministrator, setIsAdministrator] = useState(false);
   const [denyAccess, setDenyAccess] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -53,6 +56,7 @@ export default function PermissionsProvider({ guildId, children }: PermissionsPr
         setPermissions(json.data.permissions ?? {});
         setHideDeniedFeatures(json.data.hideDeniedFeatures ?? false);
         setIsOwner(json.data.isOwner ?? false);
+        setIsBotOwner(json.data.isBotOwner ?? false);
         setIsAdministrator(json.data.isAdministrator ?? false);
         setDenyAccess(json.data.denyAccess ?? false);
       }
@@ -68,5 +72,5 @@ export default function PermissionsProvider({ guildId, children }: PermissionsPr
     refresh();
   }, [refresh]);
 
-  return <PermissionsContext.Provider value={{ permissions, hideDeniedFeatures, isOwner, isAdministrator, denyAccess, loaded, refresh }}>{children}</PermissionsContext.Provider>;
+  return <PermissionsContext.Provider value={{ permissions, hideDeniedFeatures, isOwner, isBotOwner, isAdministrator, denyAccess, loaded, refresh }}>{children}</PermissionsContext.Provider>;
 }

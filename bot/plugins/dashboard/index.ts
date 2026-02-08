@@ -35,7 +35,7 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
   const isDev = process.env.NODE_ENV !== "production";
 
   // Determine which optional plugin features are available
-  const optionalPlugins = ["minecraft", "modmail", "tickets", "suggestions", "tags", "logging", "welcome", "tempvc", "reminders"];
+  const optionalPlugins = ["minecraft", "modmail", "tickets", "suggestions", "tags", "logging", "welcome", "tempvc", "reminders", "vc-transcription"];
   const features = optionalPlugins.filter((p) => dependencies.has(p));
   logger.info(`Available dashboard features: ${features.length > 0 ? features.join(", ") : "none"}`);
 

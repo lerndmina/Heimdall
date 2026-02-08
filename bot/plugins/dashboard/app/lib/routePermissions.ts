@@ -132,6 +132,14 @@ const routeMap: Record<string, string> = {
   "POST /reminders": "reminders.manage_reminders",
   "PUT /reminders/*": "reminders.manage_reminders",
   "DELETE /reminders/*": "reminders.manage_reminders",
+
+  // ── VC Transcription ──
+  "GET /vc-transcription/config": "vc-transcription.view_config",
+  "PUT /vc-transcription/config": "vc-transcription.manage_config",
+  "DELETE /vc-transcription/config": "vc-transcription.manage_config",
+  "GET /vc-transcription/apikey/status": "vc-transcription.view_config",
+  "PUT /vc-transcription/apikey": "vc-transcription.manage_config",
+  "DELETE /vc-transcription/apikey": "vc-transcription.manage_config",
 };
 
 /**

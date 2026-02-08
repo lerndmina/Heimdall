@@ -124,6 +124,15 @@ export const permissionCategories: PermissionCategory[] = [
       { key: "manage_reminders", label: "Manage Reminders", description: "Create, edit, or delete reminders." },
     ],
   },
+  {
+    key: "vc-transcription",
+    label: "Voice Transcription",
+    description: "Configure voice message transcription settings.",
+    actions: [
+      { key: "view_config", label: "View Configuration", description: "View the current transcription configuration." },
+      { key: "manage_config", label: "Manage Configuration", description: "Edit transcription mode, provider, model, filters, and API keys." },
+    ],
+  },
 ];
 
 /**

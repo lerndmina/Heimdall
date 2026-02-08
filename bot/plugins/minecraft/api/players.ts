@@ -256,6 +256,27 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
     }
   });
 
+  // DELETE /players/:playerId/permanent — Permanently delete player record
+  router.delete("/:playerId/permanent", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { guildId, playerId } = req.params;
+
+      const player = await MinecraftPlayer.findOneAndDelete({ _id: playerId, guildId }).lean();
+      if (!player) {
+        res.status(404).json({
+          success: false,
+          error: { code: "NOT_FOUND", message: "Player not found" },
+        });
+        return;
+      }
+
+      log.info(`Permanently deleted player record: ${player.minecraftUsername} (guild: ${guildId})`);
+      res.json({ success: true, data: { deleted: player.minecraftUsername } });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // POST /players/:playerId/whitelist — Whitelist player
   router.post("/:playerId/whitelist", async (req: Request, res: Response, next: NextFunction) => {
     try {

@@ -405,12 +405,25 @@ export class MinecraftPanelService {
   /**
    * Unlink Account button — shows a select menu if multiple accounts,
    * or a confirmation prompt if only one account.
+   * Blocked when allowSelfUnlink is disabled in config.
    */
   private async handleUnlinkButton(interaction: ButtonInteraction): Promise<void> {
     const guildId = interaction.guildId;
     if (!guildId) return;
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    // Check if self-unlink is allowed
+    const mcConfig = await MinecraftConfig.findOne({ guildId }).lean();
+    if (mcConfig && mcConfig.allowSelfUnlink === false) {
+      const embed = this.lib
+        .createEmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle("🔒 Unlinking Requires Staff Approval")
+        .setDescription("Self-unlinking is disabled on this server. Please contact a staff member to unlink your account.");
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
 
     const discordId = interaction.user.id;
     const linkedPlayers = await MinecraftPlayer.find({ guildId, discordId, linkedAt: { $ne: null } })
@@ -433,12 +446,7 @@ export class MinecraftPanelService {
         .setDescription(`Are you sure you want to unlink **${player.minecraftUsername}**?\n\n` + `This will remove your whitelist and you won't be able to join the server until you re-link.`);
 
       const confirmBtn = this.lib.createButtonBuilder(async (i) => {
-        const doc = await MinecraftPlayer.findById(player._id);
-        if (doc) {
-          doc.unlinkAccount();
-          doc.revokeWhitelist(discordId, "Unlinked by user via panel");
-          await doc.save();
-        }
+        await MinecraftPlayer.findByIdAndDelete(player._id);
         const doneEmbed = this.lib
           .createEmbedBuilder()
           .setColor(0x00ff00)
@@ -473,19 +481,19 @@ export class MinecraftPanelService {
         return;
       }
 
+      const playerUsername = doc.minecraftUsername;
+
       // Show confirmation
-      const confirmEmbed = this.lib.createEmbedBuilder().setColor(0xff0000).setTitle("⚠️ Confirm Unlink").setDescription(`Unlink **${doc.minecraftUsername}**? This will remove your whitelist.`);
+      const confirmEmbed = this.lib.createEmbedBuilder().setColor(0xff0000).setTitle("⚠️ Confirm Unlink").setDescription(`Unlink **${playerUsername}**? This will remove your whitelist.`);
 
       const confirmBtn = this.lib.createButtonBuilder(async (ci) => {
-        doc.unlinkAccount();
-        doc.revokeWhitelist(discordId, "Unlinked by user via panel");
-        await doc.save();
+        await MinecraftPlayer.findByIdAndDelete(doc._id);
 
         const doneEmbed = this.lib
           .createEmbedBuilder()
           .setColor(0x00ff00)
           .setTitle("✅ Account Unlinked")
-          .setDescription(`**${doc.minecraftUsername}** has been unlinked.\n\nClick **Link Account** to link a new account.`);
+          .setDescription(`**${playerUsername}** has been unlinked.\n\nClick **Link Account** to link a new account.`);
         await ci.update({ embeds: [doneEmbed], components: [] });
       }, 120);
       confirmBtn.setLabel("Confirm Unlink").setStyle(ButtonStyle.Danger);

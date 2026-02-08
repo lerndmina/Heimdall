@@ -97,9 +97,11 @@ export async function execute(context: CommandContext): Promise<void> {
       embed.setDescription(`Use \`/link-minecraft <username>\` to link ${linkedPlayers.length > 0 ? "another" : "your"} Minecraft account.`);
     }
 
-    // Build unlink buttons if multiple accounts are linked
+    // Build unlink buttons — only if self-unlink is allowed
     const components: ActionRowBuilder<any>[] = [];
-    if (linkedPlayers.length > 1) {
+    const allowSelfUnlink = mcConfig.allowSelfUnlink !== false;
+
+    if (allowSelfUnlink && linkedPlayers.length > 1) {
       const row = new ActionRowBuilder<any>();
       for (const player of linkedPlayers.slice(0, 5)) {
         const btn = pluginAPI.lib.createButtonBuilder(async (i) => {
@@ -112,12 +114,7 @@ export async function execute(context: CommandContext): Promise<void> {
 
           const confirmBtn = pluginAPI.lib
             .createButtonBuilder(async (ci) => {
-              const doc = await MinecraftPlayer.findById(player._id);
-              if (doc) {
-                doc.unlinkAccount();
-                doc.revokeWhitelist(discordId, "Unlinked by user");
-                await doc.save();
-              }
+              await MinecraftPlayer.findByIdAndDelete(player._id);
 
               const doneEmbed = pluginAPI.lib
                 .createEmbedBuilder()
@@ -147,7 +144,7 @@ export async function execute(context: CommandContext): Promise<void> {
         row.addComponents(btn);
       }
       components.push(row);
-    } else if (linkedPlayers.length === 1) {
+    } else if (allowSelfUnlink && linkedPlayers.length === 1) {
       // Single account — offer unlink button
       const player = linkedPlayers[0]!;
       const btn = pluginAPI.lib.createButtonBuilder(async (i) => {
@@ -159,12 +156,7 @@ export async function execute(context: CommandContext): Promise<void> {
 
         const confirmBtn = pluginAPI.lib
           .createButtonBuilder(async (ci) => {
-            const doc = await MinecraftPlayer.findById(player._id);
-            if (doc) {
-              doc.unlinkAccount();
-              doc.revokeWhitelist(discordId, "Unlinked by user");
-              await doc.save();
-            }
+            await MinecraftPlayer.findByIdAndDelete(player._id);
             const doneEmbed = pluginAPI.lib.createEmbedBuilder().setColor(0x00ff00).setTitle("✅ Account Unlinked").setDescription(`**${player.minecraftUsername}** has been unlinked.`);
             await ci.update({ embeds: [doneEmbed], components: [] });
           }, 120)

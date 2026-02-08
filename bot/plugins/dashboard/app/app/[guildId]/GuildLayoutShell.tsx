@@ -12,7 +12,7 @@ import GuildProvider, { type GuildInfo } from "@/components/providers/GuildProvi
 import PermissionsProvider, { usePermissions } from "@/components/providers/PermissionsProvider";
 import UnsavedChangesProvider from "@/components/providers/UnsavedChangesProvider";
 import Sidebar, { type NavItem } from "@/components/layout/Sidebar";
-import { OverviewIcon, MinecraftIcon, ModmailIcon, TicketsIcon, SuggestionsIcon, TagsIcon, LoggingIcon, WelcomeIcon, TempVCIcon, RemindersIcon, SettingsIcon } from "@/components/icons";
+import { OverviewIcon, MinecraftIcon, ModmailIcon, TicketsIcon, SuggestionsIcon, TagsIcon, LoggingIcon, WelcomeIcon, TempVCIcon, RemindersIcon, VCTranscriptionIcon, SettingsIcon } from "@/components/icons";
 
 /**
  * Nav item with its associated permission category key.
@@ -37,19 +37,22 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: "Welcome", href: (id) => `/${id}/welcome`, icon: <WelcomeIcon />, category: "welcome" },
   { label: "Temp VC", href: (id) => `/${id}/tempvc`, icon: <TempVCIcon />, category: "tempvc" },
   { label: "Reminders", href: (id) => `/${id}/reminders`, icon: <RemindersIcon />, category: "reminders" },
+  { label: "VC Transcription", href: (id) => `/${id}/vc-transcription`, icon: <VCTranscriptionIcon />, category: "vc-transcription" },
   { label: "Settings", href: (id) => `/${id}/settings`, icon: <SettingsIcon />, category: "dashboard" },
 ];
 
 function GuildLayoutInner({ guild, children }: { guild: GuildInfo; children: React.ReactNode }) {
-  const { permissions, hideDeniedFeatures, isOwner, denyAccess, loaded } = usePermissions();
+  const { permissions, hideDeniedFeatures, isOwner, isBotOwner, denyAccess, loaded } = usePermissions();
+  const hasFullAccess = isOwner || isBotOwner;
 
   function hasAnyCategoryAccess(categoryKey: string): boolean {
-    if (isOwner) return true;
+    if (hasFullAccess) return true;
     return Object.entries(permissions).some(([key, val]) => key.startsWith(categoryKey + ".") && val === true);
   }
 
   // If dashboard access is denied for this user, show access denied
-  if (loaded && denyAccess && !isOwner) {
+  // Bot owners always bypass deny_access
+  if (loaded && denyAccess && !hasFullAccess) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
@@ -72,7 +75,7 @@ function GuildLayoutInner({ guild, children }: { guild: GuildInfo; children: Rea
 
   const navItems: NavItem[] = NAV_ITEMS.map((def) => {
     const href = def.href(guild.id);
-    const hasAccess = !def.category || isOwner || hasAnyCategoryAccess(def.category);
+    const hasAccess = !def.category || hasFullAccess || hasAnyCategoryAccess(def.category);
 
     // If permissions haven't loaded yet, show all items
     if (!loaded) return { label: def.label, href, icon: def.icon };

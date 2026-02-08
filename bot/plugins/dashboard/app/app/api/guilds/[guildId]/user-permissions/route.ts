@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getUserGuilds } from "@/lib/guildCache";
 import { resolvePermissions, type RoleOverrides, type MemberInfo } from "@/lib/permissions";
+import { checkBotOwner } from "@/lib/botOwner";
 
 const API_PORT = process.env.API_PORT || "3001";
 const API_BASE = `http://localhost:${API_PORT}`;
@@ -44,30 +45,36 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Fetch member info + permission overrides + settings in parallel
-  const [memberData, permData, settingsData] = await Promise.all([
+  // Fetch member info + permission overrides + settings + bot owner in parallel
+  const [memberData, permData, settingsData, isBotOwner] = await Promise.all([
     fetchBotApi<MemberInfo>(`/api/guilds/${guildId}/members/${session.user.id}`),
     fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny"> }> }>(`/api/guilds/${guildId}/dashboard-permissions`),
     fetchBotApi<{ settings: { hideDeniedFeatures: boolean } }>(`/api/guilds/${guildId}/dashboard-settings`),
+    checkBotOwner(session.user.id),
   ]);
 
   if (!memberData) {
     // If member not in cache, default to basic access (no special permissions)
+    // But if they're a bot owner, grant full access
     return NextResponse.json({
       success: true,
       data: {
         permissions: {},
         hideDeniedFeatures: false,
         isOwner: false,
+        isBotOwner,
         isAdministrator: false,
       },
     });
   }
 
+  // Bot owners bypass all permission checks — treat as guild owner
+  const effectiveMember: MemberInfo = isBotOwner ? { ...memberData, isOwner: true } : memberData;
+
   // Build role overrides for the user's roles only
   const roleOverrides: RoleOverrides[] = (permData?.permissions ?? []).filter((p) => memberData.roleIds.includes(p.discordRoleId)).map((p) => ({ overrides: p.overrides }));
 
-  const resolved = resolvePermissions(memberData, roleOverrides);
+  const resolved = resolvePermissions(effectiveMember, roleOverrides);
 
   return NextResponse.json({
     success: true,
@@ -75,6 +82,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       permissions: resolved.getAll(),
       hideDeniedFeatures: settingsData?.settings?.hideDeniedFeatures ?? false,
       isOwner: memberData.isOwner,
+      isBotOwner,
       isAdministrator: memberData.isAdministrator,
       denyAccess: resolved.denyAccess,
     },
