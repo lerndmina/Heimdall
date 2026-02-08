@@ -9,7 +9,7 @@ FROM oven/bun:1-alpine AS deps
 WORKDIR /app
 
 # Install dependencies for native modules
-RUN apk add --no-cache libc6-compat python3 make g++ cmake
+RUN apk add --no-cache libc6-compat python3 make g++ cmake git wget
 
 # Copy package files
 COPY package.json bun.lock ./
