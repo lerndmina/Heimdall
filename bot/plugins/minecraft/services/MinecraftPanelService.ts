@@ -397,7 +397,7 @@ export class MinecraftPanelService {
         value:
           `**Username:** ${pendingAuth.minecraftUsername}\n` +
           `**Expires:** <t:${Math.floor((pendingAuth.expiresAt?.getTime() || 0) / 1000)}:R>\n` +
-          (pendingAuth.codeShownAt ? `**Code:** \`${pendingAuth.authCode}\` — Click **Confirm Code** below` : `Join \`${mcConfig.serverHost}:${mcConfig.serverPort}\` to get your code`),
+          `Join \`${mcConfig.serverHost}:${mcConfig.serverPort}\` to receive your code, then click **Confirm Code** below`,
         inline: false,
       });
     }
@@ -521,6 +521,7 @@ export class MinecraftPanelService {
       } else {
         // Normal link
         freshAuth.linkedAt = new Date();
+        freshAuth.confirmedAt = new Date();
 
         if (mcConfig.autoWhitelist) {
           freshAuth.whitelistedAt = new Date();

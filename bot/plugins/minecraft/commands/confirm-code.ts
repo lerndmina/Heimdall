@@ -129,6 +129,7 @@ export async function execute(context: CommandContext): Promise<void> {
 
   // Normal link
   pendingAuth.linkedAt = new Date();
+  pendingAuth.confirmedAt = new Date();
 
   // Auto-whitelist if configured
   if (mcConfig.autoWhitelist) {

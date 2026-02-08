@@ -145,8 +145,8 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
         return;
       }
 
-      // Not whitelisted — check for pending auth
-      const hasAuth = player.authCode && player.expiresAt && player.expiresAt > new Date();
+      // Not whitelisted — check for pending auth (not yet confirmed)
+      const hasAuth = player.authCode && player.expiresAt && player.expiresAt > new Date() && !player.confirmedAt;
 
       if (hasAuth) {
         // Mark that code was shown to player
