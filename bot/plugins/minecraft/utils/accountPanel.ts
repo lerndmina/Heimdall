@@ -106,9 +106,7 @@ async function buildPanel(
       value:
         `**Username:** ${pendingAuth.minecraftUsername}\n` +
         `**Expires:** <t:${Math.floor((pendingAuth.expiresAt?.getTime() || 0) / 1000)}:R>\n` +
-        (pendingAuth.codeShownAt
-          ? `**Code:** \`${pendingAuth.authCode}\` — Click **Confirm Code** below`
-          : `Join \`${mcConfig.serverHost}:${mcConfig.serverPort}\` to receive your code`),
+        (pendingAuth.codeShownAt ? `**Code:** \`${pendingAuth.authCode}\` — Click **Confirm Code** below` : `Join \`${mcConfig.serverHost}:${mcConfig.serverPort}\` to receive your code`),
       inline: false,
     });
   }
