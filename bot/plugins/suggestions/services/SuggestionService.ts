@@ -386,7 +386,7 @@ export class SuggestionService {
   private async checkManagePermission(interaction: ButtonInteraction, channelId: string): Promise<boolean> {
     try {
       const channel = await this.client.channels.fetch(channelId);
-      if (!channel || !('permissionsFor' in channel)) return false;
+      if (!channel || !("permissionsFor" in channel)) return false;
       const member = interaction.guild?.members.cache.get(interaction.user.id) ?? (await interaction.guild?.members.fetch(interaction.user.id));
       if (!member) return false;
       const perms = (channel as TextChannel | ForumChannel).permissionsFor(member);
