@@ -95,7 +95,7 @@ export class MinecraftPanelService {
             `**How it works:**\n` +
             `1. Click **Link Account** and enter your Minecraft username\n` +
             `2. Join the Minecraft server — you'll be shown an auth code\n` +
-            `3. Use \`/confirm-code <code>\` here in Discord to complete linking\n` +
+            `3. Click **My Status** and then **Confirm Code** to complete linking\n` +
             (config.autoWhitelist
               ? `4. ✅ You'll be **automatically whitelisted!**\n`
               : config.requireApproval
@@ -189,7 +189,7 @@ export class MinecraftPanelService {
             `**To complete linking:**\n` +
             `1. Join the Minecraft server: \`${mcConfig.serverHost}:${mcConfig.serverPort}\`\n` +
             `2. You'll see your authentication code\n` +
-            `3. Use \`/confirm-code <code>\` here in Discord\n\n` +
+            `3. Click **My Status** below to confirm your code\n\n` +
             `**Expires:** <t:${Math.floor((existingPending.expiresAt?.getTime() || Date.now()) / 1000)}:R>\n\n` +
             `*Click **Link Account** again after it expires to start a new request.*`,
         );
@@ -312,7 +312,7 @@ export class MinecraftPanelService {
           `**Next steps:**\n` +
             `1. Join the Minecraft server: \`${mcConfig.serverHost}:${mcConfig.serverPort}\`\n` +
             `2. You'll be shown your authentication code\n` +
-            `3. Come back here and use \`/confirm-code <your-code>\`\n\n` +
+            `3. Click **My Status** below to confirm your code\n\n` +
             (mcConfig.autoWhitelist
               ? `✅ You'll be automatically whitelisted once confirmed!`
               : mcConfig.requireApproval
@@ -396,9 +396,7 @@ export class MinecraftPanelService {
         value:
           `**Username:** ${pendingAuth.minecraftUsername}\n` +
           `**Expires:** <t:${Math.floor((pendingAuth.expiresAt?.getTime() || 0) / 1000)}:R>\n` +
-          (pendingAuth.codeShownAt
-            ? `**Code:** \`${pendingAuth.authCode}\` — Use \`/confirm-code ${pendingAuth.authCode}\``
-            : `Join \`${mcConfig.serverHost}:${mcConfig.serverPort}\` to get your code`),
+          (pendingAuth.codeShownAt ? `**Code:** \`${pendingAuth.authCode}\` — Click **Confirm Code** below` : `Join \`${mcConfig.serverHost}:${mcConfig.serverPort}\` to get your code`),
         inline: false,
       });
     }
@@ -409,7 +407,147 @@ export class MinecraftPanelService {
     }
     embed.setFooter({ text: footer });
 
-    await interaction.editReply({ embeds: [embed] });
+    // Add Confirm Code button if pending auth has been shown a code
+    const components: ActionRowBuilder<any>[] = [];
+    if (pendingAuth?.codeShownAt) {
+      const confirmCodeBtn = this.lib.createButtonBuilder(async (btnI) => {
+        await this.handleConfirmCode(btnI, pendingAuth, guildId, discordId, mcConfig, interaction);
+      }, 300);
+      confirmCodeBtn.setLabel("Confirm Code").setEmoji("✅").setStyle(ButtonStyle.Success);
+      await confirmCodeBtn.ready();
+
+      const row = new ActionRowBuilder<any>().addComponents(confirmCodeBtn);
+      components.push(row);
+    }
+
+    await interaction.editReply({ embeds: [embed], components });
+  }
+
+  /**
+   * Confirm Code — modal flow triggered from the status button's "Confirm Code" button.
+   */
+  private async handleConfirmCode(btnInteraction: ButtonInteraction, pendingAuth: any, guildId: string, discordId: string, mcConfig: any, statusInteraction: ButtonInteraction): Promise<void> {
+    const modalId = nanoid();
+    const modal = new ModalBuilder().setCustomId(modalId).setTitle("Confirm Authentication Code");
+
+    const codeInput = new TextInputBuilder()
+      .setCustomId("code")
+      .setLabel("Enter your 6-digit code")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setPlaceholder("e.g. 123456")
+      .setMinLength(6)
+      .setMaxLength(6);
+
+    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(codeInput));
+    await btnInteraction.showModal(modal);
+
+    try {
+      const submit = await btnInteraction.awaitModalSubmit({
+        filter: (i) => i.user.id === discordId && i.customId === modalId,
+        time: 300_000,
+      });
+
+      await submit.deferUpdate();
+
+      const code = submit.fields.getTextInputValue("code").trim();
+
+      if (!/^\d{6}$/.test(code)) {
+        const embed = this.lib.createEmbedBuilder().setColor(0xff0000).setTitle("❌ Invalid Code").setDescription("Authentication codes must be exactly 6 digits.");
+        await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      // Re-fetch the pending auth to validate the code matches
+      const freshAuth = await MinecraftPlayer.findOne({
+        guildId,
+        authCode: code,
+        linkedAt: null,
+        expiresAt: { $gt: new Date() },
+        $or: [{ discordId }, { discordId: null, isExistingPlayerLink: true }],
+      });
+
+      if (!freshAuth) {
+        const embed = this.lib
+          .createEmbedBuilder()
+          .setColor(0xff0000)
+          .setTitle("❌ Invalid Code")
+          .setDescription(
+            "No pending authentication found with that code.\n\n" +
+              "Make sure you:\n" +
+              "• Used the correct 6-digit code\n" +
+              "• Got the code by trying to join the Minecraft server\n" +
+              "• Haven't already confirmed this code",
+          );
+        await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      if (!freshAuth.codeShownAt) {
+        const embed = this.lib
+          .createEmbedBuilder()
+          .setColor(0xff0000)
+          .setTitle("❌ Invalid Process")
+          .setDescription(`You must try joining the Minecraft server first to receive your code.\n\n` + `**Join:** \`${mcConfig.serverHost}:${mcConfig.serverPort}\``);
+        await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      // Handle existing-player link (immediate whitelist)
+      if (freshAuth.isExistingPlayerLink && freshAuth.whitelistedAt) {
+        const maxAccounts = mcConfig.maxPlayersPerUser ?? 1;
+        const linkedCount = await MinecraftPlayer.countDocuments({ guildId, discordId, linkedAt: { $ne: null } });
+        if (linkedCount >= maxAccounts) {
+          const embed = this.lib
+            .createEmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle("❌ Account Limit Reached")
+            .setDescription(`You've reached the maximum of **${maxAccounts}** linked account${maxAccounts > 1 ? "s" : ""}.`);
+          await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+          return;
+        }
+
+        freshAuth.discordId = discordId;
+        freshAuth.discordUsername = btnInteraction.user.username;
+        freshAuth.discordDisplayName = (btnInteraction.member as any)?.displayName || btnInteraction.user.globalName;
+        freshAuth.linkedAt = new Date();
+        freshAuth.authCode = undefined;
+        freshAuth.expiresAt = undefined;
+        freshAuth.codeShownAt = undefined;
+        freshAuth.confirmedAt = undefined;
+        freshAuth.isExistingPlayerLink = undefined;
+        await freshAuth.save();
+      } else {
+        // Normal link
+        freshAuth.linkedAt = new Date();
+
+        if (mcConfig.autoWhitelist) {
+          freshAuth.whitelistedAt = new Date();
+          freshAuth.approvedBy = "auto";
+        }
+
+        await freshAuth.save();
+      }
+
+      // Update the status reply to show the result
+      const successEmbed = this.lib
+        .createEmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle("✅ Account Linked!")
+        .setDescription(
+          `**${freshAuth.minecraftUsername}** has been linked to your Discord account!\n\n` +
+            (mcConfig.autoWhitelist
+              ? "You've been **automatically whitelisted** — you can join the server now!"
+              : mcConfig.requireApproval
+                ? "⏳ A staff member will review and approve your whitelist request."
+                : "⏳ Your whitelist request is being processed."),
+        )
+        .setFooter({ text: `${mcConfig.serverHost}:${mcConfig.serverPort}` });
+
+      await statusInteraction.editReply({ embeds: [successEmbed], components: [] });
+    } catch {
+      // Modal timed out — ignore
+    }
   }
 
   /**
