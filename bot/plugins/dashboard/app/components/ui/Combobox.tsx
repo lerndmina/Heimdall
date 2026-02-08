@@ -91,10 +91,7 @@ export default function Combobox({
     if (!open) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (
-        containerRef.current && !containerRef.current.contains(target) &&
-        popoverRef.current && !popoverRef.current.contains(target)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(target) && popoverRef.current && !popoverRef.current.contains(target)) {
         setOpen(false);
       }
     };
@@ -151,48 +148,49 @@ export default function Combobox({
       </button>
 
       {/* Popover — rendered via portal to escape overflow containers */}
-      {open && createPortal(
-        <div ref={popoverRef} style={popoverStyle} className="rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl shadow-black/40" onKeyDown={handleKeyDown}>
-          {/* Search input */}
-          <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2">
-            <svg className="h-4 w-4 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              ref={inputRef}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={searchPlaceholder}
-              className="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 outline-none"
-            />
-          </div>
+      {open &&
+        createPortal(
+          <div ref={popoverRef} style={popoverStyle} className="rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl shadow-black/40" onKeyDown={handleKeyDown}>
+            {/* Search input */}
+            <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2">
+              <svg className="h-4 w-4 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                ref={inputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 outline-none"
+              />
+            </div>
 
-          {/* List */}
-          <div ref={listRef} className="max-h-52 overflow-y-auto p-1">
-            {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-zinc-500">{emptyMessage}</p>}
-            {filtered.map((opt, i) => {
-              const isSelected = opt.value === value;
-              const isHighlighted = i === highlightIndex;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => select(opt.value)}
-                  onMouseEnter={() => setHighlightIndex(i)}
-                  className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition ${isHighlighted ? "bg-zinc-800 text-zinc-100" : "text-zinc-300 hover:bg-zinc-800/60"}`}>
-                  {/* Checkmark */}
-                  <svg className={`h-4 w-4 shrink-0 ${isSelected ? "text-primary-400" : "text-transparent"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="truncate">{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>,
-        document.body
-      )}
+            {/* List */}
+            <div ref={listRef} className="max-h-52 overflow-y-auto p-1">
+              {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-zinc-500">{emptyMessage}</p>}
+              {filtered.map((opt, i) => {
+                const isSelected = opt.value === value;
+                const isHighlighted = i === highlightIndex;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => select(opt.value)}
+                    onMouseEnter={() => setHighlightIndex(i)}
+                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition ${isHighlighted ? "bg-zinc-800 text-zinc-100" : "text-zinc-300 hover:bg-zinc-800/60"}`}>
+                    {/* Checkmark */}
+                    <svg className={`h-4 w-4 shrink-0 ${isSelected ? "text-primary-400" : "text-transparent"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="truncate">{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
