@@ -13,17 +13,30 @@ import Toggle from "@/components/ui/Toggle";
 import TextInput from "@/components/ui/TextInput";
 import Modal from "@/components/ui/Modal";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
+import RoleCombobox from "@/components/ui/RoleCombobox";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
 
+type PermissionState = "allow" | "deny" | "neutral";
+type PermissionMode = "none" | "inherit_opener" | "inherit_category" | "custom";
+
+interface RoleOverride {
+  roleId: string;
+  view: PermissionState;
+  connect: PermissionState;
+}
+
 interface ChannelConfig {
   channelId: string;
   categoryId: string;
   useSequentialNames: boolean;
   channelName: string;
+  permissionMode: PermissionMode;
+  roleOverrides: RoleOverride[];
+  sendInviteDM: boolean;
 }
 
 interface TempVCConfig {
@@ -32,6 +45,22 @@ interface TempVCConfig {
   createdAt: string;
   updatedAt: string;
 }
+
+// ── Constants ────────────────────────────────────────────
+
+const PERMISSION_MODE_LABELS: Record<PermissionMode, string> = {
+  none: "None (Owner Only)",
+  inherit_opener: "Inherit from Opener",
+  inherit_category: "Inherit from Category",
+  custom: "Custom Roles",
+};
+
+const PERMISSION_MODE_OPTIONS: { value: PermissionMode; label: string; description: string }[] = [
+  { value: "none", label: "None", description: "Only the channel owner gets manage permissions" },
+  { value: "inherit_opener", label: "Inherit from Opener", description: "Copy permission overwrites from the opener channel" },
+  { value: "inherit_category", label: "Inherit from Category", description: "Copy permission overwrites from the target category" },
+  { value: "custom", label: "Custom Roles", description: "Define custom View/Connect permissions per role" },
+];
 
 // ── Component ────────────────────────────────────────────
 
@@ -50,7 +79,15 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
   // Add/edit modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editIndex, setEditIndex] = useState<number | null>(null);
-  const [draftChannel, setDraftChannel] = useState<ChannelConfig>({ channelId: "", categoryId: "", useSequentialNames: false, channelName: "Temp VC" });
+  const [draftChannel, setDraftChannel] = useState<ChannelConfig>({
+    channelId: "",
+    categoryId: "",
+    useSequentialNames: false,
+    channelName: "Temp VC",
+    permissionMode: "none",
+    roleOverrides: [],
+    sendInviteDM: false,
+  });
 
   // Delete confirmation
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
@@ -127,7 +164,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
   // ── Modal handlers ──
   const openAddModal = () => {
     setEditIndex(null);
-    setDraftChannel({ channelId: "", categoryId: "", useSequentialNames: false, channelName: "Temp VC" });
+    setDraftChannel({ channelId: "", categoryId: "", useSequentialNames: false, channelName: "Temp VC", permissionMode: "none", roleOverrides: [], sendInviteDM: false });
     setModalOpen(true);
   };
 
@@ -246,6 +283,11 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
                   <FieldDisplay label="Category" value={ch.categoryId} />
                   <FieldDisplay label="Channel Name Template" value={ch.channelName || "Temp VC"} />
                   <FieldDisplay label="Sequential Names" value={ch.useSequentialNames ? "Yes" : "No"} />
+                  <FieldDisplay label="Permission Mode" value={PERMISSION_MODE_LABELS[ch.permissionMode] ?? "None"} />
+                  <FieldDisplay label="Invite DM" value={ch.sendInviteDM ? "Enabled" : "Disabled"} />
+                  {ch.permissionMode === "custom" && ch.roleOverrides.length > 0 && (
+                    <FieldDisplay label="Role Overrides" value={`${ch.roleOverrides.length} role${ch.roleOverrides.length !== 1 ? "s" : ""}`} />
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -364,6 +406,122 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
             checked={draftChannel.useSequentialNames}
             onChange={(v) => setDraftChannel((d) => ({ ...d, useSequentialNames: v }))}
           />
+
+          {/* ── Permission Mode ── */}
+          <div>
+            <label className="block text-sm font-medium text-zinc-200 mb-1">Permission Mode</label>
+            <p className="text-xs text-zinc-500 mb-2">How permissions are applied to spawned temp VCs</p>
+            <div className="space-y-2">
+              {PERMISSION_MODE_OPTIONS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition ${
+                    draftChannel.permissionMode === opt.value ? "border-primary-500 bg-primary-500/10" : "border-zinc-700/30 hover:border-zinc-600/50"
+                  }`}>
+                  <input
+                    type="radio"
+                    name="permissionMode"
+                    value={opt.value}
+                    checked={draftChannel.permissionMode === opt.value}
+                    onChange={() => setDraftChannel((d) => ({ ...d, permissionMode: opt.value }))}
+                    className="mt-0.5 accent-primary-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-zinc-200">{opt.label}</p>
+                    <p className="text-xs text-zinc-500">{opt.description}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Custom Role Overrides ── */}
+          {draftChannel.permissionMode === "custom" && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-200 mb-1">Role Overrides</label>
+              <p className="text-xs text-zinc-500 mb-3">Configure View and Connect permissions per role</p>
+              <div className="space-y-3">
+                {draftChannel.roleOverrides.map((ro, i) => (
+                  <div key={`${ro.roleId}-${i}`} className="rounded-lg border border-zinc-700/30 p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <RoleCombobox
+                        guildId={guildId}
+                        value={ro.roleId}
+                        onChange={(v) => {
+                          setDraftChannel((d) => {
+                            const updated = [...d.roleOverrides];
+                            updated[i] = { ...updated[i]!, roleId: v };
+                            return { ...d, roleOverrides: updated };
+                          });
+                        }}
+                        label=""
+                        excludeIds={draftChannel.roleOverrides.filter((_, j) => j !== i).map((r) => r.roleId)}
+                      />
+                      <button
+                        onClick={() =>
+                          setDraftChannel((d) => ({
+                            ...d,
+                            roleOverrides: d.roleOverrides.filter((_, j) => j !== i),
+                          }))
+                        }
+                        className="shrink-0 ml-2 rounded-lg p-2 text-zinc-400 transition hover:bg-red-500/10 hover:text-red-400"
+                        title="Remove override">
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <PermToggle
+                        label="View Channel"
+                        value={ro.view}
+                        onChange={(v) => {
+                          setDraftChannel((d) => {
+                            const updated = [...d.roleOverrides];
+                            updated[i] = { ...updated[i]!, view: v };
+                            return { ...d, roleOverrides: updated };
+                          });
+                        }}
+                      />
+                      <PermToggle
+                        label="Connect"
+                        value={ro.connect}
+                        onChange={(v) => {
+                          setDraftChannel((d) => {
+                            const updated = [...d.roleOverrides];
+                            updated[i] = { ...updated[i]!, connect: v };
+                            return { ...d, roleOverrides: updated };
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() =>
+                    setDraftChannel((d) => ({
+                      ...d,
+                      roleOverrides: [...d.roleOverrides, { roleId: "", view: "neutral", connect: "neutral" }],
+                    }))
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-700/30 px-3 py-2 text-xs font-medium text-zinc-400 transition hover:border-primary-500 hover:text-primary-400">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Role Override
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Invite DM ── */}
+          <Toggle
+            label="DM Invited Users"
+            description="Send a DM with a channel link when users are invited to a temp VC"
+            checked={draftChannel.sendInviteDM}
+            onChange={(v) => setDraftChannel((d) => ({ ...d, sendInviteDM: v }))}
+          />
         </div>
       </Modal>
 
@@ -415,13 +573,36 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
   );
 }
 
-// ── Helper ───────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────
 
 function FieldDisplay({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-1 text-sm text-zinc-200">{value}</p>
+    </div>
+  );
+}
+
+const PERM_STATE_STYLES: Record<PermissionState, { bg: string; text: string }> = {
+  allow: { bg: "bg-emerald-500/20 border-emerald-500/50 text-emerald-400", text: "Allow" },
+  deny: { bg: "bg-red-500/20 border-red-500/50 text-red-400", text: "Deny" },
+  neutral: { bg: "bg-zinc-700/20 border-zinc-700/50 text-zinc-400", text: "Neutral" },
+};
+
+function PermToggle({ label, value, onChange }: { label: string; value: PermissionState; onChange: (v: PermissionState) => void }) {
+  const cycle: PermissionState[] = ["neutral", "allow", "deny"];
+  const next = () => {
+    const idx = cycle.indexOf(value);
+    onChange(cycle[(idx + 1) % cycle.length]!);
+  };
+  const style = PERM_STATE_STYLES[value];
+  return (
+    <div>
+      <p className="text-xs text-zinc-500 mb-1">{label}</p>
+      <button type="button" onClick={next} className={`w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition ${style.bg}`}>
+        {style.text}
+      </button>
     </div>
   );
 }

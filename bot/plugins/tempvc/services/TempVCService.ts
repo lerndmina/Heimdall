@@ -8,7 +8,7 @@
  * - Control panel generation (delegates to TempVCInteractionHandler)
  */
 
-import { ChannelType, PermissionsBitField, type GuildMember, type VoiceChannel, type MessageCreateOptions } from "discord.js";
+import { ChannelType, PermissionsBitField, PermissionFlagsBits, type GuildMember, type VoiceChannel, type MessageCreateOptions, type OverwriteResolvable } from "discord.js";
 import type { RedisClientType } from "redis";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import type { LibAPI } from "../../lib/index.js";
@@ -18,12 +18,25 @@ import { createLogger } from "../../../src/core/Logger.js";
 
 const log = createLogger("tempvc:service");
 
+/** Permission state for a single permission type */
+export type PermissionState = "allow" | "deny" | "neutral";
+
+/** A role override entry */
+export interface RoleOverride {
+  roleId: string;
+  view: PermissionState;
+  connect: PermissionState;
+}
+
 /** Configuration for a single creator channel */
 export interface ChannelConfig {
   channelId: string;
   categoryId: string;
   useSequentialNames?: boolean;
   channelName?: string;
+  permissionMode?: "none" | "inherit_opener" | "inherit_category" | "custom";
+  roleOverrides?: RoleOverride[];
+  sendInviteDM?: boolean;
 }
 
 export class TempVCService {
@@ -127,17 +140,15 @@ export class TempVCService {
       channelName = `${member.displayName}'s VC`;
     }
 
+    // Build permission overwrites
+    const permissionOverwrites = await this.buildPermissionOverwrites(member, config, sourceChannel);
+
     // Create the channel
     const newChannel = await guild.channels.create({
       name: channelName,
       type: ChannelType.GuildVoice,
       parent: config.categoryId,
-      permissionOverwrites: [
-        {
-          id: member.id,
-          allow: [PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ManageRoles],
-        },
-      ],
+      permissionOverwrites,
       userLimit: sourceChannel.userLimit,
       bitrate: sourceChannel.bitrate,
     });
@@ -235,6 +246,145 @@ export class TempVCService {
     }
 
     log.info(`Banned user ${userId} from channel ${channel.id}`);
+  }
+
+  // ==================== Permission Management ====================
+
+  /**
+   * Build permission overwrites for a new temp VC based on the opener's permission mode.
+   */
+  private async buildPermissionOverwrites(member: GuildMember, config: ChannelConfig, sourceChannel: VoiceChannel): Promise<OverwriteResolvable[]> {
+    const overwrites: OverwriteResolvable[] = [
+      // Owner always gets manage perms
+      {
+        id: member.id,
+        allow: [PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles],
+      },
+    ];
+
+    const mode = config.permissionMode ?? "none";
+
+    if (mode === "inherit_opener") {
+      // Copy all permission overwrites from the opener (source) channel
+      for (const [, overwrite] of sourceChannel.permissionOverwrites.cache) {
+        if (overwrite.id === member.id) continue; // Skip — owner already added above
+        overwrites.push({
+          id: overwrite.id,
+          type: overwrite.type,
+          allow: overwrite.allow,
+          deny: overwrite.deny,
+        });
+      }
+      log.debug(`Applied inherit_opener permissions from ${sourceChannel.id} (${sourceChannel.permissionOverwrites.cache.size} overwrites)`);
+    } else if (mode === "inherit_category") {
+      // Copy all permission overwrites from the target category
+      const category = member.guild.channels.cache.get(config.categoryId);
+      if (category && "permissionOverwrites" in category) {
+        for (const [, overwrite] of category.permissionOverwrites.cache) {
+          if (overwrite.id === member.id) continue;
+          overwrites.push({
+            id: overwrite.id,
+            type: overwrite.type,
+            allow: overwrite.allow,
+            deny: overwrite.deny,
+          });
+        }
+        log.debug(`Applied inherit_category permissions from ${config.categoryId} (${category.permissionOverwrites.cache.size} overwrites)`);
+      }
+    } else if (mode === "custom" && config.roleOverrides?.length) {
+      // Apply custom role overrides
+      for (const ro of config.roleOverrides) {
+        const allow: bigint[] = [];
+        const deny: bigint[] = [];
+
+        if (ro.view === "allow") allow.push(PermissionFlagsBits.ViewChannel);
+        if (ro.view === "deny") deny.push(PermissionFlagsBits.ViewChannel);
+        if (ro.connect === "allow") allow.push(PermissionFlagsBits.Connect);
+        if (ro.connect === "deny") deny.push(PermissionFlagsBits.Connect);
+
+        if (allow.length || deny.length) {
+          overwrites.push({ id: ro.roleId, allow, deny });
+        }
+      }
+      log.debug(`Applied ${config.roleOverrides.length} custom role overrides`);
+    }
+
+    return overwrites;
+  }
+
+  /**
+   * Invite users to a temp VC by granting them explicit View+Connect permissions.
+   * Optionally DMs them a channel link if the opener has sendInviteDM enabled.
+   */
+  async inviteUsers(channel: VoiceChannel, userIds: string[], sendDM: boolean): Promise<{ invited: string[]; failed: string[] }> {
+    const invited: string[] = [];
+    const failed: string[] = [];
+
+    for (const userId of userIds) {
+      try {
+        // Grant explicit view + connect permissions
+        await channel.permissionOverwrites.edit(userId, {
+          ViewChannel: true,
+          Connect: true,
+        });
+
+        if (sendDM) {
+          try {
+            const user = await this.lib.thingGetter.getUser(userId);
+            if (user) {
+              const embed = this.lib
+                .createEmbedBuilder()
+                .setColor(0x57f287)
+                .setTitle("📨 You've Been Invited!")
+                .setDescription(`You have been invited to a voice channel!\n\n` + `**Channel:** <#${channel.id}>\n` + `**Server:** ${channel.guild.name}\n\n` + `Click the channel link above to join.`)
+                .setTimestamp();
+              await user.send({ embeds: [embed] }).catch(() => {
+                log.debug(`Couldn't DM invite to ${userId} — DMs may be closed`);
+              });
+            }
+          } catch {
+            log.debug(`Failed to DM invite to ${userId}`);
+          }
+        }
+
+        invited.push(userId);
+      } catch (error) {
+        log.error(`Failed to invite user ${userId} to ${channel.id}:`, error);
+        failed.push(userId);
+      }
+    }
+
+    log.info(`Invited ${invited.length} users to channel ${channel.id} (${failed.length} failed)`);
+    return { invited, failed };
+  }
+
+  /**
+   * Get the opener config for a given temp channel (resolves through openerMap → TempVC config).
+   * Used by interaction handler to check per-opener settings like sendInviteDM.
+   */
+  async getOpenerConfig(guildId: string, channelId: string): Promise<ChannelConfig | null> {
+    const openerId = await this.getOpenerForChannel(guildId, channelId);
+    if (!openerId) return null;
+
+    const guildConfig = await TempVC.findOne({ guildId }).lean();
+    if (!guildConfig?.channels) return null;
+
+    const opener = guildConfig.channels.find((c) => c.channelId === openerId);
+    if (!opener) return null;
+
+    return {
+      channelId: opener.channelId,
+      categoryId: opener.categoryId,
+      useSequentialNames: opener.useSequentialNames ?? false,
+      channelName: opener.channelName ?? "Temp VC",
+      permissionMode: (opener as any).permissionMode ?? "none",
+      roleOverrides: ((opener as any).roleOverrides ?? []).map((ro: any) => ({
+        roleId: ro.roleId,
+        view: ro.view ?? "neutral",
+        connect: ro.connect ?? "neutral",
+      })),
+      sendInviteDM: (opener as any).sendInviteDM ?? false,
+    };
   }
 
   // ==================== Active Channel Tracking ====================

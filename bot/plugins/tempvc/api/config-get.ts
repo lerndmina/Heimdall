@@ -54,6 +54,13 @@ export function createConfigRoutes(_deps: TempVCApiDependencies): Router {
             categoryId: ch.categoryId,
             useSequentialNames: ch.useSequentialNames ?? false,
             channelName: ch.channelName || "Temp VC",
+            permissionMode: (ch as any).permissionMode ?? "none",
+            roleOverrides: ((ch as any).roleOverrides ?? []).map((ro: any) => ({
+              roleId: ro.roleId,
+              view: ro.view ?? "neutral",
+              connect: ro.connect ?? "neutral",
+            })),
+            sendInviteDM: (ch as any).sendInviteDM ?? false,
           })),
           createdAt: config.createdAt.toISOString(),
           updatedAt: config.updatedAt.toISOString(),

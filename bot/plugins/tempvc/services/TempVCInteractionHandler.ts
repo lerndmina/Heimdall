@@ -64,9 +64,14 @@ export class TempVCInteractionHandler {
       await this.handleRenameModal(interaction);
     });
 
-    cbs.registerPersistentHandler("tempvc.invite", async (interaction) => {
+    cbs.registerPersistentHandler("tempvc.invite_menu", async (interaction) => {
       if (!interaction.isButton()) return;
-      await this.handleInvite(interaction);
+      await this.handleInviteMenu(interaction);
+    });
+
+    cbs.registerPersistentHandler("tempvc.invite_user", async (interaction) => {
+      if (!interaction.isUserSelectMenu()) return;
+      await this.handleInviteUserSelect(interaction);
     });
 
     cbs.registerPersistentHandler("tempvc.ban_menu", async (interaction) => {
@@ -103,7 +108,7 @@ export class TempVCInteractionHandler {
 
     const deleteId = await cbs.createPersistentComponent("tempvc.delete_request", "button", { channelId });
     const renameId = await cbs.createPersistentComponent("tempvc.rename", "button", { channelId });
-    const inviteId = await cbs.createPersistentComponent("tempvc.invite", "button", { channelId });
+    const inviteId = await cbs.createPersistentComponent("tempvc.invite_menu", "button", { channelId });
     const banId = await cbs.createPersistentComponent("tempvc.ban_menu", "button", { channelId });
     const limitId = await cbs.createPersistentComponent("tempvc.limit", "button", { channelId });
     const lockId = await cbs.createPersistentComponent("tempvc.lock_toggle", "button", { channelId });
@@ -133,7 +138,7 @@ export class TempVCInteractionHandler {
       .addFields(
         { name: "🗑️ Delete Channel", value: "Permanently remove this channel with confirmation", inline: false },
         { name: "📝 Rename Channel", value: "Change the channel name to something custom", inline: false },
-        { name: "📨 Create Invite", value: "Generate a 10-minute invite link (max 10 uses)", inline: false },
+        { name: "📨 Invite Users", value: "Select users to invite to this channel", inline: false },
         { name: "🔨 Ban Users", value: "Remove and ban specific users from this channel", inline: false },
         { name: "🔢 Set User Limit", value: "Configure maximum number of users allowed", inline: false },
         { name: "🔒 Lock/Unlock Channel", value: "Toggle public channel access", inline: false },
@@ -304,9 +309,44 @@ export class TempVCInteractionHandler {
   }
 
   /**
-   * Create an invite link
+   * Show invite user select menu
    */
-  private async handleInvite(interaction: ButtonInteraction): Promise<void> {
+  private async handleInviteMenu(interaction: ButtonInteraction): Promise<void> {
+    try {
+      const metadata = await this.lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
+      const channelId = metadata?.channelId as string | undefined;
+      if (!channelId || !interaction.guild) {
+        await interaction.reply({ content: "❌ Channel information not found.", ephemeral: true });
+        return;
+      }
+
+      const channel = interaction.guild.channels.cache.get(channelId);
+      if (!channel) {
+        await interaction.reply({ content: "❌ Channel not found or was deleted.", ephemeral: true });
+        return;
+      }
+
+      const selectId = await this.lib.componentCallbackService.createPersistentComponent("tempvc.invite_user", "selectMenu", { channelId });
+
+      const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
+        new UserSelectMenuBuilder().setCustomId(selectId).setPlaceholder("Select users to invite").setMinValues(1).setMaxValues(25),
+      );
+
+      await interaction.reply({
+        content: "📨 **Invite Users**\n\nSelect users to invite to this voice channel. They will be granted access to view and connect.",
+        components: [row],
+        ephemeral: true,
+      });
+    } catch (error) {
+      log.error("Error in handleInviteMenu:", error);
+      await this.sendError(interaction, "Failed to show invite menu.");
+    }
+  }
+
+  /**
+   * Execute invite from user select
+   */
+  private async handleInviteUserSelect(interaction: UserSelectMenuInteraction): Promise<void> {
     try {
       await interaction.deferReply({ ephemeral: true });
 
@@ -323,27 +363,33 @@ export class TempVCInteractionHandler {
         return;
       }
 
-      // Check if locked
-      const everyoneRole = interaction.guild.roles.everyone;
-      const perms = channel.permissionOverwrites.cache.get(everyoneRole.id);
-      if (perms?.deny.has(PermissionFlagsBits.Connect)) {
-        await interaction.editReply({ content: "❌ Cannot create invite for a locked channel. Unlock it first." });
+      const userIds = interaction.values;
+      if (!userIds.length) {
+        await interaction.editReply({ content: "❌ No users selected." });
         return;
       }
 
-      const inviteUrl = await this.service.createInvite(channel);
+      // Look up opener config to check sendInviteDM setting
+      const openerConfig = await this.service.getOpenerConfig(interaction.guild.id, channelId);
+      const sendDM = openerConfig?.sendInviteDM ?? false;
 
-      const embed = this.lib
-        .createEmbedBuilder()
-        .setColor(0x57f287)
-        .setTitle("📨 Invite Created!")
-        .setDescription(`Your invite link:\n${inviteUrl}\n\n` + `**⏰ Expires:** <t:${Math.floor(Date.now() / 1000) + 600}:R>\n` + `**🔢 Max Uses:** 10`)
-        .setFooter({ text: "Share this link to invite users to your channel" });
+      const { invited, failed } = await this.service.inviteUsers(channel, userIds, sendDM);
 
-      await interaction.editReply({ embeds: [embed] });
+      const parts: string[] = [];
+      if (invited.length) {
+        parts.push(`✅ Invited ${invited.length} user${invited.length !== 1 ? "s" : ""}: ${invited.map((id) => `<@${id}>`).join(", ")}`);
+      }
+      if (failed.length) {
+        parts.push(`❌ Failed to invite ${failed.length} user${failed.length !== 1 ? "s" : ""}: ${failed.map((id) => `<@${id}>`).join(", ")}`);
+      }
+      if (sendDM && invited.length) {
+        parts.push(`📨 DM notifications sent to invited users`);
+      }
+
+      await interaction.editReply({ content: parts.join("\n") || "❌ No users were invited." });
     } catch (error) {
-      log.error("Error in handleInvite:", error);
-      await this.sendError(interaction, "Failed to create invite.");
+      log.error("Error in handleInviteUserSelect:", error);
+      await this.sendError(interaction, "Failed to invite users.");
     }
   }
 
