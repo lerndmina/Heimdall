@@ -2,7 +2,7 @@
  * /attachment-blocker command — Configure attachment blocking rules per-guild and per-channel.
  */
 
-import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits, ChannelType } from "discord.js";
 
 export const data = new SlashCommandBuilder()
   .setName("attachment-blocker")
@@ -36,7 +36,9 @@ export const data = new SlashCommandBuilder()
         sub
           .setName("add")
           .setDescription("Add or update a channel-specific override")
-          .addChannelOption((opt) => opt.setName("channel").setDescription("Target channel").setRequired(true))
+          .addChannelOption((opt) =>
+            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+          )
           .addStringOption((opt) =>
             opt
               .setName("type")
@@ -57,7 +59,9 @@ export const data = new SlashCommandBuilder()
         sub
           .setName("remove")
           .setDescription("Remove a channel override (revert to guild defaults)")
-          .addChannelOption((opt) => opt.setName("channel").setDescription("Channel to remove override from").setRequired(true)),
+          .addChannelOption((opt) =>
+            opt.setName("channel").setDescription("Channel to remove override from").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+          ),
       ),
   )
   .addSubcommand((sub) => sub.setName("view").setDescription("View current attachment blocking configuration"))
