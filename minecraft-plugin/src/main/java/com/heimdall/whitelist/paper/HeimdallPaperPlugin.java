@@ -36,7 +36,19 @@ public class HeimdallPaperPlugin extends JavaPlugin implements Listener {
     // Initialize core managers
     apiClient = new ApiClient(logger, configProvider);
     whitelistManager = new WhitelistManager(logger, configProvider, apiClient);
-    luckPermsManager = new PaperLuckPermsManager(this, logger);
+
+    // Initialize LuckPerms integration only if LuckPerms is available
+    if (getServer().getPluginManager().getPlugin("LuckPerms") != null) {
+      try {
+        luckPermsManager = new PaperLuckPermsManager(this, logger);
+      } catch (NoClassDefFoundError e) {
+        logger.warning("LuckPerms plugin found but API classes not available. Role sync disabled.");
+        luckPermsManager = null;
+      }
+    } else {
+      logger.info("LuckPerms not detected. Role sync features will be disabled.");
+      luckPermsManager = null;
+    }
 
     // Initialize whitelist cache
     long cacheWindow = getConfig().getLong("cache.cacheWindow", 60);

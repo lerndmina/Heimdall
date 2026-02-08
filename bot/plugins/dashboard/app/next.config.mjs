@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
 
   // Allow dev origins for HMR through tunnels/proxies
-  allowedDevOrigins: ["*"],
+  allowedDevOrigins: ["*", "cope-sound-amanda-thanks.trycloudflare.com"],
 
   // Output as standalone for Docker builds
   output: process.env.NODE_ENV === "production" ? "standalone" : undefined,

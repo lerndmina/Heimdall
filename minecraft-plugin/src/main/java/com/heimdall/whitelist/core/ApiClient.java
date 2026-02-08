@@ -150,9 +150,9 @@ public class ApiClient {
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setRequestProperty("User-Agent", "HeimdallWhitelist/2.0.0");
 
-        // Add Authorization header with API key
+        // Add X-API-Key header for authentication
         if (apiKey != null && !apiKey.isEmpty()) {
-          connection.setRequestProperty("Authorization", "Bearer " + apiKey);
+          connection.setRequestProperty("X-API-Key", apiKey);
         } else {
           logger.warning("API key not configured! Set api.apiKey in config.yml");
         }
@@ -335,9 +335,9 @@ public class ApiClient {
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setRequestProperty("User-Agent", "HeimdallWhitelist/2.0.0");
 
-        // Add Authorization header with API key
+        // Add X-API-Key header for authentication
         if (apiKey != null && !apiKey.isEmpty()) {
-          connection.setRequestProperty("Authorization", "Bearer " + apiKey);
+          connection.setRequestProperty("X-API-Key", apiKey);
         } else {
           logger.warning("API key not configured! Set api.apiKey in config.yml");
         }

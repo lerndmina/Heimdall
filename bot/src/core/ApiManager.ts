@@ -240,6 +240,39 @@ export class ApiManager {
       });
     });
 
+    // Bot owner check — is the authenticated user a bot owner?
+    this.app.get("/api/bot-owner", (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const userId = req.header("X-User-Id");
+      const ownerIds = (process.env.OWNER_IDS || "").trim().split(",").filter(Boolean);
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Not authenticated",
+          },
+        });
+        return;
+      }
+
+      const isBotOwner = ownerIds.includes(userId);
+
+      res.json({
+        success: true,
+        data: {
+          isBotOwner,
+          userId,
+        },
+      });
+    });
+
     // Mutual guild check — which of the given guilds is the bot in?
     this.app.post("/api/mutual-guilds", (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
@@ -313,6 +346,85 @@ export class ApiManager {
       } catch (err) {
         log.error("[API] Error checking dashboard access:", err);
         res.status(500).json({ success: false, error: "Database error" });
+      }
+    });
+
+    // Dev migration endpoint — import data from old bot (owner only)
+    this.app.post("/api/dev/migrate", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      // Only allow bot owner to run migrations
+      const userId = req.header("X-User-Id");
+      const ownerIds = (process.env.OWNER_IDS || "").trim().split(",").filter(Boolean);
+
+      if (!userId || !ownerIds.includes(userId)) {
+        res.status(401).json({
+          success: false,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Only the bot owner can execute migrations",
+          },
+        });
+        return;
+      }
+
+      const { oldDbUri, guildId, categoryMapping, importOpenThreads, skipModmail, modmailCollection } = req.body;
+
+      if (!oldDbUri || typeof oldDbUri !== "string") {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "INVALID_REQUEST",
+            message: "oldDbUri is required",
+          },
+        });
+        return;
+      }
+
+      try {
+        // Dynamically import the migration function
+        const { runFullMigration } = await import("../../plugins/dev/utils/migration.js");
+
+        // Use SSE to stream progress
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+        res.flushHeaders();
+
+        const stats = await runFullMigration({
+          oldDbUri,
+          guildId,
+          categoryMapping,
+          importOpenThreads: importOpenThreads === true,
+          skipModmail: skipModmail === true,
+          modmailCollection: typeof modmailCollection === "string" && modmailCollection.trim() ? modmailCollection.trim() : undefined,
+          onProgress: (event: any) => {
+            res.write(`data: ${JSON.stringify({ type: "progress", ...event })}\n\n`);
+          },
+        });
+
+        res.write(`data: ${JSON.stringify({ type: "complete", stats })}\n\n`);
+        res.end();
+      } catch (error: any) {
+        log.error("[API] Migration failed:", error);
+        // If headers already sent (SSE mode), send error as event
+        if (res.headersSent) {
+          res.write(`data: ${JSON.stringify({ type: "error", message: error.message || "Migration failed" })}\n\n`);
+          res.end();
+        } else {
+          res.status(500).json({
+            success: false,
+            error: {
+              code: "MIGRATION_FAILED",
+              message: error.message || "Migration failed",
+            },
+          });
+        }
       }
     });
 

@@ -15,7 +15,7 @@ import { fetchApi } from "@/lib/api";
 // ── Types ────────────────────────────────────────────────
 
 interface Conversation {
-  modmailId: string;
+  id: string;
   ticketNumber: number;
   userId: string;
   userDisplayName: string;
@@ -133,7 +133,7 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
     setLoadingDetail(true);
     setDetailConv(conv);
     try {
-      const res = await fetchApi<Conversation>(guildId, `modmail/conversations/${conv.modmailId}`, { skipCache: true });
+      const res = await fetchApi<Conversation>(guildId, `modmail/conversations/${conv.id}`, { skipCache: true });
       if (res.success && res.data) {
         setDetailConv(res.data);
       }
@@ -223,7 +223,7 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
       ) : (
         <div className="space-y-2">
           {conversations.map((conv) => (
-            <Card key={conv.modmailId} className="cursor-pointer transition hover:border-zinc-600" onClick={() => openDetail(conv)}>
+            <Card key={conv.id} className="cursor-pointer transition hover:border-zinc-600" onClick={() => openDetail(conv)}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {conv.userAvatarUrl ? <img src={conv.userAvatarUrl} alt="" className="h-8 w-8 rounded-full" /> : <div className="h-8 w-8 rounded-full bg-zinc-700" />}

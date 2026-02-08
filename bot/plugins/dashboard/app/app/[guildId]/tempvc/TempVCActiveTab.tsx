@@ -21,12 +21,13 @@ interface TempVCStats {
 
 interface ActiveChannel {
   channelId: string;
-  channelName: string;
-  ownerId: string;
-  ownerTag: string;
+  name: string;
   memberCount: number;
+  userLimit: number;
+  bitrate: number;
+  categoryId: string | null;
   createdAt: string;
-  creatorChannelId: string;
+  members: { id: string; username: string; displayName: string; avatar: string | null }[];
 }
 
 // ── Component ────────────────────────────────────────────
@@ -53,7 +54,8 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
       ]);
 
       if (activeRes.success) {
-        setChannels(activeRes.data ?? []);
+        const raw = activeRes.data as any;
+        setChannels(Array.isArray(raw) ? raw : (raw?.channels ?? []));
       }
       if (statsRes.success) {
         setStats(statsRes.data ?? null);
@@ -81,7 +83,7 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
         method: "DELETE",
       });
       if (res.success) {
-        toast.success(`Deleted channel ${deleteTarget.channelName}`);
+        toast.success(`Deleted channel ${deleteTarget.name}`);
         setChannels((chs) => chs.filter((c) => c.channelId !== deleteTarget.channelId));
         setDeleteTarget(null);
       } else {
@@ -96,6 +98,7 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
 
   // ── Helpers ──
   function formatDuration(seconds: number): string {
+    if (!seconds || seconds < 0) return "0s";
     if (seconds < 60) return `${Math.round(seconds)}s`;
     if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
     const hrs = Math.floor(seconds / 3600);
@@ -138,7 +141,7 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
       {/* Stats row */}
       {stats && (
         <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard label="Active Channels" value={String(stats.totalActive)} />
+          <StatCard label="Active Channels" value={String(stats.totalActive ?? 0)} />
           <StatCard label="Total Created" value={String(stats.totalCreated)} />
           <StatCard label="Avg. Lifetime" value={formatDuration(stats.avgLifetimeSeconds)} />
         </div>
@@ -154,11 +157,17 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
           </div>
           <CardTitle>No Active Temp Channels</CardTitle>
           <CardDescription className="mt-2 max-w-md">When a user joins a creator channel, a temporary voice channel will appear here.</CardDescription>
+          <button onClick={fetchData} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
         </Card>
       ) : (
         <Card>
           <div className="flex items-center justify-between">
-            <CardTitle>Active Channels ({channels.length})</CardTitle>
+            <CardTitle>Active Channels ({channels.length ?? 0})</CardTitle>
             <button onClick={fetchData} className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200" title="Refresh">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -171,8 +180,8 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
                 <thead>
                   <tr className="border-b border-zinc-800 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                     <th className="pb-3 pr-4">Channel</th>
-                    <th className="pb-3 pr-4">Owner</th>
                     <th className="pb-3 pr-4">Members</th>
+                    <th className="pb-3 pr-4">Limit</th>
                     <th className="pb-3 pr-4">Age</th>
                     {canManage && <th className="pb-3 text-right">Actions</th>}
                   </tr>
@@ -181,13 +190,13 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
                   {channels.map((ch) => (
                     <tr key={ch.channelId} className="group">
                       <td className="py-3 pr-4">
-                        <span className="text-zinc-200">{ch.channelName}</span>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <span className="text-zinc-400">{ch.ownerTag}</span>
+                        <span className="text-zinc-200">{ch.name}</span>
                       </td>
                       <td className="py-3 pr-4">
                         <span className="text-zinc-400">{ch.memberCount}</span>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span className="text-zinc-400">{ch.userLimit || "∞"}</span>
                       </td>
                       <td className="py-3 pr-4">
                         <span className="text-zinc-400">{formatAge(ch.createdAt)}</span>
@@ -236,8 +245,8 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
           </>
         }>
         <p className="text-sm text-zinc-400">
-          Are you sure you want to force-delete <span className="font-medium text-zinc-200">{deleteTarget?.channelName}</span>? This will immediately remove the voice channel from Discord. All members
-          will be disconnected.
+          Are you sure you want to force-delete <span className="font-medium text-zinc-200">{deleteTarget?.name}</span>? This will immediately remove the voice channel from Discord. All members will
+          be disconnected.
         </p>
       </Modal>
     </div>
