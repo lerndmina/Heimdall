@@ -9,7 +9,7 @@ FROM oven/bun:1-alpine AS deps
 WORKDIR /app
 
 # Install dependencies for native modules
-RUN apk add --no-cache libc6-compat python3 make g++
+RUN apk add --no-cache libc6-compat python3 make g++ cmake
 
 # Copy package files
 COPY package.json bun.lock ./
@@ -20,6 +20,14 @@ RUN bun install --frozen-lockfile --production && \
   cp -R node_modules /tmp/node_modules && \
   # Install all deps (including dev) for build stage
   bun install --frozen-lockfile
+
+# Pre-build whisper.cpp and download default model so runtime doesn't need build tools
+RUN cd /tmp/node_modules/nodejs-whisper/cpp/whisper.cpp && \
+  cmake -B build -DCMAKE_BUILD_TYPE=Release && \
+  cmake --build build --config Release -j$(nproc) && \
+  cd /app && \
+  wget -q -O /tmp/node_modules/nodejs-whisper/cpp/whisper.cpp/models/ggml-base.en.bin \
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
 
 # ──────────────────────────────────────────────────────────────────────
 # Stage 2: Build Dashboard
