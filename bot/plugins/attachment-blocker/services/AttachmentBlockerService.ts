@@ -13,7 +13,7 @@ import type { LibAPI } from "../../lib/index.js";
 import AttachmentBlockerConfig, { type IAttachmentBlockerConfig } from "../models/AttachmentBlockerConfig.js";
 import AttachmentBlockerChannel, { type IAttachmentBlockerChannel } from "../models/AttachmentBlockerChannel.js";
 import { AttachmentType, isMimeTypeAllowed, AttachmentTypeLabels } from "../utils/attachment-types.js";
-import { detectMediaLinks, getDetectedLinkTypes } from "../utils/link-detection.js";
+import { detectDisallowedLinks, getDetectedLinkTypes } from "../utils/link-detection.js";
 
 const log = createLogger("attachment-blocker:service");
 
@@ -229,13 +229,23 @@ export class AttachmentBlockerService {
       }
     }
 
-    // Check for media links (when video is not allowed or NONE is set)
-    const isVideoAllowed = effectiveConfig.allowedTypes.includes(AttachmentType.VIDEO);
-    if ((!isVideoAllowed || isNoneSet) && message.content) {
-      const detectedLinks = detectMediaLinks(message.content);
-      if (detectedLinks.length > 0) {
+    // Check for media links (GIF links vs video links checked independently)
+    if (!isNoneSet && message.content) {
+      const disallowed = detectDisallowedLinks(message.content, effectiveConfig.allowedTypes);
+      if (disallowed) {
         shouldDelete = true;
-        const linkTypes = getDetectedLinkTypes(detectedLinks);
+        const linkTypes = getDetectedLinkTypes(disallowed.links);
+        if (blockedReasons.length < 1) {
+          blockedReasons.push(`${linkTypes} not allowed`);
+        } else {
+          blockedReasons.push(linkTypes);
+        }
+      }
+    } else if (isNoneSet && message.content) {
+      const disallowed = detectDisallowedLinks(message.content, []);
+      if (disallowed) {
+        shouldDelete = true;
+        const linkTypes = getDetectedLinkTypes(disallowed.links);
         if (blockedReasons.length < 1) {
           blockedReasons.push(`${linkTypes} not allowed`);
         } else {

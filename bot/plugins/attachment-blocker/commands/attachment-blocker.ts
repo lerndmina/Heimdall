@@ -19,7 +19,8 @@ export const data = new SlashCommandBuilder()
           .setRequired(true)
           .addChoices(
             { name: "Images", value: "image" },
-            { name: "Videos & GIFs", value: "video" },
+            { name: "Videos", value: "video" },
+            { name: "GIFs", value: "gif" },
             { name: "Audio", value: "audio" },
             { name: "All (allow everything)", value: "all" },
             { name: "None (block everything)", value: "none" },
@@ -43,7 +44,8 @@ export const data = new SlashCommandBuilder()
               .setRequired(true)
               .addChoices(
                 { name: "Images", value: "image" },
-                { name: "Videos & GIFs", value: "video" },
+                { name: "Videos", value: "video" },
+                { name: "GIFs", value: "gif" },
                 { name: "Audio", value: "audio" },
                 { name: "All (allow everything)", value: "all" },
                 { name: "None (block everything)", value: "none" },

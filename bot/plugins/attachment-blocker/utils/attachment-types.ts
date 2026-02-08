@@ -6,6 +6,7 @@
 export enum AttachmentType {
   IMAGE = "image",
   VIDEO = "video",
+  GIF = "gif",
   AUDIO = "audio",
   ALL = "all",
   NONE = "none",
@@ -13,7 +14,8 @@ export enum AttachmentType {
 
 /**
  * Maps each AttachmentType to the MIME types it covers.
- * VIDEO includes animated image types (gif, apng, animated webp).
+ * VIDEO covers actual video files only.
+ * GIF covers animated image types (gif, apng, animated webp).
  */
 export const AttachmentTypesResolved: Record<AttachmentType, string[]> = {
   [AttachmentType.IMAGE]: [
@@ -33,20 +35,11 @@ export const AttachmentTypesResolved: Record<AttachmentType, string[]> = {
     "image/avif",
     "image/jxl",
   ],
-  [AttachmentType.VIDEO]: [
-    "video/mp4",
-    "video/webm",
-    "video/ogg",
-    "video/quicktime",
-    "video/x-msvideo",
-    "video/x-ms-wmv",
-    "video/x-flv",
-    "video/3gpp",
-    "video/3gpp2",
-    "video/x-matroska",
+  [AttachmentType.VIDEO]: ["video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo", "video/x-ms-wmv", "video/x-flv", "video/3gpp", "video/3gpp2", "video/x-matroska"],
+  [AttachmentType.GIF]: [
     "image/gif",
     "image/apng",
-    "image/webp",
+    "image/webp", // animated webp
   ],
   [AttachmentType.AUDIO]: [
     "audio/mpeg",
@@ -76,7 +69,8 @@ export const AttachmentTypesResolved: Record<AttachmentType, string[]> = {
 /** Human-readable labels for each attachment type */
 export const AttachmentTypeLabels: Record<AttachmentType, string> = {
   [AttachmentType.IMAGE]: "Images",
-  [AttachmentType.VIDEO]: "Videos & GIFs",
+  [AttachmentType.VIDEO]: "Videos",
+  [AttachmentType.GIF]: "GIFs",
   [AttachmentType.AUDIO]: "Audio",
   [AttachmentType.ALL]: "All Attachments",
   [AttachmentType.NONE]: "No Attachments",
