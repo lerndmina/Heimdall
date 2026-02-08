@@ -48,7 +48,7 @@ export async function fetchApi<T = unknown>(guildId: string, path: string, optio
   });
 
   let data: ApiResponse<T>;
-  
+
   try {
     data = (await res.json()) as ApiResponse<T>;
   } catch {
@@ -72,14 +72,14 @@ export async function fetchApi<T = unknown>(guildId: string, path: string, optio
         message: `HTTP ${res.status}: ${res.statusText}`,
       };
     }
-    
+
     // Override error code based on HTTP status
     if (res.status === 403) {
       data.error.code = "FORBIDDEN";
     } else if (res.status === 401) {
       data.error.code = "UNAUTHORIZED";
     }
-    
+
     data.success = false;
   }
 
