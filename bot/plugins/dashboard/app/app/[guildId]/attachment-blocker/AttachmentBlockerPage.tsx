@@ -159,8 +159,11 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
 
   // ── Type toggle handler (generic) ──
   const toggleTypeInList = (list: string[], typeId: string): string[] => {
-    if (typeId === "all") return ["all"];
-    if (typeId === "none") return ["none"];
+    // Special types (all/none): toggle on/off
+    if (typeId === "all" || typeId === "none") {
+      return list.includes(typeId) ? [] : [typeId];
+    }
+    // Clicking a media type clears any active special type
     const filtered = list.filter((t) => t !== "all" && t !== "none");
     if (filtered.includes(typeId)) {
       return filtered.filter((t) => t !== typeId);
@@ -528,7 +531,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
                             key={type.id}
                             type={type}
                             checked={guildAllowedTypes.includes(type.id)}
-                            disabled={!canManage || savingGuild || guildAllowedTypes.includes("all") || guildAllowedTypes.includes("none")}
+                            disabled={!canManage || savingGuild}
                             onChange={() => setGuildAllowedTypes(toggleTypeInList(guildAllowedTypes, type.id))}
                           />
                         ))}
