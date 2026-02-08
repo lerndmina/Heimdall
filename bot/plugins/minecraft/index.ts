@@ -75,10 +75,7 @@ export async function onLoad(context: PluginContext): Promise<MinecraftPluginAPI
     }
 
     // Rename old whitelistPendingMessage → unset it so the new split fields take effect
-    const pendingMigrated = await MinecraftConfig.updateMany(
-      { whitelistPendingMessage: { $exists: true } },
-      { $unset: { whitelistPendingMessage: "" } },
-    );
+    const pendingMigrated = await MinecraftConfig.updateMany({ whitelistPendingMessage: { $exists: true } }, { $unset: { whitelistPendingMessage: "" } });
     if (pendingMigrated.modifiedCount > 0) {
       logger.info(`🔧 Migrated ${pendingMigrated.modifiedCount} config(s): removed old whitelistPendingMessage`);
     }

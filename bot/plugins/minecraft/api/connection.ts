@@ -219,11 +219,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
           let schedule = "soon";
           if (config.whitelistSchedule.type === "delay") {
             const mins = config.whitelistSchedule.delayMinutes ?? 0;
-            schedule = mins >= 1440
-              ? `in approximately ${Math.round(mins / 1440)} day(s)`
-              : mins >= 60
-                ? `in approximately ${Math.round(mins / 60)} hour(s)`
-                : `in approximately ${mins} minute(s)`;
+            schedule = mins >= 1440 ? `in approximately ${Math.round(mins / 1440)} day(s)` : mins >= 60 ? `in approximately ${Math.round(mins / 60)} hour(s)` : `in approximately ${mins} minute(s)`;
           } else if (config.whitelistSchedule.type === "scheduled_day") {
             const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
             const day = days[config.whitelistSchedule.scheduledDay ?? 0] ?? "the scheduled day";
@@ -233,13 +229,13 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
             schedule = `on ${day} at ${hh}:${mm} UTC`;
           }
 
-          message = (config.whitelistPendingScheduledMessage || "§eYou will be whitelisted {schedule}.\n§7Please check back later!")
-            .replace("{schedule}", schedule)
-            .replace("{player}", username);
+          message = (config.whitelistPendingScheduledMessage || "§eYou will be whitelisted {schedule}.\n§7Please check back later!").replace("{schedule}", schedule).replace("{player}", username);
         } else {
           // Staff approval required
-          message = (config.whitelistPendingApprovalMessage || "§eYour whitelist application is pending staff approval.\n§7Please wait for a staff member to review your request.")
-            .replace("{player}", username);
+          message = (config.whitelistPendingApprovalMessage || "§eYour whitelist application is pending staff approval.\n§7Please wait for a staff member to review your request.").replace(
+            "{player}",
+            username,
+          );
         }
 
         res.json({

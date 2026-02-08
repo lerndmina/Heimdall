@@ -64,6 +64,9 @@ COPY plugins ./plugins
 # ──────────────────────────────────────────────────────────────────────
 FROM oven/bun:1-alpine AS runner
 
+# Install runtime dependencies
+RUN apk add --no-cache ffmpeg
+
 # Security: Run as non-root user
 RUN addgroup --system --gid 1001 nodejs && \
   adduser --system --uid 1001 heimdall
