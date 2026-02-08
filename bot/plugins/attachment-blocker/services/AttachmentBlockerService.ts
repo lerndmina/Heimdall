@@ -263,13 +263,26 @@ export class AttachmentBlockerService {
     try {
       // Get tempvc plugin to check opener mapping
       const tempvcPlugin = this.client.plugins?.get("tempvc") as { tempVCService: { getOpenerForChannel(guildId: string, channelId: string): Promise<string | null> } } | undefined;
-      if (!tempvcPlugin?.tempVCService) return null;
+      if (!tempvcPlugin?.tempVCService) {
+        log.debug(`resolveOpenerConfig: tempvc plugin not available`);
+        return null;
+      }
 
       const openerId = await tempvcPlugin.tempVCService.getOpenerForChannel(guildId, channelId);
-      if (!openerId) return null;
+      if (!openerId) {
+        log.debug(`resolveOpenerConfig: channel ${channelId} is not a temp VC (no opener found)`);
+        return null;
+      }
+
+      log.debug(`resolveOpenerConfig: channel ${channelId} spawned by opener ${openerId}`);
 
       const openerConfig = await this.getOpenerConfig(openerId);
-      if (!openerConfig) return null;
+      if (!openerConfig) {
+        log.debug(`resolveOpenerConfig: no attachment blocker config for opener ${openerId}`);
+        return null;
+      }
+
+      log.debug(`resolveOpenerConfig: found opener config — enabled=${openerConfig.enabled}, types=${openerConfig.allowedTypes?.join(",")}`);
 
       return {
         enabled: openerConfig.enabled && guildConfig.enabled,

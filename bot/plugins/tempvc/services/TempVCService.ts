@@ -278,15 +278,45 @@ export class TempVCService {
   /**
    * Look up which opener spawned a given temp channel.
    * Returns the opener channelId or null if not found.
+   * Falls back to category-based lookup for temp VCs created before openerMap was added.
    */
   async getOpenerForChannel(guildId: string, channelId: string): Promise<string | null> {
     const doc = await ActiveTempChannels.findOne({ guildId, channelIds: channelId }).lean();
     if (!doc) return null;
+
+    // Try openerMap first (direct mapping)
     const map = doc.openerMap as Map<string, string> | Record<string, string> | undefined;
-    if (!map) return null;
-    // .lean() returns a POJO so openerMap is a plain object, not a Map
-    if (map instanceof Map) return map.get(channelId) ?? null;
-    return (map as Record<string, string>)[channelId] ?? null;
+    if (map) {
+      // .lean() returns a POJO so openerMap is a plain object, not a Map
+      const openerId = map instanceof Map ? map.get(channelId) : (map as Record<string, string>)[channelId];
+      if (openerId) return openerId;
+    }
+
+    // Fallback: infer opener from the channel's parent category
+    // This handles temp VCs created before openerMap tracking was added
+    try {
+      const guild = this.client.guilds.cache.get(guildId);
+      if (!guild) return null;
+
+      const channel = guild.channels.cache.get(channelId) ?? (await guild.channels.fetch(channelId).catch(() => null));
+      if (!channel || !("parentId" in channel) || !channel.parentId) return null;
+
+      const config = await TempVC.findOne({ guildId }).lean();
+      if (!config?.channels) return null;
+
+      // Find which opener creates channels in this category
+      const match = config.channels.find((c) => c.categoryId === channel.parentId);
+      if (match) {
+        // Backfill the openerMap so future lookups are fast
+        await ActiveTempChannels.updateOne({ guildId }, { $set: { [`openerMap.${channelId}`]: match.channelId } });
+        log.debug(`Backfilled openerMap for channel ${channelId} → opener ${match.channelId}`);
+        return match.channelId;
+      }
+    } catch (error) {
+      log.debug("Category-based opener fallback failed:", error);
+    }
+
+    return null;
   }
 
   // ==================== Redis Channel Numbering ====================
