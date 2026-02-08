@@ -93,13 +93,15 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
     // Guild owner or bot owner bypasses all checks
     if (!memberData.isOwner && !isBotOwner) {
       // Fetch guild permission overrides
-      const permData = await fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny"> }> }>(
+      const permData = await fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(
         `/api/guilds/${guildId}/dashboard-permissions`,
         `perms:${guildId}`,
       );
 
-      // Build role overrides for the user's roles only
-      const roleOverrides: RoleOverrides[] = (permData?.permissions ?? []).filter((p) => memberData.roleIds.includes(p.discordRoleId)).map((p) => ({ overrides: p.overrides }));
+      // Build role overrides for the user's roles only, including position for hierarchy resolution
+      const roleOverrides: RoleOverrides[] = (permData?.permissions ?? [])
+        .filter((p) => memberData.roleIds.includes(p.discordRoleId))
+        .map((p) => ({ overrides: p.overrides, position: p.position ?? 0 }));
 
       const resolved = resolvePermissions(memberData, roleOverrides);
 

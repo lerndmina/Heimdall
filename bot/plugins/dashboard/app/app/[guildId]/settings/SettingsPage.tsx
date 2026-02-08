@@ -323,6 +323,13 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
   const configuredRoleIds = new Set(permDocs.map((d) => d.discordRoleId));
   const availableRoles = roles.filter((r) => !configuredRoleIds.has(r.id));
 
+  // Sort configured permission docs by Discord role position (highest first)
+  const sortedPermDocs = [...permDocs].sort((a, b) => {
+    const roleA = roles.find((r) => r.id === a.discordRoleId);
+    const roleB = roles.find((r) => r.id === b.discordRoleId);
+    return (roleB?.position ?? 0) - (roleA?.position ?? 0);
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -440,8 +447,8 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
 
                 <div className="space-y-1">
                   <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Configured Roles</p>
-                  {permDocs.length === 0 && <p className="py-4 text-center text-xs text-zinc-600">No roles configured yet.</p>}
-                  {permDocs.map((doc) => {
+                  {sortedPermDocs.length === 0 && <p className="py-4 text-center text-xs text-zinc-600">No roles configured yet.</p>}
+                  {sortedPermDocs.map((doc) => {
                     const role = roles.find((r) => r.id === doc.discordRoleId);
                     const isSelected = doc.discordRoleId === selectedRoleId;
                     return (

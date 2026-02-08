@@ -4,12 +4,12 @@
  *
  * Resolution order:
  * 1. Guild owner → always allow everything
- * 2. Discord Administrator → default allow, then apply overrides (deny wins)
- * 3. Normal user → inherit (deny) by default, apply overrides (deny wins across roles)
+ * 2. Discord Administrator → default allow, then apply overrides
+ * 3. Normal user → inherit (deny) by default, apply overrides
  *
  * Override precedence:
  * - Action-level overrides ("minecraft.manage_config") beat category-level ("minecraft")
- * - Across roles: deny wins (matching Discord's behaviour)
+ * - Across roles: highest-positioned role wins (matching Discord's hierarchy)
  */
 
 import { permissionCategories } from "./permissionDefs";
@@ -17,6 +17,8 @@ import { permissionCategories } from "./permissionDefs";
 export interface RoleOverrides {
   /** Map of override key → "allow" | "deny" */
   overrides: Map<string, "allow" | "deny"> | Record<string, "allow" | "deny">;
+  /** Discord role position — higher number = higher in hierarchy */
+  position: number;
 }
 
 export interface MemberInfo {
@@ -78,12 +80,20 @@ export function resolvePermissions(member: MemberInfo, roleOverridesList: RoleOv
     return createResult(resolved, categoryActions, false);
   }
 
-  // Collect all override maps
-  const overrideMaps = roleOverridesList.map((r) => toMap(r.overrides));
+  // Sort role overrides by position descending (highest role first)
+  const sortedRoles = [...roleOverridesList].sort((a, b) => b.position - a.position);
+  const overrideMaps = sortedRoles.map((r) => toMap(r.overrides));
 
-  // Check if any of the user's role overrides deny dashboard access entirely.
-  // When _deny_access is "deny", the admin privilege is revoked for dashboard purposes.
-  const denyAccess = overrideMaps.some((m) => m.get(DENY_ACCESS_KEY) === "deny");
+  // Check if the HIGHEST role that has a _deny_access override denies access.
+  // Higher-positioned roles override lower ones.
+  let denyAccess = false;
+  for (const overrides of overrideMaps) {
+    const val = overrides.get(DENY_ACCESS_KEY);
+    if (val) {
+      denyAccess = val === "deny";
+      break; // Highest role with an opinion wins
+    }
+  }
   const effectiveAdmin = member.isAdministrator && !denyAccess;
 
   for (const actionKey of allActions) {
@@ -92,43 +102,39 @@ export function resolvePermissions(member: MemberInfo, roleOverridesList: RoleOv
     // Determine default: Administrators start with allow (unless access denied), others with deny
     let defaultValue: boolean = effectiveAdmin;
 
-    // (c) Check action-level overrides across all roles
+    // (c) Check action-level overrides — highest-positioned role with an opinion wins
     let hasActionLevel = false;
-    let actionAllowed = false;
-    let actionDenied = false;
+    let actionResult: boolean = false;
 
     for (const overrides of overrideMaps) {
       const actionVal = overrides.get(actionKey);
       if (actionVal) {
         hasActionLevel = true;
-        if (actionVal === "deny") actionDenied = true;
-        else if (actionVal === "allow") actionAllowed = true;
+        actionResult = actionVal === "allow";
+        break; // Highest role with an explicit action-level override wins
       }
     }
 
     if (hasActionLevel) {
-      // Deny wins across roles at action level
-      resolved[actionKey] = actionDenied ? false : actionAllowed;
+      resolved[actionKey] = actionResult;
       continue;
     }
 
-    // Fall back to category-level overrides
+    // Fall back to category-level overrides — highest-positioned role wins
     let hasCategoryLevel = false;
-    let categoryAllowed = false;
-    let categoryDenied = false;
+    let categoryResult: boolean = false;
 
     for (const overrides of overrideMaps) {
       const catVal = overrides.get(categoryKey!);
       if (catVal) {
         hasCategoryLevel = true;
-        if (catVal === "deny") categoryDenied = true;
-        else if (catVal === "allow") categoryAllowed = true;
+        categoryResult = catVal === "allow";
+        break; // Highest role with an explicit category-level override wins
       }
     }
 
     if (hasCategoryLevel) {
-      // Deny wins across roles at category level
-      resolved[actionKey] = categoryDenied ? false : categoryAllowed;
+      resolved[actionKey] = categoryResult;
       continue;
     }
 

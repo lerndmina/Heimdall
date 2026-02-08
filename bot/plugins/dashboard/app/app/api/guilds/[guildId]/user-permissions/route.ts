@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   // Fetch member info + permission overrides + settings + bot owner in parallel
   const [memberData, permData, settingsData, isBotOwner] = await Promise.all([
     fetchBotApi<MemberInfo>(`/api/guilds/${guildId}/members/${session.user.id}`),
-    fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny"> }> }>(`/api/guilds/${guildId}/dashboard-permissions`),
+    fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(`/api/guilds/${guildId}/dashboard-permissions`),
     fetchBotApi<{ settings: { hideDeniedFeatures: boolean } }>(`/api/guilds/${guildId}/dashboard-settings`),
     checkBotOwner(session.user.id),
   ]);
@@ -71,8 +71,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   // Bot owners bypass all permission checks — treat as guild owner
   const effectiveMember: MemberInfo = isBotOwner ? { ...memberData, isOwner: true } : memberData;
 
-  // Build role overrides for the user's roles only
-  const roleOverrides: RoleOverrides[] = (permData?.permissions ?? []).filter((p) => memberData.roleIds.includes(p.discordRoleId)).map((p) => ({ overrides: p.overrides }));
+  // Build role overrides for the user's roles only, including position for hierarchy resolution
+  const roleOverrides: RoleOverrides[] = (permData?.permissions ?? []).filter((p) => memberData.roleIds.includes(p.discordRoleId)).map((p) => ({ overrides: p.overrides, position: p.position ?? 0 }));
 
   const resolved = resolvePermissions(effectiveMember, roleOverrides);
 

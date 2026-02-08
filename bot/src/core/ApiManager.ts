@@ -575,7 +575,13 @@ export class ApiManager {
       }
       try {
         const docs = await DashboardPermission.find({ guildId: req.params.guildId }).lean();
-        res.json({ success: true, data: { permissions: docs } });
+        // Enrich with Discord role position for hierarchy-based resolution
+        const guild = this.client?.guilds.cache.get(req.params.guildId);
+        const enriched = docs.map((doc) => {
+          const role = guild?.roles.cache.get(doc.discordRoleId);
+          return { ...doc, position: role?.position ?? 0 };
+        });
+        res.json({ success: true, data: { permissions: enriched } });
       } catch (err) {
         log.error("[API] Error fetching dashboard permissions:", err);
         res.status(500).json({ success: false, error: "Database error" });
