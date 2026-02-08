@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
 import Modal from "@/components/ui/Modal";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -33,8 +33,7 @@ interface ActiveChannel {
 // ── Component ────────────────────────────────────────────
 
 export default function TempVCActiveTab({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["tempvc.manage_channels"] === true;
+  const canManage = useCanManage("tempvc.manage_channels");
 
   const [stats, setStats] = useState<TempVCStats | null>(null);
   const [channels, setChannels] = useState<ActiveChannel[]>([]);

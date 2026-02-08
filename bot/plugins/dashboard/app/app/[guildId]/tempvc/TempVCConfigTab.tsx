@@ -13,7 +13,7 @@ import Toggle from "@/components/ui/Toggle";
 import TextInput from "@/components/ui/TextInput";
 import Modal from "@/components/ui/Modal";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -36,8 +36,7 @@ interface TempVCConfig {
 // ── Component ────────────────────────────────────────────
 
 export default function TempVCConfigTab({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["tempvc.manage_config"] === true;
+  const canManage = useCanManage("tempvc.manage_config");
 
   const [config, setConfig] = useState<TempVCConfig | null>(null);
   const [loading, setLoading] = useState(true);

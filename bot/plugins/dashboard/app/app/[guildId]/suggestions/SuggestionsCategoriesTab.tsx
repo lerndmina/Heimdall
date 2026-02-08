@@ -19,7 +19,7 @@ import Toggle from "@/components/ui/Toggle";
 import Modal from "@/components/ui/Modal";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import { NotConfigured } from "@/components/ui/SetupWizard";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -41,8 +41,7 @@ interface SuggestionCategory {
 // ── Component ────────────────────────────────────────────
 
 export default function SuggestionsCategoriesTab({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["suggestions.manage_categories"] === true;
+  const canManage = useCanManage("suggestions.manage_categories");
 
   const [categories, setCategories] = useState<SuggestionCategory[]>([]);
   const [loading, setLoading] = useState(true);

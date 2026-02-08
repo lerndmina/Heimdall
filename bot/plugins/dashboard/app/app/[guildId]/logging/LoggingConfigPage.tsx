@@ -17,7 +17,7 @@ import Toggle from "@/components/ui/Toggle";
 import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -58,8 +58,7 @@ interface TestResult {
 // ── Component ────────────────────────────────────────────
 
 export default function LoggingConfigPage({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["logging.manage_config"] === true;
+  const canManage = useCanManage("logging.manage_config");
 
   const [config, setConfig] = useState<LoggingConfig | null>(null);
   const [eventsMeta, setEventsMeta] = useState<CategoryMeta[]>([]);

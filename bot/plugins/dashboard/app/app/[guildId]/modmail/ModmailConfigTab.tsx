@@ -15,7 +15,7 @@ import NumberInput from "@/components/ui/NumberInput";
 import TextInput from "@/components/ui/TextInput";
 import Toggle from "@/components/ui/Toggle";
 import SetupWizard, { NotConfigured, EditButton, FieldDisplay, ReviewSection, ReviewRow, type WizardStep } from "@/components/ui/SetupWizard";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -75,8 +75,7 @@ const DEFAULT_DRAFT: Draft = {
 // ── Component ────────────────────────────────────────────
 
 export default function ModmailConfigTab({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["modmail.manage_config"] === true;
+  const canManage = useCanManage("modmail.manage_config");
 
   const [config, setConfig] = useState<ModmailConfig | null>(null);
   const [loading, setLoading] = useState(true);

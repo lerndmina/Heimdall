@@ -9,7 +9,7 @@ import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/C
 import Spinner from "@/components/ui/Spinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Modal from "@/components/ui/Modal";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { useSession } from "next-auth/react";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -56,9 +56,8 @@ const STATUS_FILTERS = ["all", "open", "claimed", "closed", "archived"] as const
 // ── Component ────────────────────────────────────────────
 
 export default function TicketsListTab({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
+  const canManage = useCanManage("tickets.manage_tickets");
   const { data: session } = useSession();
-  const canManage = isOwner || permissions["tickets.manage_tickets"] === true;
 
   // Data
   const [tickets, setTickets] = useState<Ticket[]>([]);

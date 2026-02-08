@@ -14,7 +14,7 @@ import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -37,8 +37,7 @@ interface TemplateVariable {
 // ── Component ────────────────────────────────────────────
 
 export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["welcome.manage_config"] === true;
+  const canManage = useCanManage("welcome.manage_config");
 
   const [config, setConfig] = useState<WelcomeConfig | null>(null);
   const [loading, setLoading] = useState(true);

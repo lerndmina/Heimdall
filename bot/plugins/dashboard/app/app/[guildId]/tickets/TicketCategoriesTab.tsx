@@ -20,7 +20,7 @@ import Toggle from "@/components/ui/Toggle";
 import NumberInput from "@/components/ui/NumberInput";
 import Modal from "@/components/ui/Modal";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -60,8 +60,7 @@ interface TicketCategory {
 // ── Component ────────────────────────────────────────────
 
 export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["tickets.manage_categories"] === true;
+  const canManage = useCanManage("tickets.manage_categories");
 
   const [categories, setCategories] = useState<TicketCategory[]>([]);
   const [loading, setLoading] = useState(true);

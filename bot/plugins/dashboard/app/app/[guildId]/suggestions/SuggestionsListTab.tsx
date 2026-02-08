@@ -9,7 +9,7 @@ import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/C
 import Spinner from "@/components/ui/Spinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Modal from "@/components/ui/Modal";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -61,8 +61,7 @@ const SORT_OPTIONS = [
 // ── Component ────────────────────────────────────────────
 
 export default function SuggestionsListTab({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["suggestions.manage_suggestions"] === true;
+  const canManage = useCanManage("suggestions.manage_suggestions");
 
   // Data
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);

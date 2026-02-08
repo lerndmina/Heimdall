@@ -18,7 +18,7 @@ import Combobox from "@/components/ui/Combobox";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
 import Modal from "@/components/ui/Modal";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -64,8 +64,7 @@ const FILTER_MODE_OPTIONS = [
 // ── Component ────────────────────────────────────────────
 
 export default function VCTranscriptionConfigPage({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["vc-transcription.manage_config"] === true;
+  const canManage = useCanManage("vc-transcription.manage_config");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

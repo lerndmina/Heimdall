@@ -17,7 +17,7 @@ import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import NumberInput from "@/components/ui/NumberInput";
 import Tabs from "@/components/ui/Tabs";
 import SetupWizard, { NotConfigured, ReviewSection, ReviewRow } from "@/components/ui/SetupWizard";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -55,8 +55,7 @@ interface ChannelOverride {
 // ── Component ────────────────────────────────────────────
 
 export default function AttachmentBlockerPage({ guildId }: { guildId: string }) {
-  const { permissions, isOwner, isBotOwner, isAdministrator } = usePermissions();
-  const canManage = isOwner || isBotOwner || isAdministrator || permissions["attachment-blocker.manage_config"] === true;
+  const canManage = useCanManage("attachment-blocker.manage_config");
 
   const [config, setConfig] = useState<GuildConfig | null>(null);
   const [channels, setChannels] = useState<ChannelOverride[]>([]);

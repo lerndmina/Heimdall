@@ -18,7 +18,7 @@ import NumberInput from "@/components/ui/NumberInput";
 import Toggle from "@/components/ui/Toggle";
 import Modal from "@/components/ui/Modal";
 import SetupWizard, { NotConfigured, EditButton, FieldDisplay, ReviewSection, ReviewRow, type WizardStep } from "@/components/ui/SetupWizard";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -73,8 +73,7 @@ const DEFAULT_DRAFT: Draft = {
 // ── Component ────────────────────────────────────────────
 
 export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["suggestions.manage_config"] === true;
+  const canManage = useCanManage("suggestions.manage_config");
 
   const [config, setConfig] = useState<SuggestionConfig | null>(null);
   const [openers, setOpeners] = useState<SuggestionOpener[]>([]);

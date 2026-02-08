@@ -20,7 +20,7 @@ import Textarea from "@/components/ui/Textarea";
 import NumberInput from "@/components/ui/NumberInput";
 import Modal from "@/components/ui/Modal";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
-import { usePermissions } from "@/components/providers/PermissionsProvider";
+import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -63,8 +63,7 @@ interface ArchiveConfig {
 // ── Component ────────────────────────────────────────────
 
 export default function TicketOpenersTab({ guildId }: { guildId: string }) {
-  const { permissions, isOwner } = usePermissions();
-  const canManage = isOwner || permissions["tickets.manage_openers"] === true;
+  const canManage = useCanManage("tickets.manage_openers");
 
   const [openers, setOpeners] = useState<TicketOpener[]>([]);
   const [categories, setCategories] = useState<TicketCategory[]>([]);
