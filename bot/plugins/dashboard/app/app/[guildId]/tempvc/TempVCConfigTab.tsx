@@ -192,7 +192,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
       {/* Channel list */}
       {channels.length === 0 ? (
         <Card className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="mb-4 rounded-full bg-zinc-800 p-4">
+          <div className="mb-4 rounded-full bg-white/5 p-4">
             <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-8.464a5 5 0 000 7.072" />
             </svg>
@@ -219,7 +219,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
                 </div>
                 {canManage && (
                   <div className="flex items-center gap-2">
-                    <button onClick={() => openEditModal(i)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200" title="Edit">
+                    <button onClick={() => openEditModal(i)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200" title="Edit">
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
@@ -256,7 +256,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
           {canManage && (
             <button
               onClick={openAddModal}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-400 transition hover:border-primary-500 hover:text-primary-400">
+              className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-700/30 px-3 py-2 text-xs font-medium text-zinc-400 transition hover:border-primary-500 hover:text-primary-400">
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -268,7 +268,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
 
       {/* Dirty-state save bar */}
       {dirty && canManage && (
-        <div className="sticky bottom-4 z-40 flex items-center justify-between rounded-xl border border-zinc-700 bg-zinc-900/95 px-6 py-3 shadow-xl backdrop-blur">
+        <div className="sticky bottom-4 z-40 flex items-center justify-between rounded-xl border border-zinc-700/30 bg-zinc-900/40 backdrop-blur-xl px-6 py-3 shadow-xl">
           <p className="text-sm text-zinc-300">You have unsaved changes</p>
           <div className="flex gap-3">
             <button
@@ -276,7 +276,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
                 setChannels(config?.channels ?? []);
                 setDirty(false);
               }}
-              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+              className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Reset
             </button>
             <button
@@ -321,7 +321,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
         title={editIndex !== null ? "Edit Creator Channel" : "Add Creator Channel"}
         footer={
           <>
-            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
@@ -375,7 +375,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
         title="Remove Creator Channel"
         footer={
           <>
-            <button onClick={() => setDeleteIndex(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setDeleteIndex(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button onClick={() => deleteIndex !== null && handleRemoveChannel(deleteIndex)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500">
@@ -393,7 +393,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
         title="Delete All Configuration"
         footer={
           <>
-            <button onClick={() => setShowDeleteAllModal(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setShowDeleteAllModal(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button

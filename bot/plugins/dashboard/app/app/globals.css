@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Scan all TypeScript and TSX files in the app */
+@source "./**/*.{ts,tsx}";
+@source "../../components/**/*.{ts,tsx}";
+
 /*
  * Central colour tokens for the dashboard.
  * Change the primary palette here and every component picks it up.
@@ -17,4 +21,24 @@
   --color-primary-800: #3730a3;
   --color-primary-900: #312e81;
   --color-primary-950: #1e1b4b;
+
+  /* Animation delays */
+  --animate-delay-1000: 1000ms;
+  --animate-delay-2000: 2000ms;
+  --animate-delay-3000: 3000ms;
+}
+
+/* Custom animations */
+@layer utilities {
+  .animation-delay-1000 {
+    animation-delay: var(--animate-delay-1000);
+  }
+
+  .animation-delay-2000 {
+    animation-delay: var(--animate-delay-2000);
+  }
+
+  .animation-delay-3000 {
+    animation-delay: var(--animate-delay-3000);
+  }
 }

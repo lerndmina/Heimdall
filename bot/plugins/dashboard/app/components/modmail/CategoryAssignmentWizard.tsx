@@ -188,7 +188,7 @@ export default function CategoryAssignmentWizard({ guildId, onClose, onComplete 
       <Card>
         <CardTitle>Assign Categories to Imported Threads</CardTitle>
         <CardContent className="mt-4 space-y-4">
-          <div className="rounded-lg border border-zinc-600 bg-zinc-800/30 px-4 py-3 text-sm text-zinc-400">
+          <div className="rounded-lg border border-zinc-600/30 bg-white/5 px-4 py-3 text-sm text-zinc-400 backdrop-blur-sm">
             <p className="font-semibold">✅ No Open Threads to Assign</p>
             <p className="mt-2 text-xs text-zinc-500">There are no open modmail threads that need category assignment. All imported threads either already have valid categories or are closed.</p>
           </div>
@@ -216,11 +216,14 @@ export default function CategoryAssignmentWizard({ guildId, onClose, onComplete 
         </div>
 
         {/* Bulk Assignment */}
-        <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-4">
+        <div className="rounded-lg border border-zinc-700/30 bg-white/5 p-4 backdrop-blur-sm">
           <h3 className="text-sm font-medium text-zinc-300">Bulk Assign</h3>
           <p className="mt-1 text-xs text-zinc-500">Quickly assign all threads to the same category</p>
           <div className="mt-3 flex gap-2">
-            <select value={bulkCategoryId} onChange={(e) => setBulkCategoryId(e.target.value)} className="flex-1 rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm text-zinc-100">
+            <select
+              value={bulkCategoryId}
+              onChange={(e) => setBulkCategoryId(e.target.value)}
+              className="flex-1 rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 backdrop-blur-sm">
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.emoji ? `${cat.emoji} ` : ""}
@@ -240,11 +243,11 @@ export default function CategoryAssignmentWizard({ guildId, onClose, onComplete 
         {/* Individual Assignments */}
         <div className="space-y-2">
           <h3 className="text-sm font-medium text-zinc-300">Individual Assignments</h3>
-          <div className="max-h-100 space-y-2 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-800/30 p-3">
+          <div className="max-h-100 space-y-2 overflow-y-auto rounded-lg border border-zinc-700/30 bg-white/5 p-3 backdrop-blur-sm">
             {threads.map((thread) => {
               const currentCategory = categories.find((c) => c.id === assignments[thread.id]);
               return (
-                <div key={thread.id} className="flex items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+                <div key={thread.id} className="flex items-center gap-3 rounded-lg border border-zinc-700/30 bg-white/5 p-3 backdrop-blur-sm">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono text-zinc-500">#{thread.ticketNumber}</span>
@@ -260,7 +263,7 @@ export default function CategoryAssignmentWizard({ guildId, onClose, onComplete 
                         [thread.id]: e.target.value,
                       })
                     }
-                    className="rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-100">
+                    className="rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 backdrop-blur-sm">
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {cat.emoji ? `${cat.emoji} ` : ""}
@@ -280,7 +283,7 @@ export default function CategoryAssignmentWizard({ guildId, onClose, onComplete 
             <button
               onClick={onClose}
               disabled={saving}
-              className="flex-1 rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed">
+              className="flex-1 rounded-lg border border-zinc-700/30 bg-white/5 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed">
               Cancel
             </button>
           )}

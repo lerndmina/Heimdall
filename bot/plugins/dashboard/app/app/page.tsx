@@ -22,7 +22,7 @@ export default async function GuildSelectorPage() {
       {/* Header */}
       <div className="mb-8 flex items-start justify-between">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Select a Server</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Select a Server</h1>
           <p className="text-zinc-400">
             Choose a server to manage. Servers where you have <span className="text-zinc-300">Manage Server</span> permission or dashboard access are shown.
           </p>

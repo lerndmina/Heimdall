@@ -145,16 +145,16 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
   };
 
   // ── Helpers ──
-  function getStatusVariant(status: string): "success" | "warning" | "error" | "default" {
+  function getStatusVariant(status: string): "success" | "warning" | "error" | "neutral" {
     switch (status) {
       case "open":
         return "success";
       case "resolved":
         return "warning";
       case "closed":
-        return "default";
+        return "neutral";
       default:
-        return "default";
+        return "neutral";
     }
   }
 
@@ -179,7 +179,7 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
       <Card>
         <CardContent>
           <p className="text-sm text-red-400">{error}</p>
-          <button onClick={fetchConversations} className="mt-3 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-700">
+          <button onClick={fetchConversations} className="mt-3 rounded-lg bg-white/5 backdrop-blur-sm px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/10">
             Retry
           </button>
         </CardContent>
@@ -201,17 +201,17 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex rounded-lg border border-zinc-700 overflow-hidden">
+        <div className="flex rounded-lg border border-zinc-700/30 overflow-hidden">
           {STATUS_FILTERS.map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 text-xs font-medium capitalize transition ${statusFilter === s ? "bg-primary-600 text-white" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"}`}>
+              className={`px-3 py-1.5 text-xs font-medium capitalize transition ${statusFilter === s ? "bg-primary-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}>
               {s}
             </button>
           ))}
         </div>
-        <TextInput placeholder="Search by user…" value={search} onChange={setSearch} />
+        <TextInput label="Search" placeholder="Search by user…" value={search} onChange={setSearch} />
       </div>
 
       {/* Conversation list */}
@@ -223,28 +223,30 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
       ) : (
         <div className="space-y-2">
           {conversations.map((conv) => (
-            <Card key={conv.id} className="cursor-pointer transition hover:border-zinc-600" onClick={() => openDetail(conv)}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {conv.userAvatarUrl ? <img src={conv.userAvatarUrl} alt="" className="h-8 w-8 rounded-full" /> : <div className="h-8 w-8 rounded-full bg-zinc-700" />}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-zinc-200">{conv.userDisplayName}</p>
-                      <span className="text-xs font-mono text-zinc-500">#{conv.ticketNumber}</span>
-                      <StatusBadge status={conv.status} variant={getStatusVariant(conv.status)} />
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
-                      {conv.categoryName && <span>{conv.categoryName}</span>}
-                      {conv.claimedBy && <span>· Claimed by {conv.claimedBy}</span>}
-                      <span>· {new Date(conv.createdAt).toLocaleDateString()}</span>
+            <div key={conv.id} className="cursor-pointer" onClick={() => openDetail(conv)}>
+              <Card className="transition hover:border-zinc-600">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {conv.userAvatarUrl ? <img src={conv.userAvatarUrl} alt="" className="h-8 w-8 rounded-full" /> : <div className="h-8 w-8 rounded-full bg-zinc-700" />}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-zinc-200">{conv.userDisplayName}</p>
+                        <span className="text-xs font-mono text-zinc-500">#{conv.ticketNumber}</span>
+                        <StatusBadge variant={getStatusVariant(conv.status)}>{conv.status}</StatusBadge>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5">
+                        {conv.categoryName && <span>{conv.categoryName}</span>}
+                        {conv.claimedBy && <span>· Claimed by {conv.claimedBy}</span>}
+                        <span>· {new Date(conv.createdAt).toLocaleDateString()}</span>
+                      </div>
                     </div>
                   </div>
+                  <svg className="h-4 w-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
-                <svg className="h-4 w-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </Card>
+              </Card>
+            </div>
           ))}
 
           {loading && (
@@ -262,8 +264,8 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={!pagination.hasPreviousPage}
-                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                  disabled={pagination.currentPage <= 1}
+                  className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                   Previous
                 </button>
                 <span className="text-xs text-zinc-500">
@@ -271,8 +273,8 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
                 </span>
                 <button
                   onClick={() => setPage((p) => p + 1)}
-                  disabled={!pagination.hasNextPage}
-                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                  disabled={pagination.currentPage >= pagination.totalPages}
+                  className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                   Next
                 </button>
               </div>
@@ -289,7 +291,7 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
             <div className="grid gap-3 sm:grid-cols-2 text-sm">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">Status</p>
-                <StatusBadge status={detailConv.status} variant={getStatusVariant(detailConv.status)} />
+                <StatusBadge variant={getStatusVariant(detailConv.status)}>{detailConv.status}</StatusBadge>
               </div>
               {detailConv.categoryName && (
                 <div>
@@ -329,7 +331,7 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
             {detailConv.formResponses && detailConv.formResponses.length > 0 && (
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-2">Form Responses</p>
-                <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                <div className="space-y-2 rounded-lg border border-zinc-700/30 bg-white/5 p-3">
                   {detailConv.formResponses.map((fr, i) => (
                     <div key={i}>
                       <p className="text-xs font-medium text-zinc-400">{fr.fieldLabel}</p>
@@ -358,8 +360,8 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
                             ? "bg-amber-500/5 border border-amber-500/20"
                             : "bg-primary-500/5 border border-primary-500/20"
                           : msg.senderType === "system"
-                            ? "bg-zinc-800/50 border border-zinc-700"
-                            : "bg-zinc-900 border border-zinc-800"
+                            ? "bg-white/5 border border-zinc-700/30"
+                            : "bg-white/5 border border-zinc-700/30"
                       }`}>
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-xs font-medium ${msg.senderType === "staff" ? "text-primary-400" : msg.senderType === "system" ? "text-zinc-500" : "text-zinc-300"}`}>

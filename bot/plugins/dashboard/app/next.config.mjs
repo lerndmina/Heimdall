@@ -5,9 +5,6 @@ const nextConfig = {
   // Allow dev origins for HMR through tunnels/proxies
   allowedDevOrigins: ["*", "cope-sound-amanda-thanks.trycloudflare.com"],
 
-  // Output as standalone for Docker builds
-  output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
-
   // Disable Next.js telemetry
   env: {
     NEXT_TELEMETRY_DISABLED: "1",

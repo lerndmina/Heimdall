@@ -51,16 +51,18 @@ function GuildLayoutInner({ guild, children }: { guild: GuildInfo; children: Rea
   // If dashboard access is denied for this user, show access denied
   if (loaded && denyAccess && !isOwner) {
     return (
-      <div className="flex h-screen items-center justify-center bg-zinc-950">
+      <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-zinc-800">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-zinc-700/30 bg-zinc-900/40 backdrop-blur-xl">
             <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
           </div>
           <h2 className="text-lg font-semibold text-zinc-200">Dashboard Access Denied</h2>
           <p className="mt-1 text-sm text-zinc-500">Your role has been restricted from accessing this server&apos;s dashboard.</p>
-          <a href="/" className="mt-4 inline-block rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-700 hover:text-zinc-100">
+          <a
+            href="/"
+            className="mt-4 inline-block rounded-lg border border-zinc-700/30 bg-zinc-900/40 px-4 py-2 text-sm font-medium text-zinc-300 backdrop-blur-xl transition-all duration-300 hover:border-zinc-600/40 hover:text-zinc-100 hover:shadow-lg">
             ← Back to servers
           </a>
         </div>

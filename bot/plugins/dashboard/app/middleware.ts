@@ -14,8 +14,8 @@ export async function middleware(request: NextRequest) {
     return authResult;
   }
 
-  // Add performance and security headers
-  const response = authResult || NextResponse.next();
+  // Create response with headers
+  const response = NextResponse.next();
 
   // Cache static assets aggressively
   if (request.nextUrl.pathname.startsWith("/_next/static/")) {
@@ -43,6 +43,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Protect all dashboard routes, but exclude login and static assets matcher
-  matcher: ["/((?!api|login|favicon.ico).*)"],
+  // Protect all dashboard routes, but exclude login, dev pages, static assets, and Next.js internals
+  matcher: ["/((?!api|_next/static|_next/image|login|dev|favicon.ico).*)"],
 };

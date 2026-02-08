@@ -65,7 +65,7 @@ function StatCard({ title, value, description, icon, accent }: { title: string; 
           <p className={`mt-1 text-3xl font-bold ${accent ?? "text-zinc-100"}`}>{value}</p>
           <p className="mt-1 text-xs text-zinc-500">{description}</p>
         </div>
-        <div className="rounded-lg bg-zinc-800 p-2 text-zinc-400">{icon}</div>
+        <div className="rounded-lg bg-white/5 p-2 text-zinc-400 backdrop-blur-sm">{icon}</div>
       </div>
     </Card>
   );
@@ -248,7 +248,7 @@ export default function GuildOverviewPage() {
         <Card>
           <CardTitle>Minecraft Servers</CardTitle>
           <CardContent>
-            <div className="mt-3 divide-y divide-zinc-800">
+            <div className="mt-3 divide-y divide-zinc-700/30">
               {mcServers.map((srv, i) => (
                 <div key={i} className="flex items-center justify-between py-2">
                   <div>
@@ -263,7 +263,7 @@ export default function GuildOverviewPage() {
                         {srv.lastPing.players.online}/{srv.lastPing.players.max}
                       </span>
                     )}
-                    <StatusBadge status={srv.lastPing?.online ? "active" : "inactive"} label={srv.lastPing?.online ? "Online" : "Offline"} />
+                    <StatusBadge variant={srv.lastPing?.online ? "success" : "error"}>{srv.lastPing?.online ? "Online" : "Offline"}</StatusBadge>
                   </div>
                 </div>
               ))}
@@ -287,7 +287,7 @@ export default function GuildOverviewPage() {
                     ["Archived", tickets.archived, "text-zinc-500"],
                   ] as const
                 ).map(([label, val, color]) => (
-                  <div key={label} className="rounded-lg bg-zinc-800/50 p-3">
+                  <div key={label} className="rounded-lg border border-zinc-700/20 bg-white/5 p-3 backdrop-blur-sm transition-transform duration-200 hover:scale-[1.02]">
                     <p className="text-xs text-zinc-500">{label}</p>
                     <p className={`text-xl font-bold ${color}`}>{val.toLocaleString()}</p>
                   </div>
@@ -309,7 +309,7 @@ export default function GuildOverviewPage() {
                     ["Denied", suggestions.denied, "text-red-400"],
                   ] as const
                 ).map(([label, val, color]) => (
-                  <div key={label} className="rounded-lg bg-zinc-800/50 p-3">
+                  <div key={label} className="rounded-lg border border-zinc-700/20 bg-white/5 p-3 backdrop-blur-sm transition-transform duration-200 hover:scale-[1.02]">
                     <p className="text-xs text-zinc-500">{label}</p>
                     <p className={`text-xl font-bold ${color}`}>{val.toLocaleString()}</p>
                   </div>

@@ -116,6 +116,8 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
         setNotFound(false);
       } else if (res.error?.code === "NOT_FOUND") {
         setNotFound(true);
+      } else if (res.error?.code === "FORBIDDEN" || res.error?.code === "UNAUTHORIZED" || res.error?.message?.toLowerCase().includes("permission")) {
+        setError("Access denied: You don't have permission to view server configuration");
       } else {
         setError(res.error?.message ?? "Failed to load configuration");
       }
@@ -377,7 +379,7 @@ function StepServer({ draft, update }: StepProps) {
       <div className="grid gap-5 sm:grid-cols-2">
         <NumberInput label="Server Port" description="Minecraft server port (default: 25565)" value={draft.serverPort} onChange={(v) => update("serverPort", v)} min={1} max={65535} />
       </div>
-      <div className="border-t border-zinc-800 pt-5">
+      <div className="border-t border-zinc-700/30 pt-5">
         <Toggle label="Enable" description="Enable the Minecraft configuration for this server" checked={draft.enabled} onChange={(v) => update("enabled", v)} />
       </div>
       <div>
@@ -403,7 +405,7 @@ function StepWhitelist({ draft, update }: StepProps) {
       />
 
       {draft.autoWhitelist && (
-        <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+        <div className="space-y-4 rounded-lg border border-zinc-700/30 bg-white/5 p-4">
           <p className="text-sm font-medium text-zinc-300">Whitelist Schedule</p>
           <div className="space-y-2">
             {(
@@ -467,7 +469,7 @@ function StepWhitelist({ draft, update }: StepProps) {
       )}
 
       {!draft.autoWhitelist && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 px-4 py-3 text-xs text-zinc-400">💡 With auto-whitelist off, all whitelist requests require manual staff approval.</div>
+        <div className="rounded-lg border border-zinc-700/30 bg-white/5 px-4 py-3 text-xs text-zinc-400">💡 With auto-whitelist off, all whitelist requests require manual staff approval.</div>
       )}
 
       <NumberInput
@@ -525,7 +527,7 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
       {/* Leave / Rejoin */}
       <div>
         <p className="mb-3 text-sm font-medium text-zinc-300">Leave &amp; Rejoin Behaviour</p>
-        <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+        <div className="space-y-4 rounded-lg border border-zinc-700/30 bg-white/5 p-4">
           <Toggle
             label="Auto-Revoke on Server Leave"
             description="Revoke a player's whitelist when they leave the Discord server"
@@ -544,7 +546,7 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
       {/* Role Sync */}
       <div>
         <p className="mb-3 text-sm font-medium text-zinc-300">Role Sync</p>
-        <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+        <div className="space-y-4 rounded-lg border border-zinc-700/30 bg-white/5 p-4">
           <div>
             <p className="text-sm font-medium text-zinc-200">Role Sync Mode</p>
             <p className="text-xs text-zinc-500 mb-3">Choose how Discord roles are synced to Minecraft permission groups</p>
@@ -625,7 +627,7 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
                       value={mapping.minecraftGroup}
                       onChange={(e) => updateMapping(i, "minecraftGroup", e.target.value)}
                       placeholder="e.g. vip, admin, member"
-                      className={`w-full rounded-lg border bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none transition focus:ring-1 ${
+                      className={`w-full rounded-lg border bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none transition focus:ring-1 ${
                         missingGroup && !missingRole ? "border-red-500 focus:border-red-500 focus:ring-red-500/30" : "border-zinc-700 focus:border-primary-500 focus:ring-primary-500"
                       }`}
                     />
@@ -651,7 +653,7 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
               {/* Add Button */}
               <button
                 onClick={addMapping}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-400 transition hover:border-primary-500 hover:text-primary-400">
+                className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-zinc-700/30 px-3 py-2 text-xs font-medium text-zinc-400 transition hover:border-primary-500 hover:text-primary-400">
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
@@ -691,7 +693,7 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
       {/* RCON */}
       <div>
         <p className="mb-3 text-sm font-medium text-zinc-300">RCON</p>
-        <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+        <div className="space-y-4 rounded-lg border border-zinc-700/30 bg-white/5 p-4">
           <Toggle label="Enable RCON" description="Allow the bot to send commands to the server via RCON" checked={draft.rconEnabled} onChange={(v) => update("rconEnabled", v)} />
           {draft.rconEnabled && (
             <div className="grid gap-4 pt-2 sm:grid-cols-2">
@@ -722,7 +724,7 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
       {/* Default Dashboard Tab */}
       <div>
         <p className="mb-3 text-sm font-medium text-zinc-300">Dashboard</p>
-        <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+        <div className="space-y-4 rounded-lg border border-zinc-700/30 bg-white/5 p-4">
           <div>
             <p className="text-sm font-medium text-zinc-200">Default Tab</p>
             <p className="text-xs text-zinc-500 mb-3">Choose which tab opens by default on the Minecraft dashboard page</p>
@@ -803,7 +805,7 @@ function StepReview({ draft }: { draft: Omit<MinecraftConfig, "guildId"> }) {
             }
           />
           {draft.roleSyncMode !== "off" && draft.roleMappings.length > 0 && (
-            <div className="mt-2 space-y-1 rounded border border-zinc-700/50 bg-zinc-900/50 p-2">
+            <div className="mt-2 space-y-1 rounded border border-zinc-700/30 bg-white/5 p-2">
               {draft.roleMappings.map((m, i) => (
                 <div key={i} className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400">{m.discordRoleName || "Unknown Role"}</span>

@@ -128,7 +128,7 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
       <Card>
         <CardContent>
           <p className="text-sm text-red-400">{error}</p>
-          <button onClick={fetchData} className="mt-3 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-700">
+          <button onClick={fetchData} className="mt-3 rounded-lg bg-white/5 backdrop-blur-sm px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/10">
             Retry
           </button>
         </CardContent>
@@ -150,14 +150,14 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
       {/* Active channels */}
       {channels.length === 0 ? (
         <Card className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="mb-4 rounded-full bg-zinc-800 p-4">
+          <div className="mb-4 rounded-full bg-white/5 p-4">
             <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-8.464a5 5 0 000 7.072" />
             </svg>
           </div>
           <CardTitle>No Active Temp Channels</CardTitle>
           <CardDescription className="mt-2 max-w-md">When a user joins a creator channel, a temporary voice channel will appear here.</CardDescription>
-          <button onClick={fetchData} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+          <button onClick={fetchData} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
@@ -168,7 +168,7 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
         <Card>
           <div className="flex items-center justify-between">
             <CardTitle>Active Channels ({channels.length ?? 0})</CardTitle>
-            <button onClick={fetchData} className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200" title="Refresh">
+            <button onClick={fetchData} className="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200" title="Refresh">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
@@ -178,7 +178,7 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  <tr className="border-b border-zinc-700/30 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                     <th className="pb-3 pr-4">Channel</th>
                     <th className="pb-3 pr-4">Members</th>
                     <th className="pb-3 pr-4">Limit</th>
@@ -186,7 +186,7 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
                     {canManage && <th className="pb-3 text-right">Actions</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-zinc-700/30">
                   {channels.map((ch) => (
                     <tr key={ch.channelId} className="group">
                       <td className="py-3 pr-4">
@@ -227,7 +227,7 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
         title="Force Delete Channel"
         footer={
           <>
-            <button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button

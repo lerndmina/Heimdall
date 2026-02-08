@@ -238,7 +238,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
       <Card>
         <CardContent>
           <p className="text-sm text-red-400">{error}</p>
-          <button onClick={fetchTags} className="mt-3 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-700">
+          <button onClick={fetchTags} className="mt-3 rounded-lg bg-white/5 backdrop-blur-sm px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/10">
             Retry
           </button>
         </CardContent>
@@ -251,11 +251,11 @@ export default function TagsPage({ guildId }: { guildId: string }) {
       {/* Header bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <TextInput placeholder="Search tags…" value={search} onChange={setSearch} />
+          <TextInput label="Search" placeholder="Search tags…" value={search} onChange={setSearch} />
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none transition focus:border-primary-500">
+            className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-2 text-sm text-zinc-200 outline-none transition focus:border-primary-500">
             {SORT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 Sort: {opt.label}
@@ -277,7 +277,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
       {/* Tag list */}
       {tags.length === 0 && !loading ? (
         <Card className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="mb-4 rounded-full bg-zinc-800 p-4">
+          <div className="mb-4 rounded-full bg-white/5 backdrop-blur-sm p-4">
             <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -298,7 +298,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  <tr className="border-b border-zinc-700/30 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                     <th className="pb-3 pr-4">Name</th>
                     <th className="pb-3 pr-4">Content</th>
                     <th className="pb-3 pr-4">Uses</th>
@@ -306,7 +306,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
                     {canManage && <th className="pb-3 text-right">Actions</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-zinc-700/30">
                   {tags.map((tag) => (
                     <tr key={tag.name} className="group">
                       <td className="py-3 pr-4">
@@ -320,7 +320,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
                       {canManage && (
                         <td className="py-3 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
-                            <button onClick={() => openEditModal(tag)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200">
+                            <button onClick={() => openEditModal(tag)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
                               Edit
                             </button>
                             <button onClick={() => setDeleteTarget(tag)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/10">
@@ -344,7 +344,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-4">
+              <div className="mt-4 flex items-center justify-between border-t border-zinc-700/30 pt-4">
                 <p className="text-xs text-zinc-500">
                   {total} tag{total !== 1 ? "s" : ""} total
                 </p>
@@ -352,7 +352,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
                   <button
                     onClick={() => setPage((p) => Math.max(0, p - 1))}
                     disabled={page === 0}
-                    className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                    className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                     Previous
                   </button>
                   <span className="text-xs text-zinc-500">
@@ -361,7 +361,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                     disabled={page >= totalPages - 1}
-                    className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                    className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                     Next
                   </button>
                 </div>
@@ -378,7 +378,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
         title={editTag ? `Edit Tag: ${editTag.name}` : "Create Tag"}
         footer={
           <>
-            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
@@ -420,7 +420,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
         title="Delete Tag"
         footer={
           <>
-            <button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button

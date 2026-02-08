@@ -288,12 +288,12 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
           <CardTitle>Configured Channels</CardTitle>
           <CardDescription className="mt-1">Suggestion channels are managed via Discord commands.</CardDescription>
           <CardContent className="mt-3">
-            <div className="divide-y divide-zinc-800">
+            <div className="divide-y divide-zinc-700/30">
               {config.channels.map((ch) => (
                 <div key={ch.channelId} className="flex items-center justify-between py-3">
                   <span className="text-sm text-zinc-300">{ch.channelId}</span>
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs font-medium text-zinc-400 capitalize">{ch.mode}</span>
+                    <span className="inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-xs font-medium text-zinc-400 capitalize">{ch.mode}</span>
                     {ch.enableAiTitles && <span className="inline-flex items-center rounded-full bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-400">AI Titles</span>}
                   </div>
                 </div>
@@ -311,7 +311,7 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
           {openers.length === 0 ? (
             <p className="py-6 text-center text-sm text-zinc-500">No openers deployed</p>
           ) : (
-            <div className="divide-y divide-zinc-800">
+            <div className="divide-y divide-zinc-700/30">
               {openers.map((op) => (
                 <div key={op._id} className="flex items-center justify-between py-3 group">
                   <div>
@@ -343,7 +343,7 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
         title="Delete Opener"
         footer={
           <>
-            <button onClick={() => setDeleteOpener(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setDeleteOpener(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
@@ -387,7 +387,7 @@ function StepLimits({ draft, update }: { draft: Draft; update: UpdateFn }) {
         min={1}
         max={25}
       />
-      <div className="border-t border-zinc-800 pt-5">
+      <div className="border-t border-zinc-700/30 pt-5">
         <Toggle
           label="Enable Categories"
           description="Allow organizing suggestions into named categories for easier management"
@@ -396,7 +396,9 @@ function StepLimits({ draft, update }: { draft: Draft; update: UpdateFn }) {
         />
       </div>
       {!draft.enableCategories && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 px-4 py-3 text-xs text-zinc-400">You can enable categories later. When off, all suggestions go into a single pool.</div>
+        <div className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-4 py-3 text-xs text-zinc-400">
+          You can enable categories later. When off, all suggestions go into a single pool.
+        </div>
       )}
     </div>
   );
@@ -433,7 +435,7 @@ function StepCooldowns({ draft, update }: { draft: Draft; update: UpdateFn }) {
         </p>
       )}
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 px-4 py-3 text-xs text-zinc-400">
+      <div className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-4 py-3 text-xs text-zinc-400">
         These cooldowns prevent spam while still allowing active participation. You can adjust them later via the edit wizard.
       </div>
     </div>

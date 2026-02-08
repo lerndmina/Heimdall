@@ -1,0 +1,106 @@
+version: "3.8"
+
+services:
+  # MongoDB database
+  mongodb:
+    image: mongo:7
+    container_name: heimdall-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-changeme}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - heimdall-network
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: heimdall-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
+    volumes:
+      - redis_data:/data
+    networks:
+      - heimdall-network
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  # Heimdall bot + dashboard
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: heimdall-bot
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+      - redis
+    environment:
+      # Bot Configuration
+      BOT_TOKEN: ${BOT_TOKEN}
+      OWNER_IDS: ${OWNER_IDS}
+      PREFIX: ${PREFIX:-.}
+
+      # Database
+      MONGODB_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-changeme}@mongodb:27017/?authSource=admin
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-heimdall}
+      REDIS_URL: redis://default:${REDIS_PASSWORD:-changeme}@redis:6379
+
+      # Security
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+
+      # Dashboard
+      DASHBOARD_PORT: 3000
+      API_PORT: 3001
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+
+      # Optional
+      DEBUG_LOG: ${DEBUG_LOG:-false}
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-UTC}
+
+      # Cloudflare R2 (if using transcripts)
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY}
+      R2_SECRET_KEY: ${R2_SECRET_KEY}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_CUSTOM_DOMAIN: ${R2_CUSTOM_DOMAIN}
+
+      NODE_ENV: production
+    networks:
+      - heimdall-network
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      # Mount logs directory (optional)
+      - ./logs:/app/logs
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/api/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  heimdall-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local

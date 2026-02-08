@@ -151,7 +151,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
   };
 
   // ── Status badge helper ──
-  function getStatusVariant(status: string): "success" | "warning" | "error" | "default" {
+  function getStatusVariant(status: string): "success" | "warning" | "error" | "neutral" {
     switch (status) {
       case "approved":
         return "success";
@@ -160,7 +160,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
       case "denied":
         return "error";
       default:
-        return "default";
+        return "neutral";
     }
   }
 
@@ -178,7 +178,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
       <Card>
         <CardContent>
           <p className="text-sm text-red-400">{error}</p>
-          <button onClick={fetchSuggestions} className="mt-3 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-700">
+          <button onClick={fetchSuggestions} className="mt-3 rounded-lg bg-white/5 backdrop-blur-sm px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/10">
             Retry
           </button>
         </CardContent>
@@ -200,12 +200,12 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
 
       {/* Filters row */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex rounded-lg border border-zinc-700 overflow-hidden">
+        <div className="flex rounded-lg border border-zinc-700/30 overflow-hidden">
           {STATUS_FILTERS.map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 text-xs font-medium capitalize transition ${statusFilter === s ? "bg-primary-600 text-white" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"}`}>
+              className={`px-3 py-1.5 text-xs font-medium capitalize transition ${statusFilter === s ? "bg-primary-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}>
               {s}
             </button>
           ))}
@@ -213,7 +213,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200 outline-none transition focus:border-primary-500">
+          className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-1.5 text-xs text-zinc-200 outline-none transition focus:border-primary-500">
           {SORT_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
@@ -235,7 +235,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <StatusBadge status={s.status} variant={getStatusVariant(s.status)} />
+                    <StatusBadge variant={getStatusVariant(s.status)}>{s.status}</StatusBadge>
                     <span className="text-xs font-mono text-zinc-500">#{s.id}</span>
                     {s.mode === "forum" && <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">Forum</span>}
                   </div>
@@ -296,7 +296,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
                 <button
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                   Previous
                 </button>
                 <span className="text-xs text-zinc-500">
@@ -305,7 +305,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                   Next
                 </button>
               </div>
@@ -321,7 +321,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
         title={`${manageAction === "approved" ? "Approve" : "Deny"} Suggestion`}
         footer={
           <>
-            <button onClick={() => setManageTarget(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setManageTarget(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
@@ -343,7 +343,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
         <div className="space-y-3">
           <p className="text-sm text-zinc-400">Are you sure you want to {manageAction === "approved" ? "approve" : "deny"} this suggestion?</p>
           {manageTarget && (
-            <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+            <div className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm p-3">
               <p className="text-sm font-medium text-zinc-200">{manageTarget.title}</p>
               <p className="mt-1 text-xs text-zinc-400 line-clamp-3">{manageTarget.suggestion}</p>
             </div>

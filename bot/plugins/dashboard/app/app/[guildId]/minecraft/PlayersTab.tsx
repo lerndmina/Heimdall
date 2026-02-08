@@ -276,6 +276,11 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
       if (unconfirmedRes.success && unconfirmedRes.data) {
         setUnconfirmedCount(unconfirmedRes.data.pagination.total);
       }
+
+      // Check for permission errors
+      if (!playersRes.success && (playersRes.error?.code === "FORBIDDEN" || playersRes.error?.code === "UNAUTHORIZED" || playersRes.error?.message?.toLowerCase().includes("permission"))) {
+        setError("Access denied: You don't have permission to view player data");
+      }
     } catch {
       setError("Failed to load player data");
     } finally {
@@ -718,7 +723,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 key={f.value}
                 onClick={() => setStatusFilter(f.value)}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${
-                  statusFilter === f.value ? "bg-primary-600 text-white" : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
+                  statusFilter === f.value ? "bg-primary-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
                 }`}>
                 {f.label}
                 {badge && <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold leading-none text-black">{badge}</span>}
@@ -744,7 +749,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
               setImportOverwrite(false);
               setImportProgress(null);
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-zinc-100">
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 hover:text-zinc-100">
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
@@ -765,7 +770,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search players..."
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 py-2 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            className="w-full rounded-lg border border-zinc-700/30 bg-white/5 py-2 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
           />
         </div>
 
@@ -775,7 +780,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
           <select
             value={pageSize}
             onChange={(e) => handlePageSizeChange(e.target.value)}
-            className="rounded-lg border border-zinc-700 bg-zinc-800/50 px-2 py-2 text-sm text-zinc-100 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
+            className="rounded-lg border border-zinc-700/30 bg-white/5 px-2 py-2 text-sm text-zinc-100 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
             {PAGE_SIZE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -787,10 +792,10 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
 
       {/* Player table */}
       <div className="space-y-4">
-        <div ref={tableScrollRef} className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div ref={tableScrollRef} className="overflow-x-auto rounded-lg border border-zinc-700/30">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-900/50">
+              <tr className="border-b border-zinc-700/30 bg-white/5">
                 <th className="px-4 py-3 text-left font-medium text-zinc-400">Minecraft</th>
                 <th className="px-4 py-3 text-left font-medium text-zinc-400">Discord</th>
                 <th className="px-4 py-3 text-left font-medium text-zinc-400">Link</th>
@@ -830,7 +835,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   };
 
                   return (
-                    <tr key={row._id} className="border-b border-zinc-800/50 transition hover:bg-zinc-800/30">
+                    <tr key={row._id} className="border-b border-zinc-700/30 transition hover:bg-white/5">
                       {/* Minecraft */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -870,7 +875,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                                 }
                                 openActionMenu(row._id, e.currentTarget);
                               }}
-                              className="rounded p-1 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-300">
+                              className="rounded p-1 text-zinc-500 transition hover:bg-white/5 hover:text-zinc-300">
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path
                                   strokeLinecap="round"
@@ -898,11 +903,11 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
             <div
               ref={menuRef}
               style={{ position: "fixed", top: menuPosition.top, left: menuPosition.left, zIndex: 60 }}
-              className={`w-44 rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl ${menuVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+              className={`w-44 rounded-lg border border-zinc-700/30 bg-zinc-900/40 backdrop-blur-xl py-1 shadow-xl ${menuVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
               <MenuButton onClick={() => openEditModal(activeMenuRow)} color="blue">
                 ✎ Edit
               </MenuButton>
-              <div className="my-1 border-t border-zinc-800" />
+              <div className="my-1 border-t border-zinc-700/30" />
               {playerWhitelistStatus(activeMenuRow) === "pending" && (
                 <>
                   <MenuButton onClick={() => handleApprove(activeMenuRow._id)} color="emerald">
@@ -952,14 +957,14 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
           {pageSize !== "all" && pagination.pages > 1 && (
             <div className="flex items-center gap-1">
               {/* First */}
-              <button onClick={() => setPage(1)} disabled={page <= 1} className="rounded px-2 py-1 transition hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400">
+              <button onClick={() => setPage(1)} disabled={page <= 1} className="rounded px-2 py-1 transition hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400">
                 ««
               </button>
               {/* Prev */}
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="rounded px-2 py-1 transition hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400">
+                className="rounded px-2 py-1 transition hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400">
                 «
               </button>
 
@@ -984,21 +989,21 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   <>
                     {start > 1 && (
                       <>
-                        <button onClick={() => setPage(1)} className="rounded px-2.5 py-1 text-zinc-400 transition hover:bg-zinc-800">
+                        <button onClick={() => setPage(1)} className="rounded px-2.5 py-1 text-zinc-400 transition hover:bg-white/5">
                           1
                         </button>
                         {start > 2 && <span className="px-1 text-zinc-600">…</span>}
                       </>
                     )}
                     {pages.map((p) => (
-                      <button key={p} onClick={() => setPage(p)} className={`rounded px-2.5 py-1 transition ${p === page ? "bg-primary-600 text-white" : "text-zinc-400 hover:bg-zinc-800"}`}>
+                      <button key={p} onClick={() => setPage(p)} className={`rounded px-2.5 py-1 transition ${p === page ? "bg-primary-600 text-white" : "text-zinc-400 hover:bg-white/5"}`}>
                         {p}
                       </button>
                     ))}
                     {end < total && (
                       <>
                         {end < total - 1 && <span className="px-1 text-zinc-600">…</span>}
-                        <button onClick={() => setPage(total)} className="rounded px-2.5 py-1 text-zinc-400 transition hover:bg-zinc-800">
+                        <button onClick={() => setPage(total)} className="rounded px-2.5 py-1 text-zinc-400 transition hover:bg-white/5">
                           {total}
                         </button>
                       </>
@@ -1011,14 +1016,14 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
               <button
                 onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
                 disabled={page >= pagination.pages}
-                className="rounded px-2 py-1 transition hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400">
+                className="rounded px-2 py-1 transition hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400">
                 »
               </button>
               {/* Last */}
               <button
                 onClick={() => setPage(pagination.pages)}
                 disabled={page >= pagination.pages}
-                className="rounded px-2 py-1 transition hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400">
+                className="rounded px-2 py-1 transition hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-400">
                 »»
               </button>
             </div>
@@ -1047,7 +1052,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                       value={playerForm.minecraftUsername}
                       onChange={(e) => setPlayerForm((p) => ({ ...p, minecraftUsername: e.target.value }))}
                       placeholder="Steve"
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                      className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
                   <div>
@@ -1057,7 +1062,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                       value={playerForm.minecraftUuid}
                       onChange={(e) => setPlayerForm((p) => ({ ...p, minecraftUuid: e.target.value }))}
                       placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                      className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -1074,7 +1079,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                       value={playerForm.discordId}
                       onChange={(e) => setPlayerForm((p) => ({ ...p, discordId: e.target.value }))}
                       placeholder="123456789012345678"
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                      className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
                   <div>
@@ -1084,7 +1089,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                       value={playerForm.discordUsername}
                       onChange={(e) => setPlayerForm((p) => ({ ...p, discordUsername: e.target.value }))}
                       placeholder="user"
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                      className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
                   <div className="sm:col-span-2">
@@ -1094,7 +1099,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                       value={playerForm.discordDisplayName}
                       onChange={(e) => setPlayerForm((p) => ({ ...p, discordDisplayName: e.target.value }))}
                       placeholder="Display Name"
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                      className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -1138,7 +1143,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                       value={playerForm.revocationReason}
                       onChange={(e) => setPlayerForm((p) => ({ ...p, revocationReason: e.target.value }))}
                       placeholder="Reason for revocation…"
-                      className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                      className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
                 )}
@@ -1152,7 +1157,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   onChange={(e) => setPlayerForm((p) => ({ ...p, notes: e.target.value }))}
                   rows={2}
                   placeholder="Reason for adding, additional context…"
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                  className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -1164,7 +1169,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   setEditingPlayerId(null);
                   setPlayerForm({ ...EMPTY_FORM });
                 }}
-                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+                className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
                 Cancel
               </button>
               <button
@@ -1194,7 +1199,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   max={pending.length}
                   value={bulkApproveCount}
                   onChange={(e) => setBulkApproveCount(Number(e.target.value))}
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                  className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 />
                 <p className="mt-1 text-xs text-zinc-500">Pending total: {pending.length}</p>
               </div>
@@ -1212,11 +1217,11 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                           toast.error("Failed to copy list");
                         }
                       }}
-                      className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 transition hover:bg-zinc-800">
+                      className="rounded-md border border-zinc-700/30 px-2 py-1 text-xs text-zinc-300 transition hover:bg-white/5">
                       Copy
                     </button>
                   </div>
-                  <textarea readOnly rows={6} value={bulkApprovedNames.join("\n")} className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 outline-none" />
+                  <textarea readOnly rows={6} value={bulkApprovedNames.join("\n")} className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none" />
                 </div>
               )}
             </div>
@@ -1228,7 +1233,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   setBulkApprovedIds([]);
                   setBulkApprovedNames([]);
                 }}
-                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+                className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
                 Close
               </button>
               {bulkApprovedIds.length > 0 && (
@@ -1264,7 +1269,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 <button
                   onClick={() => setImportMode("file")}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                    importMode === "file" ? "bg-primary-600/20 text-primary-400 border border-primary-500" : "bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-zinc-200"
+                    importMode === "file" ? "bg-primary-600/20 text-primary-400 border border-primary-500" : "bg-white/5 text-zinc-400 border border-zinc-700/30 hover:text-zinc-200"
                   }`}>
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -1279,7 +1284,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 <button
                   onClick={() => setImportMode("paste")}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                    importMode === "paste" ? "bg-primary-600/20 text-primary-400 border border-primary-500" : "bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-zinc-200"
+                    importMode === "paste" ? "bg-primary-600/20 text-primary-400 border border-primary-500" : "bg-white/5 text-zinc-400 border border-zinc-700/30 hover:text-zinc-200"
                   }`}>
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -1295,7 +1300,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 <p className="text-xs font-medium text-zinc-400 mb-2">Whitelist File</p>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-3 transition hover:border-zinc-600">
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-zinc-700/30 bg-white/5 px-4 py-3 transition hover:border-zinc-600">
                   <span className="text-sm text-zinc-400">Choose file</span>
                   <span className="text-sm text-zinc-500">{importFile ? importFile.name : "No file chosen"}</span>
                 </div>
@@ -1312,7 +1317,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   onChange={(e) => setImportJson(e.target.value)}
                   rows={6}
                   placeholder='[{"name": "PlayerName", "uuid": "player-uuid-here"}, ...] or Heimdall export array'
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500 font-mono"
+                  className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500 font-mono"
                 />
               </div>
             )}
@@ -1357,7 +1362,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   if (!importLoading) setImportOpen(false);
                 }}
                 disabled={importLoading}
-                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed">
                 Cancel
               </button>
               <button
@@ -1386,10 +1391,10 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
               onChange={(e) => setReason(e.target.value)}
               rows={3}
               placeholder="Reason…"
-              className="mt-4 w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              className="mt-4 w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             />
             <div className="mt-4 flex justify-end gap-3">
-              <button onClick={() => setReasonModal(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+              <button onClick={() => setReasonModal(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
                 Cancel
               </button>
               <button

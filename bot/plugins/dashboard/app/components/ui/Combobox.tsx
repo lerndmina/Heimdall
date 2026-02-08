@@ -139,7 +139,7 @@ export default function Combobox({
         onClick={() => setOpen((o) => !o)}
         className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm outline-none transition ${
           error ? "border-red-500 ring-1 ring-red-500/30" : open ? "border-primary-500 ring-1 ring-primary-500" : "border-zinc-700 hover:border-zinc-600"
-        } bg-zinc-800/50 ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+        } bg-white/5 backdrop-blur-sm ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
         <span className={selectedLabel ? "text-zinc-100" : "text-zinc-500"}>{loading ? "Loading…" : selectedLabel || placeholder}</span>
         {/* Chevron */}
         <svg className={`ml-2 h-4 w-4 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,9 +150,9 @@ export default function Combobox({
       {/* Popover — rendered via portal to escape overflow containers */}
       {open &&
         createPortal(
-          <div ref={popoverRef} style={popoverStyle} className="rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl shadow-black/40" onKeyDown={handleKeyDown}>
+          <div ref={popoverRef} style={popoverStyle} className="rounded-lg border border-zinc-700/30 bg-zinc-900/90 shadow-xl shadow-black/40 backdrop-blur-2xl" onKeyDown={handleKeyDown}>
             {/* Search input */}
-            <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2">
+            <div className="flex items-center gap-2 border-b border-zinc-700/30 px-3 py-2">
               <svg className="h-4 w-4 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -178,7 +178,7 @@ export default function Combobox({
                     type="button"
                     onClick={() => select(opt.value)}
                     onMouseEnter={() => setHighlightIndex(i)}
-                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition ${isHighlighted ? "bg-zinc-800 text-zinc-100" : "text-zinc-300 hover:bg-zinc-800/60"}`}>
+                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition ${isHighlighted ? "bg-white/10 text-zinc-100" : "text-zinc-300 hover:bg-white/5"}`}>
                     {/* Checkmark */}
                     <svg className={`h-4 w-4 shrink-0 ${isSelected ? "text-primary-400" : "text-transparent"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

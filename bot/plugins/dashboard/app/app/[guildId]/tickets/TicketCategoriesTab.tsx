@@ -358,7 +358,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
               <button
                 onClick={() => i < wizardStep && setWizardStep(i)}
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  i === wizardStep ? "bg-primary-600 text-white" : i < wizardStep ? "bg-primary-600/20 text-primary-400 hover:bg-primary-600/30 cursor-pointer" : "bg-zinc-800 text-zinc-500"
+                  i === wizardStep ? "bg-primary-600 text-white" : i < wizardStep ? "bg-primary-600/20 text-primary-400 hover:bg-primary-600/30 cursor-pointer" : "bg-white/5 text-zinc-500"
                 }`}>
                 <span>{s.icon}</span>
                 <span className="hidden sm:inline">{s.label}</span>
@@ -407,7 +407,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
               <TextInput label="Emoji" description="Optional" value={wizardParent.emoji} onChange={(v) => setWizardParent((d) => ({ ...d, emoji: v }))} placeholder="📂" />
             </div>
             <div className="mt-6 flex justify-between">
-              <button onClick={() => setWizardStep(0)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+              <button onClick={() => setWizardStep(0)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
                 Back
               </button>
               <button
@@ -454,7 +454,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
               />
             </div>
             <div className="mt-6 flex justify-between">
-              <button onClick={() => setWizardStep(1)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+              <button onClick={() => setWizardStep(1)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
                 Back
               </button>
               <button
@@ -491,7 +491,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
                 </div>
 
                 {/* Child preview nested */}
-                <div className="ml-4 mt-3 border-l-2 border-zinc-800 pl-4">
+                <div className="ml-4 mt-3 border-l-2 border-zinc-700/30 pl-4">
                   <div className="flex items-center gap-2">
                     {wizardChild.emoji && <span>{wizardChild.emoji}</span>}
                     <div>
@@ -504,7 +504,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
             </div>
 
             <div className="mt-6 flex justify-between">
-              <button onClick={() => setWizardStep(2)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+              <button onClick={() => setWizardStep(2)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
                 Back
               </button>
               <button
@@ -564,14 +564,14 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-zinc-200">{parent.name}</p>
                         <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">Parent</span>
-                        {!parent.isActive && <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">Inactive</span>}
+                        {!parent.isActive && <span className="inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-500">Inactive</span>}
                       </div>
                       <p className="text-xs text-zinc-500">{parent.description}</p>
                     </div>
                   </div>
                   {canManage && (
                     <div className="flex items-center gap-1">
-                      <button onClick={() => openEditModal(parent)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200" title="Edit">
+                      <button onClick={() => openEditModal(parent)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200" title="Edit">
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
@@ -597,17 +597,17 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
 
                 {childCats.length > 0 && (
                   <CardContent className="mt-3">
-                    <div className="ml-4 space-y-2 border-l-2 border-zinc-800 pl-4">
+                    <div className="ml-4 space-y-2 border-l-2 border-zinc-700/30 pl-4">
                       {childCats.map((child) => (
                         <div key={child.id} className="flex items-center justify-between group">
                           <div className="flex items-center gap-2">
                             {child.emoji && <span>{child.emoji}</span>}
                             <span className="text-sm text-zinc-300">{child.name}</span>
-                            {!child.isActive && <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">Inactive</span>}
+                            {!child.isActive && <span className="inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-500">Inactive</span>}
                           </div>
                           {canManage && (
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                              <button onClick={() => openEditModal(child)} className="rounded-lg px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200">
+                              <button onClick={() => openEditModal(child)} className="rounded-lg px-2 py-1 text-xs text-zinc-400 hover:bg-white/5 hover:text-zinc-200">
                                 Edit
                               </button>
                               <button onClick={() => setDeleteCat(child)} className="rounded-lg px-2 py-1 text-xs text-red-400 hover:bg-red-500/10">
@@ -633,11 +633,11 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
                   <div className="flex items-center gap-2">
                     {child.emoji && <span>{child.emoji}</span>}
                     <p className="text-sm text-zinc-200">{child.name}</p>
-                    <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">No parent</span>
+                    <span className="inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-500">No parent</span>
                   </div>
                   {canManage && (
                     <div className="flex items-center gap-1">
-                      <button onClick={() => openEditModal(child)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200">
+                      <button onClick={() => openEditModal(child)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
@@ -672,7 +672,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
         title={editCat ? `Edit: ${editCat.name}` : "New Category"}
         footer={
           <>
-            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
@@ -694,7 +694,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
               <select
                 value={draft.type}
                 onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value as "parent" | "child" }))}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
                 <option value="parent">Parent</option>
                 <option value="child">Child</option>
               </select>
@@ -708,7 +708,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
                 <select
                   value={draft.parentId}
                   onChange={(e) => setDraft((d) => ({ ...d, parentId: e.target.value }))}
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
+                  className="w-full rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
                   <option value="">None</option>
                   {parents.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -738,7 +738,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
           {editCat && <Toggle label="Active" checked={draft.isActive} onChange={(v) => setDraft((d) => ({ ...d, isActive: v }))} />}
 
           {/* Inactivity reminder */}
-          <div className="rounded-lg border border-zinc-800 p-3 space-y-3">
+          <div className="rounded-lg border border-zinc-700/30 p-3 space-y-3">
             <Toggle
               label="Inactivity Reminder"
               description="Warn and auto-close inactive tickets"
@@ -754,7 +754,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
                   <select
                     value={draft.inactivityPingBehavior}
                     onChange={(e) => setDraft((d) => ({ ...d, inactivityPingBehavior: e.target.value as any }))}
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
+                    className="w-full rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
                     <option value="opener">Ping ticket opener</option>
                     <option value="all">Ping all participants</option>
                     <option value="none">No ping</option>
@@ -773,7 +773,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
         title="Delete Category"
         footer={
           <>
-            <button onClick={() => setDeleteCat(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setDeleteCat(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button

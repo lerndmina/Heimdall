@@ -203,7 +203,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
   };
 
   // ── Helpers ──
-  function getStatusVariant(status: string): "success" | "warning" | "error" | "default" {
+  function getStatusVariant(status: string): "success" | "warning" | "error" | "neutral" {
     switch (status) {
       case "open":
         return "success";
@@ -212,9 +212,9 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
       case "closed":
         return "error";
       case "archived":
-        return "default";
+        return "neutral";
       default:
-        return "default";
+        return "neutral";
     }
   }
 
@@ -232,7 +232,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
       <Card>
         <CardContent>
           <p className="text-sm text-red-400">{error}</p>
-          <button onClick={fetchTickets} className="mt-3 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-700">
+          <button onClick={fetchTickets} className="mt-3 rounded-lg bg-white/5 backdrop-blur-sm px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/10">
             Retry
           </button>
         </CardContent>
@@ -254,12 +254,12 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
       )}
 
       {/* Filters */}
-      <div className="flex rounded-lg border border-zinc-700 overflow-hidden w-fit">
+      <div className="flex rounded-lg border border-zinc-700/30 overflow-hidden w-fit">
         {STATUS_FILTERS.map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 text-xs font-medium capitalize transition ${statusFilter === s ? "bg-primary-600 text-white" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"}`}>
+            className={`px-3 py-1.5 text-xs font-medium capitalize transition ${statusFilter === s ? "bg-primary-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10"}`}>
             {s}
           </button>
         ))}
@@ -277,7 +277,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  <tr className="border-b border-zinc-700/30 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                     <th className="pb-3 pr-4">#</th>
                     <th className="pb-3 pr-4">User</th>
                     <th className="pb-3 pr-4">Category</th>
@@ -286,14 +286,14 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
                     <th className="pb-3 text-right">View</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-zinc-700/30">
                   {tickets.map((t) => (
-                    <tr key={t.id} className="group cursor-pointer hover:bg-zinc-800/30" onClick={() => openDetail(t)}>
+                    <tr key={t.id} className="group cursor-pointer hover:bg-white/5" onClick={() => openDetail(t)}>
                       <td className="py-3 pr-4 font-mono text-zinc-400">{t.ticketNumber}</td>
                       <td className="py-3 pr-4 text-zinc-200">{t.userDisplayName}</td>
                       <td className="py-3 pr-4 text-zinc-400">{t.categoryName}</td>
                       <td className="py-3 pr-4">
-                        <StatusBadge status={t.status} variant={getStatusVariant(t.status)} />
+                        <StatusBadge variant={getStatusVariant(t.status)}>{t.status}</StatusBadge>
                       </td>
                       <td className="py-3 pr-4 text-zinc-500">{new Date(t.openedAt).toLocaleDateString()}</td>
                       <td className="py-3 text-right">
@@ -314,7 +314,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
             )}
 
             {totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-4">
+              <div className="mt-4 flex items-center justify-between border-t border-zinc-700/30 pt-4">
                 <p className="text-xs text-zinc-500">
                   {total} ticket{total !== 1 ? "s" : ""}
                 </p>
@@ -322,7 +322,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
                   <button
                     onClick={() => setPage((p) => Math.max(0, p - 1))}
                     disabled={page === 0}
-                    className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                    className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                     Previous
                   </button>
                   <span className="text-xs text-zinc-500">
@@ -331,7 +331,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                     disabled={page >= totalPages - 1}
-                    className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                    className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                     Next
                   </button>
                 </div>
@@ -349,7 +349,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
         footer={
           detailTicket && canManage && (detailTicket.status === "open" || detailTicket.status === "claimed") ? (
             <>
-              <button onClick={() => setDetailTicket(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+              <button onClick={() => setDetailTicket(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
                 Close Panel
               </button>
               {detailTicket.status === "open" && (
@@ -361,7 +361,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
                 <button
                   onClick={handleUnclaim}
                   disabled={actionLoading}
-                  className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-50">
+                  className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-50">
                   Unclaim
                 </button>
               )}
@@ -396,7 +396,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
             {detailTicket.questionResponses && detailTicket.questionResponses.length > 0 && (
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 mb-2">Intake Responses</p>
-                <div className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                <div className="space-y-2 rounded-lg border border-zinc-700/30 bg-white/5 p-3">
                   {detailTicket.questionResponses.map((qr, i) => (
                     <div key={i}>
                       <p className="text-xs font-medium text-zinc-400">{qr.questionLabel}</p>

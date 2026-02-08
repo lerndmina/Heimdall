@@ -26,7 +26,7 @@ export default function Tabs({ tabs, defaultTab, className = "" }: TabsProps) {
   return (
     <div className={className}>
       {/* Tab list */}
-      <div className="flex gap-1 border-b border-zinc-800">
+      <div className="flex gap-1 border-b border-zinc-700/30">
         {tabs.map((tab) => (
           <button
             key={tab.id}

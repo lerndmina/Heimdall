@@ -239,14 +239,14 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
                 Template Variables
               </button>
               {showVars && variables.length > 0 && (
-                <div className="mt-2 rounded-lg border border-zinc-800 bg-zinc-800/30 p-3">
+                <div className="mt-2 rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm p-3">
                   <div className="space-y-1.5">
                     {variables.map((v) => (
                       <div key={v.variable} className="flex items-start gap-3 text-xs">
                         <button
                           type="button"
                           onClick={() => setDraftMessage((m) => m + v.variable)}
-                          className="shrink-0 rounded bg-zinc-700 px-2 py-0.5 font-mono text-primary-400 hover:bg-zinc-600 transition"
+                          className="shrink-0 rounded bg-white/10 px-2 py-0.5 font-mono text-primary-400 hover:bg-white/15 transition"
                           title="Click to insert">
                           {v.variable}
                         </button>
@@ -263,7 +263,7 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
 
         {/* Actions */}
         <div className="flex items-center justify-between">
-          <button onClick={() => setEditing(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+          <button onClick={() => setEditing(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
             Cancel
           </button>
           <button
@@ -287,7 +287,7 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
   if (notFound || !config) {
     return (
       <Card className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="mb-4 rounded-full bg-zinc-800 p-4">
+        <div className="mb-4 rounded-full bg-white/5 backdrop-blur-sm p-4">
           <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
           </svg>
@@ -319,7 +319,7 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
             <span className="text-sm text-zinc-200">#{config.channelId}</span>
           </FieldDisplay>
           <FieldDisplay label="Message Template">
-            <div className="mt-1 rounded-lg border border-zinc-800 bg-zinc-800/30 p-3">
+            <div className="mt-1 rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm p-3">
               <pre className="whitespace-pre-wrap text-sm text-zinc-200 font-sans">{config.message}</pre>
             </div>
           </FieldDisplay>
@@ -336,7 +336,7 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
           <button
             onClick={handleTest}
             disabled={testing}
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-50">
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-50">
             {testing ? (
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
@@ -381,7 +381,7 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
       <Modal open={showTestModal} onClose={() => setShowTestModal(false)} title="Test Welcome Message">
         <div className="space-y-3">
           <p className="text-sm text-zinc-400">This is how the welcome message will look with sample data:</p>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+          <div className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm p-4">
             <pre className="whitespace-pre-wrap text-sm text-zinc-200 font-sans">{testResult}</pre>
           </div>
         </div>
@@ -394,7 +394,7 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
         title="Delete Welcome Message"
         footer={
           <>
-            <button onClick={() => setShowDeleteModal(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setShowDeleteModal(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button

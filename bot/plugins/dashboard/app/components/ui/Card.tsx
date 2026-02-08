@@ -1,5 +1,5 @@
 /**
- * Card — generic container with consistent styling.
+ * Card — glassmorphism container with backdrop blur and subtle borders.
  */
 
 interface CardProps {
@@ -8,7 +8,14 @@ interface CardProps {
 }
 
 export function Card({ children, className = "" }: CardProps) {
-  return <div className={`rounded-xl border border-zinc-800 bg-zinc-900 p-6 ${className}`}>{children}</div>;
+  return (
+    <div
+      className={`group relative rounded-2xl border border-zinc-700/30 bg-zinc-900/40 p-6 shadow-lg backdrop-blur-xl transition-all duration-500 hover:shadow-2xl hover:border-zinc-600/40 ${className}`}>
+      {/* Subtle hover gradient overlay */}
+      <div className="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-r from-primary-500/0 via-primary-500/5 to-primary-500/0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+      <div className="relative">{children}</div>
+    </div>
+  );
 }
 
 export function CardHeader({ children, className = "" }: CardProps) {

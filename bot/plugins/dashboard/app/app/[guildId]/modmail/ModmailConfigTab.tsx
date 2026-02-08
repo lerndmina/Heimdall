@@ -290,13 +290,13 @@ export default function ModmailConfigTab({ guildId }: { guildId: string }) {
           <CardTitle>Categories</CardTitle>
           <CardDescription className="mt-1">Modmail categories are managed via Discord commands.</CardDescription>
           <CardContent className="mt-3">
-            <div className="divide-y divide-zinc-800">
+            <div className="divide-y divide-zinc-700/30">
               {config.categories.map((cat) => (
                 <div key={cat.id} className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-2">
                     {cat.emoji && <span>{cat.emoji}</span>}
                     <span className="text-sm text-zinc-200">{cat.name}</span>
-                    {!cat.enabled && <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">Disabled</span>}
+                    {!cat.enabled && <span className="inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-500">Disabled</span>}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-zinc-500">
                     <span>Priority {cat.priority}</span>
@@ -380,7 +380,7 @@ function StepAutoClose({ draft, update }: { draft: Draft; update: UpdateFn }) {
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-400">Warning time must be less than the auto-close time.</div>
       )}
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 px-4 py-3 text-xs text-zinc-400">
+      <div className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-4 py-3 text-xs text-zinc-400">
         Users will receive a warning message when their conversation is about to be auto-closed due to inactivity.
       </div>
     </div>
@@ -401,7 +401,7 @@ function StepAttachments({ draft, update }: { draft: Draft; update: UpdateFn }) 
           max={100}
         />
       )}
-      <div className="border-t border-zinc-800 pt-5">
+      <div className="border-t border-zinc-700/30 pt-5">
         <Toggle label="Track User Activity" description="Track when users are last active in conversations" checked={draft.trackUserActivity} onChange={(v) => update("trackUserActivity", v)} />
       </div>
       <Toggle label="Track Staff Activity" description="Track when staff last respond in conversations" checked={draft.trackStaffActivity} onChange={(v) => update("trackStaffActivity", v)} />

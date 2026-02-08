@@ -230,7 +230,7 @@ export default function LoggingConfigPage({ guildId }: { guildId: string }) {
               <button
                 onClick={handleTest}
                 disabled={testing}
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-50">
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-50">
                 {testing ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
@@ -266,7 +266,7 @@ export default function LoggingConfigPage({ guildId }: { guildId: string }) {
       <Modal open={showTestModal} onClose={() => setShowTestModal(false)} title="Test Results">
         <div className="space-y-3">
           {testResults.map((r) => (
-            <div key={r.category} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/30 px-4 py-3">
+            <div key={r.category} className="flex items-center justify-between rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-4 py-3">
               <span className="text-sm font-medium text-zinc-200 capitalize">{r.category}</span>
               {r.success ? <StatusBadge variant="success">Sent</StatusBadge> : <StatusBadge variant="error">{r.error ?? "Failed"}</StatusBadge>}
             </div>
@@ -281,7 +281,7 @@ export default function LoggingConfigPage({ guildId }: { guildId: string }) {
         title="Delete All Logging"
         footer={
           <>
-            <button onClick={() => setShowDeleteModal(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setShowDeleteModal(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
@@ -381,7 +381,7 @@ function CategoryCard({ guildId, meta, currentConfig, canManage, saving, onSave 
         {/* Subcategory toggles */}
         <div>
           <p className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-500">Event Types</p>
-          <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+          <div className="space-y-3 rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm p-4">
             {meta.subcategories.map((sub) => (
               <Toggle
                 key={sub.id}

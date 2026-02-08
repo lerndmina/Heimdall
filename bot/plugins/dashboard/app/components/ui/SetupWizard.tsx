@@ -71,7 +71,7 @@ export default function SetupWizard({ steps, step, onStepChange, isEdit, saving,
             Step {step + 1} of {steps.length} — {currentStep?.label}
           </p>
         </div>
-        <button onClick={onCancel} className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200">
+        <button onClick={onCancel} className="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -86,7 +86,7 @@ export default function SetupWizard({ steps, step, onStepChange, isEdit, saving,
             onClick={() => i <= step && onStepChange(i)}
             disabled={i > step && !canNext}
             className={`flex-1 rounded-full py-1 text-xs font-medium transition cursor-pointer ${
-              i === step ? "bg-primary-600 text-white" : i < step ? "bg-primary-600/30 text-primary-400 hover:bg-primary-600/50" : "bg-zinc-800 text-zinc-500 hover:bg-zinc-700"
+              i === step ? "bg-primary-600 text-white" : i < step ? "bg-primary-600/30 text-primary-400 hover:bg-primary-600/50" : "bg-white/5 text-zinc-500 hover:bg-white/10"
             } disabled:cursor-not-allowed disabled:opacity-50`}>
             {s.label}
           </button>
@@ -105,7 +105,7 @@ export default function SetupWizard({ steps, step, onStepChange, isEdit, saving,
       <div className="flex items-center justify-between">
         <button
           onClick={() => (step === 0 ? onCancel() : onStepChange(step - 1))}
-          className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+          className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
           {step === 0 ? "Cancel" : "Back"}
         </button>
 
@@ -139,7 +139,7 @@ export default function SetupWizard({ steps, step, onStepChange, isEdit, saving,
 
 export function ReviewSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+    <div className="rounded-lg border border-zinc-700/30 bg-white/5 p-4 backdrop-blur-sm">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</p>
       <div className="space-y-1.5">{children}</div>
     </div>
@@ -188,7 +188,7 @@ export function NotConfigured({
 }) {
   return (
     <Card className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="mb-4 rounded-full bg-zinc-800 p-4">
+      <div className="mb-4 rounded-full border border-zinc-700/30 bg-zinc-900/40 p-4 backdrop-blur-xl">
         {icon ?? (
           <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path

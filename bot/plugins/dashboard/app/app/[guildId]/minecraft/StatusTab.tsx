@@ -104,7 +104,12 @@ export default function StatusTab({ guildId }: { guildId: string }) {
       if (res.success && res.data) {
         setServers(res.data.servers);
       } else {
-        setError(res.error?.message ?? "Failed to load server status");
+        // Check for permission denied errors
+        if (res.error?.code === "FORBIDDEN" || res.error?.code === "UNAUTHORIZED" || res.error?.message?.toLowerCase().includes("permission")) {
+          setError("Access denied: You don't have permission to view server configuration");
+        } else {
+          setError(res.error?.message ?? "Failed to load server status");
+        }
       }
     } catch {
       setError("Failed to connect to API");
@@ -159,7 +164,7 @@ export default function StatusTab({ guildId }: { guildId: string }) {
     return (
       <>
         <Card className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="mb-4 rounded-full bg-zinc-800 p-4">
+          <div className="mb-4 rounded-full bg-white/5 backdrop-blur-sm p-4">
             <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -193,7 +198,7 @@ export default function StatusTab({ guildId }: { guildId: string }) {
           {servers.length} server{servers.length !== 1 ? "s" : ""} monitored
         </p>
         <div className="flex items-center gap-2">
-          <button onClick={fetchStatus} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800">
+          <button onClick={fetchStatus} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5">
             <RefreshIcon />
             Refresh
           </button>
@@ -220,7 +225,7 @@ export default function StatusTab({ guildId }: { guildId: string }) {
         title="Remove Server"
         footer={
           <>
-            <button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800" disabled={deleting}>
+            <button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm text-zinc-300 transition hover:bg-white/5" disabled={deleting}>
               Cancel
             </button>
             <button onClick={handleDelete} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50" disabled={deleting}>
@@ -287,7 +292,7 @@ function AddServerModal({ guildId, onClose, onAdded }: AddServerModalProps) {
       title="Add Monitored Server"
       footer={
         <>
-          <button onClick={onClose} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800" disabled={saving}>
+          <button onClick={onClose} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm text-zinc-300 transition hover:bg-white/5" disabled={saving}>
             Cancel
           </button>
           <button
@@ -307,7 +312,7 @@ function AddServerModal({ guildId, onClose, onAdded }: AddServerModalProps) {
 
         <NumberInput label="Server Port" description="Minecraft server port (default: 25565)" value={serverPort} onChange={setServerPort} min={1} max={65535} />
 
-        <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 px-3 py-2 text-xs text-zinc-400">
+        <div className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-2 text-xs text-zinc-400">
           💡 The server must be online and reachable to be added. It will be pinged to verify connectivity.
         </div>
       </div>
@@ -342,7 +347,7 @@ function ServerCard({ server, onDelete }: { server: MonitoredServer; onDelete: (
           {favicon ? (
             <img src={favicon} alt="" className="h-10 w-10 rounded-lg" />
           ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-zinc-500">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 backdrop-blur-sm text-zinc-500">
               <ServerIcon />
             </div>
           )}
@@ -371,7 +376,7 @@ function ServerCard({ server, onDelete }: { server: MonitoredServer; onDelete: (
 
         {/* MOTD */}
         {motd && (
-          <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-800/30 px-4 py-3">
+          <div className="mt-4 rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-4 py-3">
             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">MOTD</p>
             <p className="mt-1 whitespace-pre-wrap font-mono text-sm text-zinc-300">{motd}</p>
           </div>
@@ -383,7 +388,7 @@ function ServerCard({ server, onDelete }: { server: MonitoredServer; onDelete: (
             <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">Online Players ({playerList.length})</p>
             <div className="flex flex-wrap gap-2">
               {playerList.map((p) => (
-                <div key={p.uuid} className="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-800/30 px-2 py-1 text-xs">
+                <div key={p.uuid} className="inline-flex items-center gap-1.5 rounded-md border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-2 py-1 text-xs">
                   <img src={`https://mc-heads.net/avatar/${p.uuid}/16`} alt="" className="h-4 w-4 rounded" />
                   <span className="text-zinc-200">{p.name_clean}</span>
                 </div>
@@ -456,7 +461,7 @@ function ServerIcon() {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+    <div className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm p-4">
       <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="mt-1 text-xl font-bold text-zinc-100">{value}</p>
     </div>

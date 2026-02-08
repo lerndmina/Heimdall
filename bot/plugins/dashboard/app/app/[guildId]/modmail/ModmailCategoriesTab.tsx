@@ -322,7 +322,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
                     <div className="flex items-center gap-2">
                       {cat.emoji && <span className="text-xl">{cat.emoji}</span>}
                       <h3 className="text-base font-medium text-zinc-100">{cat.name}</h3>
-                      {!cat.enabled && <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-500">Disabled</span>}
+                      {!cat.enabled && <span className="inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-500">Disabled</span>}
                     </div>
                     {cat.description && <p className="mt-1 text-sm text-zinc-400">{cat.description}</p>}
 
@@ -349,7 +349,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
                     <button
                       onClick={() => handleEdit(index)}
                       disabled={saving}
-                      className="rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-700 disabled:opacity-50">
+                      className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/10 disabled:opacity-50">
                       Edit
                     </button>
                     <button

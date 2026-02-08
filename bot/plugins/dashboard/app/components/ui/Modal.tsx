@@ -37,11 +37,11 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}>
-      <div className={`mx-4 w-full ${maxWidth} rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl`}>
+      <div className={`mx-4 w-full ${maxWidth} rounded-2xl border border-zinc-700/30 bg-zinc-900/70 shadow-2xl shadow-black/50 backdrop-blur-2xl`}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-zinc-700/30 px-6 py-4">
           <h2 className="text-lg font-semibold text-zinc-100">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200">
+          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -52,7 +52,7 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
         <div className="max-h-[70vh] overflow-y-auto px-6 py-4">{children}</div>
 
         {/* Footer */}
-        {footer && <div className="flex items-center justify-end gap-3 border-t border-zinc-800 px-6 py-4">{footer}</div>}
+        {footer && <div className="flex items-center justify-end gap-3 border-t border-zinc-700/30 px-6 py-4">{footer}</div>}
       </div>
     </div>
   );

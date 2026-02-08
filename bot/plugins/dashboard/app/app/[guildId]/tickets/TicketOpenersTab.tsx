@@ -355,13 +355,13 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-zinc-200">{op.name}</p>
                     <div className="mt-1 flex items-center gap-2">
-                      <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">{op.uiType === "buttons" ? "Buttons" : "Dropdown"}</span>
+                      <span className="inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-400">{op.uiType === "buttons" ? "Buttons" : "Dropdown"}</span>
                       <span className="text-xs text-zinc-500">{op.categoryIds.length} categories</span>
                     </div>
                   </div>
                   {canManage && (
                     <div className="flex items-center gap-1">
-                      <button onClick={() => openEditModal(op)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200" title="Edit">
+                      <button onClick={() => openEditModal(op)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200" title="Edit">
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path
                             strokeLinecap="round"
@@ -387,7 +387,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
 
                 {/* Embed preview */}
                 <CardContent className="mt-3">
-                  <div className="rounded-lg border-l-4 p-3 bg-zinc-800/50" style={{ borderColor: op.embedColor ? `#${op.embedColor.toString(16).padStart(6, "0")}` : "#5865f2" }}>
+                  <div className="rounded-lg border-l-4 p-3 bg-white/5 backdrop-blur-sm" style={{ borderColor: op.embedColor ? `#${op.embedColor.toString(16).padStart(6, "0")}` : "#5865f2" }}>
                     <p className="text-sm font-semibold text-zinc-200">{op.embedTitle}</p>
                     <p className="mt-1 text-xs text-zinc-400 line-clamp-2">{op.embedDescription}</p>
                   </div>
@@ -395,7 +395,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
                   {/* Category list */}
                   <div className="mt-2 flex flex-wrap gap-1">
                     {op.categoryIds.map((cid) => (
-                      <span key={cid} className="inline-flex items-center rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+                      <span key={cid} className="inline-flex items-center rounded bg-white/5 px-2 py-0.5 text-xs text-zinc-300">
                         {getCategoryName(cid)}
                       </span>
                     ))}
@@ -465,13 +465,13 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
             </div>
 
             {archDirty && canManage && (
-              <div className="mt-4 flex items-center justify-end gap-2 border-t border-zinc-800 pt-4">
+              <div className="mt-4 flex items-center justify-end gap-2 border-t border-zinc-700/30 pt-4">
                 <button
                   onClick={() => {
                     setArchDraft(archiveConfig);
                     setArchDirty(false);
                   }}
-                  className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800">
+                  className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-white/5">
                   Discard
                 </button>
                 <button
@@ -493,7 +493,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
         title={editOpener ? `Edit: ${editOpener.name}` : "New Opener"}
         footer={
           <>
-            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
@@ -512,13 +512,13 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
             <select
               value={draft.uiType}
               onChange={(e) => setDraft((d) => ({ ...d, uiType: e.target.value as "buttons" | "dropdown" }))}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
+              className="w-full rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
               <option value="buttons">Buttons</option>
               <option value="dropdown">Dropdown</option>
             </select>
           </div>
 
-          <hr className="border-zinc-800" />
+          <hr className="border-zinc-700/30" />
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Embed</p>
 
           <TextInput label="Title" value={draft.embedTitle} onChange={(v) => setDraft((d) => ({ ...d, embedTitle: v }))} placeholder="Open a Ticket" />
@@ -539,7 +539,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
             placeholder="https://…"
           />
 
-          <hr className="border-zinc-800" />
+          <hr className="border-zinc-700/30" />
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Categories</p>
           <p className="text-xs text-zinc-500">Select 1–25 categories this opener provides.</p>
 
@@ -557,7 +557,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
                       type="button"
                       onClick={() => toggleCategory(cat.id)}
                       className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition ${
-                        selected ? "border-primary-600 bg-primary-600/10 text-primary-300" : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
+                        selected ? "border-primary-600 bg-primary-600/10 text-primary-300" : "border-zinc-700/30 bg-white/5 text-zinc-300 hover:bg-white/10"
                       }`}>
                       <span className={`h-4 w-4 rounded border flex items-center justify-center transition ${selected ? "border-primary-500 bg-primary-500" : "border-zinc-600"}`}>
                         {selected && (
@@ -583,7 +583,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
         title="Delete Opener"
         footer={
           <>
-            <button onClick={() => setDeleteOpener(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setDeleteOpener(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
