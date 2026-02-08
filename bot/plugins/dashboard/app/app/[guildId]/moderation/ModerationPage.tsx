@@ -383,7 +383,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                   </div>
                   {canManage && (
                     <div className="flex items-center gap-2">
-                      <Toggle checked={rule.enabled} onChange={() => handleToggle(rule)} />
+                      <Toggle label="Enabled" checked={rule.enabled} onChange={() => handleToggle(rule)} />
                       <button onClick={() => openEdit(rule)} className="text-sm text-zinc-400 hover:text-zinc-200">
                         Edit
                       </button>
@@ -786,23 +786,11 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
         <CardTitle>General Settings</CardTitle>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-zinc-200">Enable Automod</p>
-                <p className="text-xs text-zinc-400">Toggle automatic message filtering</p>
-              </div>
-              <Toggle checked={automodEnabled} onChange={setAutomodEnabled} disabled={!canManage} />
-            </div>
+            <Toggle label="Enable Automod" description="Toggle automatic message filtering" checked={automodEnabled} onChange={setAutomodEnabled} disabled={!canManage} />
 
             <TextInput label="Fallback Log Channel ID" value={logChannelId} onChange={setLogChannelId} placeholder="Channel ID (used if logging plugin not configured)" disabled={!canManage} />
 
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-zinc-200">Point Decay</p>
-                <p className="text-xs text-zinc-400">Automatically expire infraction points after a set period</p>
-              </div>
-              <Toggle checked={pointDecayEnabled} onChange={setPointDecayEnabled} disabled={!canManage} />
-            </div>
+            <Toggle label="Point Decay" description="Automatically expire infraction points after a set period" checked={pointDecayEnabled} onChange={setPointDecayEnabled} disabled={!canManage} />
 
             {pointDecayEnabled && <TextInput label="Decay Period (days)" value={String(pointDecayDays)} onChange={(v) => setPointDecayDays(parseInt(v) || 30)} type="number" disabled={!canManage} />}
           </div>
@@ -813,13 +801,7 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
         <CardTitle>DM Notifications</CardTitle>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-zinc-200">DM on Infraction</p>
-                <p className="text-xs text-zinc-400">Send a DM to users when they receive an infraction</p>
-              </div>
-              <Toggle checked={dmOnInfraction} onChange={setDmOnInfraction} disabled={!canManage} />
-            </div>
+            <Toggle label="DM on Infraction" description="Send a DM to users when they receive an infraction" checked={dmOnInfraction} onChange={setDmOnInfraction} disabled={!canManage} />
 
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1">DM Mode</label>

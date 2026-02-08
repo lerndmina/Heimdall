@@ -11,6 +11,10 @@ import { PURGE_MAX_MESSAGES, BULK_DELETE_MAX_AGE_MS } from "../../utils/constant
 export async function handleTime(context: CommandContext): Promise<void> {
   const { interaction, getPluginAPI } = context;
   const mod = getPluginAPI<ModerationPluginAPI>("moderation");
+  if (!mod) {
+    await interaction.reply({ content: "Moderation plugin not loaded.", ephemeral: true });
+    return;
+  }
 
   await interaction.deferReply({ ephemeral: true });
 

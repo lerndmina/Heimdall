@@ -19,7 +19,10 @@ export const config = { allowInDMs: false };
 export async function execute(context: CommandContext): Promise<void> {
   const { interaction, getPluginAPI } = context;
   const mod = getPluginAPI<ModerationPluginAPI>("moderation");
-
+  if (!mod) {
+    await interaction.reply({ content: "Moderation plugin not loaded.", ephemeral: true });
+    return;
+  }
   await interaction.deferReply({ ephemeral: true });
 
   const user = interaction.options.getUser("user", true);

@@ -63,7 +63,7 @@ export function createRulesTestRoutes(deps: ModerationApiDeps): Router {
         success: true,
         data: {
           matched: result.matched,
-          matchedPatterns: result.matchedPatterns,
+          matchedPattern: result.matchedPattern,
           invalidPatterns: [],
         },
       });
