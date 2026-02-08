@@ -15,7 +15,6 @@ import { createLogger } from "../../../src/core/Logger.js";
 import { WhisperProvider } from "../types/index.js";
 import { downloadFile, convertFile, deleteFile, checkFfmpeg, getTempPath } from "./FileHelpers.js";
 import type { GuildEnvService } from "../../../src/core/services/GuildEnvService.js";
-import FormData from "form-data";
 
 const log = createLogger("vc-transcription");
 

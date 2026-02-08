@@ -72,7 +72,7 @@ export async function convertFile(
   return new Promise<string>((resolve, reject) => {
     ffmpeg(inputPath)
       .toFormat(toExt === "wav" ? "wav" : "mp3")
-      .on("error", (err) => {
+      .on("error", (err: Error) => {
         log.error("FFmpeg conversion error:", err);
         reject(err);
       })
@@ -110,7 +110,7 @@ export function deleteFilePath(filePath: string): void {
  */
 export async function checkFfmpeg(): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
-    ffmpeg.getAvailableFormats((err) => {
+    ffmpeg.getAvailableFormats((err: Error | null) => {
       if (err) {
         log.error("FFmpeg not available:", err);
         resolve(false);

@@ -62,7 +62,7 @@ export async function execute(
   // Check guild config
   try {
     const config = await VoiceTranscriptionConfig.findOne({ guildId: message.guildId });
-    const mode = config?.mode || TranscriptionMode.DISABLED;
+    const mode = (config?.mode as TranscriptionMode) || TranscriptionMode.DISABLED;
 
     if (mode !== TranscriptionMode.REACTIONS) {
       log.debug(`Ignoring reaction — guild mode is ${mode}, not reactions`);

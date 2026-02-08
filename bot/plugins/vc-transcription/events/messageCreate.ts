@@ -43,7 +43,7 @@ export async function execute(client: HeimdallClient, message: Message): Promise
 
   try {
     const config = await VoiceTranscriptionConfig.findOne({ guildId: message.guildId });
-    const mode = config?.mode || TranscriptionMode.DISABLED;
+    const mode = (config?.mode as TranscriptionMode) || TranscriptionMode.DISABLED;
 
     if (mode === TranscriptionMode.DISABLED) return;
 

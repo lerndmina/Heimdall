@@ -65,8 +65,8 @@ async function handleStatus(
 ): Promise<void> {
   try {
     const config = await VoiceTranscriptionConfig.findOne({ guildId: interaction.guild!.id });
-    const mode = config?.mode || TranscriptionMode.DISABLED;
-    const provider = config?.whisperProvider || WhisperProvider.LOCAL;
+    const mode = (config?.mode as TranscriptionMode) || TranscriptionMode.DISABLED;
+    const provider = (config?.whisperProvider as WhisperProvider) || WhisperProvider.LOCAL;
     const model = config?.whisperModel || "base.en";
 
     const modeDescriptions: Record<TranscriptionMode, string> = {

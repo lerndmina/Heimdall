@@ -20,13 +20,7 @@ export enum FilterMode {
 }
 
 /** Available local Whisper models (whisper.cpp GGML) */
-export const LOCAL_WHISPER_MODELS = [
-  "tiny.en",
-  "base.en",
-  "small.en",
-  "medium.en",
-  "large",
-] as const;
+export const LOCAL_WHISPER_MODELS = ["tiny.en", "base.en", "small.en", "medium.en", "large"] as const;
 
 /** Available OpenAI Whisper API models */
 export const OPENAI_WHISPER_MODELS = ["whisper-1"] as const;

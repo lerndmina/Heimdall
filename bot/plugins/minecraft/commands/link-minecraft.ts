@@ -1,8 +1,11 @@
 /**
- * /link-minecraft <username> — Start the account linking flow
+ * /link-minecraft [username] — Minecraft account management panel
  *
- * Creates a pending auth record. User must then join the MC server
- * to receive their auth code, then confirm with /confirm-code.
+ * When run without a username: shows the interactive account manager panel
+ * (same as /minecraft-status) with buttons for link, unlink, refresh.
+ *
+ * When run with a username: starts the link flow directly and then
+ * shows the panel for ongoing management.
  */
 
 import { SlashCommandBuilder } from "discord.js";
@@ -10,14 +13,15 @@ import type { CommandContext } from "../../../src/core/CommandManager.js";
 import type { MinecraftPluginAPI } from "../index.js";
 import MinecraftConfig from "../models/MinecraftConfig.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
+import { showAccountPanel } from "../utils/accountPanel.js";
 import { createLogger } from "../../../src/core/Logger.js";
 
 const log = createLogger("minecraft:link");
 
 export const data = new SlashCommandBuilder()
   .setName("link-minecraft")
-  .setDescription("Link your Discord account to your Minecraft account")
-  .addStringOption((opt) => opt.setName("username").setDescription("Your Minecraft username").setRequired(true));
+  .setDescription("Manage your Minecraft account linking")
+  .addStringOption((opt) => opt.setName("username").setDescription("Your Minecraft username (or leave blank to open the panel)").setRequired(false));
 
 export const config = { allowInDMs: false };
 
@@ -31,11 +35,19 @@ export async function execute(context: CommandContext): Promise<void> {
     return;
   }
 
+  const minecraftUsername = interaction.options.getString("username")?.trim().toLowerCase();
+
+  // No username provided — show the interactive panel
+  if (!minecraftUsername) {
+    await showAccountPanel(interaction, pluginAPI.lib);
+    return;
+  }
+
+  // ── Username provided — direct link flow ───────────────────────
+
   const guildId = interaction.guildId!;
   const discordId = interaction.user.id;
-  const minecraftUsername = interaction.options.getString("username", true).toLowerCase();
 
-  // Check config
   const mcConfig = await MinecraftConfig.findOne({ guildId }).lean();
   if (!mcConfig?.enabled) {
     const embed = pluginAPI.lib.createEmbedBuilder().setColor(0xff0000).setTitle("❌ Not Available").setDescription("Minecraft account linking is not enabled on this server.");
@@ -77,37 +89,9 @@ export async function execute(context: CommandContext): Promise<void> {
       existingPending.minecraftUsername = minecraftUsername;
       existingPending.codeShownAt = undefined;
       await existingPending.save();
-
-      const embed = pluginAPI.lib
-        .createEmbedBuilder()
-        .setColor(0xffff00)
-        .setTitle("✏️ Username Updated")
-        .setDescription(
-          `Your pending link request has been updated to **${minecraftUsername}**.\n\n` +
-            `**Next Steps:**\n` +
-            `1. Try joining the Minecraft server: \`${mcConfig.serverHost}:${mcConfig.serverPort}\`\n` +
-            `2. You'll be kicked with your authentication code\n` +
-            `3. Use that code with \`/confirm-code <code>\`\n\n` +
-            `**Request expires:** <t:${Math.floor((existingPending.expiresAt?.getTime() || Date.now()) / 1000)}:R>`,
-        );
-      await interaction.editReply({ embeds: [embed] });
-      return;
     }
-
-    const embed = pluginAPI.lib
-      .createEmbedBuilder()
-      .setColor(0xffff00)
-      .setTitle("⏳ Pending Request")
-      .setDescription(
-        `You already have a pending link request for **${existingPending.minecraftUsername}**.\n\n` +
-          `**To complete linking:**\n` +
-          `1. Try joining the Minecraft server: \`${mcConfig.serverHost}:${mcConfig.serverPort}\`\n` +
-          `2. You'll be kicked with your authentication code\n` +
-          `3. Use that code with \`/confirm-code <code>\`\n\n` +
-          `**Request expires:** <t:${Math.floor((existingPending.expiresAt?.getTime() || Date.now()) / 1000)}:R>\n\n` +
-          `*Want to change the username? Just run this command again with a different username.*`,
-      );
-    await interaction.editReply({ embeds: [embed] });
+    // Show the panel — it will display the pending request
+    await showAccountPanel(interaction, pluginAPI.lib);
     return;
   }
 
@@ -116,29 +100,15 @@ export async function execute(context: CommandContext): Promise<void> {
   const linkedAccounts = await MinecraftPlayer.find({ guildId, discordId, linkedAt: { $ne: null } }).lean();
 
   if (linkedAccounts.length >= maxAccounts) {
-    const accountList = linkedAccounts.map((p) => `• **${p.minecraftUsername}**`).join("\n");
-    const embed = pluginAPI.lib
-      .createEmbedBuilder()
-      .setColor(0xff0000)
-      .setTitle("❌ Account Limit Reached")
-      .setDescription(
-        `You've reached the maximum of **${maxAccounts}** linked Minecraft account${maxAccounts > 1 ? "s" : ""}.\n\n` +
-          `**Your linked accounts:**\n${accountList}\n\n` +
-          (maxAccounts > 1 ? `Use \`/minecraft-status\` to manage your accounts, or unlink one to add a new one.` : `Use \`/minecraft-status\` to see your current status.`),
-      );
-    await interaction.editReply({ embeds: [embed] });
+    // Show the panel — it will display linked accounts and the limit
+    await showAccountPanel(interaction, pluginAPI.lib);
     return;
   }
 
   // Check if this specific MC username is already linked to this user
   const alreadyLinkedSameUsername = linkedAccounts.find((p) => p.minecraftUsername.toLowerCase() === minecraftUsername);
   if (alreadyLinkedSameUsername) {
-    const embed = pluginAPI.lib
-      .createEmbedBuilder()
-      .setColor(0xff0000)
-      .setTitle("❌ Already Linked")
-      .setDescription(`You're already linked to **${alreadyLinkedSameUsername.minecraftUsername}**.\n\nUse \`/minecraft-status\` to see your accounts.`);
-    await interaction.editReply({ embeds: [embed] });
+    await showAccountPanel(interaction, pluginAPI.lib);
     return;
   }
 
@@ -183,29 +153,6 @@ export async function execute(context: CommandContext): Promise<void> {
     return;
   }
 
-  const approvalNote = mcConfig.autoWhitelist
-    ? `✅ **Auto-whitelist is on** — you'll be whitelisted automatically once you confirm your code.`
-    : mcConfig.requireApproval
-      ? `⏰ **Staff approval required** — after confirming your code, staff will review your request.`
-      : `✅ You'll be whitelisted once you confirm your code.`;
-
-  const accountNote =
-    linkedAccounts.length > 0 ? `\n\n📋 This will be your **${linkedAccounts.length + 1}${linkedAccounts.length === 1 ? "nd" : linkedAccounts.length === 2 ? "rd" : "th"}** linked account.` : "";
-
-  const embed = pluginAPI.lib
-    .createEmbedBuilder()
-    .setColor(0xffff00)
-    .setTitle("🎮 Link Request Created")
-    .setDescription(
-      `**Step 1 Complete!** Your authentication request has been created.\n\n` +
-        `**Next Steps:**\n` +
-        `1. Try joining the Minecraft server: \`${mcConfig.serverHost}:${mcConfig.serverPort}\`\n` +
-        `2. You'll be kicked with your authentication code\n` +
-        `3. Come back here and use \`/confirm-code <your-code>\`\n\n` +
-        `${approvalNote}${accountNote}\n\n` +
-        `**Your request expires:** <t:${Math.floor(expiresAt.getTime() / 1000)}:R>`,
-    )
-    .setFooter({ text: "Your authentication code will be shown when you try to join" });
-
-  await interaction.editReply({ embeds: [embed] });
+  // Show the panel — it will now show the new pending request with all management buttons
+  await showAccountPanel(interaction, pluginAPI.lib);
 }

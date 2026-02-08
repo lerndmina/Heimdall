@@ -5,7 +5,7 @@
  * and role/channel filter configuration.
  */
 
-import mongoose, { type Document, Schema, model } from "mongoose";
+import mongoose, { Schema, model, type Model, type InferSchemaType } from "mongoose";
 import {
   TranscriptionMode,
   WhisperProvider,
@@ -14,24 +14,7 @@ import {
   OPENAI_WHISPER_MODELS,
 } from "../types/index.js";
 
-export interface VoiceTranscriptionConfigType extends Document {
-  guildId: string;
-  mode: TranscriptionMode;
-  whisperProvider: WhisperProvider;
-  whisperModel: string;
-  roleFilter: {
-    mode: FilterMode;
-    roles: string[];
-  };
-  channelFilter: {
-    mode: FilterMode;
-    channels: string[];
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-const VoiceTranscriptionConfigSchema = new Schema<VoiceTranscriptionConfigType>(
+const VoiceTranscriptionConfigSchema = new Schema(
   {
     guildId: {
       type: String,
@@ -52,15 +35,6 @@ const VoiceTranscriptionConfigSchema = new Schema<VoiceTranscriptionConfigType>(
     whisperModel: {
       type: String,
       default: "base.en",
-      validate: {
-        validator: function (this: VoiceTranscriptionConfigType, v: string) {
-          if (this.whisperProvider === WhisperProvider.LOCAL) {
-            return (LOCAL_WHISPER_MODELS as readonly string[]).includes(v);
-          }
-          return (OPENAI_WHISPER_MODELS as readonly string[]).includes(v);
-        },
-        message: "Invalid whisper model for the selected provider",
-      },
     },
     roleFilter: {
       mode: {
@@ -90,5 +64,10 @@ const VoiceTranscriptionConfigSchema = new Schema<VoiceTranscriptionConfigType>(
   },
 );
 
-export default mongoose.models.VoiceTranscriptionConfig ||
-  model<VoiceTranscriptionConfigType>("VoiceTranscriptionConfig", VoiceTranscriptionConfigSchema);
+type IVoiceTranscriptionConfig = InferSchemaType<typeof VoiceTranscriptionConfigSchema>;
+
+const VoiceTranscriptionConfig = (mongoose.models.VoiceTranscriptionConfig ||
+  model<IVoiceTranscriptionConfig>("VoiceTranscriptionConfig", VoiceTranscriptionConfigSchema)) as Model<IVoiceTranscriptionConfig>;
+
+export default VoiceTranscriptionConfig;
+export type { IVoiceTranscriptionConfig };

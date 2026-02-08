@@ -4,7 +4,7 @@
 
 import type { GuildMember, Message } from "discord.js";
 import { FilterMode } from "../types/index.js";
-import type { VoiceTranscriptionConfigType } from "../models/VoiceTranscriptionConfig.js";
+import type { IVoiceTranscriptionConfig } from "../models/VoiceTranscriptionConfig.js";
 import { createLogger } from "../../../src/core/Logger.js";
 
 const log = createLogger("vc-transcription");
@@ -15,7 +15,7 @@ const log = createLogger("vc-transcription");
  */
 export function passesFilters(
   message: Message,
-  config: VoiceTranscriptionConfigType,
+  config: IVoiceTranscriptionConfig,
 ): boolean {
   // Check channel filter
   if (!passesChannelFilter(message.channelId, config.channelFilter)) {
@@ -35,11 +35,12 @@ export function passesFilters(
 
 function passesChannelFilter(
   channelId: string,
-  filter: { mode: FilterMode; channels: string[] },
+  filter: { mode?: string; channels?: string[] },
 ): boolean {
-  if (filter.mode === FilterMode.DISABLED) return true;
+  if (!filter.mode || filter.mode === FilterMode.DISABLED) return true;
 
-  const isInList = filter.channels.includes(channelId);
+  const channels = filter.channels ?? [];
+  const isInList = channels.includes(channelId);
 
   if (filter.mode === FilterMode.WHITELIST) {
     return isInList; // Must be in list
@@ -51,12 +52,13 @@ function passesChannelFilter(
 
 function passesRoleFilter(
   member: GuildMember,
-  filter: { mode: FilterMode; roles: string[] },
+  filter: { mode?: string; roles?: string[] },
 ): boolean {
-  if (filter.mode === FilterMode.DISABLED) return true;
+  if (!filter.mode || filter.mode === FilterMode.DISABLED) return true;
 
+  const roles = filter.roles ?? [];
   const memberRoles = member.roles.cache.map((r) => r.id);
-  const hasMatchingRole = filter.roles.some((roleId) => memberRoles.includes(roleId));
+  const hasMatchingRole = roles.some((roleId) => memberRoles.includes(roleId));
 
   if (filter.mode === FilterMode.WHITELIST) {
     return hasMatchingRole; // Must have at least one whitelisted role
