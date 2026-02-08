@@ -85,6 +85,9 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
   const [channelFormEnabled, setChannelFormEnabled] = useState(true);
   const [savingChannel, setSavingChannel] = useState(false);
 
+  // Channel name lookup
+  const [channelNames, setChannelNames] = useState<Record<string, string>>({});
+
   // Delete modal
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -95,10 +98,22 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
     setLoading(true);
     setError(null);
     try {
-      const [configRes, channelsRes] = await Promise.all([
+      const [configRes, channelsRes, discordChannelsRes] = await Promise.all([
         fetchApi<GuildConfig>(guildId, "attachment-blocker/config", { skipCache: true }),
         fetchApi<ChannelOverride[]>(guildId, "attachment-blocker/channels", { skipCache: true }),
+        fetchApi<{ channels: { id: string; name: string }[] }>(guildId, "channels?type=text", {
+          cacheKey: `channels-${guildId}-text`,
+          cacheTtl: 60_000,
+        }),
       ]);
+
+      if (discordChannelsRes.success && discordChannelsRes.data) {
+        const map: Record<string, string> = {};
+        for (const ch of discordChannelsRes.data.channels) {
+          map[ch.id] = ch.name;
+        }
+        setChannelNames(map);
+      }
 
       if (configRes.success && configRes.data) {
         setConfig(configRes.data);
@@ -638,8 +653,11 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-zinc-200">
-                                  <span className="text-zinc-500">#</span> {ch.channelId}
+                                  <span className="text-zinc-500">#</span> {channelNames[ch.channelId] || ch.channelId}
                                 </span>
+                                {channelNames[ch.channelId] && (
+                                  <span className="text-xs text-zinc-500">{ch.channelId}</span>
+                                )}
                                 <StatusBadge variant={ch.enabled ? "success" : "neutral"}>{ch.enabled ? "Active" : "Disabled"}</StatusBadge>
                               </div>
                               <div className="mt-1 flex flex-wrap gap-1.5">
