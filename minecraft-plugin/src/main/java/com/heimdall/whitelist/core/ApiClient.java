@@ -266,9 +266,10 @@ public class ApiClient {
     String action;
 
     if (whitelisted && !existingPlayerLink) {
-      // Fully whitelisted player
+      // Fully whitelisted player — clear message since it's not a kick
       hasAuth = true;
       action = "allow";
+      message = null;
     } else if (existingPlayerLink) {
       // Whitelisted but not linked — offer linking
       hasAuth = false;

@@ -8,7 +8,7 @@
 import { Events, type Message, MessageFlags, ThreadChannel, ChannelType } from "discord.js";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import VoiceTranscriptionConfig from "../models/VoiceTranscriptionConfig.js";
-import { TranscriptionMode } from "../types/index.js";
+import { TranscriptionMode, WhisperProvider } from "../types/index.js";
 import { transcribeMessage } from "../utils/TranscribeMessage.js";
 import { passesFilters } from "../utils/FilterUtils.js";
 import { createLogger } from "../../../src/core/Logger.js";
@@ -72,7 +72,7 @@ export async function execute(client: HeimdallClient, message: Message): Promise
       }
 
       await transcribeMessage(client, message, {
-        provider: config?.whisperProvider || "local",
+        provider: (config?.whisperProvider as WhisperProvider) || WhisperProvider.LOCAL,
         model: config?.whisperModel || "base.en",
         guildId: message.guildId,
         guildEnvService: pluginApi.guildEnvService,

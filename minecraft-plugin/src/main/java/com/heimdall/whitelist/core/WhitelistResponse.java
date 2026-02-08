@@ -76,15 +76,22 @@ public class WhitelistResponse {
 
   @Override
   public String toString() {
-    return "WhitelistResponse{" +
-        "shouldBeWhitelisted=" + shouldBeWhitelisted +
-        ", hasAuth=" + hasAuth +
-        ", kickMessage='" + kickMessage + '\'' +
-        ", action='" + action + '\'' +
-        ", authCode='" + authCode + '\'' +
-        ", roleSyncEnabled=" + roleSyncEnabled +
-        ", targetGroups=" + targetGroups +
-        ", managedGroups=" + managedGroups +
-        '}';
+    StringBuilder sb = new StringBuilder("WhitelistResponse{");
+    sb.append("action='").append(action).append('\'');
+    sb.append(", shouldBeWhitelisted=").append(shouldBeWhitelisted);
+    sb.append(", hasAuth=").append(hasAuth);
+    if (kickMessage != null && !kickMessage.isEmpty()) {
+      sb.append(", kickMessage='").append(kickMessage).append('\'');
+    }
+    if (authCode != null) {
+      sb.append(", authCode='").append(authCode).append('\'');
+    }
+    if (roleSyncEnabled) {
+      sb.append(", roleSyncEnabled=true");
+      sb.append(", targetGroups=").append(targetGroups);
+      sb.append(", managedGroups=").append(managedGroups);
+    }
+    sb.append('}');
+    return sb.toString();
   }
 }

@@ -16,7 +16,7 @@ import {
 } from "discord.js";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import VoiceTranscriptionConfig from "../models/VoiceTranscriptionConfig.js";
-import { TranscriptionMode } from "../types/index.js";
+import { TranscriptionMode, WhisperProvider } from "../types/index.js";
 import { transcribeMessage } from "../utils/TranscribeMessage.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import type { VCTranscriptionPluginAPI } from "../index.js";
@@ -83,7 +83,7 @@ export async function execute(
       }
 
       const success = await transcribeMessage(client, message as import("discord.js").Message, {
-        provider: config?.whisperProvider || "local",
+        provider: (config?.whisperProvider as WhisperProvider) || WhisperProvider.LOCAL,
         model: config?.whisperModel || "base.en",
         guildId: message.guildId,
         guildEnvService: pluginApi.guildEnvService,

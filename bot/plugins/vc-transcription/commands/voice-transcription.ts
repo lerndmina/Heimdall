@@ -8,7 +8,6 @@
 
 import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { CommandContext } from "../../../src/core/CommandManager.js";
-import type { VCTranscriptionPluginAPI } from "../index.js";
 import VoiceTranscriptionConfig from "../models/VoiceTranscriptionConfig.js";
 import { TranscriptionMode, WhisperProvider } from "../types/index.js";
 import { createLogger } from "../../../src/core/Logger.js";

@@ -18,14 +18,16 @@ export function passesFilters(
   config: IVoiceTranscriptionConfig,
 ): boolean {
   // Check channel filter
-  if (!passesChannelFilter(message.channelId, config.channelFilter)) {
+  const channelFilter = config.channelFilter ?? { mode: FilterMode.DISABLED, channels: [] };
+  if (!passesChannelFilter(message.channelId, channelFilter)) {
     log.debug(`Message in channel ${message.channelId} blocked by channel filter`);
     return false;
   }
 
   // Check role filter (need member data)
+  const roleFilter = config.roleFilter ?? { mode: FilterMode.DISABLED, roles: [] };
   const member = message.member;
-  if (member && !passesRoleFilter(member, config.roleFilter)) {
+  if (member && !passesRoleFilter(member, roleFilter)) {
     log.debug(`Message from ${message.author.username} blocked by role filter`);
     return false;
   }
