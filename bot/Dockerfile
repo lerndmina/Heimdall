@@ -23,7 +23,7 @@ RUN bun install --frozen-lockfile --production && \
 
 # Pre-build whisper.cpp and download default model so runtime doesn't need build tools
 RUN cd /tmp/node_modules/nodejs-whisper/cpp/whisper.cpp && \
-  cmake -B build -DCMAKE_BUILD_TYPE=Release && \
+  cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF && \
   cmake --build build --config Release -j$(nproc) && \
   cd /app && \
   wget -q -O /tmp/node_modules/nodejs-whisper/cpp/whisper.cpp/models/ggml-base.en.bin \
