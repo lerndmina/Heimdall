@@ -129,8 +129,6 @@ export default function ModerationPage({ guildId }: { guildId: string }) {
   const canManageInfractions = useCanManage("moderation.manage_infractions");
   const canManagePresets = useCanManage("moderation.manage_presets");
 
-  const [activeTab, setActiveTab] = useState("overview");
-
   return (
     <div className="space-y-6">
       <div>
@@ -139,24 +137,16 @@ export default function ModerationPage({ guildId }: { guildId: string }) {
       </div>
 
       <Tabs
+        defaultTab="overview"
         tabs={[
-          { key: "overview", label: "Overview" },
-          { key: "rules", label: "Rules" },
-          { key: "presets", label: "Presets" },
-          { key: "escalation", label: "Escalation" },
-          { key: "infractions", label: "Infractions" },
-          { key: "settings", label: "Settings" },
+          { id: "overview", label: "Overview", content: <OverviewTab guildId={guildId} /> },
+          { id: "rules", label: "Rules", content: <RulesTab guildId={guildId} canManage={canManageRules} /> },
+          { id: "presets", label: "Presets", content: <PresetsTab guildId={guildId} canManage={canManagePresets} /> },
+          { id: "escalation", label: "Escalation", content: <EscalationTab guildId={guildId} canManage={canManageConfig} /> },
+          { id: "infractions", label: "Infractions", content: <InfractionsTab guildId={guildId} canManage={canManageInfractions} /> },
+          { id: "settings", label: "Settings", content: <SettingsTab guildId={guildId} canManage={canManageConfig} /> },
         ]}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
       />
-
-      {activeTab === "overview" && <OverviewTab guildId={guildId} />}
-      {activeTab === "rules" && <RulesTab guildId={guildId} canManage={canManageRules} />}
-      {activeTab === "presets" && <PresetsTab guildId={guildId} canManage={canManagePresets} />}
-      {activeTab === "escalation" && <EscalationTab guildId={guildId} canManage={canManageConfig} />}
-      {activeTab === "infractions" && <InfractionsTab guildId={guildId} canManage={canManageInfractions} />}
-      {activeTab === "settings" && <SettingsTab guildId={guildId} canManage={canManageConfig} />}
     </div>
   );
 }
