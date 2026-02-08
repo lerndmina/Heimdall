@@ -558,19 +558,13 @@ export async function migrateModmail(
           continue;
         }
 
-        // Determine original status (for historical reference)
-        let originalStatus: "open" | "resolved" | "closed" = "open";
+        // Determine status
+        let status: "open" | "resolved" | "closed" = "open";
         if (oldThread.isClosed) {
-          originalStatus = "closed";
+          status = "closed";
         } else if (oldThread.markedResolved) {
-          originalStatus = "resolved";
+          status = "resolved";
         }
-
-        // All migrated threads are closed — the old forum threads don't exist
-        // in the new bot, so they can't function as open conversations.
-        // The original status is preserved in the closeReason for reference.
-        const status = "closed" as const;
-        const wasPreviouslyOpen = originalStatus === "open" || originalStatus === "resolved";
 
         // Map category ID if mapping provided
         let categoryId = oldThread.categoryId;
@@ -631,7 +625,7 @@ export async function migrateModmail(
           guildId: oldThread.guildId,
           userId: oldThread.userId,
           forumChannelId: oldThread.forumChannelId,
-          forumThreadId: `migrated-${oldThread.forumThreadId}`, // Prefix to prevent orphan detection
+          forumThreadId: oldThread.forumThreadId,
           categoryId,
           categoryName: oldThread.categoryName,
           priority: oldThread.priority || 0,
@@ -639,11 +633,11 @@ export async function migrateModmail(
           status,
           claimedBy: oldThread.claimedBy,
           claimedAt: oldThread.claimedAt,
-          markedResolvedBy: originalStatus === "resolved" ? oldThread.closedBy : undefined,
+          markedResolvedBy: status === "resolved" ? oldThread.closedBy : undefined,
           markedResolvedAt: oldThread.resolvedAt,
-          closedBy: oldThread.closedBy || "migration",
-          closedAt: oldThread.closedAt || new Date(),
-          closeReason: wasPreviouslyOpen ? `Migrated from old bot (was ${originalStatus})` : oldThread.closedReason || "Migrated from old bot",
+          closedBy: status === "closed" ? oldThread.closedBy : undefined,
+          closedAt: oldThread.closedAt,
+          closeReason: oldThread.closedReason,
           lastUserActivityAt: oldThread.lastUserActivityAt || new Date(),
           lastStaffActivityAt: oldThread.lastStaffActivityAt,
           autoCloseScheduledAt: oldThread.autoCloseScheduledAt,
