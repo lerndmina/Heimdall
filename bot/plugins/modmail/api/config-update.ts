@@ -134,18 +134,13 @@ export function configUpdateRoute(deps: ApiDependencies) {
         return;
       }
 
-      // Find existing configuration
-      const config = await ModmailConfig.findOne({ guildId });
+      // Find existing configuration — or create a new one if upsert requested
+      let config = await ModmailConfig.findOne({ guildId });
+      const isCreate = !config;
 
       if (!config) {
-        res.status(404).json({
-          success: false,
-          error: {
-            code: "MODMAIL_NOT_CONFIGURED",
-            message: "Modmail is not configured for this guild. Use the setup command first.",
-          },
-        });
-        return;
+        // Upsert: create a new config with defaults
+        config = new ModmailConfig({ guildId });
       }
 
       // Validate specific fields if provided
@@ -214,18 +209,20 @@ export function configUpdateRoute(deps: ApiDependencies) {
         }
       }
 
-      // Validate defaultCategoryId if provided
+      // Validate defaultCategoryId if provided (only relevant when categories exist)
       if (updateData.defaultCategoryId !== undefined && updateData.defaultCategoryId !== null) {
-        const categoryExists = config.categories.some((cat) => cat.id === updateData.defaultCategoryId);
-        if (!categoryExists) {
-          res.status(400).json({
-            success: false,
-            error: {
-              code: "INVALID_PARAMETER",
-              message: "defaultCategoryId must reference an existing category",
-            },
-          });
-          return;
+        if (config.categories.length > 0) {
+          const categoryExists = config.categories.some((cat) => cat.id === updateData.defaultCategoryId);
+          if (!categoryExists) {
+            res.status(400).json({
+              success: false,
+              error: {
+                code: "INVALID_PARAMETER",
+                message: "defaultCategoryId must reference an existing category",
+              },
+            });
+            return;
+          }
         }
       }
 
@@ -293,12 +290,12 @@ export function configUpdateRoute(deps: ApiDependencies) {
         updatedAt: config.updatedAt.toISOString(),
       };
 
-      res.json({
+      res.status(isCreate ? 201 : 200).json({
         success: true,
         data: response,
       });
 
-      log.info(`Modmail configuration updated for guild ${guildId} via API`);
+      log.info(`Modmail configuration ${isCreate ? "created" : "updated"} for guild ${guildId} via API`);
     } catch (error) {
       log.error("Error updating modmail configuration:", error);
       next(error);
