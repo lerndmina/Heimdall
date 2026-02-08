@@ -14,6 +14,7 @@ import Spinner from "@/components/ui/Spinner";
 import TextInput from "@/components/ui/TextInput";
 import NumberInput from "@/components/ui/NumberInput";
 import Toggle from "@/components/ui/Toggle";
+import Textarea from "@/components/ui/Textarea";
 import DayTimePicker from "@/components/ui/DayTimePicker";
 import Combobox from "@/components/ui/Combobox";
 import SetupWizard, { NotConfigured, EditButton, FieldDisplay, ReviewSection, ReviewRow, type WizardStep } from "@/components/ui/SetupWizard";
@@ -57,6 +58,11 @@ interface MinecraftConfig {
   enableAutoRevoke: boolean;
   enableAutoRestore: boolean;
   defaultDashboardTab: "players" | "pending" | "config" | "status";
+  // Customisable kick/auth messages (Minecraft formatting codes)
+  authSuccessMessage: string;
+  authPendingMessage: string;
+  authRejectionMessage: string;
+  applicationRejectionMessage: string;
 }
 
 const DEFAULT_CONFIG: Omit<MinecraftConfig, "guildId"> = {
@@ -85,6 +91,10 @@ const DEFAULT_CONFIG: Omit<MinecraftConfig, "guildId"> = {
   enableAutoRevoke: false,
   enableAutoRestore: false,
   defaultDashboardTab: "players",
+  authSuccessMessage: "§aWelcome back, {player}!",
+  authPendingMessage: "§eYour authentication code is: §6{code}\n§7Go back to Discord and click §fConfirm Code §7to complete linking.",
+  authRejectionMessage: "§cTo join this server:\n§7• Join the Discord server\n§7• Use §f/link-minecraft {username}\n§7• Follow the instructions to link your account",
+  applicationRejectionMessage: "§cYour whitelist application has been rejected.\n§7Please contact staff for more information.",
 };
 
 // ---------------------------------------------------------------------------
@@ -218,6 +228,11 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
         content: <StepWhitelist draft={draft} update={update} />,
       },
       {
+        id: "messages",
+        label: "Messages",
+        content: <StepMessages draft={draft} update={update} />,
+      },
+      {
         id: "advanced",
         label: "Advanced",
         content: <StepAdvanced guildId={guildId} draft={draft} update={update} />,
@@ -345,6 +360,20 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
                       : "Players"}
               </StatusBadge>
             </FieldDisplay>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Messages */}
+      <Card>
+        <CardTitle>Messages</CardTitle>
+        <CardDescription>Customise the messages shown to players when they connect to the Minecraft server.</CardDescription>
+        <CardContent>
+          <div className="mt-4 grid gap-4">
+            <FieldDisplay label="Welcome Back (Whitelisted)" value={config.authSuccessMessage || "§aWelcome back, {player}!"} />
+            <FieldDisplay label="Auth Code Shown" value={config.authPendingMessage || "(default)"} />
+            <FieldDisplay label="Not Linked / Rejected" value={config.authRejectionMessage || "(default)"} />
+            <FieldDisplay label="Application Rejected" value={config.applicationRejectionMessage || "(default)"} />
           </div>
         </CardContent>
       </Card>
@@ -481,6 +510,59 @@ function StepWhitelist({ draft, update }: StepProps) {
         max={10}
       />
       {draft.maxPlayersPerUser > 1 && <p className="text-xs text-zinc-500">💡 Users will be able to manage their linked accounts via the Minecraft panel in Discord.</p>}
+    </div>
+  );
+}
+
+function StepMessages({ draft, update }: StepProps) {
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-zinc-700/30 bg-white/5 px-4 py-3 text-xs text-zinc-400">
+        💡 These messages are shown to players when they connect to your Minecraft server. Use <code className="text-zinc-300">§</code> for Minecraft colour codes and{" "}
+        <code className="text-zinc-300">\n</code> for new lines.
+        <br />
+        Available placeholders: <code className="text-zinc-300">{"{player}"}</code> — player's Minecraft username, <code className="text-zinc-300">{"{code}"}</code> — authentication code.
+      </div>
+
+      <Textarea
+        label="Welcome Back (Whitelisted)"
+        description="Shown to a whitelisted player when they connect. Placeholder: {player}"
+        value={draft.authSuccessMessage}
+        onChange={(v) => update("authSuccessMessage", v)}
+        placeholder="§aWelcome back, {player}!"
+        rows={2}
+        maxLength={300}
+      />
+
+      <Textarea
+        label="Auth Code Shown"
+        description="Shown when a player connects to receive their authentication code. Placeholders: {code}, {player}"
+        value={draft.authPendingMessage}
+        onChange={(v) => update("authPendingMessage", v)}
+        placeholder="§eYour authentication code is: §6{code}"
+        rows={3}
+        maxLength={300}
+      />
+
+      <Textarea
+        label="Not Linked / Rejected"
+        description="Shown when an unknown player connects who hasn't started the linking process"
+        value={draft.authRejectionMessage}
+        onChange={(v) => update("authRejectionMessage", v)}
+        placeholder="§cTo join this server, link your account…"
+        rows={3}
+        maxLength={300}
+      />
+
+      <Textarea
+        label="Application Rejected"
+        description="Shown when a player whose application was rejected tries to connect"
+        value={draft.applicationRejectionMessage}
+        onChange={(v) => update("applicationRejectionMessage", v)}
+        placeholder="§cYour whitelist application has been rejected."
+        rows={3}
+        maxLength={300}
+      />
     </div>
   );
 }
@@ -789,6 +871,13 @@ function StepReview({ draft }: { draft: Omit<MinecraftConfig, "guildId"> }) {
             />
           )}
           <ReviewRow label="Max Accounts/User" value={String(draft.maxPlayersPerUser)} />
+        </ReviewSection>
+
+        <ReviewSection title="Messages">
+          <ReviewRow label="Welcome Back" value={draft.authSuccessMessage || "(default)"} />
+          <ReviewRow label="Auth Code" value={draft.authPendingMessage || "(default)"} />
+          <ReviewRow label="Not Linked" value={draft.authRejectionMessage || "(default)"} />
+          <ReviewRow label="App Rejected" value={draft.applicationRejectionMessage || "(default)"} />
         </ReviewSection>
 
         <ReviewSection title="Advanced">

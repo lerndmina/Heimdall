@@ -67,7 +67,7 @@ const MinecraftConfigSchema = new Schema(
     // Messages (Minecraft formatting codes)
     authSuccessMessage: {
       type: String,
-      default: "§aYour auth code: §f{code}\n§7Go to Discord and type: §f/confirm-code {code}",
+      default: "§aWelcome back, {player}!",
     },
     authRejectionMessage: {
       type: String,
@@ -75,7 +75,7 @@ const MinecraftConfigSchema = new Schema(
     },
     authPendingMessage: {
       type: String,
-      default: "§eYour account is linked and waiting for staff approval.\n§7Please be patient while staff review your request.\n§7You will be automatically whitelisted once approved.",
+      default: "§eYour authentication code is: §6{code}\n§7Go back to Discord and click §fConfirm Code §7to complete linking.",
     },
     applicationRejectionMessage: {
       type: String,

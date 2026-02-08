@@ -39,9 +39,9 @@ export const data = new SlashCommandBuilder()
           .setDescription("Which message to customize")
           .setRequired(true)
           .addChoices(
-            { name: "Auth Code Shown", value: "authSuccessMessage" },
+            { name: "Welcome Back (Whitelisted)", value: "authSuccessMessage" },
             { name: "Not Whitelisted", value: "authRejectionMessage" },
-            { name: "Pending Approval", value: "authPendingMessage" },
+            { name: "Auth Code Shown", value: "authPendingMessage" },
             { name: "Application Rejected", value: "applicationRejectionMessage" },
           ),
       )
@@ -183,9 +183,9 @@ export async function execute(context: CommandContext): Promise<void> {
     }
 
     const typeLabels: Record<string, string> = {
-      authSuccessMessage: "Auth Code Shown",
+      authSuccessMessage: "Welcome Back (Whitelisted)",
       authRejectionMessage: "Not Whitelisted",
-      authPendingMessage: "Pending Approval",
+      authPendingMessage: "Auth Code Shown",
       applicationRejectionMessage: "Application Rejected",
     };
 

@@ -155,7 +155,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
           await player.save();
         }
 
-        const message = config.authPendingMessage || "§eYour authentication code is: §6{code}§e\nUse /confirm-code {code} in Discord.";
+        const message = config.authPendingMessage || "§eYour authentication code is: §6{code}\n§7Go back to Discord and click §fConfirm Code §7to complete linking.";
 
         res.json({
           success: true,
@@ -179,7 +179,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
         player.codeShownAt = new Date();
         await player.save();
 
-        const message = config.authPendingMessage || "§eYour authentication code is: §6{code}§e\nUse /confirm-code {code} in Discord.";
+        const message = config.authPendingMessage || "§eYour authentication code is: §6{code}\n§7Go back to Discord and click §fConfirm Code §7to complete linking.";
 
         res.json({
           success: true,

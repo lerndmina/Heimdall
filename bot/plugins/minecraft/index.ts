@@ -26,6 +26,9 @@ import { RoleSyncService } from "./services/RoleSyncService.js";
 import { MinecraftLeaveService } from "./services/MinecraftLeaveService.js";
 import { MinecraftPanelService } from "./services/MinecraftPanelService.js";
 
+// Import models for migration
+import MinecraftConfig from "./models/MinecraftConfig.js";
+
 /** Public API exposed to other plugins and event handlers */
 export interface MinecraftPluginAPI extends PluginAPI {
   version: string;
@@ -49,6 +52,30 @@ export async function onLoad(context: PluginContext): Promise<MinecraftPluginAPI
   roleSyncService = new RoleSyncService(lib);
   panelService = new MinecraftPanelService(lib, lib.componentCallbackService, logger);
   panelService.initialize();
+
+  // ── One-time migration: fix swapped authSuccessMessage / authPendingMessage defaults ──
+  // Previous schema had these two defaults swapped — authSuccessMessage contained an auth code
+  // template but was used for welcome-back, and authPendingMessage contained an approval message
+  // but was used for showing auth codes. Unset them so the corrected schema defaults take effect.
+  try {
+    const OLD_AUTH_SUCCESS = "§aYour auth code: §f{code}\n§7Go to Discord and type: §f/confirm-code {code}";
+    const OLD_AUTH_PENDING = "§eYour account is linked and waiting for staff approval.\n§7Please be patient while staff review your request.\n§7You will be automatically whitelisted once approved.";
+
+    const migrated = await MinecraftConfig.updateMany(
+      {
+        $or: [{ authSuccessMessage: OLD_AUTH_SUCCESS }, { authPendingMessage: OLD_AUTH_PENDING }],
+      },
+      {
+        $unset: { authSuccessMessage: "", authPendingMessage: "" },
+      },
+    );
+
+    if (migrated.modifiedCount > 0) {
+      logger.info(`🔧 Migrated ${migrated.modifiedCount} config(s): reset swapped message defaults`);
+    }
+  } catch (err) {
+    logger.error("Failed to run message migration:", err);
+  }
 
   logger.debug("✅ Minecraft plugin loaded");
 

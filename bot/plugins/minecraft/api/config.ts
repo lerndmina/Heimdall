@@ -123,6 +123,11 @@ function modelToDashboard(config: Record<string, any>): Record<string, any> {
     enableAutoRestore: config.autoLinkOnJoin ?? false,
     allowSelfUnlink: config.allowSelfUnlink ?? true,
     defaultDashboardTab: config.defaultDashboardTab ?? "players",
+    // Customisable messages
+    authSuccessMessage: config.authSuccessMessage ?? "§aWelcome back, {player}!",
+    authPendingMessage: config.authPendingMessage ?? "§eYour authentication code is: §6{code}\n§7Go back to Discord and click §fConfirm Code §7to complete linking.",
+    authRejectionMessage: config.authRejectionMessage ?? "§cTo join this server:\n§7• Join the Discord server\n§7• Use §f/link-minecraft {username}\n§7• Follow the instructions to link your account",
+    applicationRejectionMessage: config.applicationRejectionMessage ?? "§cYour whitelist application has been rejected.\n§7Please contact staff for more information.",
   };
 }
 
