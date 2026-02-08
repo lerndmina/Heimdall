@@ -32,6 +32,8 @@ export enum ModerationSubcategory {
   BANS = "bans",
   UNBANS = "unbans",
   TIMEOUTS = "timeouts",
+  AUTOMOD = "automod",
+  MOD_ACTIONS = "mod_actions",
 }
 
 export enum AuditSubcategory {

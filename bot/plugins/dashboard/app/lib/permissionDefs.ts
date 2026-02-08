@@ -142,6 +142,18 @@ export const permissionCategories: PermissionCategory[] = [
       { key: "manage_config", label: "Manage Configuration", description: "Edit global settings, channel overrides, and opener overrides." },
     ],
   },
+  {
+    key: "moderation",
+    label: "Moderation",
+    description: "Manage automod rules, infractions, escalation tiers, and moderation settings.",
+    actions: [
+      { key: "view_config", label: "View Configuration", description: "View automod rules, infractions, and moderation settings." },
+      { key: "manage_rules", label: "Manage Rules", description: "Create, edit, delete, and toggle automod rules." },
+      { key: "manage_infractions", label: "Manage Infractions", description: "View and clear user infractions." },
+      { key: "manage_config", label: "Manage Configuration", description: "Edit moderation settings, escalation tiers, and immune roles." },
+      { key: "manage_presets", label: "Manage Presets", description: "Install and uninstall preset automod rules." },
+    ],
+  },
 ];
 
 /**

@@ -45,6 +45,8 @@ const EVENTS_METADATA = {
         { id: "bans", name: "Bans", description: "Member bans" },
         { id: "unbans", name: "Unbans", description: "Member unbans" },
         { id: "timeouts", name: "Timeouts", description: "Member timeouts" },
+        { id: "automod", name: "Automod", description: "Automod rule triggers and actions" },
+        { id: "mod_actions", name: "Mod Actions", description: "Manual moderation actions (kick, ban, warn, mute, purge)" },
       ],
     },
   ],

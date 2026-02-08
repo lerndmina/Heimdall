@@ -50,6 +50,8 @@ export async function autocomplete(context: Omit<CommandContext, "interaction"> 
           { name: "Bans", value: "bans" },
           { name: "Unbans", value: "unbans" },
           { name: "Timeouts", value: "timeouts" },
+          { name: "Automod", value: "automod" },
+          { name: "Mod Actions", value: "mod_actions" },
         ];
         break;
     }

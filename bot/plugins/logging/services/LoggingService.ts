@@ -69,6 +69,8 @@ export class LoggingService {
         subcategories.set(ModerationSubcategory.BANS, true);
         subcategories.set(ModerationSubcategory.UNBANS, true);
         subcategories.set(ModerationSubcategory.TIMEOUTS, true);
+        subcategories.set(ModerationSubcategory.AUTOMOD, true);
+        subcategories.set(ModerationSubcategory.MOD_ACTIONS, true);
       } else if (category === LoggingCategory.AUDIT) {
         subcategories.set(AuditSubcategory.DASHBOARD_PERMISSIONS, true);
         subcategories.set(AuditSubcategory.DASHBOARD_SETTINGS, true);

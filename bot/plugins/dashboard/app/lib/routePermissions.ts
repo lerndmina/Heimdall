@@ -140,6 +140,24 @@ const routeMap: Record<string, string> = {
   "GET /vc-transcription/apikey/status": "vc-transcription.view_config",
   "PUT /vc-transcription/apikey": "vc-transcription.manage_config",
   "DELETE /vc-transcription/apikey": "vc-transcription.manage_config",
+
+  // ── Moderation ──
+  "GET /moderation/config": "moderation.view_config",
+  "PUT /moderation/config": "moderation.manage_config",
+  "GET /moderation/rules": "moderation.view_config",
+  "GET /moderation/rules/*": "moderation.view_config",
+  "POST /moderation/rules": "moderation.manage_rules",
+  "PUT /moderation/rules/*": "moderation.manage_rules",
+  "DELETE /moderation/rules/*": "moderation.manage_rules",
+  "PATCH /moderation/rules/*/toggle": "moderation.manage_rules",
+  "POST /moderation/rules/test": "moderation.manage_rules",
+  "GET /moderation/infractions": "moderation.manage_infractions",
+  "GET /moderation/infractions/*": "moderation.manage_infractions",
+  "DELETE /moderation/infractions/*": "moderation.manage_infractions",
+  "GET /moderation/presets": "moderation.view_config",
+  "POST /moderation/presets/*/install": "moderation.manage_presets",
+  "DELETE /moderation/presets/*": "moderation.manage_presets",
+  "GET /moderation/stats": "moderation.view_config",
 };
 
 /**

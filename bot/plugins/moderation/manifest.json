@@ -1,0 +1,10 @@
+{
+  "name": "moderation",
+  "version": "1.0.0",
+  "description": "Unified moderation plugin combining automod (regex-based content filtering) with manual moderation commands, points-based infraction tracking, and configurable escalation tiers",
+  "dependencies": ["lib"],
+  "optionalDependencies": ["logging"],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": "/moderation"
+}

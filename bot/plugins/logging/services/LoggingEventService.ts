@@ -390,4 +390,54 @@ export class LoggingEventService {
       log.error("handleBanRemove error:", error);
     }
   }
+
+  // ── Moderation Log Methods (for moderation plugin) ─────
+
+  /**
+   * Send an automod log embed to the MODERATION category channel.
+   * Used by the moderation plugin when automod rules trigger.
+   */
+  async sendAutomodLog(guildId: string, embed: any): Promise<boolean> {
+    try {
+      const cfg = await this.service.getCategoryChannel(guildId, LoggingCategory.MODERATION);
+      if (!cfg) return false;
+      if (!this.service.isSubcategoryEnabled(cfg.subcategories, ModerationSubcategory.AUTOMOD)) return false;
+
+      const guild = await this.lib.thingGetter.getGuild(guildId);
+      if (!guild) return false;
+
+      const logChannel = guild.channels.cache.get(cfg.channelId);
+      if (!logChannel?.isTextBased()) return false;
+
+      await (logChannel as TextChannel).send({ embeds: [embed] });
+      return true;
+    } catch (error) {
+      log.error("sendAutomodLog error:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Send a mod action log embed to the MODERATION category channel.
+   * Used by the moderation plugin for manual actions (kick, ban, warn, mute, purge).
+   */
+  async sendModActionLog(guildId: string, embed: any): Promise<boolean> {
+    try {
+      const cfg = await this.service.getCategoryChannel(guildId, LoggingCategory.MODERATION);
+      if (!cfg) return false;
+      if (!this.service.isSubcategoryEnabled(cfg.subcategories, ModerationSubcategory.MOD_ACTIONS)) return false;
+
+      const guild = await this.lib.thingGetter.getGuild(guildId);
+      if (!guild) return false;
+
+      const logChannel = guild.channels.cache.get(cfg.channelId);
+      if (!logChannel?.isTextBased()) return false;
+
+      await (logChannel as TextChannel).send({ embeds: [embed] });
+      return true;
+    } catch (error) {
+      log.error("sendModActionLog error:", error);
+      return false;
+    }
+  }
 }
