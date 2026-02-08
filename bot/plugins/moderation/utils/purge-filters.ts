@@ -54,15 +54,11 @@ export function byGifsAndTenor(): (message: Message) => boolean {
   const gifUrlRegex = /(?:tenor\.com|giphy\.com)/i;
   return (message) => {
     // Check for GIF attachments
-    const hasGifAttachment = message.attachments.some(
-      (a) => a.contentType?.toLowerCase().includes("image/gif") ?? false,
-    );
+    const hasGifAttachment = message.attachments.some((a) => a.contentType?.toLowerCase().includes("image/gif") ?? false);
     // Check for tenor/giphy URLs in content
     const hasTenorGiphy = gifUrlRegex.test(message.content);
     // Check for tenor/giphy embed URLs
-    const hasGifEmbed = message.embeds.some(
-      (e) => (e.url && gifUrlRegex.test(e.url)) || (e.thumbnail?.url && gifUrlRegex.test(e.thumbnail.url)),
-    );
+    const hasGifEmbed = message.embeds.some((e) => (e.url && gifUrlRegex.test(e.url)) || (e.thumbnail?.url && gifUrlRegex.test(e.thumbnail.url)));
     return hasGifAttachment || hasTenorGiphy || hasGifEmbed;
   };
 }

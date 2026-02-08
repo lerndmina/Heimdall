@@ -11,9 +11,7 @@ export const data = new SlashCommandBuilder()
   .setDescription("View a user's infraction history")
   .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
   .addUserOption((opt) => opt.setName("user").setDescription("The user to view infractions for").setRequired(true))
-  .addIntegerOption((opt) =>
-    opt.setName("page").setDescription("Page number").setRequired(false).setMinValue(1),
-  );
+  .addIntegerOption((opt) => opt.setName("page").setDescription("Page number").setRequired(false).setMinValue(1));
 
 export const config = { allowInDMs: false };
 
@@ -28,19 +26,14 @@ export async function execute(context: CommandContext): Promise<void> {
   const guild = interaction.guild!;
 
   const activePoints = await mod.infractionService.getActivePoints(guild.id, user.id);
-  const { infractions, total, pages } = await mod.infractionService.getUserInfractions(
-    guild.id,
-    user.id,
-    { page, limit: 5 },
-  );
+  const { infractions, total, pages } = await mod.infractionService.getUserInfractions(guild.id, user.id, { page, limit: 5 });
 
-  const embed = mod.lib.createEmbedBuilder()
+  const embed = mod.lib
+    .createEmbedBuilder()
     .setTitle(`Infractions for ${user.tag}`)
     .setThumbnail(user.displayAvatarURL({ size: 64 }))
     .setColor(0x64748b)
-    .setDescription(
-      `**Active Points:** ${activePoints}\n**Total Infractions:** ${total}\n**Page:** ${page}/${pages || 1}`,
-    );
+    .setDescription(`**Active Points:** ${activePoints}\n**Total Infractions:** ${total}\n**Page:** ${page}/${pages || 1}`);
 
   if (infractions.length === 0) {
     embed.addFields({ name: "No Infractions", value: "This user has no recorded infractions." });
@@ -53,29 +46,23 @@ export async function execute(context: CommandContext): Promise<void> {
 
       embed.addFields({
         name: `${source} ${inf.type}${pointsStr}${active}`,
-        value: [
-          inf.reason ?? "No reason",
-          inf.moderatorId ? `Moderator: <@${inf.moderatorId}>` : "",
-          inf.ruleName ? `Rule: ${inf.ruleName}` : "",
-          `Date: ${date}`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
+        value: [inf.reason ?? "No reason", inf.moderatorId ? `Moderator: <@${inf.moderatorId}>` : "", inf.ruleName ? `Rule: ${inf.ruleName}` : "", `Date: ${date}`].filter(Boolean).join("\n"),
       });
     }
   }
 
   // Build "Clear All" button
-  const clearButton = mod.lib.createButtonBuilder(
-    async (btnInteraction: ButtonInteraction) => {
-      const cleared = await mod.infractionService.clearUserInfractions(guild.id, user.id);
-      await btnInteraction.update({
-        embeds: [mod.lib.builders.HeimdallEmbedBuilder.success(`Cleared ${cleared} active infractions for **${user.tag}**.`)],
-        components: [],
-      });
-    },
-    120_000, // 2 minute TTL
-  )
+  const clearButton = mod.lib
+    .createButtonBuilder(
+      async (btnInteraction: ButtonInteraction) => {
+        const cleared = await mod.infractionService.clearUserInfractions(guild.id, user.id);
+        await btnInteraction.update({
+          embeds: [mod.lib.builders.HeimdallEmbedBuilder.success(`Cleared ${cleared} active infractions for **${user.tag}**.`)],
+          components: [],
+        });
+      },
+      120_000, // 2 minute TTL
+    )
     .setLabel("Clear All Infractions")
     .setStyle(4); // Danger
 

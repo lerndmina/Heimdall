@@ -47,11 +47,7 @@ export function createInfractionsRoutes(deps: ModerationApiDeps): Router {
       const source = req.query.source as string | undefined;
       const type = req.query.type as string | undefined;
 
-      const result = await deps.infractionService.getUserInfractions(
-        guildId as string,
-        userId as string,
-        { page, limit, source: source as any, type: type as any },
-      );
+      const result = await deps.infractionService.getUserInfractions(guildId as string, userId as string, { page, limit, source: source as any, type: type as any });
 
       const activePoints = await deps.infractionService.getActivePoints(guildId as string, userId as string);
 

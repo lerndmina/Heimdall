@@ -30,18 +30,7 @@ export function createConfigRoutes(deps: ModerationApiDeps): Router {
   router.put("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const {
-        automodEnabled,
-        logChannelId,
-        pointDecayEnabled,
-        pointDecayDays,
-        dmOnInfraction,
-        defaultDmTemplate,
-        defaultDmEmbed,
-        dmMode,
-        immuneRoles,
-        escalationTiers,
-      } = req.body;
+      const { automodEnabled, logChannelId, pointDecayEnabled, pointDecayDays, dmOnInfraction, defaultDmTemplate, defaultDmEmbed, dmMode, immuneRoles, escalationTiers } = req.body;
 
       const updates: Record<string, any> = {};
       if (automodEnabled !== undefined) updates.automodEnabled = automodEnabled;

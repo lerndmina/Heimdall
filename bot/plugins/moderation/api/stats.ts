@@ -14,11 +14,7 @@ export function createStatsRoutes(deps: ModerationApiDeps): Router {
     try {
       const guildId = req.params.guildId as string;
 
-      const [stats, config, rules] = await Promise.all([
-        deps.infractionService.getGuildStats(guildId),
-        deps.moderationService.getOrCreateConfig(guildId),
-        deps.moderationService.listRules(guildId),
-      ]);
+      const [stats, config, rules] = await Promise.all([deps.infractionService.getGuildStats(guildId), deps.moderationService.getOrCreateConfig(guildId), deps.moderationService.listRules(guildId)]);
 
       const enabledRules = rules.filter((r) => r.enabled);
 

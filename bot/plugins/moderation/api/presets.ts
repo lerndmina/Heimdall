@@ -67,17 +67,20 @@ export function createPresetsRoutes(deps: ModerationApiDeps): Router {
       }
 
       // Create rule from preset
-      const rule = await deps.moderationService.createRule(guildId as string, {
-        name: preset.name,
-        patterns: preset.patterns,
-        matchMode: preset.matchMode,
-        target: preset.target,
-        actions: preset.actions,
-        warnPoints: preset.warnPoints,
-        enabled: true,
-        isPreset: true,
-        presetId: preset.id,
-      } as any);
+      const rule = await deps.moderationService.createRule(
+        guildId as string,
+        {
+          name: preset.name,
+          patterns: preset.patterns,
+          matchMode: preset.matchMode,
+          target: preset.target,
+          actions: preset.actions,
+          warnPoints: preset.warnPoints,
+          enabled: true,
+          isPreset: true,
+          presetId: preset.id,
+        } as any,
+      );
 
       res.status(201).json({ success: true, data: rule });
     } catch (error) {

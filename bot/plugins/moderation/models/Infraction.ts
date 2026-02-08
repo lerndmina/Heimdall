@@ -134,8 +134,7 @@ InfractionSchema.index({ expiresAt: 1 }, { sparse: true });
 
 type IInfraction = InferSchemaType<typeof InfractionSchema>;
 
-const Infraction = (mongoose.models.Infraction ||
-  model<IInfraction>("Infraction", InfractionSchema)) as Model<IInfraction>;
+const Infraction = (mongoose.models.Infraction || model<IInfraction>("Infraction", InfractionSchema)) as Model<IInfraction>;
 
 export default Infraction;
 export type { IInfraction };

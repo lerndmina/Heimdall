@@ -12,9 +12,7 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
   .addUserOption((opt) => opt.setName("user").setDescription("The member to ban").setRequired(true))
   .addStringOption((opt) => opt.setName("reason").setDescription("Reason for the ban").setRequired(false))
-  .addIntegerOption((opt) =>
-    opt.setName("delete_days").setDescription("Days of messages to delete (0-7)").setRequired(false).setMinValue(0).setMaxValue(7),
-  );
+  .addIntegerOption((opt) => opt.setName("delete_days").setDescription("Days of messages to delete (0-7)").setRequired(false).setMinValue(0).setMaxValue(7));
 
 export const config = { allowInDMs: false };
 

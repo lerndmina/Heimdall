@@ -183,10 +183,10 @@ function OverviewTab({ guildId }: { guildId: string }) {
       <Card>
         <CardTitle>Automod</CardTitle>
         <CardContent>
-          <p className={stats.automodEnabled ? "text-green-400" : "text-red-400"}>
-            {stats.automodEnabled ? "✅ Enabled" : "❌ Disabled"}
+          <p className={stats.automodEnabled ? "text-green-400" : "text-red-400"}>{stats.automodEnabled ? "✅ Enabled" : "❌ Disabled"}</p>
+          <p className="text-zinc-400 text-sm mt-1">
+            {stats.enabledRules}/{stats.totalRules} rules active
           </p>
-          <p className="text-zinc-400 text-sm mt-1">{stats.enabledRules}/{stats.totalRules} rules active</p>
         </CardContent>
       </Card>
 
@@ -209,9 +209,7 @@ function OverviewTab({ guildId }: { guildId: string }) {
       <Card>
         <CardTitle>Point Decay</CardTitle>
         <CardContent>
-          <p className={stats.pointDecayEnabled ? "text-green-400" : "text-zinc-400"}>
-            {stats.pointDecayEnabled ? `${stats.pointDecayDays} day decay` : "Disabled"}
-          </p>
+          <p className={stats.pointDecayEnabled ? "text-green-400" : "text-zinc-400"}>{stats.pointDecayEnabled ? `${stats.pointDecayDays} day decay` : "Disabled"}</p>
         </CardContent>
       </Card>
 
@@ -271,7 +269,9 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     setLoading(false);
   }, [guildId]);
 
-  useEffect(() => { loadRules(); }, [loadRules]);
+  useEffect(() => {
+    loadRules();
+  }, [loadRules]);
 
   function openCreate() {
     setEditRule(null);
@@ -394,8 +394,12 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                   {canManage && (
                     <div className="flex items-center gap-2">
                       <Toggle checked={rule.enabled} onChange={() => handleToggle(rule)} />
-                      <button onClick={() => openEdit(rule)} className="text-sm text-zinc-400 hover:text-zinc-200">Edit</button>
-                      <button onClick={() => handleDelete(rule)} className="text-sm text-red-400 hover:text-red-300">Delete</button>
+                      <button onClick={() => openEdit(rule)} className="text-sm text-zinc-400 hover:text-zinc-200">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(rule)} className="text-sm text-red-400 hover:text-red-300">
+                        Delete
+                      </button>
                     </div>
                   )}
                 </div>
@@ -421,22 +425,21 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
               <select
                 value={matchMode}
                 onChange={(e) => setMatchMode(e.target.value as "any" | "all")}
-                className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm"
-              >
+                className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm">
                 <option value="any">Any pattern</option>
                 <option value="all">All patterns</option>
               </select>
             </div>
-            <TextInput
-              label="Warn Points"
-              value={String(warnPoints)}
-              onChange={(v) => setWarnPoints(parseInt(v) || 0)}
-              type="number"
-            />
+            <TextInput label="Warn Points" value={String(warnPoints)} onChange={(v) => setWarnPoints(parseInt(v) || 0)} type="number" />
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Cancel</button>
-            <button onClick={handleSave} disabled={saving || !name || !patternsText} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50">
+            <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !name || !patternsText}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50">
               {saving ? "Saving..." : editRule ? "Update" : "Create"}
             </button>
           </div>
@@ -458,7 +461,9 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
     setLoading(false);
   }, [guildId]);
 
-  useEffect(() => { loadPresets(); }, [loadPresets]);
+  useEffect(() => {
+    loadPresets();
+  }, [loadPresets]);
 
   async function install(presetId: string) {
     const res = await fetchApi(guildId, `moderation/presets/${presetId}/install`, { method: "POST" });
@@ -490,11 +495,9 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
           <CardDescription>{preset.description}</CardDescription>
           <CardContent>
             <div className="flex items-center justify-between mt-2">
-              <span className={`text-sm ${preset.installed ? "text-green-400" : "text-zinc-500"}`}>
-                {preset.installed ? "Installed" : "Not installed"}
-              </span>
-              {canManage && (
-                preset.installed ? (
+              <span className={`text-sm ${preset.installed ? "text-green-400" : "text-zinc-500"}`}>{preset.installed ? "Installed" : "Not installed"}</span>
+              {canManage &&
+                (preset.installed ? (
                   <button onClick={() => uninstall(preset.id)} className="text-sm text-red-400 hover:text-red-300">
                     Uninstall
                   </button>
@@ -502,8 +505,7 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
                   <button onClick={() => install(preset.id)} className="text-sm text-indigo-400 hover:text-indigo-300">
                     Install
                   </button>
-                )
-              )}
+                ))}
             </div>
           </CardContent>
         </Card>
@@ -565,15 +567,10 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
     <div className="space-y-4">
       <Card>
         <CardTitle>Escalation Tiers</CardTitle>
-        <CardDescription>
-          When a user&apos;s active points cross a tier threshold, the configured action is automatically applied.
-          Tiers are checked from highest threshold to lowest.
-        </CardDescription>
+        <CardDescription>When a user&apos;s active points cross a tier threshold, the configured action is automatically applied. Tiers are checked from highest threshold to lowest.</CardDescription>
         <CardContent>
           <div className="space-y-3">
-            {tiers.length === 0 && (
-              <p className="text-zinc-500 text-sm text-center py-2">No escalation tiers configured.</p>
-            )}
+            {tiers.length === 0 && <p className="text-zinc-500 text-sm text-center py-2">No escalation tiers configured.</p>}
             {tiers.map((tier, i) => (
               <div key={i} className="flex items-end gap-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
                 <TextInput label="Name" value={tier.name} onChange={(v) => updateTier(i, "name", v)} placeholder="e.g. Warning" className="flex-1" />
@@ -583,25 +580,26 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
                   <select
                     value={tier.action}
                     onChange={(e) => updateTier(i, "action", e.target.value)}
-                    className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm"
-                  >
+                    className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm">
                     <option value="timeout">Timeout</option>
                     <option value="kick">Kick</option>
                     <option value="ban">Ban</option>
                   </select>
                 </div>
-                {tier.action === "timeout" && (
-                  <TextInput label="Duration" value={tier.duration ?? ""} onChange={(v) => updateTier(i, "duration", v)} placeholder="e.g. 1h, 1d" className="w-28" />
-                )}
+                {tier.action === "timeout" && <TextInput label="Duration" value={tier.duration ?? ""} onChange={(v) => updateTier(i, "duration", v)} placeholder="e.g. 1h, 1d" className="w-28" />}
                 {canManage && (
-                  <button onClick={() => removeTier(i)} className="text-red-400 hover:text-red-300 pb-2">✕</button>
+                  <button onClick={() => removeTier(i)} className="text-red-400 hover:text-red-300 pb-2">
+                    ✕
+                  </button>
                 )}
               </div>
             ))}
           </div>
           {canManage && (
             <div className="flex justify-between mt-4">
-              <button onClick={addTier} className="text-sm text-indigo-400 hover:text-indigo-300">+ Add Tier</button>
+              <button onClick={addTier} className="text-sm text-indigo-400 hover:text-indigo-300">
+                + Add Tier
+              </button>
               <button onClick={saveTiers} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50">
                 {saving ? "Saving..." : "Save Tiers"}
               </button>
@@ -627,11 +625,7 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
     const params = new URLSearchParams({ page: String(page), limit: "25" });
     if (searchUserId) params.set("userId", searchUserId);
 
-    const res = await fetchApi<{ infractions: Infraction[]; total: number; pages: number }>(
-      guildId,
-      `moderation/infractions?${params}`,
-      { skipCache: true },
-    );
+    const res = await fetchApi<{ infractions: Infraction[]; total: number; pages: number }>(guildId, `moderation/infractions?${params}`, { skipCache: true });
     if (res.success && res.data) {
       setInfractions(res.data.infractions);
       setTotalPages(res.data.pages);
@@ -639,7 +633,9 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
     setLoading(false);
   }, [guildId, page, searchUserId]);
 
-  useEffect(() => { loadInfractions(); }, [loadInfractions]);
+  useEffect(() => {
+    loadInfractions();
+  }, [loadInfractions]);
 
   async function clearInfractions(userId: string) {
     if (!confirm(`Clear all active infractions for user ${userId}?`)) return;
@@ -660,7 +656,10 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
             <TextInput
               label="Search by User ID"
               value={searchUserId}
-              onChange={(v) => { setSearchUserId(v); setPage(1); }}
+              onChange={(v) => {
+                setSearchUserId(v);
+                setPage(1);
+              }}
               placeholder="e.g. 123456789012345678"
               className="flex-1"
             />
@@ -684,17 +683,18 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${inf.source === "automod" ? "bg-blue-900 text-blue-300" : "bg-purple-900 text-purple-300"}`}>
-                        {inf.source}
-                      </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${inf.source === "automod" ? "bg-blue-900 text-blue-300" : "bg-purple-900 text-purple-300"}`}>{inf.source}</span>
                       <span className="text-xs bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded">{inf.type}</span>
-                      <span className={`text-xs ${inf.active ? "text-green-400" : "text-zinc-500"}`}>
-                        {inf.active ? "Active" : "Cleared"}
-                      </span>
+                      <span className={`text-xs ${inf.active ? "text-green-400" : "text-zinc-500"}`}>{inf.active ? "Active" : "Cleared"}</span>
                     </div>
                     <p className="text-sm text-zinc-300 mt-1">
                       User: <code className="text-zinc-100">{inf.userId}</code>
-                      {inf.moderatorId && <> · By: <code className="text-zinc-100">{inf.moderatorId}</code></>}
+                      {inf.moderatorId && (
+                        <>
+                          {" "}
+                          · By: <code className="text-zinc-100">{inf.moderatorId}</code>
+                        </>
+                      )}
                     </p>
                     <p className="text-sm text-zinc-400">{inf.reason ?? "No reason"}</p>
                     <p className="text-xs text-zinc-500 mt-1">
@@ -716,7 +716,9 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
               <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1} className="px-3 py-1 text-sm bg-zinc-800 rounded disabled:opacity-50 text-zinc-300">
                 Prev
               </button>
-              <span className="px-3 py-1 text-sm text-zinc-400">Page {page} of {totalPages}</span>
+              <span className="px-3 py-1 text-sm text-zinc-400">
+                Page {page} of {totalPages}
+              </span>
               <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages} className="px-3 py-1 text-sm bg-zinc-800 rounded disabled:opacity-50 text-zinc-300">
                 Next
               </button>
@@ -802,13 +804,7 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
               <Toggle checked={automodEnabled} onChange={setAutomodEnabled} disabled={!canManage} />
             </div>
 
-            <TextInput
-              label="Fallback Log Channel ID"
-              value={logChannelId}
-              onChange={setLogChannelId}
-              placeholder="Channel ID (used if logging plugin not configured)"
-              disabled={!canManage}
-            />
+            <TextInput label="Fallback Log Channel ID" value={logChannelId} onChange={setLogChannelId} placeholder="Channel ID (used if logging plugin not configured)" disabled={!canManage} />
 
             <div className="flex items-center justify-between">
               <div>
@@ -818,15 +814,7 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
               <Toggle checked={pointDecayEnabled} onChange={setPointDecayEnabled} disabled={!canManage} />
             </div>
 
-            {pointDecayEnabled && (
-              <TextInput
-                label="Decay Period (days)"
-                value={String(pointDecayDays)}
-                onChange={(v) => setPointDecayDays(parseInt(v) || 30)}
-                type="number"
-                disabled={!canManage}
-              />
-            )}
+            {pointDecayEnabled && <TextInput label="Decay Period (days)" value={String(pointDecayDays)} onChange={(v) => setPointDecayDays(parseInt(v) || 30)} type="number" disabled={!canManage} />}
           </div>
         </CardContent>
       </Card>
@@ -849,8 +837,7 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
                 value={dmMode}
                 onChange={(e) => setDmMode(e.target.value)}
                 disabled={!canManage}
-                className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm disabled:opacity-50"
-              >
+                className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm disabled:opacity-50">
                 <option value="text">Plain Text</option>
                 <option value="embed">Embed</option>
                 <option value="both">Both</option>

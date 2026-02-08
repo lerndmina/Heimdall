@@ -31,7 +31,7 @@ export class ModerationService {
       const cached = await this.redis.get(`${CACHE_KEYS.CONFIG}:${guildId}`);
       if (cached) return JSON.parse(cached) as ConfigDoc;
 
-      const config = await ModerationConfig.findOne({ guildId }).lean() as ConfigDoc | null;
+      const config = (await ModerationConfig.findOne({ guildId }).lean()) as ConfigDoc | null;
       if (config) {
         await this.redis.setEx(`${CACHE_KEYS.CONFIG}:${guildId}`, CONFIG_CACHE_TTL, JSON.stringify(config));
       }
@@ -54,11 +54,7 @@ export class ModerationService {
 
   async updateConfig(guildId: string, updates: Partial<IModerationConfig>): Promise<ConfigDoc | null> {
     try {
-      const config = await ModerationConfig.findOneAndUpdate(
-        { guildId },
-        { $set: updates },
-        { new: true, upsert: true },
-      ).lean() as ConfigDoc | null;
+      const config = (await ModerationConfig.findOneAndUpdate({ guildId }, { $set: updates }, { new: true, upsert: true }).lean()) as ConfigDoc | null;
       await this.invalidateConfigCache(guildId);
       return config;
     } catch (error) {
@@ -75,7 +71,7 @@ export class ModerationService {
       const cached = await this.redis.get(`${CACHE_KEYS.RULES}:${guildId}`);
       if (cached) return JSON.parse(cached) as RuleDoc[];
 
-      const rules = await AutomodRule.find({ guildId }).sort({ priority: -1 }).lean() as RuleDoc[];
+      const rules = (await AutomodRule.find({ guildId }).sort({ priority: -1 }).lean()) as RuleDoc[];
       await this.redis.setEx(`${CACHE_KEYS.RULES}:${guildId}`, RULES_CACHE_TTL, JSON.stringify(rules));
       return rules;
     } catch (error) {
@@ -91,7 +87,7 @@ export class ModerationService {
 
   async getRule(guildId: string, ruleId: string): Promise<RuleDoc | null> {
     try {
-      return await AutomodRule.findOne({ _id: ruleId, guildId }).lean() as RuleDoc | null;
+      return (await AutomodRule.findOne({ _id: ruleId, guildId }).lean()) as RuleDoc | null;
     } catch (error) {
       log.error("Error getting rule:", error);
       return null;
@@ -106,11 +102,7 @@ export class ModerationService {
 
   async updateRule(guildId: string, ruleId: string, updates: Partial<IAutomodRule>): Promise<RuleDoc | null> {
     try {
-      const rule = await AutomodRule.findOneAndUpdate(
-        { _id: ruleId, guildId },
-        { $set: updates },
-        { new: true },
-      ).lean() as RuleDoc | null;
+      const rule = (await AutomodRule.findOneAndUpdate({ _id: ruleId, guildId }, { $set: updates }, { new: true }).lean()) as RuleDoc | null;
       await this.invalidateRulesCache(guildId);
       return rule;
     } catch (error) {
@@ -136,7 +128,7 @@ export class ModerationService {
 
   async findRuleByPresetId(guildId: string, presetId: string): Promise<RuleDoc | null> {
     try {
-      return await AutomodRule.findOne({ guildId, isPreset: true, presetId }).lean() as RuleDoc | null;
+      return (await AutomodRule.findOne({ guildId, isPreset: true, presetId }).lean()) as RuleDoc | null;
     } catch (error) {
       log.error("Error finding preset rule:", error);
       return null;

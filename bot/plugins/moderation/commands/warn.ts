@@ -11,9 +11,7 @@ export const data = new SlashCommandBuilder()
   .setDescription("Warn a member and assign infraction points")
   .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
   .addUserOption((opt) => opt.setName("user").setDescription("The member to warn").setRequired(true))
-  .addIntegerOption((opt) =>
-    opt.setName("points").setDescription("Points to assign (default: 1)").setRequired(false).setMinValue(1).setMaxValue(100),
-  )
+  .addIntegerOption((opt) => opt.setName("points").setDescription("Points to assign (default: 1)").setRequired(false).setMinValue(1).setMaxValue(100))
   .addStringOption((opt) => opt.setName("reason").setDescription("Reason for the warning").setRequired(false));
 
 export const config = { allowInDMs: false };
@@ -45,7 +43,8 @@ export async function execute(context: CommandContext): Promise<void> {
   const result = await mod.modActionService.warn(guild, member, interaction.user.id, points, reason);
 
   if (result.success) {
-    const embed = mod.lib.createEmbedBuilder()
+    const embed = mod.lib
+      .createEmbedBuilder()
       .setColor(0xeab308)
       .setTitle("⚠️ Warning Issued")
       .addFields(

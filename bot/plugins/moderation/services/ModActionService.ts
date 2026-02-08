@@ -4,14 +4,7 @@
  * Every action follows: execute → record infraction → DM user → log.
  */
 
-import {
-  type Guild,
-  type GuildMember,
-  type GuildTextBasedChannel,
-  type Message,
-  type TextChannel,
-  Collection,
-} from "discord.js";
+import { type Guild, type GuildMember, type GuildTextBasedChannel, type Message, type TextChannel, Collection } from "discord.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import type { LibAPI } from "../../lib/index.js";
 import type { LoggingPluginAPI } from "../../logging/index.js";
@@ -31,13 +24,7 @@ export class ModActionService {
   private infractionService: InfractionService;
   private escalationService: EscalationService;
 
-  constructor(
-    client: any,
-    lib: LibAPI,
-    logging: LoggingPluginAPI | null,
-    infractionService: InfractionService,
-    escalationService: EscalationService,
-  ) {
+  constructor(client: any, lib: LibAPI, logging: LoggingPluginAPI | null, infractionService: InfractionService, escalationService: EscalationService) {
     this.client = client;
     this.lib = lib;
     this.logging = logging;
@@ -47,13 +34,7 @@ export class ModActionService {
 
   // ── Kick ───────────────────────────────────────────────
 
-  async kick(
-    guild: Guild,
-    member: GuildMember,
-    moderatorId: string,
-    reason: string,
-    points: number = 0,
-  ): Promise<{ success: boolean; error?: string; activePoints?: number }> {
+  async kick(guild: Guild, member: GuildMember, moderatorId: string, reason: string, points: number = 0): Promise<{ success: boolean; error?: string; activePoints?: number }> {
     try {
       // Fetch config for DM
       const config = await this.getConfig(guild.id);
@@ -76,17 +57,20 @@ export class ModActionService {
       });
 
       // Log
-      await this.sendModLog(guild, "mod_actions", this.lib
-        .createEmbedBuilder()
-        .setColor(ACTION_COLORS.kick)
-        .setTitle("👢 Member Kicked")
-        .setThumbnail(member.user.displayAvatarURL({ size: 64 }))
-        .addFields(
-          { name: "User", value: `${member.user.tag} (${member.user})`, inline: true },
-          { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
-          { name: "Reason", value: reason || "No reason provided" },
-        )
-        .setFooter({ text: `User ID: ${member.user.id}` }),
+      await this.sendModLog(
+        guild,
+        "mod_actions",
+        this.lib
+          .createEmbedBuilder()
+          .setColor(ACTION_COLORS.kick)
+          .setTitle("👢 Member Kicked")
+          .setThumbnail(member.user.displayAvatarURL({ size: 64 }))
+          .addFields(
+            { name: "User", value: `${member.user.tag} (${member.user})`, inline: true },
+            { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
+            { name: "Reason", value: reason || "No reason provided" },
+          )
+          .setFooter({ text: `User ID: ${member.user.id}` }),
       );
 
       return { success: true, activePoints };
@@ -98,14 +82,7 @@ export class ModActionService {
 
   // ── Ban ────────────────────────────────────────────────
 
-  async ban(
-    guild: Guild,
-    userId: string,
-    moderatorId: string,
-    reason: string,
-    deleteDays: number = 0,
-    points: number = 0,
-  ): Promise<{ success: boolean; error?: string; activePoints?: number }> {
+  async ban(guild: Guild, userId: string, moderatorId: string, reason: string, deleteDays: number = 0, points: number = 0): Promise<{ success: boolean; error?: string; activePoints?: number }> {
     try {
       const config = await this.getConfig(guild.id);
 
@@ -131,18 +108,21 @@ export class ModActionService {
         pointsAssigned: points,
       });
 
-      await this.sendModLog(guild, "mod_actions", this.lib
-        .createEmbedBuilder()
-        .setColor(ACTION_COLORS.ban)
-        .setTitle("🔨 Member Banned")
-        .setThumbnail(user?.displayAvatarURL({ size: 64 }) ?? null)
-        .addFields(
-          { name: "User", value: user ? `${user.tag} (${user})` : userId, inline: true },
-          { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
-          { name: "Delete Messages", value: `${deleteDays} day(s)`, inline: true },
-          { name: "Reason", value: reason || "No reason provided" },
-        )
-        .setFooter({ text: `User ID: ${userId}` }),
+      await this.sendModLog(
+        guild,
+        "mod_actions",
+        this.lib
+          .createEmbedBuilder()
+          .setColor(ACTION_COLORS.ban)
+          .setTitle("🔨 Member Banned")
+          .setThumbnail(user?.displayAvatarURL({ size: 64 }) ?? null)
+          .addFields(
+            { name: "User", value: user ? `${user.tag} (${user})` : userId, inline: true },
+            { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
+            { name: "Delete Messages", value: `${deleteDays} day(s)`, inline: true },
+            { name: "Reason", value: reason || "No reason provided" },
+          )
+          .setFooter({ text: `User ID: ${userId}` }),
       );
 
       return { success: true, activePoints };
@@ -154,28 +134,26 @@ export class ModActionService {
 
   // ── Unban ──────────────────────────────────────────────
 
-  async unban(
-    guild: Guild,
-    userId: string,
-    moderatorId: string,
-    reason: string,
-  ): Promise<{ success: boolean; error?: string }> {
+  async unban(guild: Guild, userId: string, moderatorId: string, reason: string): Promise<{ success: boolean; error?: string }> {
     try {
       await guild.bans.remove(userId, reason);
 
       const user = await this.lib.thingGetter.getUser(userId);
 
-      await this.sendModLog(guild, "mod_actions", this.lib
-        .createEmbedBuilder()
-        .setColor(ACTION_COLORS.unban)
-        .setTitle("🔓 Member Unbanned")
-        .setThumbnail(user?.displayAvatarURL({ size: 64 }) ?? null)
-        .addFields(
-          { name: "User", value: user ? `${user.tag} (${user})` : userId, inline: true },
-          { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
-          { name: "Reason", value: reason || "No reason provided" },
-        )
-        .setFooter({ text: `User ID: ${userId}` }),
+      await this.sendModLog(
+        guild,
+        "mod_actions",
+        this.lib
+          .createEmbedBuilder()
+          .setColor(ACTION_COLORS.unban)
+          .setTitle("🔓 Member Unbanned")
+          .setThumbnail(user?.displayAvatarURL({ size: 64 }) ?? null)
+          .addFields(
+            { name: "User", value: user ? `${user.tag} (${user})` : userId, inline: true },
+            { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
+            { name: "Reason", value: reason || "No reason provided" },
+          )
+          .setFooter({ text: `User ID: ${userId}` }),
       );
 
       return { success: true };
@@ -187,14 +165,7 @@ export class ModActionService {
 
   // ── Mute (Timeout) ─────────────────────────────────────
 
-  async mute(
-    guild: Guild,
-    member: GuildMember,
-    moderatorId: string,
-    duration: number,
-    reason: string,
-    points: number = 0,
-  ): Promise<{ success: boolean; error?: string; activePoints?: number }> {
+  async mute(guild: Guild, member: GuildMember, moderatorId: string, duration: number, reason: string, points: number = 0): Promise<{ success: boolean; error?: string; activePoints?: number }> {
     if (duration > MAX_TIMEOUT_MS) {
       return { success: false, error: `Duration exceeds Discord's maximum of 28 days (${formatDuration(MAX_TIMEOUT_MS)})` };
     }
@@ -218,18 +189,21 @@ export class ModActionService {
         duration,
       });
 
-      await this.sendModLog(guild, "mod_actions", this.lib
-        .createEmbedBuilder()
-        .setColor(ACTION_COLORS.mute)
-        .setTitle("🔇 Member Timed Out")
-        .setThumbnail(member.user.displayAvatarURL({ size: 64 }))
-        .addFields(
-          { name: "User", value: `${member.user.tag} (${member.user})`, inline: true },
-          { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
-          { name: "Duration", value: formatDuration(duration), inline: true },
-          { name: "Reason", value: reason || "No reason provided" },
-        )
-        .setFooter({ text: `User ID: ${member.user.id}` }),
+      await this.sendModLog(
+        guild,
+        "mod_actions",
+        this.lib
+          .createEmbedBuilder()
+          .setColor(ACTION_COLORS.mute)
+          .setTitle("🔇 Member Timed Out")
+          .setThumbnail(member.user.displayAvatarURL({ size: 64 }))
+          .addFields(
+            { name: "User", value: `${member.user.tag} (${member.user})`, inline: true },
+            { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
+            { name: "Duration", value: formatDuration(duration), inline: true },
+            { name: "Reason", value: reason || "No reason provided" },
+          )
+          .setFooter({ text: `User ID: ${member.user.id}` }),
       );
 
       return { success: true, activePoints };
@@ -267,18 +241,21 @@ export class ModActionService {
       if (config) await sendInfractionDm(member.user, config, vars);
 
       // Log
-      await this.sendModLog(guild, "mod_actions", this.lib
-        .createEmbedBuilder()
-        .setColor(ACTION_COLORS.warn)
-        .setTitle("⚠️ Member Warned")
-        .setThumbnail(member.user.displayAvatarURL({ size: 64 }))
-        .addFields(
-          { name: "User", value: `${member.user.tag} (${member.user})`, inline: true },
-          { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
-          { name: "Points", value: `+${points} (Total: ${activePoints})`, inline: true },
-          { name: "Reason", value: reason || "No reason provided" },
-        )
-        .setFooter({ text: `User ID: ${member.user.id}` }),
+      await this.sendModLog(
+        guild,
+        "mod_actions",
+        this.lib
+          .createEmbedBuilder()
+          .setColor(ACTION_COLORS.warn)
+          .setTitle("⚠️ Member Warned")
+          .setThumbnail(member.user.displayAvatarURL({ size: 64 }))
+          .addFields(
+            { name: "User", value: `${member.user.tag} (${member.user})`, inline: true },
+            { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
+            { name: "Points", value: `+${points} (Total: ${activePoints})`, inline: true },
+            { name: "Reason", value: reason || "No reason provided" },
+          )
+          .setFooter({ text: `User ID: ${member.user.id}` }),
       );
 
       // Check escalation
@@ -382,16 +359,7 @@ export class ModActionService {
     return modPlugin?.moderationService?.getConfig(guildId) ?? null;
   }
 
-  private buildVars(
-    member: GuildMember | null,
-    guild: Guild,
-    action: string,
-    reason: string,
-    points: number,
-    duration: number,
-    moderatorId: string,
-    user?: any,
-  ): TemplateVars {
+  private buildVars(member: GuildMember | null, guild: Guild, action: string, reason: string, points: number, duration: number, moderatorId: string, user?: any): TemplateVars {
     const targetUser = member?.user ?? user;
     return {
       user: targetUser ? `${targetUser}` : "Unknown",

@@ -5,16 +5,7 @@
 import type { GuildTextBasedChannel, Message } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
 import type { ModerationPluginAPI } from "../../index.js";
-import {
-  byUser,
-  byBots,
-  byContent,
-  byHasAttachments,
-  byAttachmentType,
-  byHasEmbeds,
-  byGifsAndTenor,
-  byLinks,
-} from "../../utils/purge-filters.js";
+import { byUser, byBots, byContent, byHasAttachments, byAttachmentType, byHasEmbeds, byGifsAndTenor, byLinks } from "../../utils/purge-filters.js";
 
 export async function handleCount(context: CommandContext): Promise<void> {
   const { interaction, getPluginAPI } = context;
@@ -39,13 +30,11 @@ export async function handleCount(context: CommandContext): Promise<void> {
     return;
   }
 
-  const embed = mod.lib.createEmbedBuilder()
+  const embed = mod.lib
+    .createEmbedBuilder()
     .setColor(0x22c55e)
     .setTitle("🗑️ Purge Complete")
-    .addFields(
-      { name: "Deleted", value: String(result.deleted), inline: true },
-      { name: "Skipped (too old)", value: String(result.skipped), inline: true },
-    );
+    .addFields({ name: "Deleted", value: String(result.deleted), inline: true }, { name: "Skipped (too old)", value: String(result.skipped), inline: true });
 
   await interaction.editReply({ embeds: [embed] });
 }

@@ -16,7 +16,8 @@ export async function handleView(context: CommandContext): Promise<void> {
   const allRules = await mod.moderationService.listRules(guildId);
   const enabledRules = allRules.filter((r) => r.enabled);
 
-  const embed = mod.lib.createEmbedBuilder()
+  const embed = mod.lib
+    .createEmbedBuilder()
     .setTitle("🛡️ Automod Configuration")
     .addFields(
       { name: "Status", value: config?.automodEnabled ? "✅ Enabled" : "❌ Disabled", inline: true },

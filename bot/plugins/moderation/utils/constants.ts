@@ -30,11 +30,7 @@ export const CACHE_KEYS = {
 } as const;
 
 /** Default DM template */
-export const DEFAULT_DM_TEMPLATE =
-  "You have received a moderation action in **{server}**.\n\n" +
-  "**Action:** {action}\n" +
-  "**Reason:** {reason}\n" +
-  "**Points:** {points} (Total: {totalPoints})";
+export const DEFAULT_DM_TEMPLATE = "You have received a moderation action in **{server}**.\n\n" + "**Action:** {action}\n" + "**Reason:** {reason}\n" + "**Points:** {points} (Total: {totalPoints})";
 
 /** Embed colors for different action types */
 export const ACTION_COLORS = {

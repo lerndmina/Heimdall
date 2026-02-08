@@ -11,11 +11,7 @@ import type { ModerationPluginAPI } from "../../index.js";
 export const event = Events.MessageReactionAdd;
 export const pluginName = "moderation";
 
-export async function execute(
-  client: HeimdallClient,
-  reaction: MessageReaction | PartialMessageReaction,
-  user: User | PartialUser,
-): Promise<void> {
+export async function execute(client: HeimdallClient, reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser): Promise<void> {
   // Ignore bots
   if (user.bot) return;
 

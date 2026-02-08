@@ -18,10 +18,7 @@ import { createInfractionsRoutes } from "./infractions.js";
 import { createPresetsRoutes } from "./presets.js";
 import { createStatsRoutes } from "./stats.js";
 
-export type ModerationApiDeps = Pick<
-  ModerationPluginAPI,
-  "moderationService" | "ruleEngine" | "infractionService" | "escalationService" | "lib"
->;
+export type ModerationApiDeps = Pick<ModerationPluginAPI, "moderationService" | "ruleEngine" | "infractionService" | "escalationService" | "lib">;
 
 export function createRouter(api: ModerationPluginAPI): Router {
   const deps: ModerationApiDeps = {

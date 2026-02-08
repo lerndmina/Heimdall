@@ -14,8 +14,7 @@ export async function handleStats(context: CommandContext): Promise<void> {
   const guildId = interaction.guildId!;
   const stats = await mod.infractionService.getGuildStats(guildId);
 
-  const embed = mod.lib.createEmbedBuilder()
-    .setTitle("📊 Moderation Statistics");
+  const embed = mod.lib.createEmbedBuilder().setTitle("📊 Moderation Statistics");
 
   embed.addFields(
     { name: "Total Infractions", value: String(stats.totalInfractions), inline: true },

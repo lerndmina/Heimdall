@@ -102,10 +102,7 @@ export class InfractionService {
             guildId,
             userId,
             active: true,
-            $or: [
-              { expiresAt: null },
-              { expiresAt: { $gt: now } },
-            ],
+            $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
           },
         },
         {
@@ -141,11 +138,11 @@ export class InfractionService {
       if (options?.type) filter.type = options.type;
 
       const total = await Infraction.countDocuments(filter);
-      const infractions = await Infraction.find(filter)
+      const infractions = (await Infraction.find(filter)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        .lean() as InfractionDoc[];
+        .lean()) as InfractionDoc[];
 
       return {
         infractions,
@@ -164,10 +161,7 @@ export class InfractionService {
    */
   async clearUserInfractions(guildId: string, userId: string): Promise<number> {
     try {
-      const result = await Infraction.updateMany(
-        { guildId, userId, active: true },
-        { $set: { active: false } },
-      );
+      const result = await Infraction.updateMany({ guildId, userId, active: true }, { $set: { active: false } });
       return result.modifiedCount;
     } catch (error) {
       log.error("Error clearing infractions:", error);
@@ -189,18 +183,9 @@ export class InfractionService {
       const [totalInfractions, activeInfractions, bySourceAgg, byTypeAgg, recentInfractions] = await Promise.all([
         Infraction.countDocuments({ guildId }),
         Infraction.countDocuments({ guildId, active: true }),
-        Infraction.aggregate([
-          { $match: { guildId } },
-          { $group: { _id: "$source", count: { $sum: 1 } } },
-        ]),
-        Infraction.aggregate([
-          { $match: { guildId } },
-          { $group: { _id: "$type", count: { $sum: 1 } } },
-        ]),
-        Infraction.find({ guildId })
-          .sort({ createdAt: -1 })
-          .limit(10)
-          .lean() as Promise<InfractionDoc[]>,
+        Infraction.aggregate([{ $match: { guildId } }, { $group: { _id: "$source", count: { $sum: 1 } } }]),
+        Infraction.aggregate([{ $match: { guildId } }, { $group: { _id: "$type", count: { $sum: 1 } } }]),
+        Infraction.find({ guildId }).sort({ createdAt: -1 }).limit(10).lean() as Promise<InfractionDoc[]>,
       ]);
 
       const bySource: Record<string, number> = {};

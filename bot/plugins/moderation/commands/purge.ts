@@ -19,12 +19,11 @@ export const data = new SlashCommandBuilder()
       .addBooleanOption((opt) => opt.setName("bots_only").setDescription("Only bot messages").setRequired(false))
       .addBooleanOption((opt) => opt.setName("has_attachments").setDescription("Only messages with attachments").setRequired(false))
       .addStringOption((opt) =>
-        opt.setName("attachment_type").setDescription("Only specific attachment types").setRequired(false)
-          .addChoices(
-            { name: "Images", value: "image" },
-            { name: "Videos", value: "video" },
-            { name: "Audio", value: "audio" },
-          ),
+        opt
+          .setName("attachment_type")
+          .setDescription("Only specific attachment types")
+          .setRequired(false)
+          .addChoices({ name: "Images", value: "image" }, { name: "Videos", value: "video" }, { name: "Audio", value: "audio" }),
       )
       .addBooleanOption((opt) => opt.setName("has_embeds").setDescription("Only messages with embeds").setRequired(false))
       .addBooleanOption((opt) => opt.setName("gifs_only").setDescription("Only GIF attachments and tenor/giphy links").setRequired(false))
@@ -40,12 +39,11 @@ export const data = new SlashCommandBuilder()
       .addBooleanOption((opt) => opt.setName("bots_only").setDescription("Only bot messages").setRequired(false))
       .addBooleanOption((opt) => opt.setName("has_attachments").setDescription("Only messages with attachments").setRequired(false))
       .addStringOption((opt) =>
-        opt.setName("attachment_type").setDescription("Only specific attachment types").setRequired(false)
-          .addChoices(
-            { name: "Images", value: "image" },
-            { name: "Videos", value: "video" },
-            { name: "Audio", value: "audio" },
-          ),
+        opt
+          .setName("attachment_type")
+          .setDescription("Only specific attachment types")
+          .setRequired(false)
+          .addChoices({ name: "Images", value: "image" }, { name: "Videos", value: "video" }, { name: "Audio", value: "audio" }),
       )
       .addBooleanOption((opt) => opt.setName("has_embeds").setDescription("Only messages with embeds").setRequired(false))
       .addBooleanOption((opt) => opt.setName("gifs_only").setDescription("Only GIF attachments and tenor/giphy links").setRequired(false))

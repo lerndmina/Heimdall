@@ -38,20 +38,13 @@ export class EscalationService {
    * Returns info about which tier (if any) was triggered.
    * The actual infraction recording is done by the caller.
    */
-  async checkAndEscalate(
-    guild: Guild,
-    member: GuildMember,
-    currentPoints: number,
-    config: ConfigDoc,
-  ): Promise<EscalationResult> {
+  async checkAndEscalate(guild: Guild, member: GuildMember, currentPoints: number, config: ConfigDoc): Promise<EscalationResult> {
     if (!config.escalationTiers || config.escalationTiers.length === 0) {
       return { triggered: false };
     }
 
     // Sort tiers by threshold descending to find the highest applicable tier
-    const sortedTiers = [...config.escalationTiers].sort(
-      (a, b) => (b.pointsThreshold ?? 0) - (a.pointsThreshold ?? 0),
-    );
+    const sortedTiers = [...config.escalationTiers].sort((a, b) => (b.pointsThreshold ?? 0) - (a.pointsThreshold ?? 0));
 
     for (const tier of sortedTiers) {
       if (currentPoints >= (tier.pointsThreshold ?? Infinity)) {
@@ -72,12 +65,7 @@ export class EscalationService {
     return { triggered: false };
   }
 
-  private async executeEscalation(
-    guild: Guild,
-    member: GuildMember,
-    tier: { name: string; action: string; duration?: number | null },
-    config: ConfigDoc,
-  ): Promise<void> {
+  private async executeEscalation(guild: Guild, member: GuildMember, tier: { name: string; action: string; duration?: number | null }, config: ConfigDoc): Promise<void> {
     const reason = `Escalation: ${tier.name} (points threshold reached)`;
 
     switch (tier.action) {
@@ -105,12 +93,7 @@ export class EscalationService {
     await this.sendEscalationLog(guild, member, tier, config);
   }
 
-  private async sendEscalationLog(
-    guild: Guild,
-    member: GuildMember,
-    tier: { name: string; action: string; duration?: number | null },
-    config: ConfigDoc,
-  ): Promise<void> {
+  private async sendEscalationLog(guild: Guild, member: GuildMember, tier: { name: string; action: string; duration?: number | null }, config: ConfigDoc): Promise<void> {
     try {
       const embed = this.lib
         .createEmbedBuilder()

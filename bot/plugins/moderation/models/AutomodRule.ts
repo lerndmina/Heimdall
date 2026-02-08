@@ -162,8 +162,7 @@ AutomodRuleSchema.index({ guildId: 1, target: 1, enabled: 1 });
 
 type IAutomodRule = InferSchemaType<typeof AutomodRuleSchema>;
 
-const AutomodRule = (mongoose.models.AutomodRule ||
-  model<IAutomodRule>("AutomodRule", AutomodRuleSchema)) as Model<IAutomodRule>;
+const AutomodRule = (mongoose.models.AutomodRule || model<IAutomodRule>("AutomodRule", AutomodRuleSchema)) as Model<IAutomodRule>;
 
 export default AutomodRule;
 export type { IAutomodRule };

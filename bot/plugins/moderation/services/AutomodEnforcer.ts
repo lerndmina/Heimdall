@@ -126,15 +126,7 @@ export class AutomodEnforcer {
       }
 
       // Record and enforce
-      await this.recordAndEscalate(
-        guildId,
-        member,
-        match,
-        InfractionType.AUTOMOD_REACTION,
-        message.channelId,
-        message.id,
-        config as any,
-      );
+      await this.recordAndEscalate(guildId, member, match, InfractionType.AUTOMOD_REACTION, message.channelId, message.id, config as any);
     } catch (error) {
       log.error("handleReaction error:", error);
     }
@@ -154,15 +146,7 @@ export class AutomodEnforcer {
       const match = this.ruleEngine.evaluateMember(member, rules, "username");
       if (!match) return;
 
-      await this.recordAndEscalate(
-        guildId,
-        member,
-        match,
-        InfractionType.AUTOMOD_USERNAME,
-        null,
-        null,
-        config as any,
-      );
+      await this.recordAndEscalate(guildId, member, match, InfractionType.AUTOMOD_USERNAME, null, null, config as any);
     } catch (error) {
       log.error("handleMemberJoin error:", error);
     }
@@ -184,15 +168,7 @@ export class AutomodEnforcer {
       const match = this.ruleEngine.evaluateMember(newMember, rules, "nickname");
       if (!match) return;
 
-      await this.recordAndEscalate(
-        guildId,
-        newMember,
-        match,
-        InfractionType.AUTOMOD_USERNAME,
-        null,
-        null,
-        config as any,
-      );
+      await this.recordAndEscalate(guildId, newMember, match, InfractionType.AUTOMOD_USERNAME, null, null, config as any);
     } catch (error) {
       log.error("handleMemberUpdate error:", error);
     }
@@ -200,12 +176,7 @@ export class AutomodEnforcer {
 
   // ── Core Enforcement ───────────────────────────────────
 
-  private async enforceRule(
-    message: Message,
-    member: GuildMember,
-    match: RuleMatch,
-    config: any,
-  ): Promise<void> {
+  private async enforceRule(message: Message, member: GuildMember, match: RuleMatch, config: any): Promise<void> {
     const actions = match.rule.actions as string[];
     const guildId = message.guild!.id;
 
@@ -250,26 +221,10 @@ export class AutomodEnforcer {
     }
 
     // Record infraction + check escalation (only if warn action present or points > 0)
-    await this.recordAndEscalate(
-      guildId,
-      member,
-      match,
-      InfractionType.AUTOMOD_DELETE,
-      message.channelId,
-      message.id,
-      config,
-    );
+    await this.recordAndEscalate(guildId, member, match, InfractionType.AUTOMOD_DELETE, message.channelId, message.id, config);
   }
 
-  private async recordAndEscalate(
-    guildId: string,
-    member: GuildMember,
-    match: RuleMatch,
-    type: InfractionType,
-    channelId: string | null,
-    messageId: string | null,
-    config: any,
-  ): Promise<void> {
+  private async recordAndEscalate(guildId: string, member: GuildMember, match: RuleMatch, type: InfractionType, channelId: string | null, messageId: string | null, config: any): Promise<void> {
     const actions = match.rule.actions as string[];
     const points = actions.includes(AutomodAction.WARN) ? (match.rule.warnPoints ?? 1) : 0;
 
@@ -305,12 +260,7 @@ export class AutomodEnforcer {
         timestamp: new Date().toISOString(),
       };
 
-      await sendInfractionDm(
-        member.user,
-        config,
-        vars,
-        match.rule as any,
-      );
+      await sendInfractionDm(member.user, config, vars, match.rule as any);
     }
 
     // Log
@@ -320,12 +270,7 @@ export class AutomodEnforcer {
 
     // Check escalation
     if (points > 0 && config.escalationTiers?.length > 0) {
-      const escalation = await this.escalationService.checkAndEscalate(
-        member.guild,
-        member,
-        activePoints,
-        config,
-      );
+      const escalation = await this.escalationService.checkAndEscalate(member.guild, member, activePoints, config);
 
       if (escalation.triggered) {
         await this.infractionService.recordInfraction({
@@ -342,12 +287,7 @@ export class AutomodEnforcer {
 
   // ── Logging ────────────────────────────────────────────
 
-  private async sendAutomodLog(
-    guild: any,
-    member: GuildMember,
-    match: RuleMatch,
-    activePoints: number,
-  ): Promise<void> {
+  private async sendAutomodLog(guild: any, member: GuildMember, match: RuleMatch, activePoints: number): Promise<void> {
     try {
       const embed = this.lib
         .createEmbedBuilder()
@@ -358,7 +298,7 @@ export class AutomodEnforcer {
           { name: "User", value: `${member.user.tag} (${member.user})`, inline: true },
           { name: "Rule", value: match.rule.name as string, inline: true },
           { name: "Points", value: `+${match.rule.warnPoints ?? 0} (Total: ${activePoints})`, inline: true },
-          { name: "Matched Content", value: (match.matchedContent?.substring(0, 200) || "N/A") },
+          { name: "Matched Content", value: match.matchedContent?.substring(0, 200) || "N/A" },
           { name: "Actions", value: (match.rule.actions as string[]).join(", ") },
         )
         .setFooter({ text: `User ID: ${member.user.id}` })

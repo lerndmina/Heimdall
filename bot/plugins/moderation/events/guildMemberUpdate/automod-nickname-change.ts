@@ -11,11 +11,7 @@ import type { ModerationPluginAPI } from "../../index.js";
 export const event = Events.GuildMemberUpdate;
 export const pluginName = "moderation";
 
-export async function execute(
-  client: HeimdallClient,
-  oldMember: GuildMember | PartialGuildMember,
-  newMember: GuildMember,
-): Promise<void> {
+export async function execute(client: HeimdallClient, oldMember: GuildMember | PartialGuildMember, newMember: GuildMember): Promise<void> {
   // Ignore bots
   if (newMember.user.bot) return;
 

@@ -105,8 +105,7 @@ const ModerationConfigSchema = new Schema(
 
 type IModerationConfig = InferSchemaType<typeof ModerationConfigSchema>;
 
-const ModerationConfig = (mongoose.models.ModerationConfig ||
-  model<IModerationConfig>("ModerationConfig", ModerationConfigSchema)) as Model<IModerationConfig>;
+const ModerationConfig = (mongoose.models.ModerationConfig || model<IModerationConfig>("ModerationConfig", ModerationConfigSchema)) as Model<IModerationConfig>;
 
 export default ModerationConfig;
 export type { IModerationConfig };
