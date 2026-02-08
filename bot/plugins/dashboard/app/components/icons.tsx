@@ -129,6 +129,20 @@ export function VCTranscriptionIcon() {
   );
 }
 
+/** Attachment blocker / shield-slash icon */
+export function AttachmentBlockerIcon() {
+  return (
+    <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.5}
+        d="M9 12h6m-3-3v6m-6.065 3.065A8.969 8.969 0 0112 3c4.97 0 9 4.03 9 9 0 1.886-.58 3.637-1.572 5.085M3 3l18 18M5.935 18.065A8.969 8.969 0 013 12c0-1.886.58-3.637 1.572-5.085"
+      />
+    </svg>
+  );
+}
+
 /** Settings / cog icon */
 export function SettingsIcon() {
   return (

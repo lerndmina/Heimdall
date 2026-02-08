@@ -12,7 +12,7 @@ import GuildProvider, { type GuildInfo } from "@/components/providers/GuildProvi
 import PermissionsProvider, { usePermissions } from "@/components/providers/PermissionsProvider";
 import UnsavedChangesProvider from "@/components/providers/UnsavedChangesProvider";
 import Sidebar, { type NavItem } from "@/components/layout/Sidebar";
-import { OverviewIcon, MinecraftIcon, ModmailIcon, TicketsIcon, SuggestionsIcon, TagsIcon, LoggingIcon, WelcomeIcon, TempVCIcon, RemindersIcon, VCTranscriptionIcon, SettingsIcon } from "@/components/icons";
+import { OverviewIcon, MinecraftIcon, ModmailIcon, TicketsIcon, SuggestionsIcon, TagsIcon, LoggingIcon, WelcomeIcon, TempVCIcon, RemindersIcon, VCTranscriptionIcon, AttachmentBlockerIcon, SettingsIcon } from "@/components/icons";
 
 /**
  * Nav item with its associated permission category key.
@@ -38,6 +38,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: "Temp VC", href: (id) => `/${id}/tempvc`, icon: <TempVCIcon />, category: "tempvc" },
   { label: "Reminders", href: (id) => `/${id}/reminders`, icon: <RemindersIcon />, category: "reminders" },
   { label: "VC Transcription", href: (id) => `/${id}/vc-transcription`, icon: <VCTranscriptionIcon />, category: "vc-transcription" },
+  { label: "Attachment Blocker", href: (id) => `/${id}/attachment-blocker`, icon: <AttachmentBlockerIcon />, category: "attachment-blocker" },
   { label: "Settings", href: (id) => `/${id}/settings`, icon: <SettingsIcon />, category: "dashboard" },
 ];
 

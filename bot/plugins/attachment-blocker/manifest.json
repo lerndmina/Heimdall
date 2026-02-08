@@ -1,0 +1,10 @@
+{
+  "name": "attachment-blocker",
+  "version": "1.0.0",
+  "description": "Per-channel and guild-wide attachment type whitelist with optional timeout enforcement",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": "/attachment-blocker"
+}
