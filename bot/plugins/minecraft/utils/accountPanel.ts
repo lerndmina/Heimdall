@@ -302,6 +302,7 @@ async function handleLinkAction(btnInteraction: ButtonInteraction, guildId: stri
         },
         {
           $set: {
+            minecraftUsername,
             discordId,
             authCode,
             expiresAt,
