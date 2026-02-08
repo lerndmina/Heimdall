@@ -334,3 +334,30 @@ The `lib` plugin is the shared utility layer. Every other plugin depends on it. 
 5. **Component callbacks** — use `registerPersistentHandler(id, handler)` for buttons/menus that survive bot restarts; use TTL-based callbacks for ephemeral interactions
 6. **tsconfig excludes dashboard app** — `plugins/dashboard/app` has its own `tsconfig.json` with DOM libs. The root tsconfig is for the bot (server-side only). Errors shown by VS Code for dashboard files are often false positives.
 7. **Plugin API pattern** — each plugin's `onLoad` returns an API object that dependent plugins receive via `context.dependencies`
+
+---
+
+## Build & Deployment
+
+### Docker Build Requirements
+
+The Docker build uses `bun install --frozen-lockfile`, which **requires `bun.lock` to be in sync with `package.json`**. Any time you add, remove, or update a dependency, you **must** regenerate the lockfile before committing:
+
+```bash
+cd bot
+bun install   # regenerates bun.lock
+```
+
+**Always use `bun install`** (not `npm install`) to add packages — this updates both `package.json` and `bun.lock` atomically:
+
+```bash
+bun add <package>           # adds to dependencies
+bun add -d <package>        # adds to devDependencies
+```
+
+If `npm install` was used by mistake, run `bun install` afterwards to sync the lockfile.
+
+**Pre-commit checklist:**
+
+- `bun.lock` is up to date (`bun install` produces no changes)
+- `bun run build` (or `npx tsc --noEmit`) passes with no type errors
