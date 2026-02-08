@@ -5,6 +5,7 @@ import PermissionGate from "@/components/guards/PermissionGate";
 import Tabs from "@/components/ui/Tabs";
 import ModmailConversationsTab from "./ModmailConversationsTab";
 import ModmailConfigTab from "./ModmailConfigTab";
+import ModmailCategoriesTab from "./ModmailCategoriesTab";
 
 export default function Page({ params }: { params: Promise<{ guildId: string }> }) {
   const { guildId } = use(params);
@@ -14,6 +15,11 @@ export default function Page({ params }: { params: Promise<{ guildId: string }> 
       id: "conversations",
       label: "Conversations",
       content: <ModmailConversationsTab guildId={guildId} />,
+    },
+    {
+      id: "categories",
+      label: "Categories",
+      content: <ModmailCategoriesTab guildId={guildId} />,
     },
     {
       id: "config",

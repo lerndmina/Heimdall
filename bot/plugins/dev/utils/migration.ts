@@ -201,7 +201,13 @@ export async function migrateTags(oldConn: mongoose.Connection, guildId?: string
 
     for (const oldTag of oldTags) {
       try {
-        const existing = await Tag.findOne({ guildId: oldTag.guildId, name: oldTag.key });
+        // Old bot stored keys as "guildId:tagName" — strip the prefix
+        let tagName = oldTag.key || "";
+        if (tagName.includes(":")) {
+          tagName = tagName.split(":").slice(1).join(":");
+        }
+
+        const existing = await Tag.findOne({ guildId: oldTag.guildId, name: tagName });
         if (existing) {
           result.skipped++;
           continue;
@@ -209,9 +215,9 @@ export async function migrateTags(oldConn: mongoose.Connection, guildId?: string
 
         await Tag.create({
           guildId: oldTag.guildId,
-          name: oldTag.key,
+          name: tagName,
           content: oldTag.tag,
-          createdBy: "migration", // No creator info in old schema
+          createdBy: "migration",
           uses: 0,
         });
 
@@ -549,6 +555,9 @@ export async function migrateModmail(
       }
     }
 
+    // Find the highest ticket number to auto-assign missing ones
+    let autoTicketNumber = oldThreads.reduce((max, t) => Math.max(max, t.ticketNumber || 0), 0) + 1;
+
     for (const oldThread of oldThreads) {
       try {
         // Skip if already exists
@@ -621,7 +630,7 @@ export async function migrateModmail(
         const totalAttachments = messages.reduce((sum, m) => sum + m.attachments.length, 0);
 
         await Modmail.create({
-          ticketNumber: oldThread.ticketNumber,
+          ticketNumber: oldThread.ticketNumber || autoTicketNumber++,
           guildId: oldThread.guildId,
           userId: oldThread.userId,
           forumChannelId: oldThread.forumChannelId,

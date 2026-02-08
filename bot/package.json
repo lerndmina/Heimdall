@@ -11,6 +11,11 @@
     "start": "tsx src/index.ts",
     "start:bun": "bun run src/index.ts",
     "build": "bunx tsc",
+    "build:dashboard": "cd plugins/dashboard/app && next build",
+    "build:dashboard:analyze": "cd plugins/dashboard/app && ANALYZE=true next build",
+    "build:prod": "npm run build && npm run build:dashboard",
+    "start:prod": "NODE_ENV=production tsx src/index.ts",
+    "start:prod:bun": "NODE_ENV=production bun run src/index.ts",
     "lint": "bunx eslint src/**/*.ts",
     "lint:fix": "bunx eslint src/**/*.ts --fix"
   },

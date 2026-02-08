@@ -285,7 +285,7 @@ export default function ModmailConfigTab({ guildId }: { guildId: string }) {
       </Card>
 
       {/* Categories (read-only) */}
-      {config.categories.length > 0 && (
+      {config.categories && config.categories.length > 0 && (
         <Card>
           <CardTitle>Categories</CardTitle>
           <CardDescription className="mt-1">Modmail categories are managed via Discord commands.</CardDescription>

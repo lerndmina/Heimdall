@@ -12,6 +12,7 @@ import TextInput from "@/components/ui/TextInput";
 import Toggle from "@/components/ui/Toggle";
 import { fetchDashboardApi } from "@/lib/api";
 import { toast } from "sonner";
+import CategoryAssignmentWizard from "@/components/modmail/CategoryAssignmentWizard";
 
 interface MigrationResult {
   success: boolean;
@@ -61,6 +62,7 @@ export default function MigrationPage() {
   const [steps, setSteps] = useState<ProgressStep[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const [showWizard, setShowWizard] = useState(false);
 
   // Check if user is bot owner on mount
   useEffect(() => {
@@ -165,6 +167,11 @@ export default function MigrationPage() {
                 setResults(event.stats);
                 setSteps((prev) => prev.map((s) => (s.status === "pending" || s.status === "running" ? { ...s, status: "done", result: event.stats[s.key] } : s)));
                 toast.success("Migration completed");
+
+                // Show wizard if modmail threads were imported
+                if (event.stats.modmail?.imported > 0) {
+                  setShowWizard(true);
+                }
               } else if (event.type === "error") {
                 throw new Error(event.message);
               }
@@ -240,7 +247,6 @@ export default function MigrationPage() {
         <h1 className="text-3xl font-bold text-zinc-100">Data Migration</h1>
         <p className="mt-2 text-sm text-zinc-400">Import configurations from the old bot database</p>
       </div>
-
       {/* Configuration */}
       <Card>
         <CardTitle>Migration Settings</CardTitle>
@@ -283,7 +289,6 @@ export default function MigrationPage() {
           </button>
         </CardContent>
       </Card>
-
       {/* Live Progress */}
       {steps.length > 0 && (
         <Card>
@@ -299,10 +304,7 @@ export default function MigrationPage() {
                   <span className="font-medium text-primary-400">{progressPercent}%</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
-                  <div
-                    className="h-full rounded-full bg-primary-500 transition-all duration-500 ease-out"
-                    style={{ width: `${progressPercent}%` }}
-                  />
+                  <div className="h-full rounded-full bg-primary-500 transition-all duration-500 ease-out" style={{ width: `${progressPercent}%` }} />
                 </div>
               </div>
             )}
@@ -315,11 +317,7 @@ export default function MigrationPage() {
                   <div
                     key={step.key}
                     className={`rounded-lg border px-4 py-3 transition-colors duration-300 ${
-                      step.status === "running"
-                        ? "border-primary-500/40 bg-primary-500/5"
-                        : step.status === "done"
-                          ? "border-zinc-800 bg-zinc-800/30"
-                          : "border-zinc-800/50 bg-zinc-900/30 opacity-50"
+                      step.status === "running" ? "border-primary-500/40 bg-primary-500/5" : step.status === "done" ? "border-zinc-800 bg-zinc-800/30" : "border-zinc-800/50 bg-zinc-900/30 opacity-50"
                     }`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
@@ -362,31 +360,102 @@ export default function MigrationPage() {
             </div>
 
             {/* Error */}
-            {errorMessage && (
-              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{errorMessage}</div>
-            )}
+            {errorMessage && <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{errorMessage}</div>}
 
             {/* Summary */}
             {results && (
-              <div className="mt-5 rounded-lg border border-zinc-700 bg-zinc-800/30 px-4 py-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-400">Total Imported:</span>
-                  <span className="font-medium text-emerald-400">
-                    {Object.values(results).reduce((sum, r) => sum + r.imported, 0)}
-                  </span>
+              <div className="mt-5 space-y-3">
+                <div className="rounded-lg border border-zinc-700 bg-zinc-800/30 px-4 py-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-zinc-400">Total Imported:</span>
+                    <span className="font-medium text-emerald-400">{Object.values(results).reduce((sum, r) => sum + r.imported, 0)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-zinc-400">Total Skipped:</span>
+                    <span className="font-medium text-zinc-400">{Object.values(results).reduce((sum, r) => sum + r.skipped, 0)}</span>
+                  </div>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-zinc-400">Total Skipped:</span>
-                  <span className="font-medium text-zinc-400">
-                    {Object.values(results).reduce((sum, r) => sum + r.skipped, 0)}
-                  </span>
-                </div>
+
+                {/* Manual wizard trigger for modmail */}
+                {results.modmail && results.modmail.imported > 0 && (
+                  <button
+                    onClick={() => {
+                      if (!guildId) {
+                        const enteredGuildId = prompt("Enter the Guild ID to assign categories for:");
+                        if (enteredGuildId) {
+                          setGuildId(enteredGuildId);
+                          setShowWizard(true);
+                        }
+                      } else {
+                        setShowWizard(true);
+                      }
+                    }}
+                    className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500 flex items-center justify-center gap-2">
+                    <span>📨</span>
+                    <span>Assign Categories to Imported Modmail Threads ({results.modmail.imported})</span>
+                  </button>
+                )}
               </div>
             )}
           </CardContent>
         </Card>
       )}
+      {/* Category Assignment Wizard */}
+      {showWizard && guildId && (
+        <CategoryAssignmentWizard
+          guildId={guildId}
+          onClose={() => setShowWizard(false)}
+          onComplete={() => {
+            setShowWizard(false);
+            toast.success("Categories assigned successfully! Imported threads can now be used.");
+          }}
+        />
+      )}
+      {/* No Guild ID Warning */}
+      {showWizard && !guildId && results?.modmail && results.modmail.imported > 0 && (
+        <Card>
+          <CardTitle>⚠️ Category Assignment Required</CardTitle>
+          <CardContent className="mt-4 space-y-4">
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
+              <p className="font-semibold">Imported modmail threads need category assignment</p>
+              <p className="mt-2 text-xs text-yellow-300">
+                {results.modmail.imported} modmail threads were imported, but they reference old category IDs that won't work with your new configuration. To make these threads functional (so staff
+                can send messages), you need to assign them to new categories.
+              </p>
+            </div>
 
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-zinc-300">What to do:</h3>
+              <ol className="space-y-2 text-sm text-zinc-400">
+                <li className="flex gap-2">
+                  <span className="text-primary-400 font-bold">1.</span>
+                  <span>First, set up your modmail categories in the Modmail Config page (create forum channels and webhooks)</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-primary-400 font-bold">2.</span>
+                  <span>Then, return to this page and run the migration again WITH a Guild ID specified</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-primary-400 font-bold">3.</span>
+                  <span>The category assignment wizard will appear after migration completes, allowing you to bulk-assign all imported threads</span>
+                </li>
+              </ol>
+            </div>
+
+            <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-3 text-sm">
+              <p className="font-medium text-zinc-300">💡 Tip: Scroll up and add your Guild ID</p>
+              <p className="mt-2 text-xs text-zinc-500">
+                The Guild ID field is marked as optional, but it's required for the category assignment wizard to work. You can find your Guild ID by right-clicking your server in Discord (with
+                Developer Mode enabled).
+              </p>
+            </div>
+
+            <button onClick={() => setShowWizard(false)} className="w-full rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500">
+              Got it
+            </button>
+          </CardContent>
+        </Card>
+      )}
       {/* Info */}
       <Card>
         <CardTitle>What Gets Migrated?</CardTitle>
@@ -419,7 +488,8 @@ export default function MigrationPage() {
             <li className="flex items-start gap-2">
               <span className="text-emerald-400">✓</span>
               <span>
-                <strong className="text-zinc-300">Modmail Config:</strong> Settings, ticket numbering, auto-close config, staff roles (categories need manual reconfiguration for webhooks/forum channels)
+                <strong className="text-zinc-300">Modmail Config:</strong> Settings, ticket numbering, auto-close config, staff roles (categories need manual reconfiguration for webhooks/forum
+                channels)
               </span>
             </li>
             <li className="flex items-start gap-2">
@@ -430,4 +500,7 @@ export default function MigrationPage() {
             </li>
           </ul>
         </CardContent>
-      </Card>
+      </Card>{" "}
+    </div>
+  );
+}

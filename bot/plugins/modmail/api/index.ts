@@ -13,6 +13,7 @@ import { conversationDetailsRoute } from "./conversation-details.js";
 import { configGetRoute } from "./config-get.js";
 import { configUpdateRoute } from "./config-update.js";
 import { statsRoute } from "./stats.js";
+import { bulkUpdateCategoriesRoute } from "./bulk-update-categories.js";
 
 /** @deprecated Use createRouter instead */
 export interface ApiDependencies {
@@ -49,6 +50,9 @@ export function createRouter(api: ModmailPluginAPI): Router {
 
   // GET /stats - Get modmail statistics
   router.get("/stats", statsRoute(deps));
+
+  // PATCH /conversations/bulk-update-categories - Bulk update category assignments
+  router.patch("/conversations/bulk-update-categories", bulkUpdateCategoriesRoute(deps));
 
   return router;
 }

@@ -1,16 +1,7 @@
 /**
  * Regular footer messages for embeds
  */
-export const REGULAR_MESSAGES = [
-  "Heimdall is watching",
-  "Guardian of the Bifrost",
-  "All-seeing, all-knowing",
-  "Watching over the nine realms",
-  "The gatekeeper",
-  "Vigilant as always",
-  "Eyes that see all",
-  "The eternal watchman",
-];
+export const REGULAR_MESSAGES = ["To contact the staff team, DM this bot and I'll open a ticket for you!"];
 
 /**
  * April Fools messages (used on April 1st)

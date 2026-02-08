@@ -26,6 +26,27 @@ interface ConfigUpdateRequest {
   trackStaffActivity?: boolean;
   enabled?: boolean;
   defaultCategoryId?: string | null;
+  categories?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    emoji?: string;
+    forumChannelId: string;
+    webhookId: string;
+    staffRoleIds: string[];
+    priority: number;
+    formFields: Array<{
+      id: string;
+      label: string;
+      placeholder?: string;
+      required: boolean;
+      type: string;
+      options?: Array<{ label: string; value: string }>;
+    }>;
+    autoCloseHours?: number;
+    resolveAutoCloseHours: number;
+    enabled: boolean;
+  }>;
 }
 
 /**
@@ -263,6 +284,11 @@ export function configUpdateRoute(deps: ApiDependencies) {
       }
       if (updateData.defaultCategoryId !== undefined) {
         config.defaultCategoryId = updateData.defaultCategoryId ?? undefined;
+      }
+
+      // Update categories if provided
+      if (updateData.categories !== undefined) {
+        config.categories = updateData.categories as any; // Type will be validated by Mongoose
       }
 
       await config.save();
