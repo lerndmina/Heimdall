@@ -4,9 +4,9 @@
  *  - Pagination with configurable page-size (saved to localStorage)
  *  - Status filter (all / whitelisted / pending / revoked / linked / unlinked)
  *  - Pending-requests banner with bulk-approve
- *  - Per-row action menu (approve / reject / revoke / whitelist / unwhitelist / edit)
+ *  - Per-row action menu (approve / revoke / whitelist / unwhitelist / edit)
  *  - Add & Edit player modals
- *  - Reject & Revoke open a reason modal
+ *  - Revoke opens a reason modal
  */
 "use client";
 
@@ -169,7 +169,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Reason modal
-  const [reasonModal, setReasonModal] = useState<{ playerId: string; action: "reject" | "revoke"; username: string } | null>(null);
+  const [reasonModal, setReasonModal] = useState<{ playerId: string; username: string } | null>(null);
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ playerId: string; username: string } | null>(null);
   const [reason, setReason] = useState("");
 
@@ -361,44 +361,26 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
       undo: { endpoint: `minecraft/players/${id}/whitelist`, method: "POST" },
     });
 
-  const openRejectModal = (player: Player) => {
-    setReasonModal({ playerId: player._id, action: "reject", username: player.minecraftUsername });
-    setReason("");
-    setOpenMenu(null);
-  };
-
   const openRevokeModal = (player: Player) => {
-    setReasonModal({ playerId: player._id, action: "revoke", username: player.minecraftUsername });
+    setReasonModal({ playerId: player._id, username: player.minecraftUsername });
     setReason("");
     setOpenMenu(null);
   };
 
   const submitReason = async () => {
     if (!reasonModal) return;
-    const { playerId, action, username } = reasonModal;
+    const { playerId, username } = reasonModal;
 
-    if (action === "reject") {
-      await doAction(
-        playerId,
-        `minecraft/players/${playerId}/reject`,
-        "POST",
-        { reason },
-        {
-          description: `Rejected ${username}`,
-        },
-      );
-    } else {
-      await doAction(
-        playerId,
-        `minecraft/players/${playerId}`,
-        "DELETE",
-        { reason },
-        {
-          description: `Revoked ${username}`,
-          undo: { endpoint: `minecraft/players/${playerId}/whitelist`, method: "POST" },
-        },
-      );
-    }
+    await doAction(
+      playerId,
+      `minecraft/players/${playerId}`,
+      "DELETE",
+      { reason },
+      {
+        description: `Revoked ${username}`,
+        undo: { endpoint: `minecraft/players/${playerId}/whitelist`, method: "POST" },
+      },
+    );
     setReasonModal(null);
   };
 
@@ -928,9 +910,6 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   <MenuButton onClick={() => handleApprove(activeMenuRow._id)} color="emerald">
                     ✓ Approve
                   </MenuButton>
-                  <MenuButton onClick={() => openRejectModal(activeMenuRow)} color="red">
-                    ✕ Reject
-                  </MenuButton>
                 </>
               )}
               {playerWhitelistStatus(activeMenuRow) === "whitelisted" && (
@@ -1399,12 +1378,8 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
       {reasonModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-zinc-100">
-              {reasonModal.action === "reject" ? "Reject" : "Revoke"} — {reasonModal.username}
-            </h3>
-            <p className="mt-1 text-sm text-zinc-400">
-              {reasonModal.action === "reject" ? "Provide a reason for rejecting this whitelist request." : "Provide a reason for revoking this player's access."}
-            </p>
+            <h3 className="text-lg font-semibold text-zinc-100">Revoke — {reasonModal.username}</h3>
+            <p className="mt-1 text-sm text-zinc-400">Provide a reason for revoking this player's access.</p>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -1420,7 +1395,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 onClick={submitReason}
                 disabled={!reason.trim() || actionLoading === reasonModal.playerId}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed">
-                {actionLoading === reasonModal.playerId ? "Processing…" : reasonModal.action === "reject" ? "Reject" : "Revoke"}
+                {actionLoading === reasonModal.playerId ? "Processing…" : "Revoke"}
               </button>
             </div>
           </div>

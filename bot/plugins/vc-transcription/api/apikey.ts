@@ -8,23 +8,23 @@
 
 import { Router, type Request, type Response } from "express";
 import { createLogger } from "../../../src/core/Logger.js";
-import type { VCTranscriptionPluginAPI } from "../index.js";
+import type { VCTranscriptionApiDependencies } from "./index.js";
 
 const log = createLogger("vc-transcription");
 
 const OPENAI_KEY_ENV = "VC_TRANSCRIPTION_OPENAI_KEY";
 
-export function createApiKeyRoutes(api: VCTranscriptionPluginAPI): Router {
+export function createApiKeyRoutes(deps: VCTranscriptionApiDependencies): Router {
   const router = Router({ mergeParams: true });
 
   /**
    * GET /apikey/status — Check if API key exists (without revealing it)
    */
   router.get("/apikey/status", async (req: Request, res: Response) => {
-    const { guildId } = req.params;
+    const guildId = req.params.guildId as string;
 
     try {
-      const hasKey = await api.guildEnvService.hasEnv(guildId, OPENAI_KEY_ENV);
+      const hasKey = await deps.guildEnvService.hasEnv(guildId, OPENAI_KEY_ENV);
       return res.json({ success: true, data: { hasApiKey: hasKey } });
     } catch (error) {
       log.error("Failed to check API key status:", error);
@@ -40,7 +40,7 @@ export function createApiKeyRoutes(api: VCTranscriptionPluginAPI): Router {
    * Body: { apiKey: string }
    */
   router.put("/apikey", async (req: Request, res: Response) => {
-    const { guildId } = req.params;
+    const guildId = req.params.guildId as string;
     const { apiKey } = req.body;
 
     if (!apiKey || typeof apiKey !== "string") {
@@ -59,7 +59,7 @@ export function createApiKeyRoutes(api: VCTranscriptionPluginAPI): Router {
     }
 
     try {
-      await api.guildEnvService.setEnv(guildId, OPENAI_KEY_ENV, apiKey, "dashboard");
+      await deps.guildEnvService.setEnv(guildId, OPENAI_KEY_ENV, apiKey, "dashboard");
       log.info(`OpenAI API key set for guild ${guildId}`);
 
       return res.json({
@@ -79,10 +79,10 @@ export function createApiKeyRoutes(api: VCTranscriptionPluginAPI): Router {
    * DELETE /apikey — Remove the API key
    */
   router.delete("/apikey", async (req: Request, res: Response) => {
-    const { guildId } = req.params;
+    const guildId = req.params.guildId as string;
 
     try {
-      await api.guildEnvService.deleteEnv(guildId, OPENAI_KEY_ENV);
+      await deps.guildEnvService.deleteEnv(guildId, OPENAI_KEY_ENV);
       log.info(`OpenAI API key removed for guild ${guildId}`);
 
       return res.json({

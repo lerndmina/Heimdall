@@ -248,6 +248,10 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       player.revokedAt = new Date();
       player.revokedBy = "api";
       player.revocationReason = reason || "Removed via API";
+      // Clear auth/linking data
+      player.authCode = undefined;
+      player.expiresAt = undefined;
+      player.codeShownAt = undefined;
       await player.save();
 
       res.json({ success: true, data: player.toObject() });
@@ -330,44 +334,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
     }
   });
 
-  // POST /players/:playerId/reject — Reject a whitelist application
-  router.post("/:playerId/reject", async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { guildId, playerId } = req.params;
-      const { reason, rejectedBy } = req.body || {};
-
-      if (!reason) {
-        res.status(400).json({
-          success: false,
-          error: { code: "VALIDATION_ERROR", message: "reason is required" },
-        });
-        return;
-      }
-
-      const player = await MinecraftPlayer.findOne({ _id: playerId, guildId });
-      if (!player) {
-        res.status(404).json({
-          success: false,
-          error: { code: "NOT_FOUND", message: "Player not found" },
-        });
-        return;
-      }
-
-      player.rejectionReason = reason;
-      player.revokedAt = new Date();
-      player.revokedBy = rejectedBy || "api";
-      player.revocationReason = reason;
-      // Clear auth data
-      player.authCode = undefined;
-      player.expiresAt = undefined;
-      player.codeShownAt = undefined;
-      await player.save();
-
-      res.json({ success: true, data: player.toObject() });
-    } catch (error) {
-      next(error);
-    }
-  });
+  // NOTE: reject endpoint removed — revoke now handles both cases (clears auth data too)
 
   // POST /players/:playerId/link — Manually link a Discord account to a Minecraft player
   router.post("/:playerId/link", async (req: Request, res: Response, next: NextFunction) => {

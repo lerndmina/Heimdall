@@ -107,7 +107,7 @@ async function buildPanel(
         `**Username:** ${pendingAuth.minecraftUsername}\n` +
         `**Expires:** <t:${Math.floor((pendingAuth.expiresAt?.getTime() || 0) / 1000)}:R>\n` +
         (pendingAuth.codeShownAt
-          ? `**Code:** \`${pendingAuth.authCode}\` — Use \`/confirm-code ${pendingAuth.authCode}\``
+          ? `**Code:** \`${pendingAuth.authCode}\` — Click **Confirm Code** below`
           : `Join \`${mcConfig.serverHost}:${mcConfig.serverPort}\` to receive your code`),
       inline: false,
     });
@@ -147,8 +147,18 @@ async function buildPanel(
     mainRow.addComponents(linkBtn);
   }
 
-  // Cancel pending request button
+  // Pending auth buttons — confirm code + cancel
   if (pendingAuth) {
+    // Confirm Code button — only when code has been shown (user joined the server)
+    if (pendingAuth.codeShownAt) {
+      const confirmBtn = lib.createButtonBuilder(async (btnI) => {
+        await handleConfirmCodeAction(btnI, pendingAuth, guildId, discordId, lib, mcConfig, commandInteraction);
+      }, 600);
+      confirmBtn.setLabel("Confirm Code").setEmoji("✅").setStyle(ButtonStyle.Success);
+      await confirmBtn.ready();
+      mainRow.addComponents(confirmBtn);
+    }
+
     const cancelBtn = lib.createButtonBuilder(async (btnI) => {
       await btnI.deferUpdate();
       await MinecraftPlayer.findByIdAndDelete(pendingAuth._id).catch(() => {});
@@ -224,14 +234,15 @@ async function handleLinkAction(btnInteraction: ButtonInteraction, guildId: stri
       time: 300_000, // 5 minutes
     });
 
-    await submit.deferReply({ flags: MessageFlags.Ephemeral });
+    // Acknowledge the modal — don't create a separate reply
+    await submit.deferUpdate();
 
     const minecraftUsername = submit.fields.getTextInputValue("username").trim();
 
     // Validate username format
     if (!/^[a-zA-Z0-9_]{3,16}$/.test(minecraftUsername)) {
       const embed = lib.createEmbedBuilder().setColor(0xff0000).setTitle("❌ Invalid Username").setDescription("Minecraft usernames must be 3–16 characters (letters, numbers, underscores only).");
-      await submit.editReply({ embeds: [embed] });
+      await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -245,7 +256,7 @@ async function handleLinkAction(btnInteraction: ButtonInteraction, guildId: stri
 
     if (alreadyLinked) {
       const embed = lib.createEmbedBuilder().setColor(0xff0000).setTitle("❌ Already Linked").setDescription(`You're already linked to **${alreadyLinked.minecraftUsername}**.`);
-      await submit.editReply({ embeds: [embed] });
+      await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -259,7 +270,7 @@ async function handleLinkAction(btnInteraction: ButtonInteraction, guildId: stri
 
     if (taken) {
       const embed = lib.createEmbedBuilder().setColor(0xff0000).setTitle("❌ Username Taken").setDescription(`**${minecraftUsername}** is already linked to another Discord account.`);
-      await submit.editReply({ embeds: [embed] });
+      await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -297,38 +308,143 @@ async function handleLinkAction(btnInteraction: ButtonInteraction, guildId: stri
     } catch (error) {
       log.error("Failed to create pending auth:", error);
       const embed = lib.createEmbedBuilder().setColor(0xff0000).setTitle("❌ Error").setDescription("Failed to create authentication request. Please try again later.");
-      await submit.editReply({ embeds: [embed] });
+      await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
       return;
     }
 
-    const approvalNote = mcConfig.autoWhitelist
-      ? "✅ You'll be automatically whitelisted once confirmed!"
-      : mcConfig.requireApproval
-        ? "⏳ After confirming, staff will review your request."
-        : "⏳ After confirming, your whitelist will be processed.";
-
-    const embed = lib
-      .createEmbedBuilder()
-      .setColor(0x00ff00)
-      .setTitle("🎮 Link Request Created!")
-      .setDescription(
-        `**Next steps:**\n` +
-          `1. Join the Minecraft server: \`${mcConfig.serverHost}:${mcConfig.serverPort}\`\n` +
-          `2. You'll be shown your authentication code\n` +
-          `3. Come back here and use \`/confirm-code <your-code>\`\n\n` +
-          `${approvalNote}\n\n` +
-          `**Request expires:** <t:${Math.floor(expiresAt.getTime() / 1000)}:R>`,
-      )
-      .setFooter({ text: `Linking as: ${minecraftUsername}` });
-
-    await submit.editReply({ embeds: [embed] });
-
-    // Refresh the main panel to show the new pending request
+    // Refresh the panel — it will now show the pending request with next steps
     try {
       const refreshed = await buildPanel(guildId, discordId, lib, mcConfig, commandInteraction);
       await commandInteraction.editReply(refreshed);
     } catch {
       // Panel refresh failed (interaction token may have expired) — that's OK
+    }
+  } catch {
+    // Modal timed out — ignore
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIRM CODE ACTION — Modal flow (replaces /confirm-code command)
+// ═══════════════════════════════════════════════════════════════
+
+async function handleConfirmCodeAction(
+  btnInteraction: ButtonInteraction,
+  pendingAuth: any,
+  guildId: string,
+  discordId: string,
+  lib: LibAPI,
+  mcConfig: any,
+  commandInteraction: ChatInputCommandInteraction,
+): Promise<void> {
+  const modalId = nanoid();
+  const modal = new ModalBuilder().setCustomId(modalId).setTitle("Confirm Authentication Code");
+
+  const codeInput = new TextInputBuilder()
+    .setCustomId("code")
+    .setLabel("Enter your 6-digit code")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setPlaceholder("e.g. 123456")
+    .setMinLength(6)
+    .setMaxLength(6);
+
+  modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(codeInput));
+  await btnInteraction.showModal(modal);
+
+  try {
+    const submit = await btnInteraction.awaitModalSubmit({
+      filter: (i) => i.user.id === discordId && i.customId === modalId,
+      time: 300_000,
+    });
+
+    await submit.deferUpdate();
+
+    const code = submit.fields.getTextInputValue("code").trim();
+
+    if (!/^\d{6}$/.test(code)) {
+      const embed = lib.createEmbedBuilder().setColor(0xff0000).setTitle("❌ Invalid Code").setDescription("Authentication codes must be exactly 6 digits.");
+      await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      return;
+    }
+
+    // Re-fetch the pending auth to validate the code matches
+    const freshAuth = await MinecraftPlayer.findOne({
+      guildId,
+      authCode: code,
+      linkedAt: null,
+      expiresAt: { $gt: new Date() },
+      $or: [{ discordId }, { discordId: null, isExistingPlayerLink: true }],
+    });
+
+    if (!freshAuth) {
+      const embed = lib
+        .createEmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle("❌ Invalid Code")
+        .setDescription(
+          "No pending authentication found with that code.\n\n" +
+            "Make sure you:\n" +
+            "• Used the correct 6-digit code\n" +
+            "• Got the code by trying to join the Minecraft server\n" +
+            "• Haven't already confirmed this code",
+        );
+      await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      return;
+    }
+
+    if (!freshAuth.codeShownAt) {
+      const embed = lib
+        .createEmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle("❌ Invalid Process")
+        .setDescription(`You must try joining the Minecraft server first to receive your code.\n\n` + `**Join:** \`${mcConfig.serverHost}:${mcConfig.serverPort}\``);
+      await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      return;
+    }
+
+    // Handle existing-player link (immediate whitelist)
+    if (freshAuth.isExistingPlayerLink && freshAuth.whitelistedAt) {
+      const maxAccounts = mcConfig.maxPlayersPerUser ?? 1;
+      const linkedCount = await MinecraftPlayer.countDocuments({ guildId, discordId, linkedAt: { $ne: null } });
+      if (linkedCount >= maxAccounts) {
+        const embed = lib
+          .createEmbedBuilder()
+          .setColor(0xff0000)
+          .setTitle("❌ Account Limit Reached")
+          .setDescription(`You've reached the maximum of **${maxAccounts}** linked account${maxAccounts > 1 ? "s" : ""}.`);
+        await submit.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      freshAuth.discordId = discordId;
+      freshAuth.discordUsername = btnInteraction.user.username;
+      freshAuth.discordDisplayName = (btnInteraction.member as any)?.displayName || btnInteraction.user.globalName;
+      freshAuth.linkedAt = new Date();
+      freshAuth.authCode = undefined;
+      freshAuth.expiresAt = undefined;
+      freshAuth.codeShownAt = undefined;
+      freshAuth.confirmedAt = undefined;
+      freshAuth.isExistingPlayerLink = undefined;
+      await freshAuth.save();
+    } else {
+      // Normal link
+      freshAuth.linkedAt = new Date();
+
+      if (mcConfig.autoWhitelist) {
+        freshAuth.whitelistedAt = new Date();
+        freshAuth.approvedBy = "auto";
+      }
+
+      await freshAuth.save();
+    }
+
+    // Refresh the panel — it will now show the newly linked account
+    try {
+      const refreshed = await buildPanel(guildId, discordId, lib, mcConfig, commandInteraction);
+      await commandInteraction.editReply(refreshed);
+    } catch {
+      // Panel refresh failed — that's OK
     }
   } catch {
     // Modal timed out — ignore

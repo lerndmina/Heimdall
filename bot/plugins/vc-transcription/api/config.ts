@@ -16,18 +16,18 @@ import {
   OPENAI_WHISPER_MODELS,
 } from "../types/index.js";
 import { createLogger } from "../../../src/core/Logger.js";
-import type { VCTranscriptionPluginAPI } from "../index.js";
+import type { VCTranscriptionApiDependencies } from "./index.js";
 
 const log = createLogger("vc-transcription");
 
-export function createConfigRoutes(api: VCTranscriptionPluginAPI): Router {
+export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router {
   const router = Router({ mergeParams: true });
 
   /**
    * GET /config — Get current transcription config for the guild
    */
   router.get("/config", async (req: Request, res: Response) => {
-    const { guildId } = req.params;
+    const guildId = req.params.guildId as string;
 
     try {
       const config = await VoiceTranscriptionConfig.findOne({ guildId });
@@ -50,7 +50,7 @@ export function createConfigRoutes(api: VCTranscriptionPluginAPI): Router {
       // Check if OpenAI API key is configured (without revealing it)
       let hasApiKey = false;
       try {
-        hasApiKey = await api.guildEnvService.hasEnv(guildId, "VC_TRANSCRIPTION_OPENAI_KEY");
+        hasApiKey = await deps.guildEnvService.hasEnv(guildId, "VC_TRANSCRIPTION_OPENAI_KEY");
       } catch {
         // GuildEnvService may not be available
       }
@@ -77,7 +77,7 @@ export function createConfigRoutes(api: VCTranscriptionPluginAPI): Router {
    * PUT /config — Update transcription config
    */
   router.put("/config", async (req: Request, res: Response) => {
-    const { guildId } = req.params;
+    const guildId = req.params.guildId as string;
     const { mode, whisperProvider, whisperModel, roleFilter, channelFilter } = req.body;
 
     try {
@@ -185,7 +185,7 @@ export function createConfigRoutes(api: VCTranscriptionPluginAPI): Router {
       // Check API key status
       let hasApiKey = false;
       try {
-        hasApiKey = await api.guildEnvService.hasEnv(guildId, "VC_TRANSCRIPTION_OPENAI_KEY");
+        hasApiKey = await deps.guildEnvService.hasEnv(guildId, "VC_TRANSCRIPTION_OPENAI_KEY");
       } catch {
         // ignore
       }
@@ -214,14 +214,14 @@ export function createConfigRoutes(api: VCTranscriptionPluginAPI): Router {
    * DELETE /config — Reset transcription config for the guild
    */
   router.delete("/config", async (req: Request, res: Response) => {
-    const { guildId } = req.params;
+    const guildId = req.params.guildId as string;
 
     try {
       await VoiceTranscriptionConfig.deleteOne({ guildId });
 
       // Also clean up the API key
       try {
-        await api.guildEnvService.deleteEnv(guildId, "VC_TRANSCRIPTION_OPENAI_KEY");
+        await deps.guildEnvService.deleteEnv(guildId, "VC_TRANSCRIPTION_OPENAI_KEY");
       } catch {
         // ignore
       }
