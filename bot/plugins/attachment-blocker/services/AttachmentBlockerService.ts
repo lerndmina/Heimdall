@@ -5,6 +5,7 @@
  * and enforcement actions (delete, timeout, DM).
  */
 
+import { MessageFlags } from "discord.js";
 import type { Message, GuildMember } from "discord.js";
 import type { RedisClientType } from "redis";
 import { createLogger } from "../../../src/core/Logger.js";
@@ -194,6 +195,9 @@ export class AttachmentBlockerService {
   async checkAndEnforce(message: Message): Promise<boolean> {
     if (!message.guild || !message.guildId) return false;
     if (message.author.bot) return false;
+
+    // Skip voice messages — they're handled by vc-transcription, not regular uploads
+    if (message.flags.has(MessageFlags.IsVoiceMessage)) return false;
 
     const effectiveConfig = await this.resolveEffectiveConfig(message.guildId, message.channel.id);
 
