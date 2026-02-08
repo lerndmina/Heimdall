@@ -25,13 +25,7 @@ export const data = new SlashCommandBuilder()
             { name: "None (block everything)", value: "none" },
           ),
       )
-      .addIntegerOption((opt) =>
-        opt
-          .setName("timeout")
-          .setDescription("Timeout duration in seconds for violators (0 = no timeout)")
-          .setMinValue(0)
-          .setMaxValue(604800),
-      ),
+      .addIntegerOption((opt) => opt.setName("timeout").setDescription("Timeout duration in seconds for violators (0 = no timeout)").setMinValue(0).setMaxValue(604800)),
   )
   .addSubcommandGroup((group) =>
     group
@@ -41,9 +35,7 @@ export const data = new SlashCommandBuilder()
         sub
           .setName("add")
           .setDescription("Add or update a channel-specific override")
-          .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Target channel").setRequired(true),
-          )
+          .addChannelOption((opt) => opt.setName("channel").setDescription("Target channel").setRequired(true))
           .addStringOption((opt) =>
             opt
               .setName("type")
@@ -57,29 +49,17 @@ export const data = new SlashCommandBuilder()
                 { name: "None (block everything)", value: "none" },
               ),
           )
-          .addIntegerOption((opt) =>
-            opt
-              .setName("timeout")
-              .setDescription("Timeout duration override in seconds (0 = no timeout)")
-              .setMinValue(0)
-              .setMaxValue(604800),
-          ),
+          .addIntegerOption((opt) => opt.setName("timeout").setDescription("Timeout duration override in seconds (0 = no timeout)").setMinValue(0).setMaxValue(604800)),
       )
       .addSubcommand((sub) =>
         sub
           .setName("remove")
           .setDescription("Remove a channel override (revert to guild defaults)")
-          .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Channel to remove override from").setRequired(true),
-          ),
+          .addChannelOption((opt) => opt.setName("channel").setDescription("Channel to remove override from").setRequired(true)),
       ),
   )
-  .addSubcommand((sub) =>
-    sub.setName("view").setDescription("View current attachment blocking configuration"),
-  )
-  .addSubcommand((sub) =>
-    sub.setName("disable").setDescription("Disable attachment blocking guild-wide"),
-  );
+  .addSubcommand((sub) => sub.setName("view").setDescription("View current attachment blocking configuration"))
+  .addSubcommand((sub) => sub.setName("disable").setDescription("Disable attachment blocking guild-wide"));
 
 export const config = {
   allowInDMs: false,

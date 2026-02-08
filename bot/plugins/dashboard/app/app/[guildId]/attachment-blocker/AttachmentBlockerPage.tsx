@@ -298,9 +298,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
         <CardHeader>
           <div className="flex items-center gap-3">
             <CardTitle>Guild Defaults</CardTitle>
-            <StatusBadge variant={guildEnabled ? "success" : "neutral"}>
-              {guildEnabled ? "Enabled" : "Disabled"}
-            </StatusBadge>
+            <StatusBadge variant={guildEnabled ? "success" : "neutral"}>{guildEnabled ? "Enabled" : "Disabled"}</StatusBadge>
           </div>
           {savingGuild && (
             <svg className="h-5 w-5 animate-spin text-primary-500" viewBox="0 0 24 24" fill="none">
@@ -309,9 +307,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
             </svg>
           )}
         </CardHeader>
-        <CardDescription>
-          Set default attachment blocking rules that apply to all channels. Individual channels can override these settings.
-        </CardDescription>
+        <CardDescription>Set default attachment blocking rules that apply to all channels. Individual channels can override these settings.</CardDescription>
 
         <CardContent className="mt-4 space-y-5">
           <Toggle
@@ -336,12 +332,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
                       ? "border-primary-500/50 bg-primary-500/10 text-zinc-100"
                       : "border-zinc-700/30 bg-white/5 text-zinc-400 hover:border-zinc-600/40 hover:text-zinc-200"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}>
-                  <div
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                      guildAllowedTypes.includes(type.id)
-                        ? "border-primary-500 bg-primary-600"
-                        : "border-zinc-600"
-                    }`}>
+                  <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${guildAllowedTypes.includes(type.id) ? "border-primary-500 bg-primary-600" : "border-zinc-600"}`}>
                     {guildAllowedTypes.includes(type.id) && (
                       <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -362,14 +353,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
             <p className="mb-1 text-sm font-medium text-zinc-200">Timeout Duration</p>
             <p className="mb-2 text-xs text-zinc-500">Automatically timeout users who violate the rules (0 = no timeout)</p>
             <div className="max-w-xs">
-              <NumberInput
-                label="Seconds"
-                value={guildTimeoutSeconds}
-                onChange={setGuildTimeoutSeconds}
-                min={0}
-                max={604800}
-                disabled={!canManage || savingGuild}
-              />
+              <NumberInput label="Seconds" value={guildTimeoutSeconds} onChange={setGuildTimeoutSeconds} min={0} max={604800} disabled={!canManage || savingGuild} />
             </div>
           </div>
 
@@ -395,9 +379,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
             <StatusBadge variant="neutral">{channels.length} configured</StatusBadge>
           </div>
           {canManage && (
-            <button
-              onClick={openAddModal}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-700/30 px-3 py-1.5 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
+            <button onClick={openAddModal} className="inline-flex items-center gap-2 rounded-lg border border-zinc-700/30 px-3 py-1.5 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -405,9 +387,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
             </button>
           )}
         </CardHeader>
-        <CardDescription>
-          Override guild defaults for specific channels. Channels without overrides inherit the guild defaults.
-        </CardDescription>
+        <CardDescription>Override guild defaults for specific channels. Channels without overrides inherit the guild defaults.</CardDescription>
 
         <CardContent className="mt-4">
           {channels.length === 0 ? (
@@ -417,17 +397,13 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
           ) : (
             <div className="space-y-2">
               {channels.map((ch) => (
-                <div
-                  key={ch.channelId}
-                  className="flex items-center justify-between rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-4 py-3">
+                <div key={ch.channelId} className="flex items-center justify-between rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-zinc-200">
                         <span className="text-zinc-500">#</span> {ch.channelId}
                       </span>
-                      <StatusBadge variant={ch.enabled ? "success" : "neutral"}>
-                        {ch.enabled ? "Active" : "Disabled"}
-                      </StatusBadge>
+                      <StatusBadge variant={ch.enabled ? "success" : "neutral"}>{ch.enabled ? "Active" : "Disabled"}</StatusBadge>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {ch.allowedTypes && ch.allowedTypes.length > 0 ? (
@@ -439,29 +415,29 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
                       ) : (
                         <span className="text-xs text-zinc-500 italic">Inherits guild defaults</span>
                       )}
-                      {ch.timeoutDuration != null && (
-                        <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-                          Timeout: {Math.round(ch.timeoutDuration / 1000)}s
-                        </span>
-                      )}
+                      {ch.timeoutDuration != null && <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">Timeout: {Math.round(ch.timeoutDuration / 1000)}s</span>}
                     </div>
                   </div>
                   {canManage && (
                     <div className="flex items-center gap-2 ml-4">
-                      <button
-                        onClick={() => openEditModal(ch)}
-                        className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-zinc-200"
-                        title="Edit">
+                      <button onClick={() => openEditModal(ch)} className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-zinc-200" title="Edit">
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
                         </svg>
                       </button>
-                      <button
-                        onClick={() => confirmDeleteChannel(ch.channelId)}
-                        className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-red-500/10 hover:text-red-400"
-                        title="Delete">
+                      <button onClick={() => confirmDeleteChannel(ch.channelId)} className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-red-500/10 hover:text-red-400" title="Delete">
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
                         </svg>
                       </button>
                     </div>
@@ -480,9 +456,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
         title={editingChannel ? "Edit Channel Override" : "Add Channel Override"}
         footer={
           <>
-            <button
-              onClick={() => setShowAddChannel(false)}
-              className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
+            <button onClick={() => setShowAddChannel(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
@@ -512,13 +486,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
             />
           )}
 
-          <Toggle
-            label="Enabled"
-            description="Whether attachment blocking is active for this channel"
-            checked={channelFormEnabled}
-            onChange={setChannelFormEnabled}
-            disabled={savingChannel}
-          />
+          <Toggle label="Enabled" description="Whether attachment blocking is active for this channel" checked={channelFormEnabled} onChange={setChannelFormEnabled} disabled={savingChannel} />
 
           <div>
             <p className="mb-2 text-sm font-medium text-zinc-200">Whitelisted Types</p>
@@ -530,14 +498,9 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
                   disabled={savingChannel}
                   onClick={() => toggleChannelType(type.id)}
                   className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
-                    channelFormTypes.includes(type.id)
-                      ? "border-primary-500/50 bg-primary-500/10 text-zinc-100"
-                      : "border-zinc-700/30 bg-white/5 text-zinc-400 hover:border-zinc-600/40"
+                    channelFormTypes.includes(type.id) ? "border-primary-500/50 bg-primary-500/10 text-zinc-100" : "border-zinc-700/30 bg-white/5 text-zinc-400 hover:border-zinc-600/40"
                   } disabled:opacity-50`}>
-                  <div
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                      channelFormTypes.includes(type.id) ? "border-primary-500 bg-primary-600" : "border-zinc-600"
-                    }`}>
+                  <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${channelFormTypes.includes(type.id) ? "border-primary-500 bg-primary-600" : "border-zinc-600"}`}>
                     {channelFormTypes.includes(type.id) && (
                       <svg className="h-2.5 w-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -553,14 +516,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
           <div>
             <p className="mb-1 text-sm font-medium text-zinc-200">Timeout Override</p>
             <p className="mb-2 text-xs text-zinc-500">Leave empty to inherit guild default</p>
-            <NumberInput
-              label="Seconds"
-              value={channelFormTimeout ?? 0}
-              onChange={(v) => setChannelFormTimeout(v || undefined)}
-              min={0}
-              max={604800}
-              disabled={savingChannel}
-            />
+            <NumberInput label="Seconds" value={channelFormTimeout ?? 0} onChange={(v) => setChannelFormTimeout(v || undefined)} min={0} max={604800} disabled={savingChannel} />
           </div>
         </div>
       </Modal>
@@ -572,9 +528,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
         title="Delete Channel Override"
         footer={
           <>
-            <button
-              onClick={() => setShowDeleteModal(false)}
-              className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
+            <button onClick={() => setShowDeleteModal(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
@@ -591,9 +545,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
             </button>
           </>
         }>
-        <p className="text-sm text-zinc-400">
-          Are you sure you want to remove this channel override? The channel will revert to using guild-wide defaults.
-        </p>
+        <p className="text-sm text-zinc-400">Are you sure you want to remove this channel override? The channel will revert to using guild-wide defaults.</p>
       </Modal>
     </div>
   );

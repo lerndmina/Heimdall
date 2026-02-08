@@ -30,9 +30,7 @@ export async function handleSetup(context: CommandContext, pluginAPI: Attachment
     allowedTypes = [type];
   } else if (existing?.defaultAllowedTypes) {
     // Add to existing types (remove ALL/NONE if present)
-    const currentTypes = (existing.defaultAllowedTypes as AttachmentType[]).filter(
-      (t) => t !== AttachmentType.ALL && t !== AttachmentType.NONE,
-    );
+    const currentTypes = (existing.defaultAllowedTypes as AttachmentType[]).filter((t) => t !== AttachmentType.ALL && t !== AttachmentType.NONE);
     if (currentTypes.includes(type)) {
       await interaction.editReply(`ℹ️ **${AttachmentTypeLabels[type]}** is already whitelisted guild-wide.`);
       return;
@@ -48,11 +46,10 @@ export async function handleSetup(context: CommandContext, pluginAPI: Attachment
     defaultTimeoutDuration: timeoutDuration,
   });
 
-  const typesDisplay = (config.defaultAllowedTypes as AttachmentType[])
-    .map((t) => AttachmentTypeLabels[t] ?? t)
-    .join(", ");
+  const typesDisplay = (config.defaultAllowedTypes as AttachmentType[]).map((t) => AttachmentTypeLabels[t] ?? t).join(", ");
 
-  const embed = pluginAPI.lib.createEmbedBuilder()
+  const embed = pluginAPI.lib
+    .createEmbedBuilder()
     .setColor(0x00ff00)
     .setTitle("✅ Attachment Blocker Configured")
     .setDescription("Guild-wide attachment blocking has been enabled.")

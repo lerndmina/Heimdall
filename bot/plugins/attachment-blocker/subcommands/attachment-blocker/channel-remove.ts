@@ -29,7 +29,8 @@ export async function handleChannelRemove(context: CommandContext, pluginAPI: At
     // Non-critical
   }
 
-  const embed = pluginAPI.lib.createEmbedBuilder()
+  const embed = pluginAPI.lib
+    .createEmbedBuilder()
     .setColor(0x00ff00)
     .setTitle("✅ Channel Override Removed")
     .setDescription(`Attachment blocking override removed for ${channel}.\nThis channel now uses guild-wide defaults.`)

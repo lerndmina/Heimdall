@@ -35,9 +35,7 @@ export async function handleChannelAdd(context: CommandContext, pluginAPI: Attac
   if (type === AttachmentType.ALL || type === AttachmentType.NONE) {
     allowedTypes = [type];
   } else if (existing?.allowedTypes) {
-    const currentTypes = (existing.allowedTypes as AttachmentType[]).filter(
-      (t) => t !== AttachmentType.ALL && t !== AttachmentType.NONE,
-    );
+    const currentTypes = (existing.allowedTypes as AttachmentType[]).filter((t) => t !== AttachmentType.ALL && t !== AttachmentType.NONE);
     if (currentTypes.includes(type)) {
       await interaction.editReply(`ℹ️ **${AttachmentTypeLabels[type]}** is already whitelisted in ${channel}.`);
       return;
@@ -63,11 +61,10 @@ export async function handleChannelAdd(context: CommandContext, pluginAPI: Attac
     // Non-critical, log only
   }
 
-  const typesDisplay = (config.allowedTypes as AttachmentType[])
-    .map((t) => AttachmentTypeLabels[t] ?? t)
-    .join(", ");
+  const typesDisplay = (config.allowedTypes as AttachmentType[]).map((t) => AttachmentTypeLabels[t] ?? t).join(", ");
 
-  const embed = pluginAPI.lib.createEmbedBuilder()
+  const embed = pluginAPI.lib
+    .createEmbedBuilder()
     .setColor(0x00ff00)
     .setTitle("✅ Channel Override Set")
     .setDescription(`Attachment blocking override configured for ${channel}.`)
@@ -75,9 +72,7 @@ export async function handleChannelAdd(context: CommandContext, pluginAPI: Attac
       { name: "Whitelisted Types", value: typesDisplay || "Inherits guild default", inline: true },
       {
         name: "Timeout",
-        value: config.timeoutDuration !== undefined && config.timeoutDuration !== null
-          ? `${(config.timeoutDuration as number) / 1000}s`
-          : "Inherits guild default",
+        value: config.timeoutDuration !== undefined && config.timeoutDuration !== null ? `${(config.timeoutDuration as number) / 1000}s` : "Inherits guild default",
         inline: true,
       },
     )

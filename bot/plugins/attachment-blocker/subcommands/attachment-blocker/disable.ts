@@ -19,7 +19,8 @@ export async function handleDisable(context: CommandContext, pluginAPI: Attachme
 
   await pluginAPI.service.updateGuildConfig(guildId, { enabled: false });
 
-  const embed = pluginAPI.lib.createEmbedBuilder()
+  const embed = pluginAPI.lib
+    .createEmbedBuilder()
     .setColor(0xff4444)
     .setTitle("🛑 Attachment Blocker Disabled")
     .setDescription("Attachment blocking has been disabled guild-wide.\nChannel overrides are preserved but inactive. Use `/attachment-blocker setup` to re-enable.")

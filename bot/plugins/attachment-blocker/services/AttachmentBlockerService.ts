@@ -50,26 +50,23 @@ export class AttachmentBlockerService {
     try {
       const cached = await this.redis.get(`${GUILD_CACHE_PREFIX}${guildId}`);
       if (cached) return JSON.parse(cached);
-    } catch { /* cache miss */ }
+    } catch {
+      /* cache miss */
+    }
 
-    const config = await AttachmentBlockerConfig.findOne({ guildId }).lean() as GuildConfigDoc | null;
+    const config = (await AttachmentBlockerConfig.findOne({ guildId }).lean()) as GuildConfigDoc | null;
     if (config) {
       try {
         await this.redis.setEx(`${GUILD_CACHE_PREFIX}${guildId}`, CACHE_TTL, JSON.stringify(config));
-      } catch { /* cache write failure non-critical */ }
+      } catch {
+        /* cache write failure non-critical */
+      }
     }
     return config;
   }
 
-  async updateGuildConfig(
-    guildId: string,
-    updates: Partial<Pick<IAttachmentBlockerConfig, "enabled" | "defaultAllowedTypes" | "defaultTimeoutDuration">>,
-  ): Promise<GuildConfigDoc> {
-    const config = await AttachmentBlockerConfig.findOneAndUpdate(
-      { guildId },
-      { $set: { ...updates, guildId } },
-      { upsert: true, new: true },
-    ).lean() as GuildConfigDoc;
+  async updateGuildConfig(guildId: string, updates: Partial<Pick<IAttachmentBlockerConfig, "enabled" | "defaultAllowedTypes" | "defaultTimeoutDuration">>): Promise<GuildConfigDoc> {
+    const config = (await AttachmentBlockerConfig.findOneAndUpdate({ guildId }, { $set: { ...updates, guildId } }, { upsert: true, new: true }).lean()) as GuildConfigDoc;
 
     // Invalidate cache
     await this.invalidateGuildCache(guildId);
@@ -88,13 +85,17 @@ export class AttachmentBlockerService {
     try {
       const cached = await this.redis.get(`${CHANNEL_CACHE_PREFIX}${channelId}`);
       if (cached) return JSON.parse(cached);
-    } catch { /* cache miss */ }
+    } catch {
+      /* cache miss */
+    }
 
-    const config = await AttachmentBlockerChannel.findOne({ channelId }).lean() as ChannelConfigDoc | null;
+    const config = (await AttachmentBlockerChannel.findOne({ channelId }).lean()) as ChannelConfigDoc | null;
     if (config) {
       try {
         await this.redis.setEx(`${CHANNEL_CACHE_PREFIX}${channelId}`, CACHE_TTL, JSON.stringify(config));
-      } catch { /* cache write failure non-critical */ }
+      } catch {
+        /* cache write failure non-critical */
+      }
     }
     return config;
   }
@@ -123,11 +124,7 @@ export class AttachmentBlockerService {
     if (data.timeoutDuration !== undefined) updateData.timeoutDuration = data.timeoutDuration ?? undefined;
     if (data.enabled !== undefined) updateData.enabled = data.enabled;
 
-    const config = await AttachmentBlockerChannel.findOneAndUpdate(
-      { channelId },
-      { $set: updateData },
-      { upsert: true, new: true },
-    ).lean() as ChannelConfigDoc;
+    const config = (await AttachmentBlockerChannel.findOneAndUpdate({ channelId }, { $set: updateData }, { upsert: true, new: true }).lean()) as ChannelConfigDoc;
 
     await this.invalidateChannelCache(channelId);
     return config;
@@ -157,10 +154,7 @@ export class AttachmentBlockerService {
    * with any per-channel overrides.
    */
   async resolveEffectiveConfig(guildId: string, channelId: string): Promise<EffectiveConfig> {
-    const [guildConfig, channelConfig] = await Promise.all([
-      this.getGuildConfig(guildId),
-      this.getChannelConfig(channelId),
-    ]);
+    const [guildConfig, channelConfig] = await Promise.all([this.getGuildConfig(guildId), this.getChannelConfig(channelId)]);
 
     // No guild config at all → feature is disabled
     if (!guildConfig) {
@@ -185,9 +179,7 @@ export class AttachmentBlockerService {
     // Merge: channel values take priority when explicitly set
     return {
       enabled: channelConfig.enabled && guildConfig.enabled,
-      allowedTypes: (channelConfig.allowedTypes && channelConfig.allowedTypes.length > 0
-        ? channelConfig.allowedTypes
-        : guildConfig.defaultAllowedTypes) as AttachmentType[],
+      allowedTypes: (channelConfig.allowedTypes && channelConfig.allowedTypes.length > 0 ? channelConfig.allowedTypes : guildConfig.defaultAllowedTypes) as AttachmentType[],
       timeoutDuration: channelConfig.timeoutDuration ?? guildConfig.defaultTimeoutDuration,
       isChannelOverride: true,
     };
@@ -262,10 +254,7 @@ export class AttachmentBlockerService {
           try {
             const member = message.member || (await this.lib.thingGetter.getMember(message.guild, message.author.id));
             if (member) {
-              await (member as GuildMember).timeout(
-                effectiveConfig.timeoutDuration,
-                `AttachmentBlocker: ${blockedReasons.join(", ")}`,
-              );
+              await (member as GuildMember).timeout(effectiveConfig.timeoutDuration, `AttachmentBlocker: ${blockedReasons.join(", ")}`);
             }
           } catch (e) {
             log.error("Error timing out user", e);
@@ -274,15 +263,14 @@ export class AttachmentBlockerService {
 
         // DM the user
         try {
-          const embed = this.lib.createEmbedBuilder()
+          const embed = this.lib
+            .createEmbedBuilder()
             .setColor(0xff4444)
             .setTitle("⚠️ Attachment Blocker")
             .setDescription(
               `Your message in <#${message.channel.id}> was removed.\n` +
-              `**Reason:** ${blockedReasons.join(", ")}` +
-              (effectiveConfig.timeoutDuration > 0
-                ? `\n\nYou have been timed out for ${effectiveConfig.timeoutDuration / 1000} seconds.`
-                : ""),
+                `**Reason:** ${blockedReasons.join(", ")}` +
+                (effectiveConfig.timeoutDuration > 0 ? `\n\nYou have been timed out for ${effectiveConfig.timeoutDuration / 1000} seconds.` : ""),
             )
             .setTimestamp();
 
@@ -291,9 +279,7 @@ export class AttachmentBlockerService {
           log.debug(`Couldn't DM user ${message.author.tag} about blocked attachment`);
         }
 
-        log.info(
-          `Blocked content from ${message.author.tag} in #${(message.channel as any).name ?? message.channel.id}: ${blockedReasons.join(", ")}`,
-        );
+        log.info(`Blocked content from ${message.author.tag} in #${(message.channel as any).name ?? message.channel.id}: ${blockedReasons.join(", ")}`);
         return true;
       } catch (error) {
         log.error("Error deleting message with blocked content", error);
@@ -308,12 +294,16 @@ export class AttachmentBlockerService {
   private async invalidateGuildCache(guildId: string): Promise<void> {
     try {
       await this.redis.del(`${GUILD_CACHE_PREFIX}${guildId}`);
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   private async invalidateChannelCache(channelId: string): Promise<void> {
     try {
       await this.redis.del(`${CHANNEL_CACHE_PREFIX}${channelId}`);
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 }

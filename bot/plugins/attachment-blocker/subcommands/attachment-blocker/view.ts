@@ -19,15 +19,12 @@ export async function handleView(context: CommandContext, pluginAPI: AttachmentB
     return;
   }
 
-  const typesDisplay = (guildConfig.defaultAllowedTypes as AttachmentType[])
-    .map((t) => AttachmentTypeLabels[t] ?? t)
-    .join(", ") || "None";
+  const typesDisplay = (guildConfig.defaultAllowedTypes as AttachmentType[]).map((t) => AttachmentTypeLabels[t] ?? t).join(", ") || "None";
 
-  const timeoutDisplay = guildConfig.defaultTimeoutDuration > 0
-    ? `${guildConfig.defaultTimeoutDuration / 1000}s`
-    : "Disabled";
+  const timeoutDisplay = guildConfig.defaultTimeoutDuration > 0 ? `${guildConfig.defaultTimeoutDuration / 1000}s` : "Disabled";
 
-  const embed = pluginAPI.lib.createEmbedBuilder()
+  const embed = pluginAPI.lib
+    .createEmbedBuilder()
     .setColor(guildConfig.enabled ? 0x5865f2 : 0x777777)
     .setTitle("📎 Attachment Blocker Configuration")
     .addFields(
@@ -40,12 +37,8 @@ export async function handleView(context: CommandContext, pluginAPI: AttachmentB
   const channels = await pluginAPI.service.getChannelConfigs(guildId);
   if (channels.length > 0) {
     const channelLines = channels.map((ch: IAttachmentBlockerChannel & { channelId: string }) => {
-      const types = (ch.allowedTypes as AttachmentType[] | undefined)
-        ?.map((t) => AttachmentTypeLabels[t] ?? t)
-        .join(", ") || "Inherits default";
-      const timeout = ch.timeoutDuration !== undefined && ch.timeoutDuration !== null
-        ? `${(ch.timeoutDuration as number) / 1000}s`
-        : "Inherits default";
+      const types = (ch.allowedTypes as AttachmentType[] | undefined)?.map((t) => AttachmentTypeLabels[t] ?? t).join(", ") || "Inherits default";
+      const timeout = ch.timeoutDuration !== undefined && ch.timeoutDuration !== null ? `${(ch.timeoutDuration as number) / 1000}s` : "Inherits default";
       const status = ch.enabled ? "" : " (disabled)";
       return `<#${ch.channelId}>${status}\n  Types: ${types} • Timeout: ${timeout}`;
     });
