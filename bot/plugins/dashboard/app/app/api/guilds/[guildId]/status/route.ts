@@ -32,6 +32,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
     const res = await fetch(`${API_BASE}/api/guilds/${guildId}/status`, {
       headers: { "X-API-Key": API_KEY },
+      cache: "no-store",
     });
 
     const data = await res.text();

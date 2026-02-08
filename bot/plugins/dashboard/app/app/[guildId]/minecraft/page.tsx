@@ -1,18 +1,55 @@
 /**
  * Minecraft management page — tabbed view with Players, Config, and Server Status.
  * Client component because it uses Tabs (interactive).
+ *
+ * Fetches server config on mount to determine the default tab.
+ * "pending" is treated as the Players tab with the pending filter pre-selected.
  */
 "use client";
 
+import { useEffect, useState } from "react";
 import { useGuild } from "@/components/providers/GuildProvider";
 import PermissionGate from "@/components/guards/PermissionGate";
 import Tabs from "@/components/ui/Tabs";
+import Spinner from "@/components/ui/Spinner";
 import PlayersTab from "./PlayersTab";
 import ConfigTab from "./ConfigTab";
 import StatusTab from "./StatusTab";
+import { fetchApi } from "@/lib/api";
+
+type DashboardTab = "players" | "pending" | "config" | "status";
 
 export default function MinecraftPage() {
   const { guild } = useGuild();
+  const [defaultTab, setDefaultTab] = useState<DashboardTab | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch config to determine default tab
+  useEffect(() => {
+    let cancelled = false;
+    fetchApi<{ defaultDashboardTab?: DashboardTab }>(guild.id, "minecraft/config")
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.data?.defaultDashboardTab) {
+          setDefaultTab(res.data.defaultDashboardTab);
+        } else {
+          setDefaultTab("players");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setDefaultTab("players");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [guild.id]);
+
+  // "pending" maps to the players tab with default filter set to "pending"
+  const resolvedTab = defaultTab === "pending" ? "players" : (defaultTab ?? "players");
+  const defaultPlayerFilter = defaultTab === "pending" ? "pending" : undefined;
 
   const tabs = [
     {
@@ -28,7 +65,7 @@ export default function MinecraftPage() {
           />
         </svg>
       ),
-      content: <PlayersTab guildId={guild.id} />,
+      content: <PlayersTab guildId={guild.id} defaultFilter={defaultPlayerFilter} />,
     },
     {
       id: "config",
@@ -63,6 +100,22 @@ export default function MinecraftPage() {
     },
   ];
 
+  if (loading) {
+    return (
+      <PermissionGate category="minecraft">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Minecraft</h1>
+            <p className="text-zinc-400">Manage players, whitelist, and server configuration.</p>
+          </div>
+          <div className="flex justify-center py-16">
+            <Spinner label="Loading…" />
+          </div>
+        </div>
+      </PermissionGate>
+    );
+  }
+
   return (
     <PermissionGate category="minecraft">
       <div className="space-y-6">
@@ -71,7 +124,7 @@ export default function MinecraftPage() {
           <p className="text-zinc-400">Manage players, whitelist, and server configuration.</p>
         </div>
 
-        <Tabs tabs={tabs} defaultTab="players" />
+        <Tabs tabs={tabs} defaultTab={resolvedTab} />
       </div>
     </PermissionGate>
   );

@@ -10,6 +10,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 
 export interface ComboboxOption {
   value: string;
@@ -44,8 +45,13 @@ export default function Combobox({
   const [highlightIndex, setHighlightIndex] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Position state for portal-based popover
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
 
   const selectedLabel = useMemo(() => options.find((o) => o.value === value)?.label, [options, value]);
 
@@ -60,9 +66,19 @@ export default function Combobox({
     setHighlightIndex(0);
   }, [filtered.length]);
 
-  // Focus the search input when opening
+  // Focus the search input when opening & calculate popover position
   useEffect(() => {
     if (open) {
+      if (triggerRef.current) {
+        const rect = triggerRef.current.getBoundingClientRect();
+        setPopoverStyle({
+          position: "fixed",
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: rect.width,
+          zIndex: 9999,
+        });
+      }
       // Small delay so the popover is rendered
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
@@ -70,11 +86,15 @@ export default function Combobox({
     }
   }, [open]);
 
-  // Click outside
+  // Click outside — check both container and popover
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        popoverRef.current && !popoverRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     };
@@ -116,6 +136,7 @@ export default function Combobox({
     <div ref={containerRef} className="relative w-full" onKeyDown={handleKeyDown}>
       {/* Trigger */}
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
@@ -129,9 +150,9 @@ export default function Combobox({
         </svg>
       </button>
 
-      {/* Popover */}
-      {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl shadow-black/40">
+      {/* Popover — rendered via portal to escape overflow containers */}
+      {open && createPortal(
+        <div ref={popoverRef} style={popoverStyle} className="rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl shadow-black/40" onKeyDown={handleKeyDown}>
           {/* Search input */}
           <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2">
             <svg className="h-4 w-4 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,7 +190,8 @@ export default function Combobox({
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

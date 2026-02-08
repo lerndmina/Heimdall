@@ -79,6 +79,9 @@ function dashboardToModel(data: Record<string, any>): Record<string, any> {
     mapped.authCodeExpiry = mapped.cacheTimeout;
     delete mapped.cacheTimeout;
   }
+  if ("defaultDashboardTab" in mapped) {
+    mapped.defaultDashboardTab = mapped.defaultDashboardTab;
+  }
 
   return mapped;
 }
@@ -118,6 +121,7 @@ function modelToDashboard(config: Record<string, any>): Record<string, any> {
     enableMinecraftPlugin: config.enableMinecraftPlugin ?? false,
     enableAutoRevoke: config.leaveRevocation?.enabled ?? false,
     enableAutoRestore: config.autoLinkOnJoin ?? false,
+    defaultDashboardTab: config.defaultDashboardTab ?? "players",
   };
 }
 

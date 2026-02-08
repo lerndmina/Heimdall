@@ -341,7 +341,8 @@ export class ApiManager {
       });
     });
 
-    // Guild text channels — for channel pickers in the dashboard
+    // Guild channels — for channel pickers in the dashboard
+    // Supports ?type=text|voice|category|all (default: text)
     this.app.get("/api/guilds/:guildId/channels", (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
       if (!key || key !== this.apiKey) {
@@ -361,12 +362,23 @@ export class ApiManager {
         return;
       }
 
+      const typeFilter = (req.query.type as string) || "text";
+      const typeMap: Record<string, ChannelType[]> = {
+        text: [ChannelType.GuildText],
+        voice: [ChannelType.GuildVoice],
+        category: [ChannelType.GuildCategory],
+        all: [ChannelType.GuildText, ChannelType.GuildVoice, ChannelType.GuildCategory, ChannelType.GuildForum, ChannelType.GuildAnnouncement, ChannelType.GuildStageVoice],
+      };
+
+      const allowedTypes = typeMap[typeFilter] ?? [ChannelType.GuildText];
+
       const channels = guild.channels.cache
-        .filter((ch) => ch.type === ChannelType.GuildText)
+        .filter((ch) => allowedTypes.includes(ch.type))
         .sort((a, b) => a.position - b.position)
         .map((ch) => ({
           id: ch.id,
           name: ch.name,
+          type: ch.type,
           category: ch.parent?.name ?? null,
           categoryId: ch.parentId ?? null,
         }));
@@ -472,11 +484,7 @@ export class ApiManager {
         return;
       }
       try {
-        const doc = await DashboardPermission.findOneAndUpdate(
-          { guildId, discordRoleId: roleId },
-          { $set: { roleName: roleName ?? roleId, overrides: new Map(Object.entries(overrides)) } },
-          { upsert: true, new: true },
-        ).lean();
+        const doc = await DashboardPermission.findOneAndUpdate({ guildId, discordRoleId: roleId }, { $set: { roleName: roleName ?? roleId, overrides } }, { upsert: true, new: true }).lean();
         res.json({ success: true, data: { permission: doc } });
 
         // Audit log

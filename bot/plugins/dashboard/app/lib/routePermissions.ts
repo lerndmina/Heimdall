@@ -39,28 +39,45 @@ const routeMap: Record<string, string> = {
   // ── Tickets ──
   "GET /tickets": "tickets.view_tickets",
   "GET /tickets/*": "tickets.view_tickets",
+  "GET /tickets/stats": "tickets.view_tickets",
   "PUT /tickets/*": "tickets.manage_tickets",
+  "PATCH /tickets/*": "tickets.manage_tickets",
   "DELETE /tickets/*": "tickets.manage_tickets",
   "POST /tickets/*/close": "tickets.manage_tickets",
+  "PATCH /tickets/*/claim": "tickets.manage_tickets",
+  "PATCH /tickets/*/unclaim": "tickets.manage_tickets",
+  "PATCH /tickets/*/close": "tickets.manage_tickets",
   "GET /tickets/categories": "tickets.manage_categories",
   "POST /tickets/categories": "tickets.manage_categories",
   "PUT /tickets/categories/*": "tickets.manage_categories",
+  "PATCH /tickets/categories/*": "tickets.manage_categories",
   "DELETE /tickets/categories/*": "tickets.manage_categories",
+  "GET /tickets/categories/*/questions": "tickets.manage_categories",
+  "POST /tickets/categories/*/questions/*": "tickets.manage_categories",
+  "PATCH /tickets/categories/*/questions/*": "tickets.manage_categories",
+  "DELETE /tickets/categories/*/questions/*": "tickets.manage_categories",
   "GET /tickets/openers": "tickets.manage_openers",
   "POST /tickets/openers": "tickets.manage_openers",
   "PUT /tickets/openers/*": "tickets.manage_openers",
+  "PATCH /tickets/openers/*": "tickets.manage_openers",
   "DELETE /tickets/openers/*": "tickets.manage_openers",
+  "PATCH /tickets/openers/*/categories": "tickets.manage_openers",
+  "GET /tickets/archive-config": "tickets.manage_categories",
+  "PATCH /tickets/archive-config": "tickets.manage_categories",
 
   // ── Modmail ──
   "GET /modmail/conversations": "modmail.view_conversations",
   "GET /modmail/conversations/*": "modmail.view_conversations",
   "GET /modmail/config": "modmail.manage_config",
   "PUT /modmail/config": "modmail.manage_config",
+  "GET /modmail/stats": "modmail.view_conversations",
 
   // ── Suggestions ──
   "GET /suggestions": "suggestions.view_suggestions",
   "GET /suggestions/*": "suggestions.view_suggestions",
+  "GET /suggestions/stats": "suggestions.view_suggestions",
   "PUT /suggestions/*": "suggestions.manage_suggestions",
+  "PATCH /suggestions/*/status": "suggestions.manage_suggestions",
   "POST /suggestions/*/approve": "suggestions.manage_suggestions",
   "POST /suggestions/*/deny": "suggestions.manage_suggestions",
   "GET /suggestions/config": "suggestions.manage_config",
@@ -69,6 +86,9 @@ const routeMap: Record<string, string> = {
   "POST /suggestions/categories": "suggestions.manage_categories",
   "PUT /suggestions/categories/*": "suggestions.manage_categories",
   "DELETE /suggestions/categories/*": "suggestions.manage_categories",
+  "PUT /suggestions/categories/reorder": "suggestions.manage_categories",
+  "GET /suggestions/openers": "suggestions.manage_config",
+  "DELETE /suggestions/openers/*": "suggestions.manage_config",
 
   // ── Tags ──
   "GET /tags": "tags.view_tags",
@@ -80,21 +100,31 @@ const routeMap: Record<string, string> = {
   // ── Logging ──
   "GET /logging": "logging.view_config",
   "GET /logging/config": "logging.view_config",
+  "GET /logging/events": "logging.view_config",
   "PUT /logging/config": "logging.manage_config",
   "POST /logging/config": "logging.manage_config",
   "PUT /logging/*": "logging.manage_config",
+  "DELETE /logging/config": "logging.manage_config",
+  "POST /logging/test": "logging.manage_config",
 
   // ── Welcome ──
   "GET /welcome": "welcome.view_config",
   "GET /welcome/config": "welcome.view_config",
+  "GET /welcome/variables": "welcome.view_config",
   "PUT /welcome/config": "welcome.manage_config",
   "POST /welcome/config": "welcome.manage_config",
+  "DELETE /welcome/config": "welcome.manage_config",
+  "POST /welcome/test": "welcome.manage_config",
 
   // ── Temp VC ──
   "GET /tempvc": "tempvc.view_config",
   "GET /tempvc/config": "tempvc.view_config",
+  "GET /tempvc/active": "tempvc.view_config",
+  "GET /tempvc/stats": "tempvc.view_config",
   "PUT /tempvc/config": "tempvc.manage_config",
   "POST /tempvc/config": "tempvc.manage_config",
+  "DELETE /tempvc/config": "tempvc.manage_config",
+  "DELETE /tempvc/channels/*": "tempvc.manage_channels",
 
   // ── Reminders ──
   "GET /reminders": "reminders.view_reminders",

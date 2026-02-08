@@ -4,6 +4,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { pathToFileURL } from "url";
 import log from "../utils/logger";
 import type { PluginManifest, PluginContext, PluginModule, PluginAPI, LoadedPlugin, PluginsConfig, PluginLogger } from "../types/Plugin";
 import type { HeimdallClient } from "../types/Client";
@@ -317,8 +318,8 @@ export class PluginLoader {
 
     log.debug(`Loading plugin ${name} from ${entryPath}`);
 
-    // Dynamic import
-    const module: PluginModule = await import(entryPath);
+    // Dynamic import (use file:// URL for Node.js ESM compatibility on Windows)
+    const module: PluginModule = await import(pathToFileURL(entryPath).href);
 
     if (typeof module.onLoad !== "function") {
       throw new Error(`Plugin ${name} does not export an onLoad function`);
@@ -389,7 +390,7 @@ export class PluginLoader {
       if (fileName.startsWith("_")) continue;
 
       try {
-        const commandModule = await import(file);
+        const commandModule = await import(pathToFileURL(file).href);
 
         // Must have at least data
         if (!commandModule.data) {
@@ -405,7 +406,7 @@ export class PluginLoader {
           if (commandName) {
             const subcommandPath = path.join(pluginPath, "subcommands", commandName, "index.ts");
             if (fs.existsSync(subcommandPath)) {
-              const subModule = await import(subcommandPath);
+              const subModule = await import(pathToFileURL(subcommandPath).href);
               execute = subModule.execute;
               if (execute) {
                 log.debug(`Auto-discovered subcommand router for /${commandName}`);
@@ -453,7 +454,7 @@ export class PluginLoader {
 
     for (const file of files) {
       try {
-        const eventModule = await import(file);
+        const eventModule = await import(pathToFileURL(file).href);
 
         // Validate required exports
         if (!eventModule.event || !eventModule.execute) {
@@ -508,7 +509,7 @@ export class PluginLoader {
     }
 
     try {
-      const apiModule = await import(indexPath);
+      const apiModule = await import(pathToFileURL(indexPath).href);
 
       if (typeof apiModule.createRouter !== "function") {
         log.warn(`Plugin ${pluginName} api/index.ts does not export createRouter(), skipping API mount`);

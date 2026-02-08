@@ -34,6 +34,9 @@ export function createRouter(api: MinecraftPluginAPI): Router {
   // CRUD    /api/guilds/:guildId/minecraft/players
   router.use("/players", createPlayersRoutes(deps));
 
+  // POST   /api/guilds/:guildId/minecraft/import-whitelist
+  router.use("/", createPlayersRoutes(deps));
+
   // POST    /api/guilds/:guildId/minecraft/test-rcon
   router.use("/", createRconRoutes(deps));
 

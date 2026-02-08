@@ -99,6 +99,9 @@ const MinecraftConfigSchema = new Schema(
         },
       ],
     },
+
+    // Dashboard preferences
+    defaultDashboardTab: { type: String, enum: ["players", "pending", "config", "status"], default: "players" },
   },
   { timestamps: true },
 );

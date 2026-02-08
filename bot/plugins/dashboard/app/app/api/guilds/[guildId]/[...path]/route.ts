@@ -40,6 +40,7 @@ async function fetchBotApi<T>(path: string, cacheKey?: string): Promise<T | null
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       headers: { "X-API-Key": API_KEY },
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const json = await res.json();
@@ -127,6 +128,7 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
     const init: RequestInit = {
       method: req.method,
       headers,
+      cache: "no-store",
     };
 
     // Forward body for non-GET requests
@@ -148,6 +150,10 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Failed to connect to bot API" }, { status: 502 });
   }
 }
+
+// Force dynamic rendering — never cache responses from the bot API
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export const GET = proxyRequest;
 export const POST = proxyRequest;

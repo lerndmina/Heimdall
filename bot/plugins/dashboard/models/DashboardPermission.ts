@@ -25,12 +25,8 @@ const DashboardPermissionSchema = new Schema(
     },
     /** Keys: category ("minecraft") or action ("minecraft.manage_config"), values: "allow" | "deny" */
     overrides: {
-      type: Map,
-      of: {
-        type: String,
-        enum: ["allow", "deny"],
-      },
-      default: new Map(),
+      type: Schema.Types.Mixed,
+      default: {},
     },
   },
   { timestamps: true },

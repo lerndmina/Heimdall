@@ -14,6 +14,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import type { MinecraftApiDependencies } from "./index.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { mapOldToNew, type OldPlayerDoc } from "../lib/whitelistImport.js";
 
 const log = createLogger("minecraft:api:players");
 
@@ -34,6 +35,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       } else if (status === "pending") {
         query.linkedAt = { $ne: null };
         query.whitelistedAt = null;
+        query.revokedAt = null;
       } else if (status === "revoked") {
         query.revokedAt = { $ne: null };
       } else if (status === "unlinked") {
@@ -52,16 +54,21 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       }
 
       const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
-      const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 50));
-      const skip = (pageNum - 1) * limitNum;
+      // "all" = no limit
+      const isAll = (limit as string).toLowerCase() === "all";
+      const limitNum = isAll ? 0 : Math.max(1, parseInt(limit as string, 10) || 50);
+      const skip = limitNum > 0 ? (pageNum - 1) * limitNum : 0;
 
-      const [players, total] = await Promise.all([MinecraftPlayer.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(), MinecraftPlayer.countDocuments(query)]);
+      const findQuery = MinecraftPlayer.find(query).sort({ createdAt: -1 });
+      if (limitNum > 0) findQuery.skip(skip).limit(limitNum);
+
+      const [players, total] = await Promise.all([findQuery.lean(), MinecraftPlayer.countDocuments(query)]);
 
       res.json({
         success: true,
         data: {
           players,
-          pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+          pagination: { page: limitNum > 0 ? pageNum : 1, limit: limitNum || total, total, pages: limitNum > 0 ? Math.ceil(total / limitNum) : 1 },
         },
       });
     } catch (error) {
@@ -73,7 +80,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
   router.post("/manual", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId } = req.params;
-      const { minecraftUsername, minecraftUuid, discordId, notes, whitelist } = req.body;
+      const { minecraftUsername, minecraftUuid, discordId, discordUsername, discordDisplayName, notes, status, rejectionReason, revocationReason } = req.body;
 
       if (!minecraftUsername) {
         res.status(400).json({
@@ -105,12 +112,30 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       };
 
       if (minecraftUuid) playerData.minecraftUuid = minecraftUuid;
-      if (discordId) playerData.discordId = discordId;
-      if (whitelist) {
-        playerData.whitelistedAt = new Date();
+      if (discordId) {
+        playerData.discordId = discordId;
         playerData.linkedAt = new Date();
-        playerData.approvedBy = "api";
       }
+      if (discordUsername) playerData.discordUsername = discordUsername;
+      if (discordDisplayName) playerData.discordDisplayName = discordDisplayName;
+
+      // Handle status
+      const resolvedStatus = status || "pending";
+      if (resolvedStatus === "whitelisted") {
+        playerData.whitelistedAt = new Date();
+        if (!playerData.linkedAt) playerData.linkedAt = new Date();
+        playerData.approvedBy = "api";
+      } else if (resolvedStatus === "revoked") {
+        playerData.revokedAt = new Date();
+        playerData.revokedBy = "api";
+        if (revocationReason) playerData.revocationReason = revocationReason;
+      }
+      // "pending" is the default — linkedAt set, no whitelistedAt
+      if (resolvedStatus === "pending" && !playerData.linkedAt) {
+        playerData.linkedAt = new Date();
+      }
+
+      if (rejectionReason) playerData.rejectionReason = rejectionReason;
 
       const player = await MinecraftPlayer.create(playerData);
 
@@ -128,6 +153,66 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
 
       delete updateData._id;
       delete updateData.guildId;
+
+      // Translate the virtual `status` field into the real DB fields
+      const status = updateData.status;
+      delete updateData.status;
+
+      const current = await MinecraftPlayer.findOne({ _id: playerId, guildId });
+      if (!current) {
+        res.status(404).json({
+          success: false,
+          error: { code: "NOT_FOUND", message: "Player not found" },
+        });
+        return;
+      }
+
+      if (status === "revoked") {
+        // Only set revokedAt if not already revoked
+        if (!current.revokedAt) {
+          updateData.revokedAt = new Date();
+          updateData.revokedBy = "api";
+        }
+        updateData.revocationReason = updateData.revocationReason || current.revocationReason || "Revoked via dashboard";
+        // Clear whitelist status
+        updateData.whitelistedAt = null;
+        updateData.approvedBy = null;
+      } else if (status === "whitelisted") {
+        // Only set whitelistedAt if not already whitelisted
+        if (!current.whitelistedAt) {
+          updateData.whitelistedAt = new Date();
+          updateData.approvedBy = "api";
+        }
+        // Clear revocation status
+        updateData.revokedAt = null;
+        updateData.revokedBy = null;
+        updateData.revocationReason = null;
+        // Ensure linkedAt is set
+        if (!current.linkedAt && (updateData.discordId || current.discordId)) {
+          updateData.linkedAt = new Date();
+        }
+      } else if (status === "pending") {
+        // Clear both whitelist and revocation — back to pending
+        updateData.whitelistedAt = null;
+        updateData.approvedBy = null;
+        updateData.revokedAt = null;
+        updateData.revokedBy = null;
+        updateData.revocationReason = null;
+        // Ensure linkedAt is set
+        if (!current.linkedAt) {
+          updateData.linkedAt = new Date();
+        }
+      } else {
+        // No status field — handle linkedAt auto-set for legacy callers
+        if (updateData.discordId || updateData.status === "whitelisted") {
+          const hasDiscord = updateData.discordId || current.discordId;
+          const isWhitelisted = updateData.whitelistedAt || current.whitelistedAt;
+          const hasLinked = updateData.linkedAt || current.linkedAt;
+          if (hasDiscord && isWhitelisted && !hasLinked) {
+            updateData.linkedAt = new Date();
+          }
+        }
+      }
 
       const player = await MinecraftPlayer.findOneAndUpdate({ _id: playerId, guildId }, updateData, { new: true, runValidators: true }).lean();
 
@@ -199,11 +284,10 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
     }
   });
 
-  // POST /players/:playerId/unwhitelist — Remove whitelist
+  // POST /players/:playerId/unwhitelist — Remove whitelist (back to pending, not revoked)
   router.post("/:playerId/unwhitelist", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, playerId } = req.params;
-      const { reason, revokedBy } = req.body || {};
 
       const player = await MinecraftPlayer.findOne({ _id: playerId, guildId });
       if (!player) {
@@ -214,9 +298,9 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
         return;
       }
 
-      player.revokedAt = new Date();
-      player.revokedBy = revokedBy || "api";
-      player.revocationReason = reason || "Unwhitelisted via API";
+      // Clear whitelist status but keep them linked (back to pending)
+      player.whitelistedAt = undefined;
+      player.approvedBy = undefined;
       await player.save();
 
       res.json({ success: true, data: player.toObject() });
@@ -327,11 +411,11 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
     }
   });
 
-  // POST /import-whitelist — Bulk import
-  router.post("/../import-whitelist", async (req: Request, res: Response, next: NextFunction) => {
+  // POST /import-whitelist — Bulk import with SSE progress (mounted at parent router level)
+  router.post("/import-whitelist", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId } = req.params;
-      const { players: playerList, format } = req.body;
+      const { players: playerList, mode = "skip", stream } = req.body;
 
       if (!Array.isArray(playerList) || playerList.length === 0) {
         res.status(400).json({
@@ -341,42 +425,123 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
         return;
       }
 
-      const results = { imported: 0, skipped: 0, errors: 0 };
+      const overwrite = mode === "overwrite";
+
+      const results = { imported: 0, skipped: 0, overwritten: 0, errors: 0 };
+
+      const mapEntry = (entry: unknown) => {
+        if (typeof entry === "string") {
+          return {
+            username: entry,
+            doc: {
+              guildId,
+              minecraftUsername: entry,
+              whitelistedAt: new Date(),
+              source: "imported",
+            },
+          };
+        }
+
+        if (!entry || typeof entry !== "object") return null;
+
+        const e = entry as Record<string, unknown>;
+        const username = (e.minecraftUsername as string) || (e.name as string) || (e.username as string);
+        const uuid = (e.minecraftUuid as string) || (e.uuid as string);
+
+        if (!username) return null;
+
+        const hasHeimdallFields = Boolean(
+          e.minecraftUsername || e.discordId || e.linkedAt || e.whitelistedAt || e.revokedAt || e.discordUsername || e.discordDisplayName || e.whitelistStatus || e.createdAt || e.updatedAt,
+        );
+
+        if (!hasHeimdallFields && (e.name || e.username)) {
+          return {
+            username,
+            doc: {
+              guildId,
+              minecraftUsername: username,
+              minecraftUuid: uuid,
+              whitelistedAt: new Date(),
+              source: "imported",
+            },
+          };
+        }
+
+        const mapped = mapOldToNew(e as OldPlayerDoc, guildId);
+
+        if (uuid && !mapped.minecraftUuid) mapped.minecraftUuid = uuid;
+
+        const whitelistStatus = typeof e.whitelistStatus === "string" ? e.whitelistStatus : "";
+        if (whitelistStatus === "whitelisted" && !mapped.whitelistedAt) {
+          mapped.whitelistedAt = new Date();
+        }
+        if (whitelistStatus === "revoked" && !mapped.revokedAt) {
+          mapped.revokedAt = new Date();
+        }
+
+        return { username, doc: mapped };
+      };
+
+      // If the client asks for SSE streaming, send progress events
+      const useStream = stream === true;
+      if (useStream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.flushHeaders();
+      }
+
+      const total = playerList.length;
+      let processed = 0;
+
+      // Send progress every N records (or at least every 1% / every 50 records)
+      const progressInterval = Math.max(1, Math.min(50, Math.floor(total / 100)));
 
       for (const entry of playerList) {
         try {
-          const username = typeof entry === "string" ? entry : entry.name || entry.username;
-          const uuid = typeof entry === "string" ? undefined : entry.uuid;
-
-          if (!username) {
+          const mapped = mapEntry(entry);
+          if (!mapped) {
             results.errors++;
+            processed++;
             continue;
           }
 
           const existing = await MinecraftPlayer.findOne({
             guildId,
-            minecraftUsername: { $regex: new RegExp(`^${username}$`, "i") },
-          }).lean();
+            minecraftUsername: { $regex: new RegExp(`^${mapped.username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+          });
 
           if (existing) {
-            results.skipped++;
-            continue;
+            if (overwrite) {
+              // Overwrite: update the existing record with all mapped fields except guildId
+              const updateData = { ...mapped.doc };
+              delete updateData.guildId;
+              await MinecraftPlayer.updateOne({ _id: existing._id }, { $set: updateData });
+              results.overwritten++;
+            } else {
+              results.skipped++;
+            }
+          } else {
+            await MinecraftPlayer.create(mapped.doc);
+            results.imported++;
           }
-
-          await MinecraftPlayer.create({
-            guildId,
-            minecraftUsername: username,
-            minecraftUuid: uuid,
-            whitelistedAt: new Date(),
-            source: "imported",
-          });
-          results.imported++;
         } catch {
           results.errors++;
         }
+
+        processed++;
+
+        if (useStream && (processed % progressInterval === 0 || processed === total)) {
+          res.write(`data: ${JSON.stringify({ processed, total, ...results })}\n\n`);
+        }
       }
 
-      res.json({ success: true, data: results });
+      if (useStream) {
+        res.write(`data: ${JSON.stringify({ done: true, processed, total, ...results })}\n\n`);
+        res.end();
+      } else {
+        res.json({ success: true, data: results });
+      }
     } catch (error) {
       next(error);
     }

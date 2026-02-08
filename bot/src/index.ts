@@ -199,6 +199,17 @@ async function onReady(readyClient: Client<true>): Promise<void> {
 
 baseClient.once(Events.ClientReady, onReady);
 
+// Register commands when joining a new guild
+baseClient.on(Events.GuildCreate, async (guild) => {
+  log.info(`📥 Joined guild: ${guild.name} (${guild.id})`);
+  try {
+    await commandManager.registerCommandsToGuild(guild.id);
+    log.info(`✅ Registered commands for new guild: ${guild.name} (${guild.id})`);
+  } catch (error) {
+    log.error(`Failed to register commands for new guild ${guild.name} (${guild.id}):`, error);
+  }
+});
+
 // ============================================================================
 // Phase 5: Error handling
 // ============================================================================
@@ -224,8 +235,22 @@ process.on("uncaughtException", (error) => {
 // Phase 6: Graceful shutdown
 // ============================================================================
 
+let shuttingDown = false;
+
 async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) {
+    log.warn(`Received ${signal} again, forcing exit...`);
+    process.exit(1);
+  }
+  shuttingDown = true;
   log.info(`Received ${signal}, shutting down gracefully...`);
+
+  // Force exit after 10 seconds if graceful shutdown hangs
+  const forceTimer = setTimeout(() => {
+    log.error("Shutdown timed out after 10s, forcing exit...");
+    process.exit(1);
+  }, 10_000);
+  forceTimer.unref();
 
   try {
     // Unload plugins first (in reverse order)

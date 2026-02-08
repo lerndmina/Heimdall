@@ -16,6 +16,7 @@ import NumberInput from "@/components/ui/NumberInput";
 import Toggle from "@/components/ui/Toggle";
 import DayTimePicker from "@/components/ui/DayTimePicker";
 import Combobox from "@/components/ui/Combobox";
+import SetupWizard, { NotConfigured, EditButton, FieldDisplay, ReviewSection, ReviewRow, type WizardStep } from "@/components/ui/SetupWizard";
 import { fetchApi } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,7 @@ interface MinecraftConfig {
   enableMinecraftPlugin: boolean;
   enableAutoRevoke: boolean;
   enableAutoRestore: boolean;
+  defaultDashboardTab: "players" | "pending" | "config" | "status";
 }
 
 const DEFAULT_CONFIG: Omit<MinecraftConfig, "guildId"> = {
@@ -82,6 +84,7 @@ const DEFAULT_CONFIG: Omit<MinecraftConfig, "guildId"> = {
   enableMinecraftPlugin: false,
   enableAutoRevoke: false,
   enableAutoRestore: false,
+  defaultDashboardTab: "players",
 };
 
 // ---------------------------------------------------------------------------
@@ -198,18 +201,52 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
 
   // ====== Wizard overlay ======
   if (wizardOpen) {
+    const update = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) => setDraft((d) => ({ ...d, [key]: value }));
+
+    const wizardSteps: WizardStep[] = [
+      {
+        id: "server",
+        label: "Server Details",
+        content: <StepServer draft={draft} update={update} />,
+        validate: () => draft.serverName.trim() !== "" && draft.serverIp.trim() !== "",
+      },
+      {
+        id: "whitelist",
+        label: "Whitelist",
+        content: <StepWhitelist draft={draft} update={update} />,
+      },
+      {
+        id: "advanced",
+        label: "Advanced",
+        content: <StepAdvanced guildId={guildId} draft={draft} update={update} />,
+        validate: () => {
+          const hasIncompleteMapping = draft.roleMappings.some((m) => !m.discordRoleId || !m.minecraftGroup.trim());
+          if (hasIncompleteMapping) return false;
+          if (draft.roleSyncMode === "rcon") {
+            if (!draft.rconEnabled) return false;
+            if (!draft.rconPassword || draft.rconPassword === "") return false;
+            if (draft.rconPort < 1 || draft.rconPort > 65535) return false;
+          }
+          return true;
+        },
+      },
+      {
+        id: "review",
+        label: "Review",
+        content: <StepReview draft={draft} />,
+      },
+    ];
+
     return (
-      <ConfigWizard
-        guildId={guildId}
-        draft={draft}
-        setDraft={setDraft}
+      <SetupWizard
+        steps={wizardSteps}
         step={wizardStep}
-        setStep={setWizardStep}
+        onStepChange={setWizardStep}
+        isEdit={!notFound && !!config}
         saving={saving}
         saveError={saveError}
         onSave={handleSave}
         onCancel={() => setWizardOpen(false)}
-        isEdit={!notFound && !!config}
       />
     );
   }
@@ -217,27 +254,7 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
   // ====== No config — show create prompt ======
   if (notFound || !config) {
     return (
-      <Card className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="mb-4 rounded-full bg-zinc-800 p-4">
-          <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-            />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </div>
-        <CardTitle>No Minecraft Configuration</CardTitle>
-        <CardDescription className="mt-2 max-w-md">Set up the Minecraft plugin to enable whitelist management, account linking, and server monitoring.</CardDescription>
-        <button onClick={openCreateWizard} className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-500">
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Create Configuration
-        </button>
-      </Card>
+      <NotConfigured title="No Minecraft Configuration" description="Set up the Minecraft plugin to enable whitelist management, account linking, and server monitoring." onSetup={openCreateWizard} />
     );
   }
 
@@ -315,145 +332,23 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
                 {config.rconEnabled ? `Enabled (${config.rconHost || config.serverIp || "—"}:${config.rconPort ?? 25575})` : "Disabled"}
               </StatusBadge>
             </FieldDisplay>
+            <FieldDisplay label="Default Dashboard Tab">
+              <StatusBadge variant="neutral">
+                {config.defaultDashboardTab === "pending"
+                  ? "Pending"
+                  : config.defaultDashboardTab === "config"
+                    ? "Configuration"
+                    : config.defaultDashboardTab === "status"
+                      ? "Server Status"
+                      : "Players"}
+              </StatusBadge>
+            </FieldDisplay>
           </div>
         </CardContent>
       </Card>
 
       {/* Edit button */}
-      <div className="flex justify-end">
-        <button onClick={openEditWizard} className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500">
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-            />
-          </svg>
-          Edit Configuration
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ===========================================================================
-// Setup / Edit Wizard
-// ===========================================================================
-
-const STEPS = [
-  { id: "server", label: "Server Details" },
-  { id: "whitelist", label: "Whitelist" },
-  { id: "advanced", label: "Advanced" },
-  { id: "review", label: "Review" },
-] as const;
-
-interface WizardProps {
-  guildId: string;
-  draft: Omit<MinecraftConfig, "guildId">;
-  setDraft: React.Dispatch<React.SetStateAction<Omit<MinecraftConfig, "guildId">>>;
-  step: number;
-  setStep: (s: number) => void;
-  saving: boolean;
-  saveError: string | null;
-  onSave: () => void;
-  onCancel: () => void;
-  isEdit: boolean;
-}
-
-function ConfigWizard({ guildId, draft, setDraft, step, setStep, saving, saveError, onSave, onCancel, isEdit }: WizardProps) {
-  const update = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) => setDraft((d) => ({ ...d, [key]: value }));
-
-  const canNext = () => {
-    if (step === 0) return draft.serverName.trim() !== "" && draft.serverIp.trim() !== "";
-    if (step === 2) {
-      // All role mappings must be fully filled out
-      const hasIncompleteMapping = draft.roleMappings.some((m) => !m.discordRoleId || !m.minecraftGroup.trim());
-      if (hasIncompleteMapping) return false;
-
-      // RCON mode requires RCON to be enabled and configured
-      if (draft.roleSyncMode === "rcon") {
-        if (!draft.rconEnabled) return false;
-        if (!draft.rconPassword || draft.rconPassword === "") return false;
-        if (draft.rconPort < 1 || draft.rconPort > 65535) return false;
-      }
-    }
-    return true;
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-100">{isEdit ? "Edit Configuration" : "Setup Wizard"}</h2>
-          <p className="text-sm text-zinc-400">
-            Step {step + 1} of {STEPS.length} — {STEPS[step]!.label}
-          </p>
-        </div>
-        <button onClick={onCancel} className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200">
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Step indicator */}
-      <div className="flex gap-2">
-        {STEPS.map((s, i) => (
-          <button
-            key={s.id}
-            onClick={() => setStep(i)}
-            disabled={i > step && !canNext()}
-            className={`flex-1 rounded-full py-1 text-xs font-medium transition cursor-pointer ${
-              i === step ? "bg-primary-600 text-white" : i < step ? "bg-primary-600/30 text-primary-400 hover:bg-primary-600/50" : "bg-zinc-800 text-zinc-500 hover:bg-zinc-700"
-            } disabled:cursor-not-allowed disabled:opacity-50`}>
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Step content */}
-      <Card>
-        <CardContent>
-          {step === 0 && <StepServer draft={draft} update={update} />}
-          {step === 1 && <StepWhitelist draft={draft} update={update} />}
-          {step === 2 && <StepAdvanced guildId={guildId} draft={draft} update={update} />}
-          {step === 3 && <StepReview draft={draft} />}
-        </CardContent>
-      </Card>
-
-      {/* Error */}
-      {saveError && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{saveError}</div>}
-
-      {/* Navigation */}
-      <div className="flex items-center justify-between">
-        <button onClick={() => (step === 0 ? onCancel() : setStep(step - 1))} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
-          {step === 0 ? "Cancel" : "Back"}
-        </button>
-
-        {step < STEPS.length - 1 ? (
-          <button
-            onClick={() => setStep(step + 1)}
-            disabled={!canNext()}
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
-            Continue
-          </button>
-        ) : (
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50">
-            {saving && (
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
-                <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            )}
-            {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Configuration"}
-          </button>
-        )}
-      </div>
+      <EditButton onClick={openEditWizard} />
     </div>
   );
 }
@@ -823,6 +718,43 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
         min={60}
         max={3600}
       />
+
+      {/* Default Dashboard Tab */}
+      <div>
+        <p className="mb-3 text-sm font-medium text-zinc-300">Dashboard</p>
+        <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+          <div>
+            <p className="text-sm font-medium text-zinc-200">Default Tab</p>
+            <p className="text-xs text-zinc-500 mb-3">Choose which tab opens by default on the Minecraft dashboard page</p>
+            <div className="space-y-2">
+              {[
+                { value: "players" as const, label: "Players", desc: "Show the full players list" },
+                { value: "pending" as const, label: "Pending", desc: "Show players filtered to pending whitelist requests" },
+                { value: "config" as const, label: "Configuration", desc: "Show the configuration panel" },
+                { value: "status" as const, label: "Server Status", desc: "Show the server status monitors" },
+              ].map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
+                    draft.defaultDashboardTab === opt.value ? "border-primary-500 bg-primary-600/10" : "border-zinc-700 hover:border-zinc-600"
+                  }`}>
+                  <input
+                    type="radio"
+                    name="defaultDashboardTab"
+                    checked={draft.defaultDashboardTab === opt.value}
+                    onChange={() => update("defaultDashboardTab", opt.value)}
+                    className="mt-0.5 accent-primary-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-zinc-200">{opt.label}</p>
+                    <p className="text-xs text-zinc-500">{opt.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -882,39 +814,16 @@ function StepReview({ draft }: { draft: Omit<MinecraftConfig, "guildId"> }) {
           )}
           <ReviewRow label="RCON" value={draft.rconEnabled ? `${draft.rconHost || draft.serverIp}:${draft.rconPort}` : "Disabled"} />
           <ReviewRow label="Cache Timeout" value={`${draft.cacheTimeout}s`} />
+          <ReviewRow
+            label="Default Tab"
+            value={
+              draft.defaultDashboardTab === "pending" ? "Pending" : draft.defaultDashboardTab === "config" ? "Configuration" : draft.defaultDashboardTab === "status" ? "Server Status" : "Players"
+            }
+          />
         </ReviewSection>
       </div>
     </div>
   );
 }
 
-// ===========================================================================
-// Helpers
-// ===========================================================================
-
-function ReviewSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">{title}</p>
-      <div className="space-y-1.5">{children}</div>
-    </div>
-  );
-}
-
-function ReviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-zinc-400">{label}</span>
-      <span className="font-medium text-zinc-200">{value}</span>
-    </div>
-  );
-}
-
-function FieldDisplay({ label, value, children }: { label: string; value?: string; children?: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">{label}</p>
-      <div className="mt-1">{children ?? <p className="text-sm text-zinc-200">{value ?? "—"}</p>}</div>
-    </div>
-  );
-}
+// ReviewSection, ReviewRow, FieldDisplay imported from @/components/ui/SetupWizard

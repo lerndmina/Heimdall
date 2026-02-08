@@ -6,8 +6,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run src/index.ts --watch",
-    "start": "bun run src/index.ts",
+    "dev": "tsx watch --exclude .next --exclude node_modules src/index.ts",
+    "dev:bun": "bun run src/index.ts --watch",
+    "start": "tsx src/index.ts",
+    "start:bun": "bun run src/index.ts",
     "build": "bunx tsc",
     "lint": "bunx eslint src/**/*.ts",
     "lint:fix": "bunx eslint src/**/*.ts --fix"
@@ -15,10 +17,11 @@
   "dependencies": {
     "@sentry/node": "^10.23.0",
     "@tailwindcss/postcss": "^4.1.0",
-    "chrono-node": "^2.9.0",
+    "chrono-node": "2.8.5",
     "discord.js": "^14.25.1",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "lodash": "^4.17.23",
     "mongoose": "^8.19.2",
     "nanoid": "^5.1.6",
     "next": "^15.3.0",
@@ -27,6 +30,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "redis": "^5.9.0",
+    "sonner": "^2.0.7",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "tailwindcss": "^4.1.0",
@@ -39,6 +43,7 @@
     "@types/react-dom": "^19.1.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

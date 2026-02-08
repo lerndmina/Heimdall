@@ -131,5 +131,35 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
     }
   });
 
+  // POST /bulk-revert — Undo bulk approvals (returns players to pending)
+  router.post("/bulk-revert", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { guildId } = req.params;
+      const { playerIds } = req.body;
+
+      if (!Array.isArray(playerIds) || playerIds.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "playerIds array is required" },
+        });
+        return;
+      }
+
+      const result = await MinecraftPlayer.updateMany(
+        { _id: { $in: playerIds }, guildId, whitelistedAt: { $ne: null } },
+        {
+          $unset: { whitelistedAt: 1, approvedBy: 1, confirmedAt: 1 },
+        },
+      );
+
+      res.json({
+        success: true,
+        data: { reverted: result.modifiedCount, requested: playerIds.length },
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }
