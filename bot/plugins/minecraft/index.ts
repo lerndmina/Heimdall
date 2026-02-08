@@ -73,6 +73,15 @@ export async function onLoad(context: PluginContext): Promise<MinecraftPluginAPI
     if (migrated.modifiedCount > 0) {
       logger.info(`🔧 Migrated ${migrated.modifiedCount} config(s): reset swapped message defaults`);
     }
+
+    // Rename old whitelistPendingMessage → unset it so the new split fields take effect
+    const pendingMigrated = await MinecraftConfig.updateMany(
+      { whitelistPendingMessage: { $exists: true } },
+      { $unset: { whitelistPendingMessage: "" } },
+    );
+    if (pendingMigrated.modifiedCount > 0) {
+      logger.info(`🔧 Migrated ${pendingMigrated.modifiedCount} config(s): removed old whitelistPendingMessage`);
+    }
   } catch (err) {
     logger.error("Failed to run message migration:", err);
   }

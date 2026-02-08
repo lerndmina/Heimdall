@@ -81,6 +81,14 @@ const MinecraftConfigSchema = new Schema(
       type: String,
       default: "§cYour whitelist application has been rejected.\n§7Please contact staff for more information.",
     },
+    whitelistPendingApprovalMessage: {
+      type: String,
+      default: "§eYour whitelist application is pending staff approval.\n§7Please wait for a staff member to review your request.",
+    },
+    whitelistPendingScheduledMessage: {
+      type: String,
+      default: "§eYou will be whitelisted {schedule}.\n§7Please check back later!",
+    },
 
     // Role sync
     roleSync: {
