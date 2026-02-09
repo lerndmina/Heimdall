@@ -49,7 +49,10 @@ function escapeRegexExceptWildcard(str: string): string {
  * Convert a single wildcard pattern to a regex string.
  *
  * `*` becomes `\\S*` (matches any non-whitespace characters).
- * Word boundaries are added when the pattern does not start/end with `*`.
+ * Word boundaries (`\\b`) are added when the pattern edge is a word character.
+ * For non-word characters (like `:`, `-`, etc.), no boundary is needed —
+ * the literal character itself acts as a natural delimiter. This matches
+ * Discord's AutoMod behavior where `:*preg*:` correctly matches `:solacepreg:`.
  */
 export function wildcardToRegex(wildcard: string): string {
   const trimmed = wildcard.trim();
@@ -66,9 +69,24 @@ export function wildcardToRegex(wildcard: string): string {
   // Escape regex-special chars, then replace inner `*` with `\\S*`
   const escaped = escapeRegexExceptWildcard(core).replace(/\*/g, "\\S*");
 
-  // Build final pattern with appropriate anchors
-  const prefix = startsWithWild ? "\\S*" : "\\b";
-  const suffix = endsWithWild ? "\\S*" : "\\b";
+  // Build final pattern with appropriate anchors.
+  // \b only works correctly between word (\w) and non-word chars.
+  // If the pattern edge is already a non-word char (e.g. `:`) then \b
+  // would require a word char on the other side, which fails at
+  // whitespace/start-of-string. Skip the boundary in that case.
+  let prefix: string;
+  if (startsWithWild) {
+    prefix = "\\S*";
+  } else {
+    prefix = core.length > 0 && /\w/.test(core.charAt(0)) ? "\\b" : "";
+  }
+
+  let suffix: string;
+  if (endsWithWild) {
+    suffix = "\\S*";
+  } else {
+    suffix = core.length > 0 && /\w/.test(core.charAt(core.length - 1)) ? "\\b" : "";
+  }
 
   return `${prefix}${escaped}${suffix}`;
 }
