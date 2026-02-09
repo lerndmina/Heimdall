@@ -1,25 +1,24 @@
 /**
- * AnimatedBackground — gradient glow orbs + grid overlay with a user toggle.
+ * AnimatedBackground — optional lightweight background gradients.
  *
- * Persists the "animations off" preference to localStorage under the key
- * `heimdall:bg-animations`.  When disabled the orbs and grid remain visible
- * but all motion (pulse, etc.) is paused.
+ * Persists the "effects on" preference to localStorage under the key
+ * `heimdall:bg-effects`. When disabled, no extra overlays are rendered.
  */
 "use client";
 
 import { useEffect, useState } from "react";
 
-const STORAGE_KEY = "heimdall:bg-animations";
+const STORAGE_KEY = "heimdall:bg-effects";
 
 export default function AnimatedBackground() {
-  const [enabled, setEnabled] = useState(true);
+  const [enabled, setEnabled] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   // Read preference from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "off") setEnabled(false);
+      if (stored === "on") setEnabled(true);
     } catch {
       /* SSR / private-mode — ignore */
     }
@@ -40,32 +39,19 @@ export default function AnimatedBackground() {
 
   return (
     <>
-      {/* ── Glow orbs ── */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
-        <div className={`absolute -left-[10%] top-[15%] h-[500px] w-[500px] rounded-full bg-primary-500/8 blur-[100px] transition-opacity duration-700 ${enabled ? "animate-pulse" : "opacity-60"}`} />
-        <div
-          className={`absolute right-[0%] top-[50%] h-[400px] w-[400px] rounded-full bg-purple-500/6 blur-[100px] animation-delay-2000 transition-opacity duration-700 ${enabled ? "animate-pulse" : "opacity-60"}`}
-        />
-        <div
-          className={`absolute left-[40%] -top-[5%] h-[350px] w-[350px] rounded-full bg-blue-500/5 blur-[80px] animation-delay-1000 transition-opacity duration-700 ${enabled ? "animate-pulse" : "opacity-60"}`}
-        />
-        <div
-          className={`absolute left-[60%] bottom-[10%] h-[300px] w-[300px] rounded-full bg-primary-600/5 blur-[80px] animation-delay-3000 transition-opacity duration-700 ${enabled ? "animate-pulse" : "opacity-60"}`}
-        />
-      </div>
-
-      {/* ── Grid pattern overlay ── */}
-      <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(to_right,#27272a30_1px,transparent_1px),linear-gradient(to_bottom,#27272a30_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_40%,transparent_100%)] z-0" />
+      {enabled && (
+        <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(closest-side_at_18%_22%,rgba(99,102,241,0.18),transparent_70%),radial-gradient(closest-side_at_80%_55%,rgba(59,130,246,0.14),transparent_70%),radial-gradient(closest-side_at_60%_8%,rgba(168,85,247,0.12),transparent_70%)]" />
+      )}
 
       {/* ── Toggle button (bottom-right) ── */}
       {mounted && (
         <button
           onClick={toggle}
-          aria-label={enabled ? "Disable background animations" : "Enable background animations"}
-          title={enabled ? "Disable background animations" : "Enable background animations"}
-          className="fixed bottom-4 right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700/30 bg-zinc-900/60 text-zinc-500 backdrop-blur-xl transition-all duration-300 hover:border-zinc-600/40 hover:text-zinc-300 hover:shadow-lg">
+          aria-label={enabled ? "Disable background effects" : "Enable background effects"}
+          title={enabled ? "Disable background effects" : "Enable background effects"}
+          className="fixed bottom-4 right-4 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700/40 bg-zinc-900 text-zinc-500 transition-all duration-300 hover:border-zinc-600/60 hover:text-zinc-300">
           {enabled ? (
-            /* sparkles icon — animations on */
+            /* sparkles icon — effects on */
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -74,7 +60,7 @@ export default function AnimatedBackground() {
               />
             </svg>
           ) : (
-            /* sparkles with slash — animations off */
+            /* sparkles with slash — effects off */
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
