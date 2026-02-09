@@ -323,9 +323,9 @@ async function handleLinkAction(btnInteraction: ButtonInteraction, guildId: stri
       return;
     }
 
-      broadcastDashboardChange(guildId, "minecraft", "link_requested", { requiredAction: "minecraft.view_players" });
+    broadcastDashboardChange(guildId, "minecraft", "link_requested", { requiredAction: "minecraft.view_players" });
 
-      // Refresh the panel — it will now show the pending request with next steps
+    // Refresh the panel — it will now show the pending request with next steps
     try {
       const refreshed = await buildPanel(guildId, discordId, lib, mcConfig, commandInteraction);
       await commandInteraction.editReply(refreshed);
