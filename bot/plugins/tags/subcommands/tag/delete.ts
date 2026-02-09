@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { TagsPluginAPI } from "../../index.js";
 
 export async function handleDelete(context: CommandContext, pluginAPI: TagsPluginAPI): Promise<void> {
@@ -30,5 +31,15 @@ export async function handleDelete(context: CommandContext, pluginAPI: TagsPlugi
     return;
   }
 
+  // If the tag was registered as a slash command, re-sync guild commands
+  if (existingTag.registerAsSlashCommand) {
+    try {
+      await pluginAPI.tagSlashCommandService.toggleSlashCommand(guildId, name, false);
+    } catch {
+      // Tag is already deleted, just need to refresh commands
+    }
+  }
+
   await interaction.editReply(`✅ Tag \`${name}\` has been deleted.`);
+  broadcastDashboardChange(guildId, "tags", "tag_deleted", { requiredAction: "tags.manage_tags" });
 }

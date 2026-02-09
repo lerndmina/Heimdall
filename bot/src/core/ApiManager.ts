@@ -15,6 +15,7 @@ import swaggerUi from "swagger-ui-express";
 import { ChannelType, PermissionFlagsBits, EmbedBuilder, TextChannel, type Client } from "discord.js";
 import log from "../utils/logger";
 import { broadcast } from "./broadcast";
+import { resolveRouteAction } from "./dashboardRoutePermissions";
 import { ThingGetter } from "../../plugins/lib/utils/ThingGetter.js";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
 import DashboardSettings from "../../plugins/dashboard/models/DashboardSettings.js";
@@ -109,8 +110,11 @@ export class ApiManager {
         if (!match) return;
         const guildId = match[1] ?? "";
         if (!guildId) return;
-        const plugin = path.split("/")[4] || "unknown";
-        broadcast(guildId, "dashboard:data_changed", { method, path, plugin });
+        const pathSegments = path.split("/").filter(Boolean).slice(3);
+        const plugin = pathSegments[0] || "unknown";
+        const requiredAction = resolveRouteAction(method, pathSegments);
+        const requiredCategory = requiredAction ? undefined : plugin;
+        broadcast(guildId, "dashboard:data_changed", { method, path, plugin, requiredAction }, { requiredAction, requiredCategory });
       });
 
       next();

@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { ModerationPluginAPI } from "../../index.js";
 
 export async function handleEnable(context: CommandContext): Promise<void> {
@@ -26,6 +27,7 @@ export async function handleEnable(context: CommandContext): Promise<void> {
         ),
       ],
     });
+    broadcastDashboardChange(interaction.guildId!, "moderation", "automod_toggled", { requiredAction: "moderation.manage_config" });
   } else {
     await interaction.editReply({
       embeds: [mod.lib.builders.HeimdallEmbedBuilder.error("Failed to enable automod.")],

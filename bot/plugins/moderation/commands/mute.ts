@@ -4,6 +4,7 @@
 
 import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { CommandContext } from "../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import type { ModerationPluginAPI } from "../index.js";
 import { formatDuration } from "../utils/dm-templates.js";
 
@@ -71,6 +72,7 @@ export async function execute(context: CommandContext): Promise<void> {
     await interaction.editReply({
       embeds: [mod.lib.builders.HeimdallEmbedBuilder.success(`Timed out **${user.tag}** for **${formatDuration(durationMs)}** — ${reason}`)],
     });
+    broadcastDashboardChange(guild.id, "moderation", "mod_action", { requiredAction: "moderation.manage_infractions" });
   } else {
     await interaction.editReply({
       embeds: [mod.lib.builders.HeimdallEmbedBuilder.error(`Failed to timeout: ${result.error}`)],

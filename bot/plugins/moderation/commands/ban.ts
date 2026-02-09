@@ -4,6 +4,7 @@
 
 import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { CommandContext } from "../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import type { ModerationPluginAPI } from "../index.js";
 
 export const data = new SlashCommandBuilder()
@@ -58,6 +59,7 @@ export async function execute(context: CommandContext): Promise<void> {
     await interaction.editReply({
       embeds: [mod.lib.builders.HeimdallEmbedBuilder.success(`Banned **${user.tag}** — ${reason}`)],
     });
+    broadcastDashboardChange(guild.id, "moderation", "mod_action", { requiredAction: "moderation.manage_infractions" });
   } else {
     await interaction.editReply({
       embeds: [mod.lib.builders.HeimdallEmbedBuilder.error(`Failed to ban: ${result.error}`)],

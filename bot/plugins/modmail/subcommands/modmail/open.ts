@@ -4,6 +4,7 @@
 
 import type { GuildMember } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { ModmailPluginAPI } from "../../index.js";
 import { ModmailEmbeds } from "../../utils/ModmailEmbeds.js";
 import { ModmailPermissions } from "../../utils/ModmailPermissions.js";
@@ -138,6 +139,7 @@ export async function handleOpen(context: CommandContext, pluginAPI: ModmailPlug
         ),
       ],
     });
+    broadcastDashboardChange(interaction.guildId!, "modmail", "conversation_created", { requiredAction: "modmail.view_conversations" });
   } catch (error) {
     log.error("Modmail open error:", error);
     await interaction.editReply({

@@ -35,6 +35,11 @@ const TagSchema = new Schema(
       type: Number,
       default: 0,
     },
+    /** Whether this tag is registered as a standalone slash command in the guild */
+    registerAsSlashCommand: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

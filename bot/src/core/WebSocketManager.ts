@@ -2,6 +2,9 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { HeimdallClient } from "../types/Client.js";
 import type { RedisClientType } from "redis";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
+import type { BroadcastOptions } from "./broadcast.js";
+import { permissionCategories } from "./dashboardPermissionDefs.js";
+import { resolvePermissions, type MemberInfo, type RoleOverrides, type ResolvedPermissions } from "./dashboardPermissions.js";
 import { createLogger } from "./Logger.js";
 
 const log = createLogger("ws");
@@ -10,6 +13,7 @@ interface AuthenticatedSocket extends WebSocket {
   userId?: string;
   accessToken?: string;
   guildIds: Set<string>;
+  permissionsByGuild: Map<string, ResolvedPermissions>;
   isAlive: boolean;
 }
 
@@ -45,6 +49,7 @@ export class WebSocketManager {
     this.wss.on("connection", (ws, req) => {
       const socket = ws as AuthenticatedSocket;
       socket.guildIds = new Set();
+      socket.permissionsByGuild = new Map();
       socket.isAlive = true;
 
       ws.on("pong", () => {
@@ -92,14 +97,15 @@ export class WebSocketManager {
     }
   }
 
-  broadcastToGuild(guildId: string, event: string, data: unknown): void {
+  broadcastToGuild(guildId: string, event: string, data: unknown, options?: BroadcastOptions): void {
     const room = this.guildRooms.get(guildId);
     if (!room || room.size === 0) return;
 
     const message = JSON.stringify({ event, data, guildId, timestamp: Date.now() });
+    const { requiredAction, requiredCategory } = this.getRequiredPermission(event, data, options);
 
     for (const socket of room) {
-      if (socket.readyState === WebSocket.OPEN) {
+      if (socket.readyState === WebSocket.OPEN && this.canReceiveEvent(socket, guildId, requiredAction, requiredCategory)) {
         socket.send(message);
       }
     }
@@ -274,24 +280,104 @@ export class WebSocketManager {
     }
 
     if (!member) return false;
-    if (guild.ownerId === socket.userId) return true;
 
+    const resolved = await this.resolveGuildPermissions(guildId, member, socket.userId);
+    if (!resolved) return false;
+    socket.permissionsByGuild.set(guildId, resolved);
+    return !resolved.denyAccess;
+  }
+
+  private async resolveGuildPermissions(guildId: string, member: any, userId: string): Promise<ResolvedPermissions | null> {
     const permDocs = await DashboardPermission.find({ guildId }).lean();
-    if (permDocs.length === 0) return true;
+    if (permDocs.length === 0) {
+      return this.buildAllowAllPermissions();
+    }
 
-    const denyRoles = permDocs
-      .filter((doc) => (doc.overrides as Record<string, string> | undefined)?.["_deny_access"])
+    const memberInfo: MemberInfo = {
+      roleIds: member.roles.cache.map((r: any) => r.id),
+      isOwner: member.guild.ownerId === userId,
+      isAdministrator: member.permissions.has("Administrator"),
+    };
+
+    const roleOverrides: RoleOverrides[] = permDocs
+      .filter((doc) => member.roles.cache.has(doc.discordRoleId))
       .map((doc) => ({
-        roleId: doc.discordRoleId,
-        value: (doc.overrides as Record<string, string>)["_deny_access"],
-        position: guild.roles.cache.get(doc.discordRoleId)?.position ?? 0,
-      }))
-      .filter((doc) => member.roles.cache.has(doc.roleId))
-      .sort((a, b) => b.position - a.position);
+        overrides: (doc.overrides as Record<string, "allow" | "deny">) ?? {},
+        position: member.guild.roles.cache.get(doc.discordRoleId)?.position ?? 0,
+      }));
 
-    if (denyRoles.length === 0) return true;
+    return resolvePermissions(memberInfo, roleOverrides);
+  }
 
-    return denyRoles[0]?.value !== "deny";
+  private buildAllowAllPermissions(): ResolvedPermissions {
+    const resolved: Record<string, boolean> = {};
+    const categoryActions: Record<string, string[]> = {};
+
+    for (const cat of permissionCategories) {
+      categoryActions[cat.key] = [];
+      for (const action of cat.actions) {
+        const key = `${cat.key}.${action.key}`;
+        resolved[key] = true;
+        categoryActions[cat.key]!.push(key);
+      }
+    }
+
+    return {
+      denyAccess: false,
+      has(actionKey: string): boolean {
+        return resolved[actionKey] === true;
+      },
+      getAll(): Record<string, boolean> {
+        return { ...resolved };
+      },
+      hasAnyInCategory(categoryKey: string): boolean {
+        const actions = categoryActions[categoryKey];
+        if (!actions) return false;
+        return actions.some((key) => resolved[key] === true);
+      },
+    };
+  }
+
+  private canReceiveEvent(socket: AuthenticatedSocket, guildId: string, requiredAction?: string, requiredCategory?: string): boolean {
+    if (!requiredAction && !requiredCategory) return true;
+    const resolved = socket.permissionsByGuild.get(guildId);
+    if (!resolved) return false;
+    if (resolved.denyAccess) return false;
+    if (requiredAction) return resolved.has(requiredAction);
+    if (requiredCategory) return resolved.hasAnyInCategory(requiredCategory);
+    return true;
+  }
+
+  private getRequiredPermission(event: string, data: unknown, options?: BroadcastOptions): { requiredAction?: string; requiredCategory?: string } {
+    if (options?.requiredAction || options?.requiredCategory) {
+      return { requiredAction: options.requiredAction, requiredCategory: options.requiredCategory };
+    }
+
+    const payload = data as Record<string, any> | undefined;
+    if (payload?.requiredAction || payload?.requiredCategory) {
+      return { requiredAction: payload.requiredAction, requiredCategory: payload.requiredCategory };
+    }
+
+    if (event === "dashboard:data_changed" && payload?.plugin) {
+      const plugin = String(payload.plugin);
+      const type = typeof payload.type === "string" ? payload.type : "";
+      if (plugin === "modmail") {
+        if (type.startsWith("config") || type.startsWith("configuration")) {
+          return { requiredAction: "modmail.manage_config" };
+        }
+        return { requiredAction: "modmail.view_conversations" };
+      }
+      return { requiredCategory: plugin };
+    }
+
+    if (event.startsWith("modmail:")) {
+      if (event.startsWith("modmail:configuration") || event.startsWith("modmail:config")) {
+        return { requiredAction: "modmail.manage_config" };
+      }
+      return { requiredAction: "modmail.view_conversations" };
+    }
+
+    return {};
   }
 
   private async setupRedis(): Promise<void> {

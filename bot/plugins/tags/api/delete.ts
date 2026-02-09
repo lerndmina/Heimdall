@@ -29,14 +29,19 @@
 
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { TagsApiDependencies } from "./index.js";
+import type { TagSlashCommandService } from "../services/TagSlashCommandService.js";
 
-export function createTagDeleteRoutes(deps: TagsApiDependencies): Router {
+export function createTagDeleteRoutes(deps: TagsApiDependencies & { tagSlashCommandService?: TagSlashCommandService }): Router {
   const router = Router({ mergeParams: true });
 
   router.delete("/:name", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
       const name = req.params.name as string;
+
+      // Check if the tag was a slash command before deleting
+      const tag = await deps.tagService.getTag(guildId, name);
+      const wasSlashCommand = tag?.registerAsSlashCommand === true;
 
       const deleted = await deps.tagService.deleteTag(guildId, name);
       if (!deleted) {
@@ -45,6 +50,17 @@ export function createTagDeleteRoutes(deps: TagsApiDependencies): Router {
           error: { code: "NOT_FOUND", message: `Tag "${name}" not found` },
         });
         return;
+      }
+
+      // If it was a slash command, re-sync guild commands
+      if (wasSlashCommand && deps.tagSlashCommandService) {
+        try {
+          // Tag is already deleted; the provider will no longer return it,
+          // so refreshing guild commands is sufficient to remove it from Discord
+          await deps.tagSlashCommandService.toggleSlashCommand(guildId, name, false).catch(() => {});
+        } catch {
+          // Non-critical
+        }
       }
 
       res.json({ success: true, data: { deleted: true } });

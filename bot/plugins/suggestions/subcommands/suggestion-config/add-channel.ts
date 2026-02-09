@@ -4,6 +4,7 @@
 
 import { ChannelType } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { SuggestionsPluginAPI } from "../../index.js";
 import { SuggestionConfigHelper } from "../../models/SuggestionConfig.js";
 import { hasAICapabilities } from "../../utils/AIHelper.js";
@@ -67,6 +68,7 @@ export async function handleAddChannel(context: CommandContext, pluginAPI: Sugge
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
+    broadcastDashboardChange(interaction.guildId!, "suggestions", "config_updated", { requiredAction: "suggestions.manage_config" });
     log.info(`Added suggestion channel ${channel.id} in guild ${interaction.guildId}`);
   } catch (error) {
     log.error("Error adding suggestion channel:", error);

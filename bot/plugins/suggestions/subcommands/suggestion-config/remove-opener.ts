@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { SuggestionsPluginAPI } from "../../index.js";
 import SuggestionOpener from "../../models/SuggestionOpener.js";
 import { createLogger } from "../../../../src/core/Logger.js";
@@ -41,6 +42,7 @@ export async function handleRemoveOpener(context: CommandContext, pluginAPI: Sug
     await SuggestionOpener.deleteOne({ _id: opener._id });
 
     await interaction.editReply(`✅ Suggestion opener removed from <#${channel.id}>.`);
+    broadcastDashboardChange(interaction.guildId!, "suggestions", "opener_removed", { requiredAction: "suggestions.manage_config" });
     log.info(`Removed suggestion opener from channel ${channel.id} in guild ${interaction.guildId}`);
   } catch (error) {
     log.error("Error removing suggestion opener:", error);

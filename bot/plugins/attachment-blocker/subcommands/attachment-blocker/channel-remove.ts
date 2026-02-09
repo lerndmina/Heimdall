@@ -4,6 +4,7 @@
 
 import { type TextChannel } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { AttachmentBlockerPluginAPI } from "../../index.js";
 
 export async function handleChannelRemove(context: CommandContext, pluginAPI: AttachmentBlockerPluginAPI): Promise<void> {
@@ -37,4 +38,5 @@ export async function handleChannelRemove(context: CommandContext, pluginAPI: At
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
+  broadcastDashboardChange(interaction.guildId!, "attachment-blocker", "channel_override_removed", { requiredAction: "attachment-blocker.manage_config" });
 }

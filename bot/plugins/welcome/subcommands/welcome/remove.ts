@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { WelcomePluginAPI } from "../../index.js";
 
 export async function handleRemove(context: CommandContext, pluginAPI: WelcomePluginAPI): Promise<void> {
@@ -22,6 +23,7 @@ export async function handleRemove(context: CommandContext, pluginAPI: WelcomePl
     const embed = pluginAPI.lib.createEmbedBuilder().setColor(0x00ff00).setTitle("✅ Welcome Message Removed").setDescription("Welcome messages have been disabled for this server.");
 
     await interaction.editReply({ embeds: [embed] });
+    broadcastDashboardChange(guildId, "welcome", "config_removed", { requiredAction: "welcome.manage_config" });
   } catch (error) {
     await interaction.editReply("❌ Failed to remove welcome message configuration. Please try again.");
   }

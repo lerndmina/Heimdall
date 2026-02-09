@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { SuggestionsPluginAPI } from "../../index.js";
 import { SuggestionConfigHelper } from "../../models/SuggestionConfig.js";
 import Suggestion from "../../models/Suggestion.js";
@@ -41,6 +42,7 @@ export async function handleRemoveChannel(context: CommandContext, pluginAPI: Su
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
+    broadcastDashboardChange(interaction.guildId!, "suggestions", "config_updated", { requiredAction: "suggestions.manage_config" });
     log.info(`Removed suggestion channel ${channel.id} from guild ${interaction.guildId}`);
   } catch (error) {
     log.error("Error removing suggestion channel:", error);

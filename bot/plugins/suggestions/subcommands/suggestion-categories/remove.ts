@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { SuggestionsPluginAPI } from "../../index.js";
 import { SuggestionConfigHelper } from "../../models/SuggestionConfig.js";
 import { createLogger } from "../../../../src/core/Logger.js";
@@ -36,6 +37,7 @@ export async function handleRemove(context: CommandContext, pluginAPI: Suggestio
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
+    broadcastDashboardChange(interaction.guildId!, "suggestions", "category_removed", { requiredAction: "suggestions.manage_categories" });
   } catch (error) {
     log.error("Error removing category:", error);
     await interaction.reply({ content: "❌ An error occurred while removing the category.", ephemeral: true });

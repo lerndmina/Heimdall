@@ -5,6 +5,7 @@
 import { ActionRowBuilder, ChannelType, StringSelectMenuOptionBuilder } from "discord.js";
 import type { TextChannel } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { SuggestionsPluginAPI } from "../../index.js";
 import { SuggestionConfigHelper } from "../../models/SuggestionConfig.js";
 import SuggestionOpener from "../../models/SuggestionOpener.js";
@@ -82,6 +83,7 @@ export async function handleCreateOpener(context: CommandContext, pluginAPI: Sug
     });
 
     await interaction.editReply(`✅ Suggestion opener created in <#${channel.id}>!\n\nUsers can now select a channel to submit suggestions.`);
+    broadcastDashboardChange(interaction.guildId!, "suggestions", "opener_created", { requiredAction: "suggestions.manage_config" });
 
     log.info(`Created suggestion opener in channel ${channel.id} for guild ${interaction.guildId}`);
   } catch (error) {

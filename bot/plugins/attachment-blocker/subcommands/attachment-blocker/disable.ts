@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { AttachmentBlockerPluginAPI } from "../../index.js";
 
 export async function handleDisable(context: CommandContext, pluginAPI: AttachmentBlockerPluginAPI): Promise<void> {
@@ -27,4 +28,5 @@ export async function handleDisable(context: CommandContext, pluginAPI: Attachme
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
+  broadcastDashboardChange(guildId, "attachment-blocker", "config_updated", { requiredAction: "attachment-blocker.manage_config" });
 }

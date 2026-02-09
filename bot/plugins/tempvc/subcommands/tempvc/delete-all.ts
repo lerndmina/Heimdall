@@ -5,6 +5,7 @@
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
 import { getPluginAPI } from "../../utils/getPluginAPI.js";
 import { createLogger } from "../../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 
 const log = createLogger("tempvc:delete-all");
 
@@ -47,6 +48,7 @@ export async function handleDeleteAll(context: CommandContext): Promise<void> {
       await interaction.editReply({ content: `✅ Removed ${channelCount} creator channel(s).` });
     }
 
+    broadcastDashboardChange(interaction.guild!.id, "tempvc", "config_updated", { requiredAction: "tempvc.manage_config" });
     log.info(`User ${interaction.user.tag} removed ALL ${channelCount} creator channels in guild ${interaction.guild!.id}`);
   } catch (error) {
     log.error("Error removing channels:", error);

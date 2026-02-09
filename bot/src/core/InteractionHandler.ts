@@ -101,6 +101,34 @@ export class InteractionHandler {
     const command = this.commandManager.getCommand(commandName);
 
     if (!command) {
+      // Try dynamic command resolution (e.g., tag slash commands)
+      const dynamicHandler = await this.commandManager.resolveDynamicCommand(commandName, interaction.guildId);
+      if (dynamicHandler) {
+        const context: CommandContext = {
+          interaction,
+          client: this.client,
+          getPluginAPI: <T = PluginAPI>(name: string) => this.client.plugins.get(name) as T | undefined,
+        };
+        try {
+          await dynamicHandler(context);
+        } catch (error) {
+          log.error(`Dynamic command ${commandName} execution failed:`, error);
+          captureException(error, {
+            context: "Dynamic Command Execution",
+            command: commandName,
+            guild: interaction.guildId,
+            user: interaction.user.id,
+          });
+          const reply = { content: "❌ An error occurred while executing this command.", ephemeral: true };
+          if (interaction.deferred) {
+            await interaction.editReply(reply).catch(() => {});
+          } else if (!interaction.replied) {
+            await interaction.reply(reply).catch(() => {});
+          }
+        }
+        return;
+      }
+
       log.warn(`Unknown command: ${commandName}`);
       await interaction
         .reply({

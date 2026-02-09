@@ -101,12 +101,19 @@ export async function onLoad(context: PluginContext): Promise<ModmailPluginAPI> 
   // Initialize WebSocket service (optional)
   let modmailWebSocket: ModmailWebSocketService | null = null;
   if (wsManager) {
+    const resolveRequiredAction = (event: string): string => {
+      if (event.startsWith("modmail:configuration") || event.startsWith("modmail:config")) {
+        return "modmail.manage_config";
+      }
+      return "modmail.view_conversations";
+    };
+
     const adapter: WebSocketServer = {
       to(room: string) {
         return {
           emit(event: string, data: unknown) {
             const guildId = room.replace("guild:", "");
-            wsManager.broadcastToGuild(guildId, event, data);
+            wsManager.broadcastToGuild(guildId, event, data, { requiredAction: resolveRequiredAction(event) });
           },
         };
       },

@@ -4,6 +4,7 @@
 
 import { SlashCommandBuilder, PermissionFlagsBits, ActionRowBuilder, type ButtonInteraction } from "discord.js";
 import type { CommandContext } from "../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import type { ModerationPluginAPI } from "../index.js";
 
 export const data = new SlashCommandBuilder()
@@ -64,6 +65,7 @@ export async function execute(context: CommandContext): Promise<void> {
           embeds: [mod.lib.builders.HeimdallEmbedBuilder.success(`Cleared ${cleared} active infractions for **${user.tag}**.`)],
           components: [],
         });
+        broadcastDashboardChange(guild.id, "moderation", "infractions_cleared", { requiredAction: "moderation.manage_infractions" });
       },
       120_000, // 2 minute TTL
     )

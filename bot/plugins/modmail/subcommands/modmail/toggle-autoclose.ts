@@ -4,6 +4,7 @@
 
 import type { GuildMember } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { ModmailPluginAPI } from "../../index.js";
 import { ModmailEmbeds } from "../../utils/ModmailEmbeds.js";
 import { ModmailPermissions } from "../../utils/ModmailPermissions.js";
@@ -43,6 +44,7 @@ export async function handleToggleAutoclose(context: CommandContext, pluginAPI: 
     const newValue = !modmail.autoCloseDisabled;
 
     await Modmail.updateOne({ modmailId: modmail.modmailId }, { $set: { autoCloseDisabled: newValue } });
+    broadcastDashboardChange(interaction.guildId!, "modmail", "conversation_updated", { requiredAction: "modmail.view_conversations" });
 
     if (newValue) {
       await interaction.editReply({

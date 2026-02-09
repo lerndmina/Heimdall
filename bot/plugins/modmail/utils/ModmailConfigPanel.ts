@@ -42,6 +42,7 @@ import type { ModmailPluginAPI } from "../index.js";
 import type { PluginLogger } from "../../../src/types/Plugin.js";
 import type { ForumChannel, TextChannel } from "discord.js";
 import { ModmailColors } from "./ModmailEmbeds.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 /** TTL for ephemeral components (15 minutes) */
 const COMPONENT_TTL = 900;
@@ -372,6 +373,8 @@ export class ModmailConfigPanel {
         forumTags: forumTags || {},
       });
 
+      this.notifyConfigUpdated();
+
       this.log.info(`Modmail setup completed for guild ${this.guildId}`);
 
       // Transition to the config home view
@@ -386,6 +389,15 @@ export class ModmailConfigPanel {
         flags: MessageFlags.Ephemeral,
       });
     }
+  }
+
+  private notifyConfigUpdated(): void {
+    broadcastDashboardChange(this.guildId, "modmail", "config_updated", { requiredAction: "modmail.manage_config" });
+  }
+
+  private async saveConfig(cfg: IModmailConfig & import("mongoose").Document): Promise<void> {
+    await cfg.save();
+    this.notifyConfigUpdated();
   }
 
   // ========================================
@@ -462,7 +474,7 @@ export class ModmailConfigPanel {
       const cfg = await this.freshConfig();
       if (!cfg) return;
       cfg.enabled = !cfg.enabled;
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showHome(cfg, i);
     });
@@ -736,7 +748,7 @@ export class ModmailConfigPanel {
       const cfg = await this.freshConfig();
       if (!cfg) return;
       cfg.enableAutoClose = !cfg.enableAutoClose;
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showGlobalSettings(cfg, i);
     });
@@ -747,7 +759,7 @@ export class ModmailConfigPanel {
       const cfg = await this.freshConfig();
       if (!cfg) return;
       cfg.enableInactivityWarning = !cfg.enableInactivityWarning;
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showGlobalSettings(cfg, i);
     });
@@ -761,7 +773,7 @@ export class ModmailConfigPanel {
       const cfg = await this.freshConfig();
       if (!cfg) return;
       cfg.typingIndicators = !cfg.typingIndicators;
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showGlobalSettings(cfg, i);
     });
@@ -775,7 +787,7 @@ export class ModmailConfigPanel {
       const cfg = await this.freshConfig();
       if (!cfg) return;
       cfg.allowAttachments = !cfg.allowAttachments;
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showGlobalSettings(cfg, i);
     });
@@ -792,7 +804,7 @@ export class ModmailConfigPanel {
       const cfg = await this.freshConfig();
       if (!cfg) return;
       cfg.globalStaffRoleIds = i.roles.map((r) => r.id);
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showGlobalSettings(cfg, i);
     });
@@ -812,7 +824,7 @@ export class ModmailConfigPanel {
         const cfg = await this.freshConfig();
         if (!cfg) return;
         cfg.typingIndicatorStyle = i.values[0] as TypingIndicatorStyle;
-        await cfg.save();
+        await this.saveConfig(cfg);
         await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
         await this.showGlobalSettings(cfg, i);
       });
@@ -913,7 +925,7 @@ export class ModmailConfigPanel {
       if (threadPattern.length > 0 && threadPattern.length <= 100) cfg.threadNamingPattern = threadPattern;
       else errors.push("Thread naming pattern must be 1-100 chars");
 
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
 
       if (errors.length > 0) {
@@ -1166,7 +1178,7 @@ export class ModmailConfigPanel {
       const cat = (cfg.categories as ModmailCategory[]).find((c) => c.id === category.id);
       if (!cat) return;
       cat.enabled = !cat.enabled;
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showCategoryDetail(cfg, cat, i);
     });
@@ -1223,7 +1235,7 @@ export class ModmailConfigPanel {
       const cat = (cfg.categories as ModmailCategory[]).find((c) => c.id === category.id);
       if (!cat) return;
       cat.staffRoleIds = i.roles.map((r) => r.id);
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showCategoryDetail(cfg, cat, i);
     });
@@ -1242,7 +1254,7 @@ export class ModmailConfigPanel {
       const cat = (cfg.categories as ModmailCategory[]).find((c) => c.id === category.id);
       if (!cat) return;
       cat.priority = parseInt(i.values[0]!, 10) as 1 | 2 | 3 | 4;
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showCategoryDetail(cfg, cat, i);
     });
@@ -1336,7 +1348,7 @@ export class ModmailConfigPanel {
         cat.autoCloseHours = undefined;
       }
 
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
       await this.showCategoryDetail(cfg, cat, submit);
     } catch {
@@ -1844,7 +1856,7 @@ export class ModmailConfigPanel {
         if (!f || !f.options) return;
 
         f.options = f.options.filter((o) => o.value !== optValue);
-        await cfg.save();
+        await this.saveConfig(cfg);
         await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
         await this.showOptionEditor(cfg, cat, f, i);
       });
@@ -1940,7 +1952,7 @@ export class ModmailConfigPanel {
       }
 
       field.options.push({ label, value });
-      await cfg.save();
+      await this.saveConfig(cfg);
       await this.pluginAPI.modmailService.invalidateConfigCache(this.guildId);
 
       await this.showOptionEditor(cfg, cat, field, submit);

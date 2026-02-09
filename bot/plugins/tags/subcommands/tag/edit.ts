@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { TagsPluginAPI } from "../../index.js";
 
 export async function handleEdit(context: CommandContext, pluginAPI: TagsPluginAPI): Promise<void> {
@@ -39,6 +40,7 @@ export async function handleEdit(context: CommandContext, pluginAPI: TagsPluginA
       .addFields({ name: "Name", value: `\`${tag.name}\``, inline: true }, { name: "New Content", value: tag.content.substring(0, 1024), inline: false });
 
     await interaction.editReply({ embeds: [embed] });
+    broadcastDashboardChange(guildId, "tags", "tag_updated", { requiredAction: "tags.manage_tags" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update tag";
     await interaction.editReply(`❌ ${message}`);

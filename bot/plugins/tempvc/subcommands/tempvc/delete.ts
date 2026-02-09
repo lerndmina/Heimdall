@@ -5,6 +5,7 @@
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
 import { getPluginAPI } from "../../utils/getPluginAPI.js";
 import { createLogger } from "../../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 
 const log = createLogger("tempvc:delete");
 
@@ -51,6 +52,7 @@ export async function handleDelete(context: CommandContext): Promise<void> {
       await interaction.editReply({ content: `✅ Creator channel <#${channel.id}> removed.` });
     }
 
+    broadcastDashboardChange(interaction.guild!.id, "tempvc", "config_updated", { requiredAction: "tempvc.manage_config" });
     log.info(`User ${interaction.user.tag} removed creator channel ${channel.id} in guild ${interaction.guild!.id}`);
   } catch (error) {
     log.error("Error removing channel:", error);

@@ -4,6 +4,7 @@
 
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, type TextChannel, type NewsChannel } from "discord.js";
 import type { CommandContext } from "../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import type { ModerationPluginAPI } from "../index.js";
 
 export const data = new SlashCommandBuilder()
@@ -72,6 +73,7 @@ export async function execute(context: CommandContext): Promise<void> {
     }
 
     await interaction.editReply({ embeds: [embed] });
+    broadcastDashboardChange(guild.id, "moderation", "channel_lock_updated", { requiredAction: "moderation.manage_config" });
 
     // Log the action
     await mod.modActionService.sendModLog(

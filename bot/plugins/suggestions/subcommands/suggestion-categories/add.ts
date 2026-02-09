@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { SuggestionsPluginAPI } from "../../index.js";
 import { SuggestionConfigHelper } from "../../models/SuggestionConfig.js";
 import { createLogger } from "../../../../src/core/Logger.js";
@@ -37,6 +38,7 @@ export async function handleAdd(context: CommandContext, pluginAPI: SuggestionsP
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
+    broadcastDashboardChange(interaction.guildId!, "suggestions", "category_added", { requiredAction: "suggestions.manage_categories" });
   } catch (error) {
     log.error("Error adding category:", error);
     await interaction.reply({ content: "❌ An error occurred while adding the category.", ephemeral: true });

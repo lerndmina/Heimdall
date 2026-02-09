@@ -57,11 +57,19 @@ export interface ContextMenuCommandContext {
   getPluginAPI: <T = PluginAPI>(pluginName: string) => T | undefined;
 }
 
+/** Provider that returns additional per-guild command data */
+export type GuildCommandProvider = (guildId: string) => Promise<RESTPostAPIChatInputApplicationCommandsJSONBody[]>;
+
+/** Resolver that returns a handler for dynamically registered commands */
+export type DynamicCommandResolver = (commandName: string, guildId: string | null) => Promise<((context: CommandContext) => Promise<void>) | null>;
+
 export class CommandManager {
   private rest: REST;
   private client: HeimdallClient;
   private commands: Map<string, PluginCommand> = new Map();
   private contextMenuCommands: Map<string, PluginContextMenuCommand> = new Map();
+  private guildCommandProviders: GuildCommandProvider[] = [];
+  private dynamicCommandResolvers: DynamicCommandResolver[] = [];
 
   constructor(client: HeimdallClient, botToken: string) {
     this.client = client;
@@ -121,6 +129,40 @@ export class CommandManager {
   }
 
   /**
+   * Register a provider that contributes per-guild dynamic commands.
+   * Providers are called during registerCommandsToGuild() and their
+   * commands are included in the PUT body alongside static commands.
+   */
+  registerGuildCommandProvider(provider: GuildCommandProvider): void {
+    this.guildCommandProviders.push(provider);
+  }
+
+  /**
+   * Register a resolver for dynamically registered commands.
+   * When a command is not found in the static command map, resolvers
+   * are tried in order. The first to return a handler wins.
+   */
+  registerDynamicCommandResolver(resolver: DynamicCommandResolver): void {
+    this.dynamicCommandResolvers.push(resolver);
+  }
+
+  /**
+   * Attempt to resolve a dynamic command handler.
+   * Returns null if no resolver can handle the command.
+   */
+  async resolveDynamicCommand(commandName: string, guildId: string | null): Promise<((context: CommandContext) => Promise<void>) | null> {
+    for (const resolver of this.dynamicCommandResolvers) {
+      try {
+        const handler = await resolver(commandName, guildId);
+        if (handler) return handler;
+      } catch (error) {
+        log.error(`Dynamic command resolver failed for "${commandName}":`, error);
+      }
+    }
+    return null;
+  }
+
+  /**
    * Register global commands - SKIPPED (using guild-scoped for instant updates)
    * @deprecated Use registerAllCommandsToGuilds() instead
    */
@@ -141,6 +183,16 @@ export class CommandManager {
       ...Array.from(this.commands.values()).map((cmd) => cmd.data),
       ...Array.from(this.contextMenuCommands.values()).map((cmd) => cmd.data),
     ];
+
+    // Add per-guild dynamic commands from providers
+    for (const provider of this.guildCommandProviders) {
+      try {
+        const dynamicCommands = await provider(guildId);
+        commandData.push(...dynamicCommands);
+      } catch (error) {
+        log.error(`Guild command provider failed for guild ${guildId}:`, error);
+      }
+    }
 
     if (commandData.length === 0) {
       log.debug(`No commands to register for guild ${guildId}`);

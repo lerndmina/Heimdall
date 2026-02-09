@@ -4,6 +4,7 @@
 
 import { ChannelType, type GuildMember } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { WelcomePluginAPI } from "../../index.js";
 
 export async function handleSetup(context: CommandContext, pluginAPI: WelcomePluginAPI): Promise<void> {
@@ -31,6 +32,7 @@ export async function handleSetup(context: CommandContext, pluginAPI: WelcomePlu
       .setFooter({ text: "Use /welcome test to preview how it will look" });
 
     await interaction.editReply({ embeds: [embed] });
+    broadcastDashboardChange(guildId, "welcome", "config_updated", { requiredAction: "welcome.manage_config" });
   } catch (error) {
     await interaction.editReply("❌ Failed to configure welcome message. Please try again.");
   }

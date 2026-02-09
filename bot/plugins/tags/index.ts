@@ -20,6 +20,7 @@ import "./models/Tag.js";
 
 // Import service
 import { TagService } from "./services/TagService.js";
+import { TagSlashCommandService } from "./services/TagSlashCommandService.js";
 
 /** Handler ID for the persistent forward-to-user button */
 export const TAG_FORWARD_HANDLER_ID = "tags.forward_to_modmail";
@@ -28,20 +29,24 @@ export const TAG_FORWARD_HANDLER_ID = "tags.forward_to_modmail";
 export interface TagsPluginAPI extends PluginAPI {
   version: string;
   tagService: TagService;
+  tagSlashCommandService: TagSlashCommandService;
   lib: LibAPI;
 }
 
 let tagService: TagService;
+let tagSlashCommandService: TagSlashCommandService;
 
 export async function onLoad(context: PluginContext): Promise<TagsPluginAPI> {
-  const { logger, dependencies, client } = context;
+  const { logger, dependencies, client, commandManager } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI | undefined;
   if (!lib) throw new Error("tags requires lib plugin");
 
-  // Initialize service
+  // Initialize services
   tagService = new TagService();
+  tagSlashCommandService = new TagSlashCommandService(commandManager, tagService, lib);
+  tagSlashCommandService.register();
 
   // Register the persistent handler for forwarding tags to modmail recipients
   lib.componentCallbackService.registerPersistentHandler(TAG_FORWARD_HANDLER_ID, async (interaction) => {
@@ -138,6 +143,7 @@ export async function onLoad(context: PluginContext): Promise<TagsPluginAPI> {
   return {
     version: "1.0.0",
     tagService,
+    tagSlashCommandService,
     lib,
   };
 }

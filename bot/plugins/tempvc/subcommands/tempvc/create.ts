@@ -6,6 +6,7 @@ import type { CommandContext } from "../../../../src/core/CommandManager.js";
 import type { TempVCPluginAPI } from "../../index.js";
 import { getPluginAPI } from "../../utils/getPluginAPI.js";
 import { createLogger } from "../../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 
 const log = createLogger("tempvc:create");
 
@@ -62,6 +63,7 @@ export async function handleCreate(context: CommandContext): Promise<void> {
       await interaction.editReply({ content: `✅ Creator channel <#${channel.id}> configured.` });
     }
 
+    broadcastDashboardChange(interaction.guild!.id, "tempvc", "config_updated", { requiredAction: "tempvc.manage_config" });
     log.info(`User ${interaction.user.tag} setup creator channel ${channel.id} in guild ${interaction.guild!.id}`);
   } catch (error: any) {
     if (error.message?.includes("already configured")) {

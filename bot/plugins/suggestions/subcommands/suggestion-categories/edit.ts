@@ -5,6 +5,7 @@
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from "discord.js";
 import { nanoid } from "nanoid";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { SuggestionsPluginAPI } from "../../index.js";
 import { SuggestionConfigHelper } from "../../models/SuggestionConfig.js";
 import { createLogger } from "../../../../src/core/Logger.js";
@@ -87,6 +88,7 @@ export async function handleEdit(context: CommandContext, pluginAPI: Suggestions
       .setTimestamp();
 
     await modalSubmit.editReply({ embeds: [embed] });
+    broadcastDashboardChange(interaction.guildId!, "suggestions", "category_updated", { requiredAction: "suggestions.manage_categories" });
   } catch (error) {
     log.error("Error editing category:", error);
     if (!interaction.replied && !interaction.deferred) {

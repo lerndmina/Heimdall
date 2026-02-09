@@ -4,6 +4,7 @@
 
 import { ChannelType, type TextChannel } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { AttachmentBlockerPluginAPI } from "../../index.js";
 import { AttachmentType, AttachmentTypeLabels } from "../../utils/attachment-types.js";
 
@@ -79,4 +80,5 @@ export async function handleChannelAdd(context: CommandContext, pluginAPI: Attac
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
+  broadcastDashboardChange(guildId, "attachment-blocker", "channel_override_updated", { requiredAction: "attachment-blocker.manage_config" });
 }

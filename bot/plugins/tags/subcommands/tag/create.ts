@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { TagsPluginAPI } from "../../index.js";
 
 export async function handleCreate(context: CommandContext, pluginAPI: TagsPluginAPI): Promise<void> {
@@ -28,6 +29,7 @@ export async function handleCreate(context: CommandContext, pluginAPI: TagsPlugi
       .addFields({ name: "Name", value: `\`${tag.name}\``, inline: true }, { name: "Content", value: tag.content.substring(0, 1024), inline: false });
 
     await interaction.editReply({ embeds: [embed] });
+    broadcastDashboardChange(guildId, "tags", "tag_created", { requiredAction: "tags.manage_tags" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create tag";
     await interaction.editReply(`❌ ${message}`);

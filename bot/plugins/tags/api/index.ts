@@ -11,6 +11,7 @@ import { createTagCreateRoutes } from "./create.js";
 import { createTagUpdateRoutes } from "./update.js";
 import { createTagDeleteRoutes } from "./delete.js";
 import { createTagUseRoutes } from "./use.js";
+import { createTagSlashCommandRoutes } from "./slash-command.js";
 import type { TagsPluginAPI } from "../index.js";
 
 /** @deprecated Use createRouter instead */
@@ -33,10 +34,25 @@ export function createRouter(api: TagsPluginAPI): Router {
   router.use("/", createTagUpdateRoutes(deps));
 
   // DELETE /api/guilds/:guildId/tags/:name
-  router.use("/", createTagDeleteRoutes(deps));
+  router.use(
+    "/",
+    createTagDeleteRoutes({
+      ...deps,
+      tagSlashCommandService: api.tagSlashCommandService,
+    }),
+  );
 
   // POST   /api/guilds/:guildId/tags/:name/use
   router.use("/", createTagUseRoutes(deps));
+
+  // PATCH  /api/guilds/:guildId/tags/:name/slash-command
+  router.use(
+    "/",
+    createTagSlashCommandRoutes({
+      ...deps,
+      tagSlashCommandService: api.tagSlashCommandService,
+    }),
+  );
 
   return router;
 }

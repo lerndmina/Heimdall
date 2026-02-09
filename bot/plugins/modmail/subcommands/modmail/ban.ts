@@ -4,6 +4,7 @@
 
 import type { GuildMember } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { ModmailPluginAPI } from "../../index.js";
 import { ModmailEmbeds } from "../../utils/ModmailEmbeds.js";
 import { ModmailPermissions } from "../../utils/ModmailPermissions.js";
@@ -107,6 +108,7 @@ export async function handleBan(context: CommandContext, pluginAPI: ModmailPlugi
     await interaction.editReply({
       embeds: [ModmailEmbeds.success("User Banned", `${user} has been banned from modmail.\n\n` + `**Reason:** ${reason}\n` + `**Expires:** ${expiryText}`)],
     });
+    broadcastDashboardChange(interaction.guildId!, "modmail", "user_banned", { requiredAction: "modmail.manage_config" });
   } catch (error) {
     log.error("Modmail ban error:", error);
     await interaction.editReply({

@@ -4,6 +4,7 @@
 
 import type { GuildMember } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { ModmailPluginAPI } from "../../index.js";
 import { ModmailEmbeds } from "../../utils/ModmailEmbeds.js";
 import { ModmailPermissions } from "../../utils/ModmailPermissions.js";
@@ -96,6 +97,7 @@ export async function handleResolve(context: CommandContext, pluginAPI: ModmailP
     await interaction.editReply({
       embeds: [ModmailEmbeds.threadResolved(staffDisplayName, autoCloseHours)],
     });
+    broadcastDashboardChange(interaction.guildId!, "modmail", "conversation_resolved", { requiredAction: "modmail.view_conversations" });
   } catch (error) {
     log.error("Modmail resolve error:", error);
     await interaction.editReply({
