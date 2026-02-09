@@ -332,6 +332,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
   const [actions, setActions] = useState<string[]>(["delete", "warn", "log"]);
   const [warnPoints, setWarnPoints] = useState(1);
   const [matchMode, setMatchMode] = useState<"any" | "all">("any");
+  const [dmTemplate, setDmTemplate] = useState("");
 
   // Step 4: Scoping
   const [channelInclude, setChannelInclude] = useState<string[]>([]);
@@ -370,6 +371,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     setActions(["delete", "warn", "log"]);
     setWarnPoints(1);
     setMatchMode("any");
+    setDmTemplate("");
     setChannelInclude([]);
     setChannelExclude([]);
     setRoleInclude([]);
@@ -401,6 +403,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     setActions(rule.actions);
     setWarnPoints(rule.warnPoints);
     setMatchMode(rule.matchMode);
+    setDmTemplate(rule.dmTemplate ?? "");
     setChannelInclude(rule.channelInclude ?? []);
     setChannelExclude(rule.channelExclude ?? []);
     setRoleInclude(rule.roleInclude ?? []);
@@ -458,6 +461,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
       warnPoints,
     };
 
+    if (dmTemplate.trim()) body.dmTemplate = dmTemplate;
     if (channelInclude.length > 0) body.channelInclude = channelInclude;
     if (channelExclude.length > 0) body.channelExclude = channelExclude;
     if (roleInclude.length > 0) body.roleInclude = roleInclude;
@@ -848,6 +852,65 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                 ))}
               </div>
             </div>
+
+            {/* Per-rule DM Template (shown when DM or Warn action is selected) */}
+            {(actions.includes("dm") || actions.includes("warn")) && (
+              <div className="bg-zinc-800/30 rounded-lg p-3 space-y-2 border border-zinc-700/40">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium text-zinc-200">DM Message Template</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-600/40 text-zinc-400">Optional</span>
+                </div>
+                <p className="text-xs text-zinc-500">Override the default DM message for this rule. Leave blank to use the global default from Settings.</p>
+                <Textarea
+                  label=""
+                  value={dmTemplate}
+                  onChange={setDmTemplate}
+                  placeholder="You violated the **{rule}** rule in **{server}**.\n\n**Reason:** {reason}\n**Points:** {points} (Total: {totalPoints})"
+                  rows={3}
+                />
+                <details className="text-xs">
+                  <summary className="text-zinc-400 cursor-pointer hover:text-zinc-300">Available variables</summary>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-zinc-400">
+                    <div>
+                      <code className="text-amber-400/70">{"{server}"}</code> — Server name
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{rule}"}</code> — Rule name
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{action}"}</code> — Action taken
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{reason}"}</code> — Reason text
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{points}"}</code> — Points assigned
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{totalPoints}"}</code> — Total active points
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{user}"}</code> — User mention
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{username}"}</code> — Username
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{channel}"}</code> — Channel mention
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{matchedContent}"}</code> — Matched text
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{duration}"}</code> — Timeout duration
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">{"{timestamp}"}</code> — ISO timestamp
+                    </div>
+                  </div>
+                </details>
+              </div>
+            )}
 
             {/* Match Mode + Warn Points */}
             <div className="grid grid-cols-2 gap-4">
@@ -1513,9 +1576,47 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
               rows={3}
               disabled={!canManage}
             />
-            <p className="text-xs text-zinc-500">
-              Variables: {"{server}"} {"{action}"} {"{reason}"} {"{points}"} {"{total_points}"} {"{duration}"} {"{moderator}"} {"{rule}"}
-            </p>
+            <details className="text-xs">
+              <summary className="text-zinc-400 cursor-pointer hover:text-zinc-300">Available variables</summary>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-zinc-400">
+                <div>
+                  <code className="text-amber-400/70">{"{server}"}</code> — Server name
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{rule}"}</code> — Rule name
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{action}"}</code> — Action taken
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{reason}"}</code> — Reason text
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{points}"}</code> — Points assigned
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{totalPoints}"}</code> — Total active points
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{user}"}</code> — User mention
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{username}"}</code> — Username
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{channel}"}</code> — Channel mention
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{matchedContent}"}</code> — Matched text
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{duration}"}</code> — Timeout duration
+                </div>
+                <div>
+                  <code className="text-amber-400/70">{"{timestamp}"}</code> — ISO timestamp
+                </div>
+              </div>
+            </details>
           </div>
         </CardContent>
       </Card>
