@@ -13,6 +13,7 @@ import type { CommandContext } from "../../../src/core/CommandManager.js";
 import type { MinecraftPluginAPI } from "../index.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import { mapOldToNew, type OldPlayerDoc } from "../lib/whitelistImport.js";
 
 const log = createLogger("minecraft:import-whitelist");
@@ -191,6 +192,10 @@ export async function execute(context: CommandContext): Promise<void> {
   }
 
   await interaction.editReply(replyOptions);
+
+  if (!dryRun && (results.imported > 0 || results.overwritten > 0)) {
+    broadcastDashboardChange(guildId, "minecraft", "players_imported", { requiredAction: "minecraft.view_players" });
+  }
 
   log.info(`[${guildId}] Whitelist import: ${results.imported} imported, ${results.skipped} skipped, ${results.overwritten} overwritten, ${results.errors.length} errors (dry-run: ${dryRun})`);
 }

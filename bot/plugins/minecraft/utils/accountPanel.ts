@@ -13,6 +13,7 @@ import MinecraftConfig from "../models/MinecraftConfig.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
 import { nanoid } from "nanoid";
 import { createLogger } from "../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 const log = createLogger("minecraft:panel-cmd");
 
@@ -322,7 +323,9 @@ async function handleLinkAction(btnInteraction: ButtonInteraction, guildId: stri
       return;
     }
 
-    // Refresh the panel — it will now show the pending request with next steps
+      broadcastDashboardChange(guildId, "minecraft", "link_requested", { requiredAction: "minecraft.view_players" });
+
+      // Refresh the panel — it will now show the pending request with next steps
     try {
       const refreshed = await buildPanel(guildId, discordId, lib, mcConfig, commandInteraction);
       await commandInteraction.editReply(refreshed);
@@ -450,6 +453,8 @@ async function handleConfirmCodeAction(
       await freshAuth.save();
     }
 
+    broadcastDashboardChange(guildId, "minecraft", "player_linked", { requiredAction: "minecraft.view_players" });
+
     // Refresh the panel — it will now show the newly linked account
     try {
       const refreshed = await buildPanel(guildId, discordId, lib, mcConfig, commandInteraction);
@@ -484,6 +489,7 @@ async function handleUnlinkAction(
 
   const confirmBtn = lib.createButtonBuilder(async (ci) => {
     await MinecraftPlayer.findByIdAndDelete(player._id);
+    broadcastDashboardChange(guildId, "minecraft", "player_unlinked", { requiredAction: "minecraft.view_players" });
 
     const doneEmbed = lib.createEmbedBuilder().setColor(0x00ff00).setTitle("✅ Account Unlinked").setDescription(`**${player.minecraftUsername}** has been unlinked from your Discord account.`);
     await ci.update({ embeds: [doneEmbed], components: [] });

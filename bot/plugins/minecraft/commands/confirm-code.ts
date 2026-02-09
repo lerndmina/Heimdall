@@ -8,6 +8,7 @@ import type { MinecraftPluginAPI } from "../index.js";
 import MinecraftConfig from "../models/MinecraftConfig.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 const log = createLogger("minecraft:confirm");
 
@@ -113,6 +114,8 @@ export async function execute(context: CommandContext): Promise<void> {
     pendingAuth.isExistingPlayerLink = undefined;
     await pendingAuth.save();
 
+    broadcastDashboardChange(guildId, "minecraft", "player_linked", { requiredAction: "minecraft.view_players" });
+
     const embed = pluginAPI.lib
       .createEmbedBuilder()
       .setColor(0x00ff00)
@@ -138,6 +141,8 @@ export async function execute(context: CommandContext): Promise<void> {
   }
 
   await pendingAuth.save();
+
+  broadcastDashboardChange(guildId, "minecraft", "player_linked", { requiredAction: "minecraft.view_players" });
 
   if (mcConfig.autoWhitelist) {
     const embed = pluginAPI.lib

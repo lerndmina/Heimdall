@@ -15,6 +15,7 @@ import MinecraftConfig from "../models/MinecraftConfig.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
 import { showAccountPanel } from "../utils/accountPanel.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 const log = createLogger("minecraft:link");
 
@@ -152,6 +153,8 @@ export async function execute(context: CommandContext): Promise<void> {
     await interaction.editReply({ embeds: [embed] });
     return;
   }
+
+  broadcastDashboardChange(guildId, "minecraft", "link_requested", { requiredAction: "minecraft.view_players" });
 
   // Show the panel — it will now show the new pending request with all management buttons
   await showAccountPanel(interaction, pluginAPI.lib);

@@ -28,6 +28,7 @@ import type { PluginLogger } from "../../../src/types/Plugin.js";
 import MinecraftConfig from "../models/MinecraftConfig.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
 import { nanoid } from "nanoid";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 export class MinecraftPanelService {
   constructor(
@@ -305,6 +306,8 @@ export class MinecraftPanelService {
         { upsert: true, new: true },
       );
 
+      broadcastDashboardChange(guildId, "minecraft", "link_requested", { requiredAction: "minecraft.view_players" });
+
       const embed = this.lib
         .createEmbedBuilder()
         .setColor(0x00ff00)
@@ -531,6 +534,8 @@ export class MinecraftPanelService {
         await freshAuth.save();
       }
 
+      broadcastDashboardChange(guildId, "minecraft", "player_linked", { requiredAction: "minecraft.view_players" });
+
       // Update the status reply to show the result
       const successEmbed = this.lib
         .createEmbedBuilder()
@@ -597,6 +602,7 @@ export class MinecraftPanelService {
 
       const confirmBtn = this.lib.createButtonBuilder(async (i) => {
         await MinecraftPlayer.findByIdAndDelete(player._id);
+        broadcastDashboardChange(guildId, "minecraft", "player_unlinked", { requiredAction: "minecraft.view_players" });
         const doneEmbed = this.lib
           .createEmbedBuilder()
           .setColor(0x00ff00)
@@ -638,6 +644,7 @@ export class MinecraftPanelService {
 
       const confirmBtn = this.lib.createButtonBuilder(async (ci) => {
         await MinecraftPlayer.findByIdAndDelete(doc._id);
+        broadcastDashboardChange(guildId, "minecraft", "player_unlinked", { requiredAction: "minecraft.view_players" });
 
         const doneEmbed = this.lib
           .createEmbedBuilder()
