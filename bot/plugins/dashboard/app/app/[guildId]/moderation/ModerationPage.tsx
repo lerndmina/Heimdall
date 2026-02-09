@@ -88,6 +88,7 @@ interface Preset {
   name: string;
   description: string;
   patterns: { regex: string; flags?: string; label?: string }[];
+  wildcardPatterns?: string;
   target: string[];
   matchMode: "any" | "all";
   actions: string[];
@@ -1082,31 +1083,54 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
                 ))}
             </div>
 
-            {expandedId === preset.id && (
-              <div className="mt-3 pt-3 border-t border-zinc-700/50 space-y-2">
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">
-                    Target: {(Array.isArray(preset.target) ? preset.target : [preset.target]).map((t) => TARGET_OPTIONS.find((o) => o.value === t)?.label ?? t).join(", ")}
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Match: {preset.matchMode === "all" ? "All patterns" : "Any pattern"}</span>
-                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Points: {preset.warnPoints}</span>
-                </div>
-                <div className="text-xs text-zinc-400">
-                  <span className="font-medium text-zinc-300">Actions:</span> {preset.actions.map((a) => ACTION_OPTIONS.find((o) => o.value === a)?.label ?? a).join(", ")}
-                </div>
-                <div className="space-y-1">
-                  <span className="text-xs font-medium text-zinc-300">Patterns ({preset.patterns.length}):</span>
-                  {preset.patterns.map((p, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs bg-zinc-800/60 rounded px-2 py-1.5">
-                      <code className="text-amber-400/80 break-all font-mono">
-                        /{p.regex}/{p.flags ?? ""}
-                      </code>
-                      {p.label && <span className="text-zinc-500 shrink-0">— {p.label}</span>}
+            {expandedId === preset.id &&
+              (() => {
+                const wildcards = preset.wildcardPatterns
+                  ? preset.wildcardPatterns
+                      .split(/[,\n]+/)
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                  : [];
+                return (
+                  <div className="mt-3 pt-3 border-t border-zinc-700/50 space-y-2">
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">
+                        Target: {(Array.isArray(preset.target) ? preset.target : [preset.target]).map((t) => TARGET_OPTIONS.find((o) => o.value === t)?.label ?? t).join(", ")}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Match: {preset.matchMode === "all" ? "All patterns" : "Any pattern"}</span>
+                      <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Points: {preset.warnPoints}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                    <div className="text-xs text-zinc-400">
+                      <span className="font-medium text-zinc-300">Actions:</span> {preset.actions.map((a) => ACTION_OPTIONS.find((o) => o.value === a)?.label ?? a).join(", ")}
+                    </div>
+                    {wildcards.length > 0 && (
+                      <div className="space-y-1">
+                        <span className="text-xs font-medium text-zinc-300">Wildcard Patterns ({wildcards.length}):</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {wildcards.map((w, i) => (
+                            <span key={i} className="text-xs bg-zinc-800/60 rounded px-2 py-1 font-mono text-emerald-400/80">
+                              {w}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {preset.patterns.length > 0 && (
+                      <div className="space-y-1">
+                        <span className="text-xs font-medium text-zinc-300">Regex Patterns ({preset.patterns.length}):</span>
+                        {preset.patterns.map((p, i) => (
+                          <div key={i} className="flex items-start gap-2 text-xs bg-zinc-800/60 rounded px-2 py-1.5">
+                            <code className="text-amber-400/80 break-all font-mono">
+                              /{p.regex}/{p.flags ?? ""}
+                            </code>
+                            {p.label && <span className="text-zinc-500 shrink-0">— {p.label}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
           </CardContent>
         </Card>
       ))}
