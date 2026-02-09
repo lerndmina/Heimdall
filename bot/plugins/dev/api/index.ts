@@ -8,7 +8,7 @@ import { createMigrateRoutes } from "./migrate.js";
 import { createBotOwnerRoutes } from "./bot-owner.js";
 
 export interface DevApiDependencies {
-  lib: PluginContext["lib"];
+  lib: any;
 }
 
 export function createDevApi(deps: DevApiDependencies): Router {

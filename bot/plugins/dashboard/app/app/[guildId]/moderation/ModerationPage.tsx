@@ -563,8 +563,12 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
             {tiers.length === 0 && <p className="text-zinc-500 text-sm text-center py-2">No escalation tiers configured.</p>}
             {tiers.map((tier, i) => (
               <div key={i} className="flex items-end gap-3 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
-                <TextInput label="Name" value={tier.name} onChange={(v) => updateTier(i, "name", v)} placeholder="e.g. Warning" className="flex-1" />
-                <TextInput label="Points" value={String(tier.pointsThreshold)} onChange={(v) => updateTier(i, "pointsThreshold", parseInt(v) || 0)} type="number" className="w-24" />
+                <div className="flex-1">
+                  <TextInput label="Name" value={tier.name} onChange={(v) => updateTier(i, "name", v)} placeholder="e.g. Warning" />
+                </div>
+                <div className="w-24">
+                  <TextInput label="Points" value={String(tier.pointsThreshold)} onChange={(v) => updateTier(i, "pointsThreshold", parseInt(v) || 0)} type="number" />
+                </div>
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-zinc-300 mb-1">Action</label>
                   <select
@@ -576,7 +580,11 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
                     <option value="ban">Ban</option>
                   </select>
                 </div>
-                {tier.action === "timeout" && <TextInput label="Duration" value={tier.duration ?? ""} onChange={(v) => updateTier(i, "duration", v)} placeholder="e.g. 1h, 1d" className="w-28" />}
+                {tier.action === "timeout" && (
+                  <div className="w-28">
+                    <TextInput label="Duration" value={tier.duration ?? ""} onChange={(v) => updateTier(i, "duration", v)} placeholder="e.g. 1h, 1d" />
+                  </div>
+                )}
                 {canManage && (
                   <button onClick={() => removeTier(i)} className="text-red-400 hover:text-red-300 pb-2">
                     ✕
@@ -643,16 +651,17 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
       <Card>
         <CardContent>
           <div className="flex gap-3">
-            <TextInput
-              label="Search by User ID"
-              value={searchUserId}
-              onChange={(v) => {
-                setSearchUserId(v);
-                setPage(1);
-              }}
-              placeholder="e.g. 123456789012345678"
-              className="flex-1"
-            />
+            <div className="flex-1">
+              <TextInput
+                label="Search by User ID"
+                value={searchUserId}
+                onChange={(v) => {
+                  setSearchUserId(v);
+                  setPage(1);
+                }}
+                placeholder="e.g. 123456789012345678"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

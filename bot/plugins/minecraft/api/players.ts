@@ -455,7 +455,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
           };
         }
 
-        const mapped = mapOldToNew(e as OldPlayerDoc, guildId);
+        const mapped = mapOldToNew(e as OldPlayerDoc, guildId as string);
 
         if (uuid && !mapped.minecraftUuid) mapped.minecraftUuid = uuid;
 

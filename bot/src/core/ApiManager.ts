@@ -442,7 +442,7 @@ export class ApiManager {
         return;
       }
 
-      const guild = this.client.guilds.cache.get(guildId);
+      const guild = this.client.guilds.cache.get(guildId as string);
       res.json({
         success: true,
         data: {
@@ -468,7 +468,7 @@ export class ApiManager {
         return;
       }
 
-      const guild = this.client.guilds.cache.get(guildId);
+      const guild = this.client.guilds.cache.get(guildId as string);
       if (!guild) {
         res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Guild not found" } });
         return;
@@ -486,7 +486,7 @@ export class ApiManager {
 
       const channels = guild.channels.cache
         .filter((ch) => allowedTypes.includes(ch.type))
-        .sort((a, b) => a.position - b.position)
+        .sort((a, b) => ("position" in a ? a.position : 0) - ("position" in b ? b.position : 0))
         .map((ch) => ({
           id: ch.id,
           name: ch.name,
@@ -512,7 +512,7 @@ export class ApiManager {
         return;
       }
 
-      const guild = this.client.guilds.cache.get(guildId);
+      const guild = this.client.guilds.cache.get(guildId as string);
       if (!guild) {
         res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Guild not found" } });
         return;
@@ -543,13 +543,13 @@ export class ApiManager {
         res.status(503).json({ success: false, error: "Bot not ready" });
         return;
       }
-      const guild = await this.thingGetter!.getGuild(guildId);
+      const guild = await this.thingGetter!.getGuild(guildId as string);
       if (!guild) {
         res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Guild not found" } });
         return;
       }
 
-      const member = await this.thingGetter!.getMember(guild, userId);
+      const member = await this.thingGetter!.getMember(guild, userId as string);
       if (!member) {
         res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Member not found" } });
         return;
@@ -576,7 +576,7 @@ export class ApiManager {
       try {
         const docs = await DashboardPermission.find({ guildId: req.params.guildId }).lean();
         // Enrich with Discord role position for hierarchy-based resolution
-        const guild = this.client?.guilds.cache.get(req.params.guildId);
+        const guild = this.client?.guilds.cache.get(req.params.guildId as string);
         const enriched = docs.map((doc) => {
           const role = guild?.roles.cache.get(doc.discordRoleId);
           return { ...doc, position: role?.position ?? 0 };
@@ -609,7 +609,7 @@ export class ApiManager {
         const overrideEntries = Object.entries(overrides);
         const summary = overrideEntries.length > 0 ? overrideEntries.map(([k, v]) => `\`${k}\`: **${v}**`).join("\n") : "*All overrides cleared*";
         this.sendAuditLog(
-          guildId,
+          guildId as string,
           new EmbedBuilder()
             .setColor(0x5865f2)
             .setTitle("🛡️ Dashboard Permissions Updated")
@@ -636,7 +636,7 @@ export class ApiManager {
 
         // Audit log
         this.sendAuditLog(
-          guildId,
+          guildId as string,
           new EmbedBuilder()
             .setColor(0xff0000)
             .setTitle("🛡️ Dashboard Permissions Removed")
@@ -684,7 +684,7 @@ export class ApiManager {
 
         // Audit log
         this.sendAuditLog(
-          guildId,
+          guildId as string,
           new EmbedBuilder()
             .setColor(0xffa500)
             .setTitle("⚙️ Dashboard Settings Updated")

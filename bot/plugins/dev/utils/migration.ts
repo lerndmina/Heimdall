@@ -64,7 +64,7 @@ export async function connectOldDatabase(oldDbUri: string): Promise<mongoose.Con
 
   for (let i = 0; i < attempts.length; i++) {
     try {
-      const conn = mongoose.createConnection(attempts[i], {
+      const conn = mongoose.createConnection(attempts[i]!, {
         serverSelectionTimeoutMS: 10000,
         connectTimeoutMS: 10000,
       });
@@ -624,10 +624,10 @@ export async function migrateModmail(
         });
 
         // Calculate metrics
-        const userMessages = messages.filter((m) => m.authorType === "user").length;
-        const staffMessages = messages.filter((m) => m.authorType === "staff").length;
-        const systemMessages = messages.filter((m) => m.authorType === "system").length;
-        const totalAttachments = messages.reduce((sum, m) => sum + m.attachments.length, 0);
+        const userMessages = messages.filter((m: any) => m.authorType === "user").length;
+        const staffMessages = messages.filter((m: any) => m.authorType === "staff").length;
+        const systemMessages = messages.filter((m: any) => m.authorType === "system").length;
+        const totalAttachments = messages.reduce((sum: number, m: any) => sum + m.attachments.length, 0);
 
         await Modmail.create({
           ticketNumber: oldThread.ticketNumber || autoTicketNumber++,
