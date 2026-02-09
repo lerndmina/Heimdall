@@ -273,6 +273,30 @@ const ACTION_OPTIONS = [
   { value: "log", label: "Log", icon: "📋" },
 ] as const;
 
+// ── Confirmation Dialog ──────────────────────────────────
+
+function ConfirmDialog({ open, title, message, onConfirm, onCancel }: { open: boolean; title: string; message: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title={title}
+      maxWidth="sm"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 rounded-md border border-zinc-600 hover:border-zinc-500">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-500 font-medium">
+            Confirm
+          </button>
+        </div>
+      }>
+      <p className="text-sm text-zinc-300">{message}</p>
+    </Modal>
+  );
+}
+
 // ── Rules Tab ────────────────────────────────────────────
 
 type WizardStep = 1 | 2 | 3 | 4;
@@ -315,6 +339,10 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
   const [roleExclude, setRoleExclude] = useState<string[]>([]);
 
   const [saving, setSaving] = useState(false);
+
+  // ── Confirmation dialog ──
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmRule, setConfirmRule] = useState<AutomodRule | null>(null);
 
   // ── Expanded rule details ──
   const [expandedRuleId, setExpandedRuleId] = useState<string | null>(null);
@@ -487,15 +515,22 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     }
   }
 
-  async function handleDelete(rule: AutomodRule) {
-    if (!confirm(`Delete rule "${rule.name}"?`)) return;
-    const res = await fetchApi(guildId, `moderation/rules/${rule._id}`, { method: "DELETE" });
+  function handleDelete(rule: AutomodRule) {
+    setConfirmRule(rule);
+    setConfirmOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!confirmRule) return;
+    setConfirmOpen(false);
+    const res = await fetchApi(guildId, `moderation/rules/${confirmRule._id}`, { method: "DELETE" });
     if (res.success) {
       toast.success("Rule deleted");
       loadRules();
     } else {
       toast.error("Failed to delete rule");
     }
+    setConfirmRule(null);
   }
 
   function toggleAction(action: string) {
@@ -907,6 +942,17 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete Rule"
+        message={`Are you sure you want to delete the rule "${confirmRule?.name ?? ""}"? This cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setConfirmRule(null);
+        }}
+      />
     </div>
   );
 }
@@ -1182,6 +1228,10 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
 
+  // ── Confirmation dialog ──
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmUserId, setConfirmUserId] = useState<string | null>(null);
+
   const loadInfractions = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: "25" });
@@ -1199,15 +1249,22 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
     loadInfractions();
   }, [loadInfractions]);
 
-  async function clearInfractions(userId: string) {
-    if (!confirm(`Clear all active infractions for user ${userId}?`)) return;
-    const res = await fetchApi(guildId, `moderation/infractions/${userId}`, { method: "DELETE" });
+  function clearInfractions(userId: string) {
+    setConfirmUserId(userId);
+    setConfirmOpen(true);
+  }
+
+  async function confirmClear() {
+    if (!confirmUserId) return;
+    setConfirmOpen(false);
+    const res = await fetchApi(guildId, `moderation/infractions/${confirmUserId}`, { method: "DELETE" });
     if (res.success) {
       toast.success("Infractions cleared");
       loadInfractions();
     } else {
       toast.error("Failed to clear infractions");
     }
+    setConfirmUserId(null);
   }
 
   return (
@@ -1313,6 +1370,17 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Clear Infractions"
+        message={`Are you sure you want to clear all active infractions for user ${confirmUserId ?? ""}? This cannot be undone.`}
+        onConfirm={confirmClear}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setConfirmUserId(null);
+        }}
+      />
     </div>
   );
 }
