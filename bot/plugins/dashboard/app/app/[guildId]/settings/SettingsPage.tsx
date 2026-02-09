@@ -336,7 +336,7 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
     return (roleB?.position ?? 0) - (roleA?.position ?? 0);
   });
 
-  if (loading) {
+  if (loading && roles.length === 0 && permDocs.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
         <Spinner />

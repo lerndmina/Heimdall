@@ -198,7 +198,7 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
   };
 
   // ====== Loading ======
-  if (loading) {
+  if (loading && !wizardOpen && !config && !notFound) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label="Loading configuration…" />

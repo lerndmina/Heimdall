@@ -287,7 +287,7 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
   };
 
   // ── Loading ──
-  if (loading) {
+  if (loading && originalConfig === "") {
     return (
       <div className="flex justify-center py-16">
         <Spinner label="Loading configuration…" />

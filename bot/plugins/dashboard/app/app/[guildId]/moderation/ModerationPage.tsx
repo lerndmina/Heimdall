@@ -186,7 +186,7 @@ function OverviewTab({ guildId }: { guildId: string }) {
     loadStats();
   });
 
-  if (loading) return <Spinner />;
+  if (loading && !stats) return <Spinner />;
   if (!stats) return <p className="text-zinc-400">Failed to load statistics.</p>;
 
   return (
@@ -558,7 +558,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
   const step2Valid = wildcardText.trim().length > 0 || patternsText.trim().length > 0;
   const step3Valid = actions.length > 0 && target.length > 0;
 
-  if (loading) return <Spinner />;
+  if (loading && rules.length === 0 && !modalOpen) return <Spinner />;
 
   return (
     <div className="space-y-4">
@@ -1157,7 +1157,7 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
     }
   }
 
-  if (loading) return <Spinner />;
+  if (loading && presets.length === 0) return <Spinner />;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1319,7 +1319,7 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
     setSaving(false);
   }
 
-  if (loading) return <Spinner />;
+  if (loading && !config) return <Spinner />;
   if (!config) return <p className="text-zinc-400">Failed to load config.</p>;
 
   return (
@@ -1611,7 +1611,7 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
     setSaving(false);
   }
 
-  if (loading) return <Spinner />;
+  if (loading && !config) return <Spinner />;
   if (!config) return <p className="text-zinc-400">Failed to load config.</p>;
 
   return (

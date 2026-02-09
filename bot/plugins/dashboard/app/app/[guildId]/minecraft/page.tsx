@@ -102,7 +102,7 @@ export default function MinecraftPage() {
     },
   ];
 
-  if (loading) {
+  if (loading && defaultTab === null) {
     return (
       <PermissionGate category="minecraft">
         <div className="space-y-6">

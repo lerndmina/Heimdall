@@ -309,7 +309,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
     }
   };
 
-  if (loading) {
+  if (loading && openers.length === 0 && categories.length === 0 && !archiveConfig) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label="Loading openers…" />

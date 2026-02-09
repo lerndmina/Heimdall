@@ -463,7 +463,9 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
   };
 
   // ====== Loading ======
-  if (loading) {
+  const hasData = config !== null || channels.length > 0 || openerConfigs.length > 0 || tempvcOpeners.length > 0;
+
+  if (loading && !hasData && !showWizard && !showAddChannel && !showAddOpener && !showDeleteModal && !showDeleteOpenerModal) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label="Loading configuration…" />

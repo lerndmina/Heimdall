@@ -187,7 +187,7 @@ export default function GuildOverviewPage() {
     fetchStats();
   });
 
-  if (loading) {
+  if (loading && !guild && !tickets && !modmail && !suggestions && !tempvc && mcServers.length === 0 && tagCount === null && reminderCount === null) {
     return (
       <div className="flex justify-center py-24">
         <Spinner label="Loading overview…" />

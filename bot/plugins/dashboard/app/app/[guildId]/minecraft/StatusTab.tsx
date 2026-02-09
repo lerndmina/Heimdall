@@ -151,7 +151,7 @@ export default function StatusTab({ guildId }: { guildId: string }) {
   }, [guildId, deleteTarget]);
 
   // ====== Loading ======
-  if (loading) {
+  if (loading && servers.length === 0 && !showAddModal && !deleteTarget) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label="Loading server status…" />

@@ -190,7 +190,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
     });
   };
 
-  if (loading) {
+  if (loading && categories.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="inline-flex h-8 w-8 animate-spin rounded-full border-4 border-zinc-600 border-t-primary-500" />

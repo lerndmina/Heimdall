@@ -266,7 +266,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
     }
   };
 
-  if (loading) {
+  if (loading && categories.length === 0) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label="Loading categories…" />

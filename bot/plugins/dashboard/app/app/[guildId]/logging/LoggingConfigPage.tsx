@@ -179,7 +179,7 @@ export default function LoggingConfigPage({ guildId }: { guildId: string }) {
   };
 
   // ====== Loading ======
-  if (loading) {
+  if (loading && eventsMeta.length === 0 && !showTestModal && !showDeleteModal) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label="Loading configuration…" />

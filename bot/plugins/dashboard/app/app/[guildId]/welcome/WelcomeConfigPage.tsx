@@ -188,7 +188,7 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
   };
 
   // ====== Loading ======
-  if (loading) {
+  if (loading && !config && !notFound && !editing) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label="Loading configuration…" />
