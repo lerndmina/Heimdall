@@ -36,9 +36,7 @@ export class RuleEngine {
     // Filter to message-applicable targets
     const messageTargets = new Set([AutomodTarget.MESSAGE_CONTENT, AutomodTarget.MESSAGE_EMOJI, AutomodTarget.STICKER, AutomodTarget.LINK]);
 
-    const applicableRules = rules
-      .filter((r) => r.enabled && this.getTargets(r).some((t) => messageTargets.has(t as AutomodTarget)))
-      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    const applicableRules = rules.filter((r) => r.enabled && this.getTargets(r).some((t) => messageTargets.has(t as AutomodTarget))).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
     for (const rule of applicableRules) {
       // Try each of the rule's targets that apply to messages
