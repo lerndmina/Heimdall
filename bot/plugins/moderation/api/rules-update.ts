@@ -99,6 +99,15 @@ export function createRulesUpdateRoutes(deps: ModerationApiDeps): Router {
       if (name !== undefined) updates.name = name;
       if (patterns !== undefined) updates.patterns = patterns;
       if (matchMode !== undefined) updates.matchMode = matchMode;
+
+      // Preserve or clear original wildcard input
+      if (wildcardPatterns !== undefined) {
+        const wcStr = Array.isArray(wildcardPatterns) ? wildcardPatterns.join(",") : (wildcardPatterns ?? "");
+        updates.wildcardPatterns = wcStr.trim() || null;
+      } else if (patterns !== undefined) {
+        // If patterns were rebuilt without wildcards, clear the stored wildcard string
+        updates.wildcardPatterns = null;
+      }
       if (target !== undefined) updates.target = Array.isArray(target) ? target : [target];
       if (actions !== undefined) updates.actions = actions;
       if (warnPoints !== undefined) updates.warnPoints = warnPoints;

@@ -110,6 +110,12 @@ export function createRulesCreateRoutes(deps: ModerationApiDeps): Router {
         enabled: enabled ?? true,
       };
 
+      // Preserve original wildcard input for dashboard editing
+      if (wildcardPatterns) {
+        const wcStr = Array.isArray(wildcardPatterns) ? wildcardPatterns.join(",") : wildcardPatterns;
+        if (wcStr.trim()) ruleData.wildcardPatterns = wcStr.trim();
+      }
+
       if (channelInclude) ruleData.channelInclude = channelInclude;
       if (channelExclude) ruleData.channelExclude = channelExclude;
       if (roleInclude) ruleData.roleInclude = roleInclude;

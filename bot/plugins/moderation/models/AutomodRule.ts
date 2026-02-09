@@ -145,6 +145,11 @@ const AutomodRuleSchema = new Schema(
       enum: ["template", "embed", null],
       default: null,
     },
+    /** Original wildcard input (preserved for dashboard editing) */
+    wildcardPatterns: {
+      type: String,
+      default: null,
+    },
     /** Whether this rule was created from a preset */
     isPreset: {
       type: Boolean,

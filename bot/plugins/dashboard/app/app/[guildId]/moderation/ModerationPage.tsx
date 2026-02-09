@@ -78,6 +78,7 @@ interface AutomodRule {
   roleExclude: string[];
   dmTemplate?: string;
   dmEmbed?: boolean;
+  wildcardPatterns?: string;
 }
 
 interface Preset {
@@ -345,8 +346,17 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     resetWizard();
     setEditRule(rule);
     setName(rule.name);
-    setPatternsText(rule.patterns.map((p) => p.regex).join("\n"));
-    setWildcardText("");
+
+    // Restore original wildcard patterns if stored, and show only non-wildcard regex in the regex field
+    if (rule.wildcardPatterns) {
+      setWildcardText(rule.wildcardPatterns);
+      // Filter out wildcard-generated patterns (those with labels) — show only raw regex
+      const rawRegexPatterns = rule.patterns.filter((p) => !p.label);
+      setPatternsText(rawRegexPatterns.map((p) => p.regex).join("\n"));
+    } else {
+      setWildcardText("");
+      setPatternsText(rule.patterns.map((p) => p.regex).join("\n"));
+    }
     setTarget(Array.isArray(rule.target) ? rule.target : [rule.target]);
     setActions(rule.actions);
     setWarnPoints(rule.warnPoints);
