@@ -1023,6 +1023,18 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
 
 /** Reusable channel scoping — pick channels via Combobox, add/remove */
 function ChannelScopingSection({ guildId, title, description, values, onChange }: { guildId: string; title: string; description: string; values: string[]; onChange: (v: string[]) => void }) {
+  const [channelNames, setChannelNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetchApi<{ channels: { id: string; name: string }[] }>(guildId, "channels?type=text", { cacheKey: `channels-${guildId}-text`, cacheTtl: 60_000 }).then((res) => {
+      if (res.success && res.data) {
+        const map: Record<string, string> = {};
+        for (const ch of res.data.channels) map[ch.id] = ch.name;
+        setChannelNames(map);
+      }
+    });
+  }, [guildId]);
+
   function add(id: string) {
     if (id && !values.includes(id)) onChange([...values, id]);
   }
@@ -1039,7 +1051,7 @@ function ChannelScopingSection({ guildId, title, description, values, onChange }
           {values.map((v) => (
             <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-700 text-xs text-zinc-300">
               <span className="text-zinc-400">#</span>
-              {v}
+              {channelNames[v] ?? v}
               <button onClick={() => remove(v)} className="text-zinc-500 hover:text-red-400">
                 ×
               </button>
@@ -1053,6 +1065,18 @@ function ChannelScopingSection({ guildId, title, description, values, onChange }
 
 /** Reusable role scoping — pick roles via Combobox, add/remove */
 function RoleScopingSection({ guildId, title, description, values, onChange }: { guildId: string; title: string; description: string; values: string[]; onChange: (v: string[]) => void }) {
+  const [roleNames, setRoleNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetchApi<{ roles: { id: string; name: string }[] }>(guildId, "roles", { cacheKey: `roles-${guildId}`, cacheTtl: 60_000 }).then((res) => {
+      if (res.success && res.data) {
+        const map: Record<string, string> = {};
+        for (const r of res.data.roles) map[r.id] = r.name;
+        setRoleNames(map);
+      }
+    });
+  }, [guildId]);
+
   function add(id: string) {
     if (id && !values.includes(id)) onChange([...values, id]);
   }
@@ -1069,7 +1093,7 @@ function RoleScopingSection({ guildId, title, description, values, onChange }: {
           {values.map((v) => (
             <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-700 text-xs text-zinc-300">
               <span className="text-zinc-400">@</span>
-              {v}
+              {roleNames[v] ?? v}
               <button onClick={() => remove(v)} className="text-zinc-500 hover:text-red-400">
                 ×
               </button>

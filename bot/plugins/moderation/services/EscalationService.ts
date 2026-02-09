@@ -10,6 +10,7 @@ import { createLogger } from "../../../src/core/Logger.js";
 import type { LibAPI } from "../../lib/index.js";
 import type { LoggingPluginAPI } from "../../logging/index.js";
 import type { IModerationConfig } from "../models/ModerationConfig.js";
+import Infraction, { InfractionType } from "../models/Infraction.js";
 import { ACTION_COLORS, MAX_TIMEOUT_MS } from "../utils/constants.js";
 import { formatDuration } from "../utils/dm-templates.js";
 
@@ -35,6 +36,11 @@ export class EscalationService {
   /**
    * Check if current points cross any escalation tier and execute the action.
    *
+   * Skips tiers that have already been triggered for this user (tracked via
+   * active ESCALATION infractions). This ensures each tier fires at most once
+   * per point-decay window, allowing multiple escalation tiers to work correctly
+   * (e.g. 5pts → timeout, 10pts → kick, 15pts → ban).
+   *
    * Returns info about which tier (if any) was triggered.
    * The actual infraction recording is done by the caller.
    */
@@ -43,11 +49,19 @@ export class EscalationService {
       return { triggered: false };
     }
 
+    // Find which tiers have already been triggered for this user (active escalation infractions)
+    const alreadyTriggered = await this.getTriggeredTiers(guild.id, member.user.id);
+
     // Sort tiers by threshold descending to find the highest applicable tier
     const sortedTiers = [...config.escalationTiers].sort((a, b) => (b.pointsThreshold ?? 0) - (a.pointsThreshold ?? 0));
 
     for (const tier of sortedTiers) {
       if (currentPoints >= (tier.pointsThreshold ?? Infinity)) {
+        // Skip if this tier has already been triggered
+        if (alreadyTriggered.has(tier.name ?? "")) {
+          continue;
+        }
+
         try {
           await this.executeEscalation(guild, member, tier as any, config);
           return {
@@ -63,6 +77,35 @@ export class EscalationService {
     }
 
     return { triggered: false };
+  }
+
+  /**
+   * Get the set of escalation tier names that have already been triggered
+   * for a user. Only considers active, non-expired escalation infractions
+   * so that tiers can re-fire after points decay and re-accumulate.
+   */
+  private async getTriggeredTiers(guildId: string, userId: string): Promise<Set<string>> {
+    try {
+      const now = new Date();
+      const docs = await Infraction.find({
+        guildId,
+        userId,
+        type: InfractionType.ESCALATION,
+        active: true,
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+      })
+        .select("escalationTriggered")
+        .lean();
+
+      const names = new Set<string>();
+      for (const doc of docs) {
+        if (doc.escalationTriggered) names.add(doc.escalationTriggered as string);
+      }
+      return names;
+    } catch (error) {
+      log.error("Error fetching triggered tiers:", error);
+      return new Set();
+    }
   }
 
   private async executeEscalation(guild: Guild, member: GuildMember, tier: { name: string; action: string; duration?: number | null }, config: ConfigDoc): Promise<void> {

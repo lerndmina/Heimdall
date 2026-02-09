@@ -47,10 +47,13 @@ export class InfractionService {
     try {
       const config = await this.moderationService.getConfig(data.guildId);
 
-      // Compute expiry
+      // Compute expiry — points-bearing infractions and escalation records
+      // both expire so that escalation tiers can re-fire after decay.
       let expiresAt: Date | null = null;
-      if (config?.pointDecayEnabled && config.pointDecayDays > 0 && (data.pointsAssigned ?? 0) > 0) {
-        expiresAt = new Date(Date.now() + config.pointDecayDays * 24 * 60 * 60 * 1000);
+      if (config?.pointDecayEnabled && config.pointDecayDays > 0) {
+        if ((data.pointsAssigned ?? 0) > 0 || data.type === InfractionType.ESCALATION) {
+          expiresAt = new Date(Date.now() + config.pointDecayDays * 24 * 60 * 60 * 1000);
+        }
       }
 
       // Get current active points to compute total after
