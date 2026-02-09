@@ -238,7 +238,38 @@ function OverviewTab({ guildId }: { guildId: string }) {
   );
 }
 
+// ── Shared label maps ────────────────────────────────────
+
+const TARGET_OPTIONS = [
+  { value: "message_content", label: "Message Content", description: "Scan message text" },
+  { value: "message_emoji", label: "Message Emoji", description: "Scan emoji in messages" },
+  { value: "reaction_emoji", label: "Reaction Emoji", description: "Scan emoji reactions" },
+  { value: "username", label: "Username", description: "Scan usernames" },
+  { value: "nickname", label: "Nickname", description: "Scan display names" },
+  { value: "sticker", label: "Sticker", description: "Scan sticker names" },
+  { value: "link", label: "Link", description: "Scan URLs in messages" },
+] as const;
+
+const ACTION_OPTIONS = [
+  { value: "delete", label: "Delete Message", icon: "🗑️" },
+  { value: "remove_reaction", label: "Remove Reaction", icon: "❌" },
+  { value: "dm", label: "DM User", icon: "✉️" },
+  { value: "warn", label: "Warn", icon: "⚠️" },
+  { value: "timeout", label: "Timeout", icon: "⏱️" },
+  { value: "kick", label: "Kick", icon: "👢" },
+  { value: "ban", label: "Ban", icon: "🔨" },
+  { value: "log", label: "Log", icon: "📋" },
+] as const;
+
 // ── Rules Tab ────────────────────────────────────────────
+
+type WizardStep = 1 | 2 | 3 | 4;
+
+interface WildcardTestResult {
+  wildcard: string;
+  matched: boolean;
+  label: string;
+}
 
 function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean }) {
   const [rules, setRules] = useState<AutomodRule[]>([]);
@@ -246,13 +277,36 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
   const [editRule, setEditRule] = useState<AutomodRule | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Form state
+  // ── Wizard state ──
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
+
+  // Step 1: Basics
   const [name, setName] = useState("");
+  const [patternMode, setPatternMode] = useState<"wildcard" | "regex">("wildcard");
+
+  // Step 2: Patterns
+  const [wildcardText, setWildcardText] = useState("");
   const [patternsText, setPatternsText] = useState("");
-  const [matchMode, setMatchMode] = useState<"any" | "all">("any");
-  const [actions, setActions] = useState<string[]>(["delete", "warn"]);
+  const [testInput, setTestInput] = useState("");
+  const [testResults, setTestResults] = useState<WildcardTestResult[]>([]);
+  const [testMatched, setTestMatched] = useState<boolean | null>(null);
+
+  // Step 3: Target + Actions
+  const [target, setTarget] = useState("message_content");
+  const [actions, setActions] = useState<string[]>(["delete", "warn", "log"]);
   const [warnPoints, setWarnPoints] = useState(1);
+  const [matchMode, setMatchMode] = useState<"any" | "all">("any");
+
+  // Step 4: Scoping
+  const [channelInclude, setChannelInclude] = useState<string[]>([]);
+  const [channelExclude, setChannelExclude] = useState<string[]>([]);
+  const [roleInclude, setRoleInclude] = useState<string[]>([]);
+  const [roleExclude, setRoleExclude] = useState<string[]>([]);
+
   const [saving, setSaving] = useState(false);
+
+  // ── Expanded rule details ──
+  const [expandedRuleId, setExpandedRuleId] = useState<string | null>(null);
 
   const loadRules = useCallback(async () => {
     const res = await fetchApi<{ rules: AutomodRule[]; total: number }>(guildId, "moderation/rules", { skipCache: true });
@@ -264,35 +318,114 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     loadRules();
   }, [loadRules]);
 
-  function openCreate() {
-    setEditRule(null);
+  function resetWizard() {
+    setWizardStep(1);
     setName("");
+    setPatternMode("wildcard");
+    setWildcardText("");
     setPatternsText("");
-    setMatchMode("any");
-    setActions(["delete", "warn"]);
+    setTestInput("");
+    setTestResults([]);
+    setTestMatched(null);
+    setTarget("message_content");
+    setActions(["delete", "warn", "log"]);
     setWarnPoints(1);
+    setMatchMode("any");
+    setChannelInclude([]);
+    setChannelExclude([]);
+    setRoleInclude([]);
+    setRoleExclude([]);
+    setEditRule(null);
+  }
+
+  function openCreate() {
+    resetWizard();
     setModalOpen(true);
   }
 
   function openEdit(rule: AutomodRule) {
+    resetWizard();
     setEditRule(rule);
     setName(rule.name);
+    setPatternMode("regex"); // Editing always shows raw regex
     setPatternsText(rule.patterns.map((p) => p.regex).join("\n"));
-    setMatchMode(rule.matchMode);
+    setTarget(rule.target);
     setActions(rule.actions);
     setWarnPoints(rule.warnPoints);
+    setMatchMode(rule.matchMode);
+    setChannelInclude(rule.channelInclude ?? []);
+    setChannelExclude(rule.channelExclude ?? []);
+    setRoleInclude(rule.roleInclude ?? []);
+    setRoleExclude(rule.roleExclude ?? []);
+    setWizardStep(1);
     setModalOpen(true);
   }
 
-  async function handleSave() {
-    setSaving(true);
+  async function handleTestWildcard() {
+    if (!wildcardText.trim() || !testInput.trim()) return;
+
+    const res = await fetchApi<{ matched: boolean; results: WildcardTestResult[]; errors: string[] }>(guildId, "moderation/rules/test-wildcard", {
+      method: "POST",
+      body: JSON.stringify({ wildcardPatterns: wildcardText, testContent: testInput }),
+    });
+
+    if (res.success && res.data) {
+      setTestResults(res.data.results);
+      setTestMatched(res.data.matched);
+    } else {
+      toast.error(res.error?.message ?? "Test failed");
+    }
+  }
+
+  async function handleTestRegex() {
+    if (!patternsText.trim() || !testInput.trim()) return;
+
     const patterns = patternsText
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean)
-      .map((regex) => ({ regex }));
+      .map((regex) => ({ regex, flags: "i" }));
 
-    const body = { name, patterns, matchMode, actions, warnPoints };
+    const res = await fetchApi<{ matched: boolean; matchedPattern?: { regex: string; label: string; match: string } }>(guildId, "moderation/rules/test", {
+      method: "POST",
+      body: JSON.stringify({ patterns, matchMode, testContent: testInput }),
+    });
+
+    if (res.success && res.data) {
+      setTestMatched(res.data.matched);
+      setTestResults([]);
+    } else {
+      toast.error(res.error?.message ?? "Test failed");
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+
+    const body: Record<string, any> = {
+      name,
+      matchMode,
+      target,
+      actions,
+      warnPoints,
+    };
+
+    if (channelInclude.length > 0) body.channelInclude = channelInclude;
+    if (channelExclude.length > 0) body.channelExclude = channelExclude;
+    if (roleInclude.length > 0) body.roleInclude = roleInclude;
+    if (roleExclude.length > 0) body.roleExclude = roleExclude;
+
+    if (patternMode === "wildcard") {
+      body.patternMode = "wildcard";
+      body.wildcardPatterns = wildcardText;
+    } else {
+      const patterns = patternsText
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((regex) => ({ regex }));
+      body.patterns = patterns;
+    }
 
     if (editRule) {
       const res = await fetchApi<AutomodRule>(guildId, `moderation/rules/${editRule._id}`, {
@@ -346,6 +479,15 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     }
   }
 
+  function toggleAction(action: string) {
+    setActions((prev) => (prev.includes(action) ? prev.filter((a) => a !== action) : [...prev, action]));
+  }
+
+  // ── Validation per-step ──
+  const step1Valid = name.trim().length > 0;
+  const step2Valid = patternMode === "wildcard" ? wildcardText.trim().length > 0 : patternsText.trim().length > 0;
+  const step3Valid = actions.length > 0;
+
   if (loading) return <Spinner />;
 
   return (
@@ -378,13 +520,17 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                         {rule.isPreset && <span className="ml-2 text-xs bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded">Preset</span>}
                       </p>
                       <p className="text-sm text-zinc-400">
-                        {rule.patterns.length} pattern{rule.patterns.length !== 1 ? "s" : ""} · {rule.actions.join(", ")} · {rule.warnPoints} pts
+                        {TARGET_OPTIONS.find((t) => t.value === rule.target)?.label ?? rule.target} · {rule.patterns.length} pattern{rule.patterns.length !== 1 ? "s" : ""} · {rule.actions.join(", ")}{" "}
+                        · {rule.warnPoints} pts
                       </p>
                     </div>
                   </div>
                   {canManage && (
                     <div className="flex items-center gap-2">
                       <Toggle label="Enabled" checked={rule.enabled} onChange={() => handleToggle(rule)} />
+                      <button onClick={() => setExpandedRuleId(expandedRuleId === rule._id ? null : rule._id)} className="text-sm text-zinc-400 hover:text-zinc-200">
+                        {expandedRuleId === rule._id ? "Hide" : "Details"}
+                      </button>
                       <button onClick={() => openEdit(rule)} className="text-sm text-zinc-400 hover:text-zinc-200">
                         Edit
                       </button>
@@ -394,48 +540,449 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                     </div>
                   )}
                 </div>
+
+                {expandedRuleId === rule._id && (
+                  <div className="mt-3 pt-3 border-t border-zinc-700/50 space-y-2">
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Target: {TARGET_OPTIONS.find((t) => t.value === rule.target)?.label ?? rule.target}</span>
+                      <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Match: {rule.matchMode === "all" ? "All patterns" : "Any pattern"}</span>
+                      <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Points: {rule.warnPoints}</span>
+                    </div>
+                    <div className="text-xs text-zinc-400">
+                      <span className="font-medium text-zinc-300">Actions:</span> {rule.actions.map((a) => ACTION_OPTIONS.find((o) => o.value === a)?.label ?? a).join(", ")}
+                    </div>
+                    {(rule.channelInclude.length > 0 || rule.channelExclude.length > 0 || rule.roleInclude.length > 0 || rule.roleExclude.length > 0) && (
+                      <div className="text-xs text-zinc-400 space-y-0.5">
+                        {rule.channelInclude.length > 0 && (
+                          <div>
+                            <span className="text-zinc-300">Channels (include):</span> {rule.channelInclude.length} channel(s)
+                          </div>
+                        )}
+                        {rule.channelExclude.length > 0 && (
+                          <div>
+                            <span className="text-zinc-300">Channels (exclude):</span> {rule.channelExclude.length} channel(s)
+                          </div>
+                        )}
+                        {rule.roleInclude.length > 0 && (
+                          <div>
+                            <span className="text-zinc-300">Roles (include):</span> {rule.roleInclude.length} role(s)
+                          </div>
+                        )}
+                        {rule.roleExclude.length > 0 && (
+                          <div>
+                            <span className="text-zinc-300">Roles (exclude):</span> {rule.roleExclude.length} role(s)
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      <span className="text-xs font-medium text-zinc-300">Patterns ({rule.patterns.length}):</span>
+                      {rule.patterns.map((p, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs bg-zinc-800/60 rounded px-2 py-1.5">
+                          <code className="text-amber-400/80 break-all font-mono">
+                            /{p.regex}/{p.flags ?? "i"}
+                          </code>
+                          {p.label && <span className="text-zinc-500 shrink-0">— {p.label}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editRule ? "Edit Rule" : "New Rule"}>
-        <div className="space-y-4">
-          <TextInput label="Rule Name" value={name} onChange={setName} placeholder="e.g. slur-filter" />
-          <Textarea
-            label="Patterns (one regex per line)"
-            value={patternsText}
-            onChange={setPatternsText}
-            placeholder="\\bslur1\\b&#10;\\bslur2\\b"
-            rows={4}
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">Match Mode</label>
-              <select
-                value={matchMode}
-                onChange={(e) => setMatchMode(e.target.value as "any" | "all")}
-                className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm">
-                <option value="any">Any pattern</option>
-                <option value="all">All patterns</option>
-              </select>
+      {/* ── Rule Wizard Modal ── */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editRule ? "Edit Rule" : "New Rule"} maxWidth="max-w-2xl">
+        {/* Step indicator */}
+        <div className="flex items-center gap-2 mb-6">
+          {([1, 2, 3, 4] as WizardStep[]).map((step) => (
+            <div key={step} className="flex items-center gap-2 flex-1">
+              <button
+                onClick={() => {
+                  // Allow going back to completed steps
+                  if (step < wizardStep || (step === 2 && step1Valid) || (step === 3 && step1Valid && step2Valid) || (step === 4 && step1Valid && step2Valid && step3Valid)) {
+                    setWizardStep(step);
+                  }
+                }}
+                className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all ${
+                  wizardStep === step ? "bg-indigo-600 text-white ring-2 ring-indigo-400/30" : wizardStep > step ? "bg-green-600/80 text-white cursor-pointer" : "bg-zinc-700 text-zinc-400"
+                }`}>
+                {wizardStep > step ? "✓" : step}
+              </button>
+              {step < 4 && <div className={`flex-1 h-0.5 rounded ${wizardStep > step ? "bg-green-600/60" : "bg-zinc-700"}`} />}
             </div>
-            <TextInput label="Warn Points" value={String(warnPoints)} onChange={(v) => setWarnPoints(parseInt(v) || 0)} type="number" />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || !name || !patternsText}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50">
-              {saving ? "Saving..." : editRule ? "Update" : "Create"}
-            </button>
-          </div>
+          ))}
         </div>
+        <div className="flex justify-between mb-4 text-[10px] text-zinc-500">
+          <span className="w-1/4 text-center">Name</span>
+          <span className="w-1/4 text-center">Patterns</span>
+          <span className="w-1/4 text-center">Behaviour</span>
+          <span className="w-1/4 text-center">Scoping</span>
+        </div>
+
+        {/* ── Step 1: Name & Pattern Mode ── */}
+        {wizardStep === 1 && (
+          <div className="space-y-4">
+            <TextInput label="Rule Name" description="A unique identifier for this rule" value={name} onChange={setName} placeholder="e.g. slur-filter, meme-blocker" required />
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-200 mb-2">Pattern Mode</label>
+              <p className="text-xs text-zinc-500 mb-3">Choose how you want to define what this rule matches.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setPatternMode("wildcard")}
+                  className={`p-4 rounded-lg border text-left transition-all ${
+                    patternMode === "wildcard" ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+                  }`}>
+                  <div className="text-sm font-medium text-zinc-100">Wildcard</div>
+                  <div className="text-xs text-zinc-400 mt-1">Discord-style matching with * wildcards. Easy to use.</div>
+                  <code className="text-xs text-amber-400/70 mt-2 block">*word*, st*rt, *end</code>
+                </button>
+                <button
+                  onClick={() => setPatternMode("regex")}
+                  className={`p-4 rounded-lg border text-left transition-all ${
+                    patternMode === "regex" ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+                  }`}>
+                  <div className="text-sm font-medium text-zinc-100">Regex</div>
+                  <div className="text-xs text-zinc-400 mt-1">Full regular expression support. For power users.</div>
+                  <code className="text-xs text-amber-400/70 mt-2 block">{"\\bword\\b, [a-z]+, .*"}</code>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setWizardStep(2)}
+                disabled={!step1Valid}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 2: Patterns ── */}
+        {wizardStep === 2 && (
+          <div className="space-y-4">
+            {patternMode === "wildcard" ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-200 mb-1">
+                    Wildcard Patterns
+                    <span className="ml-1 text-red-400">*</span>
+                  </label>
+                  <p className="text-xs text-zinc-500 mb-2">
+                    Separate multiple patterns with commas. Use <code className="text-amber-400/70">*</code> to match any characters.
+                  </p>
+                  <div className="space-y-2">
+                    <Textarea label="" value={wildcardText} onChange={setWildcardText} placeholder={"*m*m, d*d, exact-word\n*bad*, sl*r, *hate*"} rows={3} />
+                  </div>
+                </div>
+
+                {/* Pattern syntax reference */}
+                <div className="bg-zinc-800/60 rounded-lg p-3 space-y-1.5">
+                  <p className="text-xs font-medium text-zinc-300">Pattern Guide</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-400">
+                    <div>
+                      <code className="text-amber-400/70">word</code> — exact match
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">*word</code> — ends with &quot;word&quot;
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">word*</code> — starts with &quot;word&quot;
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">*word*</code> — contains &quot;word&quot;
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">*w*rd</code> — inner wildcard
+                    </div>
+                    <div>
+                      <code className="text-amber-400/70">a, b, c</code> — multiple patterns
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live test */}
+                <div className="bg-zinc-800/40 rounded-lg p-3 space-y-2 border border-zinc-700/50">
+                  <p className="text-xs font-medium text-zinc-300">Live Test</p>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={testInput}
+                        onChange={(e) => setTestInput(e.target.value)}
+                        placeholder="Type a test message…"
+                        className="w-full rounded-md border border-zinc-700 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <button
+                      onClick={handleTestWildcard}
+                      disabled={!wildcardText.trim() || !testInput.trim()}
+                      className="px-3 py-1.5 bg-zinc-700 text-zinc-200 rounded-md text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                      Test
+                    </button>
+                  </div>
+                  {testMatched !== null && (
+                    <div className={`text-sm font-medium ${testMatched ? "text-red-400" : "text-green-400"}`}>
+                      {testMatched ? "⚠ Matched — this message would be caught" : "✓ No match — this message would pass"}
+                    </div>
+                  )}
+                  {testResults.length > 0 && (
+                    <div className="space-y-1">
+                      {testResults.map((r, i) => (
+                        <div key={i} className={`text-xs px-2 py-1 rounded ${r.matched ? "bg-red-500/10 text-red-300" : "bg-zinc-800 text-zinc-500"}`}>
+                          <code className="text-amber-400/70">{r.wildcard}</code> → {r.label} {r.matched ? "— MATCHED" : "— no match"}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <Textarea
+                  label="Regex Patterns"
+                  description="One regular expression per line. Flags default to case-insensitive (i)."
+                  value={patternsText}
+                  onChange={setPatternsText}
+                  placeholder={"\\bslur1\\b\n\\bslur2\\b\n<a?:emote_name:\\d+>"}
+                  rows={4}
+                  required
+                />
+
+                {/* Regex live test */}
+                <div className="bg-zinc-800/40 rounded-lg p-3 space-y-2 border border-zinc-700/50">
+                  <p className="text-xs font-medium text-zinc-300">Live Test</p>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={testInput}
+                        onChange={(e) => setTestInput(e.target.value)}
+                        placeholder="Type a test message…"
+                        className="w-full rounded-md border border-zinc-700 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <button
+                      onClick={handleTestRegex}
+                      disabled={!patternsText.trim() || !testInput.trim()}
+                      className="px-3 py-1.5 bg-zinc-700 text-zinc-200 rounded-md text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                      Test
+                    </button>
+                  </div>
+                  {testMatched !== null && (
+                    <div className={`text-sm font-medium ${testMatched ? "text-red-400" : "text-green-400"}`}>
+                      {testMatched ? "⚠ Matched — this message would be caught" : "✓ No match — this message would pass"}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-between">
+              <button onClick={() => setWizardStep(1)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
+                ← Back
+              </button>
+              <button
+                onClick={() => setWizardStep(3)}
+                disabled={!step2Valid}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 3: Target, Actions, Points ── */}
+        {wizardStep === 3 && (
+          <div className="space-y-4">
+            {/* Target */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-200 mb-2">Target</label>
+              <p className="text-xs text-zinc-500 mb-2">What type of content should this rule scan?</p>
+              <div className="grid grid-cols-2 gap-2">
+                {TARGET_OPTIONS.map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => setTarget(t.value)}
+                    className={`p-2.5 rounded-lg border text-left transition-all text-sm ${
+                      target === t.value ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+                    }`}>
+                    <div className="font-medium text-zinc-100">{t.label}</div>
+                    <div className="text-xs text-zinc-400">{t.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-200 mb-2">
+                Actions <span className="text-red-400">*</span>
+              </label>
+              <p className="text-xs text-zinc-500 mb-2">What should happen when this rule triggers? Select one or more.</p>
+              <div className="grid grid-cols-2 gap-2">
+                {ACTION_OPTIONS.map((a) => (
+                  <button
+                    key={a.value}
+                    onClick={() => toggleAction(a.value)}
+                    className={`p-2 rounded-lg border text-left transition-all text-sm flex items-center gap-2 ${
+                      actions.includes(a.value) ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+                    }`}>
+                    <span>{a.icon}</span>
+                    <span className="text-zinc-100">{a.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Match Mode + Warn Points */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-200 mb-1">Match Mode</label>
+                <select
+                  value={matchMode}
+                  onChange={(e) => setMatchMode(e.target.value as "any" | "all")}
+                  className="w-full rounded-lg border border-zinc-700 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                  <option value="any">Any pattern (OR)</option>
+                  <option value="all">All patterns (AND)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-200 mb-1">Warn Points</label>
+                <input
+                  type="number"
+                  value={warnPoints}
+                  onChange={(e) => setWarnPoints(parseInt(e.target.value) || 0)}
+                  min={0}
+                  max={100}
+                  className="w-full rounded-lg border border-zinc-700 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between">
+              <button onClick={() => setWizardStep(2)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
+                ← Back
+              </button>
+              <button
+                onClick={() => setWizardStep(4)}
+                disabled={!step3Valid}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4: Scoping (optional) ── */}
+        {wizardStep === 4 && (
+          <div className="space-y-4">
+            <p className="text-xs text-zinc-500">Optionally restrict where this rule applies. Leave empty to apply everywhere.</p>
+
+            <ScopingSection title="Channel Include" description="Only apply in these channels (empty = all)" values={channelInclude} onChange={setChannelInclude} placeholder="Channel ID" />
+            <ScopingSection title="Channel Exclude" description="Never apply in these channels" values={channelExclude} onChange={setChannelExclude} placeholder="Channel ID" />
+            <ScopingSection title="Role Include" description="Only apply to users with these roles (empty = all)" values={roleInclude} onChange={setRoleInclude} placeholder="Role ID" />
+            <ScopingSection title="Role Exclude" description="Never apply to users with these roles (immune)" values={roleExclude} onChange={setRoleExclude} placeholder="Role ID" />
+
+            {/* Summary */}
+            <div className="bg-zinc-800/60 rounded-lg p-3 space-y-1.5 border border-zinc-700/50">
+              <p className="text-xs font-medium text-zinc-300">Summary</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-400">
+                <div>
+                  <span className="text-zinc-300">Name:</span> {name}
+                </div>
+                <div>
+                  <span className="text-zinc-300">Mode:</span> {patternMode === "wildcard" ? "Wildcard" : "Regex"}
+                </div>
+                <div>
+                  <span className="text-zinc-300">Target:</span> {TARGET_OPTIONS.find((t) => t.value === target)?.label}
+                </div>
+                <div>
+                  <span className="text-zinc-300">Points:</span> {warnPoints}
+                </div>
+                <div className="col-span-2">
+                  <span className="text-zinc-300">Actions:</span> {actions.map((a) => ACTION_OPTIONS.find((o) => o.value === a)?.label ?? a).join(", ")}
+                </div>
+                <div className="col-span-2">
+                  <span className="text-zinc-300">Patterns:</span> {patternMode === "wildcard" ? wildcardText : `${patternsText.split("\n").filter(Boolean).length} regex pattern(s)`}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between">
+              <button onClick={() => setWizardStep(3)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
+                ← Back
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !step1Valid || !step2Valid || !step3Valid}
+                className="px-5 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                {saving ? "Saving…" : editRule ? "Update Rule" : "Create Rule"}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
+    </div>
+  );
+}
+
+/** Reusable scoping input — add/remove ID strings */
+function ScopingSection({ title, description, values, onChange, placeholder }: { title: string; description: string; values: string[]; onChange: (v: string[]) => void; placeholder: string }) {
+  const [input, setInput] = useState("");
+
+  function add() {
+    const trimmed = input.trim();
+    if (trimmed && !values.includes(trimmed)) {
+      onChange([...values, trimmed]);
+      setInput("");
+    }
+  }
+
+  function remove(val: string) {
+    onChange(values.filter((v) => v !== val));
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-zinc-200 mb-0.5">{title}</label>
+      <p className="text-xs text-zinc-500 mb-1.5">{description}</p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder={placeholder}
+          className="flex-1 rounded-md border border-zinc-700 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        />
+        <button onClick={add} disabled={!input.trim()} className="px-3 py-1.5 bg-zinc-700 text-zinc-200 rounded-md text-xs hover:bg-zinc-600 disabled:opacity-50">
+          Add
+        </button>
+      </div>
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {values.map((v) => (
+            <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-700 text-xs text-zinc-300">
+              {v}
+              <button onClick={() => remove(v)} className="text-zinc-500 hover:text-red-400">
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -477,27 +1024,6 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
     }
   }
 
-  const targetLabels: Record<string, string> = {
-    message_content: "Message Content",
-    reaction_emoji: "Reaction Emoji",
-    message_emoji: "Message Emoji",
-    username: "Username",
-    nickname: "Nickname",
-    sticker: "Sticker",
-    link: "Link",
-  };
-
-  const actionLabels: Record<string, string> = {
-    delete: "Delete",
-    remove_reaction: "Remove Reaction",
-    dm: "DM User",
-    warn: "Warn",
-    timeout: "Timeout",
-    kick: "Kick",
-    ban: "Ban",
-    log: "Log",
-  };
-
   if (loading) return <Spinner />;
 
   return (
@@ -529,12 +1055,12 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
             {expandedId === preset.id && (
               <div className="mt-3 pt-3 border-t border-zinc-700/50 space-y-2">
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Target: {targetLabels[preset.target] ?? preset.target}</span>
+                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Target: {TARGET_OPTIONS.find((t) => t.value === preset.target)?.label ?? preset.target}</span>
                   <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Match: {preset.matchMode === "all" ? "All patterns" : "Any pattern"}</span>
                   <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Points: {preset.warnPoints}</span>
                 </div>
                 <div className="text-xs text-zinc-400">
-                  <span className="font-medium text-zinc-300">Actions:</span> {preset.actions.map((a) => actionLabels[a] ?? a).join(", ")}
+                  <span className="font-medium text-zinc-300">Actions:</span> {preset.actions.map((a) => ACTION_OPTIONS.find((o) => o.value === a)?.label ?? a).join(", ")}
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs font-medium text-zinc-300">Patterns ({preset.patterns.length}):</span>

@@ -7,6 +7,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { ModerationApiDeps } from "./index.js";
 import { validateRegex } from "../utils/regex-engine.js";
+import { parseWildcardPatterns } from "../utils/wildcard.js";
 
 export function createRulesUpdateRoutes(deps: ModerationApiDeps): Router {
   const router = Router({ mergeParams: true });
@@ -14,7 +15,24 @@ export function createRulesUpdateRoutes(deps: ModerationApiDeps): Router {
   router.put("/:ruleId", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, ruleId } = req.params;
-      const { name, patterns, matchMode, target, actions, warnPoints, priority, enabled, channelInclude, channelExclude, roleInclude, roleExclude, dmTemplate, dmEmbed } = req.body;
+      const {
+        name,
+        patterns: rawPatterns,
+        wildcardPatterns,
+        patternMode,
+        matchMode,
+        target,
+        actions,
+        warnPoints,
+        priority,
+        enabled,
+        channelInclude,
+        channelExclude,
+        roleInclude,
+        roleExclude,
+        dmTemplate,
+        dmEmbed,
+      } = req.body;
 
       // Verify rule exists
       const existing = await deps.moderationService.getRule(guildId as string, ruleId as string);
@@ -26,16 +44,31 @@ export function createRulesUpdateRoutes(deps: ModerationApiDeps): Router {
         return;
       }
 
-      // Validate patterns if provided
-      if (patterns) {
-        if (!Array.isArray(patterns) || patterns.length === 0) {
+      // Build patterns from either wildcard or regex input (if provided)
+      let patterns: Array<{ regex: string; flags?: string; label?: string }> | undefined;
+
+      if (patternMode === "wildcard" && wildcardPatterns) {
+        const input = Array.isArray(wildcardPatterns) ? wildcardPatterns.join(",") : wildcardPatterns;
+        const result = parseWildcardPatterns(input);
+
+        if (!result.success || result.patterns.length === 0) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: result.errors.join("; ") || "Invalid wildcard patterns" },
+          });
+          return;
+        }
+
+        patterns = result.patterns.map((p) => ({ regex: p.regex, flags: p.flags, label: p.label }));
+      } else if (rawPatterns) {
+        if (!Array.isArray(rawPatterns) || rawPatterns.length === 0) {
           res.status(400).json({
             success: false,
             error: { code: "INVALID_INPUT", message: "patterns must be a non-empty array" },
           });
           return;
         }
-        for (const p of patterns) {
+        for (const p of rawPatterns) {
           if (!p.regex) {
             res.status(400).json({
               success: false,
@@ -52,6 +85,7 @@ export function createRulesUpdateRoutes(deps: ModerationApiDeps): Router {
             return;
           }
         }
+        patterns = rawPatterns;
       }
 
       const updates: Record<string, any> = {};
