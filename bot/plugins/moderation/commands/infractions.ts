@@ -70,6 +70,8 @@ export async function execute(context: CommandContext): Promise<void> {
     .setLabel("Clear All Infractions")
     .setStyle(4); // Danger
 
+  await clearButton.ready();
+
   const row = new ActionRowBuilder<any>().addComponents(clearButton);
 
   await interaction.editReply({ embeds: [embed], components: total > 0 ? [row] : [] });
