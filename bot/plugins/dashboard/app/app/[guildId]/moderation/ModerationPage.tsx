@@ -1203,6 +1203,28 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
 
 // ── Escalation Tab ───────────────────────────────────────
 
+/** Convert ms to a compact human-readable duration (e.g. 3600000 → "1h") */
+function msToHumanDuration(ms: number | string | null | undefined): string {
+  if (ms === null || ms === undefined || ms === "") return "";
+  const n = typeof ms === "string" ? parseInt(ms, 10) : ms;
+  if (isNaN(n) || n <= 0) return "";
+  const units: [number, string][] = [
+    [604_800_000, "w"],
+    [86_400_000, "d"],
+    [3_600_000, "h"],
+    [60_000, "m"],
+    [1_000, "s"],
+  ];
+  for (const [div, label] of units) {
+    if (n >= div && n % div === 0) return `${n / div}${label}`;
+  }
+  // Fallback: best-fit largest unit
+  for (const [div, label] of units) {
+    if (n >= div) return `${Math.round(n / div)}${label}`;
+  }
+  return `${n}ms`;
+}
+
 function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boolean }) {
   const [config, setConfig] = useState<ModerationConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1214,7 +1236,12 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
       const res = await fetchApi<ModerationConfig>(guildId, "moderation/config", { skipCache: true });
       if (res.success && res.data) {
         setConfig(res.data);
-        setTiers(res.data.escalationTiers ?? []);
+        setTiers(
+          (res.data.escalationTiers ?? []).map((t: any) => ({
+            ...t,
+            duration: msToHumanDuration(t.duration),
+          })),
+        );
       }
       setLoading(false);
     })();

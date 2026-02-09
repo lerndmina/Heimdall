@@ -601,7 +601,7 @@ function StepAdvanced({ guildId, draft, update }: StepProps & { guildId: string 
   useEffect(() => {
     if (draft.roleSyncMode === "off") return;
     setRolesLoading(true);
-    fetchApi<{ roles: { id: string; name: string; color: string }[] }>(guildId, "roles")
+    fetchApi<{ roles: { id: string; name: string; color: string }[] }>(guildId, "roles", { cacheKey: `roles-${guildId}`, cacheTtl: 60_000 })
       .then((res) => {
         if (res.success && res.data) setGuildRoles(res.data.roles);
       })

@@ -7,6 +7,29 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { ModerationApiDeps } from "./index.js";
 
+/**
+ * Parse a human-readable duration string into milliseconds.
+ * Supports: 30s, 5m, 1h, 1d, 2w — or raw ms numbers.
+ */
+function parseDuration(input: unknown): number | null {
+  if (input === null || input === undefined) return null;
+  if (typeof input === "number") return input;
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  // Already a plain number (ms)
+  if (/^\d+$/.test(trimmed)) return parseInt(trimmed, 10);
+
+  const match = trimmed.match(/^(\d+(?:\.\d+)?)\s*(s|m|h|d|w)$/i);
+  if (!match || !match[1] || !match[2]) return null;
+
+  const value = parseFloat(match[1]);
+  const unit = match[2].toLowerCase();
+  const multipliers: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 };
+  return Math.round(value * (multipliers[unit] ?? 1));
+}
+
 export function createConfigRoutes(deps: ModerationApiDeps): Router {
   const router = Router({ mergeParams: true });
 
@@ -67,7 +90,10 @@ export function createConfigRoutes(deps: ModerationApiDeps): Router {
             return;
           }
         }
-        updates.escalationTiers = escalationTiers;
+        updates.escalationTiers = escalationTiers.map((tier: any) => ({
+          ...tier,
+          duration: tier.action === "timeout" ? parseDuration(tier.duration) : null,
+        }));
       }
 
       if (Object.keys(updates).length === 0) {
