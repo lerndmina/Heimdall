@@ -15,6 +15,7 @@ import type { LibAPI } from "../../lib/index.js";
 import TempVC, { type ITempVC } from "../models/TempVC.js";
 import ActiveTempChannels from "../models/ActiveTempChannels.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 const log = createLogger("tempvc:service");
 
@@ -170,6 +171,10 @@ export class TempVCService {
     // Add to active channels (with opener mapping)
     await this.addToActiveChannels(guild.id, newChannel.id, config.channelId);
 
+    broadcastDashboardChange(guild.id, "tempvc", "active_updated", {
+      requiredAction: "tempvc.view_config",
+    });
+
     // Send control panel inside the channel
     await this.sendControlPanel(newChannel, member.id);
 
@@ -191,6 +196,9 @@ export class TempVCService {
 
     await this.removeFromActiveChannels(guildId, channelId);
     log.info(`Deleted temp channel ${channelId} in guild ${guildId}`);
+    broadcastDashboardChange(guildId, "tempvc", "active_updated", {
+      requiredAction: "tempvc.view_config",
+    });
   }
 
   /**
@@ -199,6 +207,9 @@ export class TempVCService {
   async renameTempChannel(channel: VoiceChannel, newName: string): Promise<void> {
     await channel.setName(newName);
     log.info(`Renamed channel ${channel.id} to "${newName}"`);
+    broadcastDashboardChange(channel.guild.id, "tempvc", "active_updated", {
+      requiredAction: "tempvc.view_config",
+    });
   }
 
   /**
@@ -218,6 +229,9 @@ export class TempVCService {
   async setUserLimit(channel: VoiceChannel, limit: number): Promise<void> {
     await channel.setUserLimit(limit);
     log.info(`Set user limit to ${limit} for channel ${channel.id}`);
+    broadcastDashboardChange(channel.guild.id, "tempvc", "active_updated", {
+      requiredAction: "tempvc.view_config",
+    });
   }
 
   /**

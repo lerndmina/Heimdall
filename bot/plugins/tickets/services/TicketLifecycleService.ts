@@ -7,6 +7,7 @@ import { PermissionFlagsBits } from "discord.js";
 import type { PluginLogger } from "../../../src/types/Plugin.js";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import type { LibAPI } from "../../lib/index.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import Ticket, { type ITicket } from "../models/Ticket.js";
 import TicketCategory from "../models/TicketCategory.js";
 import { TicketStatus } from "../types/index.js";
@@ -126,6 +127,10 @@ export class TicketLifecycleService {
       await (channel as TextChannel).send({ embeds: [embed] });
     }
 
+    broadcastDashboardChange(ticket.guildId, "tickets", "ticket_claimed", {
+      requiredAction: "tickets.manage_tickets",
+    });
+
     return { success: true, message: "Ticket claimed successfully." };
   }
 
@@ -166,6 +171,10 @@ export class TicketLifecycleService {
       const embed = this.lib.createEmbedBuilder().setColor("Yellow").setTitle("🎫 Ticket Unclaimed").setDescription(`This ticket has been unclaimed by ${user}.`).setTimestamp();
       await (channel as TextChannel).send({ embeds: [embed] });
     }
+
+    broadcastDashboardChange(ticket.guildId, "tickets", "ticket_unclaimed", {
+      requiredAction: "tickets.manage_tickets",
+    });
 
     return { success: true, message: "Ticket unclaimed successfully." };
   }
@@ -220,6 +229,10 @@ export class TicketLifecycleService {
       .setTimestamp();
     await textChannel.send({ embeds: [embed] });
 
+    broadcastDashboardChange(ticket.guildId, "tickets", "ticket_closed", {
+      requiredAction: "tickets.manage_tickets",
+    });
+
     // TODO: Emit event for support-core (transcript, archive, etc.)
 
     return { success: true, message: "Ticket closed successfully." };
@@ -242,6 +255,11 @@ export class TicketLifecycleService {
     }
 
     const success = await this.setTicketChannelName(ticket, newName, `Renamed by ${user.tag}`, true);
+    if (success) {
+      broadcastDashboardChange(ticket.guildId, "tickets", "ticket_renamed", {
+        requiredAction: "tickets.manage_tickets",
+      });
+    }
     return success ? { success: true, message: `Ticket renamed to "${newName}"` } : { success: false, message: "Failed to rename ticket." };
   }
 }

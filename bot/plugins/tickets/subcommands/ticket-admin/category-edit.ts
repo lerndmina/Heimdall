@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { TicketsAPI } from "../../index.js";
 import TicketCategory from "../../models/TicketCategory.js";
 
@@ -47,6 +48,9 @@ export async function handleCategoryEdit(context: CommandContext): Promise<void>
 
     if (result) {
       await interaction.editReply({ content: `✅ Updated category: **${category.name}**` });
+      broadcastDashboardChange(interaction.guild.id, "tickets", "category_updated", {
+        requiredAction: "tickets.manage_categories",
+      });
     } else {
       await interaction.editReply({ content: "❌ Failed to update category." });
     }

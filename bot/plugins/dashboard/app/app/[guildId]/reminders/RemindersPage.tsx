@@ -115,7 +115,7 @@ export default function RemindersPage({ guildId }: { guildId: string }) {
     fetchReminders();
   }, [fetchReminders]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("reminders:updated", () => {
     fetchReminders();
   });
 

@@ -183,7 +183,31 @@ export default function GuildOverviewPage() {
     fetchStats();
   }, [fetchStats]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("tickets:updated", () => {
+    fetchStats();
+  });
+
+  useRealtimeEvent("modmail:updated", () => {
+    fetchStats();
+  });
+
+  useRealtimeEvent("suggestions:updated", () => {
+    fetchStats();
+  });
+
+  useRealtimeEvent("tempvc:updated", () => {
+    fetchStats();
+  });
+
+  useRealtimeEvent("minecraft:updated", () => {
+    fetchStats();
+  });
+
+  useRealtimeEvent("tags:updated", () => {
+    fetchStats();
+  });
+
+  useRealtimeEvent("reminders:updated", () => {
     fetchStats();
   });
 

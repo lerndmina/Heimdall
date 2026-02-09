@@ -182,7 +182,7 @@ function OverviewTab({ guildId }: { guildId: string }) {
     loadStats();
   }, [loadStats]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("moderation:updated", () => {
     loadStats();
   });
 
@@ -366,7 +366,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     loadRules();
   }, [loadRules]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("moderation:updated", () => {
     loadRules();
   });
 
@@ -1133,7 +1133,7 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
     loadPresets();
   }, [loadPresets]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("moderation:updated", () => {
     loadPresets();
   });
 
@@ -1288,7 +1288,7 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
     loadConfig();
   }, [loadConfig]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("moderation:updated", () => {
     loadConfig();
   });
 
@@ -1408,7 +1408,7 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
     loadInfractions();
   }, [loadInfractions]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("moderation:updated", () => {
     loadInfractions();
   });
 
@@ -1584,7 +1584,7 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
     loadConfig();
   }, [loadConfig]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("moderation:updated", () => {
     loadConfig();
   });
 

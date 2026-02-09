@@ -198,7 +198,11 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
     fetchData();
   }, [fetchData]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("attachment-blocker:updated", () => {
+    fetchData();
+  });
+
+  useRealtimeEvent("tempvc:updated", () => {
     fetchData();
   });
 

@@ -139,7 +139,7 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
     fetchConfig();
   }, [fetchConfig]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("vc-transcription:updated", () => {
     fetchConfig();
   });
 

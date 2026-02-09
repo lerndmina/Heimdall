@@ -147,7 +147,7 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
     fetchConfig();
   }, [fetchConfig]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("minecraft:updated", () => {
     fetchConfig();
   });
 

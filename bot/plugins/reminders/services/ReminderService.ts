@@ -11,6 +11,7 @@ import type { LibAPI } from "../../lib/index.js";
 import Reminder, { type IReminder } from "../models/Reminder.js";
 import { ReminderContextService } from "./ReminderContextService.js";
 import { EmbedBuilder, time, TimestampStyles } from "discord.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 const log = createLogger("reminders:service");
 
@@ -89,6 +90,11 @@ export class ReminderService {
     try {
       // Mark as triggered first to prevent re-delivery
       await Reminder.updateOne({ _id: reminder._id }, { $set: { triggered: true } });
+      if (reminder.guildId && reminder.guildId !== "dm") {
+        broadcastDashboardChange(reminder.guildId, "reminders", "reminder_triggered", {
+          requiredAction: "reminders.view_reminders",
+        });
+      }
 
       const user = await this.lib.thingGetter.getUser(reminder.userId);
       if (!user) {

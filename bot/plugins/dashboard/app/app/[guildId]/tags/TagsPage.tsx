@@ -109,7 +109,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
     fetchTags();
   }, [fetchTags]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("tags:updated", () => {
     fetchTags();
   });
 

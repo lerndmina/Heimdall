@@ -101,7 +101,7 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
     fetchVariables();
   }, [fetchConfig, fetchVariables]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("welcome:updated", () => {
     fetchConfig();
   });
 

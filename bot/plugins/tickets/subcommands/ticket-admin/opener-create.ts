@@ -4,6 +4,7 @@
 
 import { nanoid } from "nanoid";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import TicketOpener from "../../models/TicketOpener.js";
 import { OpenerUIType } from "../../types/index.js";
 
@@ -39,6 +40,9 @@ export async function handleOpenerCreate(context: CommandContext): Promise<void>
 
     await interaction.editReply({
       content: `✅ Created opener: **${name}**\nID: \`${openerId}\`\n\nUse \`/ticket-admin opener edit\` to add categories, then \`/ticket-admin opener post\` to deploy.`,
+    });
+    broadcastDashboardChange(interaction.guild.id, "tickets", "opener_created", {
+      requiredAction: "tickets.manage_openers",
     });
   } catch (error) {
     await interaction.editReply({ content: "❌ Failed to create opener." });

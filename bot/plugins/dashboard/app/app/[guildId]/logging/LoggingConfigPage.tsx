@@ -111,7 +111,7 @@ export default function LoggingConfigPage({ guildId }: { guildId: string }) {
     fetchData();
   }, [fetchData]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("logging:updated", () => {
     fetchData();
   });
 

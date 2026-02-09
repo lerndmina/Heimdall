@@ -128,7 +128,7 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
     fetchCategories();
   }, [fetchCategories]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("tickets:updated", () => {
     fetchCategories();
   });
 

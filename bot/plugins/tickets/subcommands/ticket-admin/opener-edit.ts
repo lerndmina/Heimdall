@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import TicketOpener from "../../models/TicketOpener.js";
 import TicketCategory from "../../models/TicketCategory.js";
 import { CategoryType } from "../../types/index.js";
@@ -68,6 +69,9 @@ export async function handleOpenerEdit(context: CommandContext): Promise<void> {
 
     await interaction.editReply({
       content: `✅ Updated opener: **${opener.name}**\nCategories: ${opener.categoryIds.length}`,
+    });
+    broadcastDashboardChange(interaction.guild.id, "tickets", "opener_updated", {
+      requiredAction: "tickets.manage_openers",
     });
   } catch (error) {
     await interaction.editReply({ content: "❌ Failed to update opener." });

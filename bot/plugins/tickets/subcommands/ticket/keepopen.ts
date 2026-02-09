@@ -4,6 +4,7 @@
 
 import type { GuildMember } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { TicketsAPI } from "../../index.js";
 import TicketCategory from "../../models/TicketCategory.js";
 import Ticket from "../../models/Ticket.js";
@@ -43,6 +44,9 @@ export async function handleKeepOpen(context: CommandContext): Promise<void> {
 
     await interaction.editReply({
       content: newValue ? "✅ Ticket is now exempt from inactivity reminders." : "✅ Ticket will now receive inactivity reminders.",
+    });
+    broadcastDashboardChange(interaction.guildId!, "tickets", "ticket_updated", {
+      requiredAction: "tickets.manage_tickets",
     });
   } catch (error) {
     await interaction.editReply({ content: "❌ An error occurred." });

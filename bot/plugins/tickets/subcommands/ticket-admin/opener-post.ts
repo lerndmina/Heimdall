@@ -4,6 +4,7 @@
 
 import { ChannelType, type TextChannel } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { TicketsAPI } from "../../index.js";
 import type { LibAPI } from "../../../lib/index.js";
 import TicketOpener from "../../models/TicketOpener.js";
@@ -58,6 +59,9 @@ export async function handleOpenerPost(context: CommandContext): Promise<void> {
 
     await interaction.editReply({
       content: `✅ Posted opener in <#${channel.id}>`,
+    });
+    broadcastDashboardChange(interaction.guild.id, "tickets", "opener_posted", {
+      requiredAction: "tickets.manage_openers",
     });
   } catch (error) {
     await interaction.editReply({ content: "❌ Failed to post opener." });

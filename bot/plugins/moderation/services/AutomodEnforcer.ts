@@ -19,6 +19,7 @@ import type { EscalationService } from "./EscalationService.js";
 import type { ModActionService } from "./ModActionService.js";
 import { ACTION_COLORS, MAX_TIMEOUT_MS } from "../utils/constants.js";
 import { sendInfractionDm, formatDuration, type TemplateVars } from "../utils/dm-templates.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 const log = createLogger("moderation:automod");
 
@@ -244,6 +245,8 @@ export class AutomodEnforcer {
       channelId,
       messageId,
     });
+
+    broadcastDashboardChange(guildId, "moderation", "infraction_created", { requiredAction: "moderation.manage_infractions" });
 
     // DM user
     if (actions.includes(AutomodAction.DM) || actions.includes(AutomodAction.WARN)) {

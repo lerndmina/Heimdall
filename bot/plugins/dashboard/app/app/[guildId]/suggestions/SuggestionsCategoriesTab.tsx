@@ -80,7 +80,7 @@ export default function SuggestionsCategoriesTab({ guildId }: { guildId: string 
     fetchCategories();
   }, [fetchCategories]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("suggestions:updated", () => {
     fetchCategories();
   });
 

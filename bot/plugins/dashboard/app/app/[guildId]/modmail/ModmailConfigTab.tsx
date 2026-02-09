@@ -115,7 +115,7 @@ export default function ModmailConfigTab({ guildId }: { guildId: string }) {
     fetchConfig();
   }, [fetchConfig]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("modmail:updated", () => {
     fetchConfig();
   });
 

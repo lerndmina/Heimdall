@@ -4,6 +4,7 @@
 
 import type { GuildMember, TextChannel } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { TicketsAPI } from "../../index.js";
 import TicketCategory from "../../models/TicketCategory.js";
 import Ticket from "../../models/Ticket.js";
@@ -80,6 +81,9 @@ export async function handleMove(context: CommandContext): Promise<void> {
 
     await interaction.editReply({
       content: `✅ Ticket moved to category: **${newCategory.name}**`,
+    });
+    broadcastDashboardChange(interaction.guildId!, "tickets", "ticket_moved", {
+      requiredAction: "tickets.manage_tickets",
     });
   } catch (error) {
     await interaction.editReply({ content: "❌ An error occurred while moving the ticket." });

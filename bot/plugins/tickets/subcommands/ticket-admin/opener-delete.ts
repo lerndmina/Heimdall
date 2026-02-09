@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import TicketOpener from "../../models/TicketOpener.js";
 
 export async function handleOpenerDelete(context: CommandContext): Promise<void> {
@@ -28,6 +29,9 @@ export async function handleOpenerDelete(context: CommandContext): Promise<void>
     await opener.deleteOne();
 
     await interaction.editReply({ content: `✅ Deleted opener: **${name}**` });
+    broadcastDashboardChange(interaction.guild.id, "tickets", "opener_deleted", {
+      requiredAction: "tickets.manage_openers",
+    });
   } catch (error) {
     await interaction.editReply({ content: "❌ Failed to delete opener." });
   }

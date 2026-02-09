@@ -4,6 +4,7 @@
 
 import { ChannelType, TextChannel } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { LoggingPluginAPI } from "../../index.js";
 import { LoggingCategory } from "../../models/LoggingConfig.js";
 
@@ -68,4 +69,7 @@ export async function handleSetup(context: CommandContext, pluginAPI: LoggingPlu
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
+  broadcastDashboardChange(interaction.guildId!, "logging", "config_updated", {
+    requiredAction: "logging.manage_config",
+  });
 }

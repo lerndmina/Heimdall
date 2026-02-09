@@ -14,6 +14,7 @@ import type { EscalationService } from "./EscalationService.js";
 import { ACTION_COLORS, MAX_TIMEOUT_MS, PURGE_MAX_MESSAGES, BULK_DELETE_MAX_AGE_MS } from "../utils/constants.js";
 import { sendInfractionDm, formatDuration, type TemplateVars } from "../utils/dm-templates.js";
 import { combinedFilter, byNotTooOld } from "../utils/purge-filters.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 const log = createLogger("moderation:actions");
 
@@ -55,6 +56,8 @@ export class ModActionService {
         reason,
         pointsAssigned: points,
       });
+
+      broadcastDashboardChange(guild.id, "moderation", "infraction_created", { requiredAction: "moderation.manage_infractions" });
 
       // Log
       await this.sendModLog(
@@ -107,6 +110,8 @@ export class ModActionService {
         reason,
         pointsAssigned: points,
       });
+
+      broadcastDashboardChange(guild.id, "moderation", "infraction_created", { requiredAction: "moderation.manage_infractions" });
 
       await this.sendModLog(
         guild,
@@ -189,6 +194,8 @@ export class ModActionService {
         duration,
       });
 
+      broadcastDashboardChange(guild.id, "moderation", "infraction_created", { requiredAction: "moderation.manage_infractions" });
+
       await this.sendModLog(
         guild,
         "mod_actions",
@@ -234,6 +241,8 @@ export class ModActionService {
         reason,
         pointsAssigned: points,
       });
+
+      broadcastDashboardChange(guild.id, "moderation", "infraction_created", { requiredAction: "moderation.manage_infractions" });
 
       // DM
       const vars = this.buildVars(member, guild, "Warning", reason, points, 0, moderatorId);

@@ -123,7 +123,7 @@ export default function StatusTab({ guildId }: { guildId: string }) {
     fetchStatus();
   }, [fetchStatus]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("minecraft:updated", () => {
     fetchStatus();
   });
 

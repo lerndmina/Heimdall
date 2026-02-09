@@ -17,6 +17,16 @@ export function clearWebSocketManager(): void {
 
 export function broadcast(guildId: string, event: string, data?: unknown, options?: BroadcastOptions): void {
   wsManager?.broadcastToGuild(guildId, event, data ?? {}, options);
+
+  if (event === "dashboard:data_changed") {
+    const payload = data as Record<string, unknown> | undefined;
+    const plugin = typeof payload?.plugin === "string" ? payload.plugin : null;
+    const type = typeof payload?.type === "string" ? payload.type : null;
+    if (plugin && type) {
+      wsManager?.broadcastToGuild(guildId, `${plugin}:updated`, data ?? {}, options);
+      wsManager?.broadcastToGuild(guildId, `${plugin}:${type}`, data ?? {}, options);
+    }
+  }
 }
 
 export function broadcastDashboardChange(guildId: string, plugin: string, type: string, options?: { requiredAction?: string; requiredCategory?: string; data?: Record<string, unknown> }): void {

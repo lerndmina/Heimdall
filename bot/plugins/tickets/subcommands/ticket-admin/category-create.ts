@@ -5,6 +5,7 @@
 import { ChannelType } from "discord.js";
 import { nanoid } from "nanoid";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { TicketsAPI } from "../../index.js";
 import TicketCategory from "../../models/TicketCategory.js";
 import { CategoryType, DEFAULT_TICKET_NAME_FORMAT } from "../../types/index.js";
@@ -80,6 +81,9 @@ export async function handleCategoryCreate(context: CommandContext): Promise<voi
 
     await interaction.editReply({
       content: `✅ Created **${type}** category: **${name}**\nID: \`${categoryId}\``,
+    });
+    broadcastDashboardChange(interaction.guild.id, "tickets", "category_created", {
+      requiredAction: "tickets.manage_categories",
     });
   } catch (error) {
     await interaction.editReply({ content: "❌ Failed to create category." });

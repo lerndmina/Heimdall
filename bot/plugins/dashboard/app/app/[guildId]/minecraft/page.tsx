@@ -45,7 +45,7 @@ export default function MinecraftPage() {
     fetchDefaultTab();
   }, [fetchDefaultTab]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("minecraft:updated", () => {
     fetchDefaultTab();
   });
 

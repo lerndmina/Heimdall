@@ -125,7 +125,7 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
     fetchConversations();
   }, [fetchConversations]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("modmail:updated", () => {
     fetchConversations();
   });
 

@@ -118,7 +118,7 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
     fetchConfig();
   }, [fetchConfig]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("tempvc:updated", () => {
     fetchConfig();
   });
 

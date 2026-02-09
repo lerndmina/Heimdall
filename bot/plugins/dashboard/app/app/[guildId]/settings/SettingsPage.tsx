@@ -116,7 +116,7 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
     loadData();
   }, [loadData]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("dashboard:updated", () => {
     loadData();
     void refreshUserPerms();
   });

@@ -21,6 +21,7 @@ import {
 } from "discord.js";
 import { nanoid } from "nanoid";
 import type { CommandContext } from "../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import type { RemindersPluginAPI } from "../index.js";
 import type { LibAPI } from "../../lib/index.js";
 import type { ReminderService } from "../services/ReminderService.js";
@@ -299,6 +300,12 @@ async function showCreateModal(interaction: ButtonInteraction, service: Reminder
       ...contextData,
     });
 
+    if (interaction.guildId) {
+      broadcastDashboardChange(interaction.guildId, "reminders", "reminder_created", {
+        requiredAction: "reminders.view_reminders",
+      });
+    }
+
     await modalSubmit.editReply({
       content: `✅ Reminder created! I'll remind you ${time(parsed.date, TimestampStyles.RelativeTime)}.`,
     });
@@ -372,6 +379,12 @@ async function showEditModal(interaction: ButtonInteraction, service: ReminderSe
       return;
     }
 
+    if (interaction.guildId) {
+      broadcastDashboardChange(interaction.guildId, "reminders", "reminder_updated", {
+        requiredAction: "reminders.view_reminders",
+      });
+    }
+
     const triggerDisplay = updates.triggerAt ? time(updates.triggerAt, TimestampStyles.RelativeTime) : time(reminder.triggerAt, TimestampStyles.RelativeTime);
 
     await modalSubmit.editReply({
@@ -391,6 +404,12 @@ async function showDeleteConfirmation(interaction: ButtonInteraction, service: R
   const confirmButton = lib.createButtonBuilder(async (btnInteraction) => {
     const deleted = await service.cancelReminder(String(reminder._id), interaction.user.id);
     if (deleted) {
+      const guildId = btnInteraction.guildId ?? interaction.guildId;
+      if (guildId) {
+        broadcastDashboardChange(guildId, "reminders", "reminder_deleted", {
+          requiredAction: "reminders.view_reminders",
+        });
+      }
       await btnInteraction.update({
         embeds: [lib.createEmbedBuilder().setTitle("✅ Deleted").setColor(0x57f287).setDescription("Reminder deleted successfully.")],
         components: [],

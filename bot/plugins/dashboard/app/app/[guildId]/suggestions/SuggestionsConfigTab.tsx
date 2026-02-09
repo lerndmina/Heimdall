@@ -125,7 +125,7 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
     fetchAll();
   }, [fetchAll]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("suggestions:updated", () => {
     fetchAll();
   });
 

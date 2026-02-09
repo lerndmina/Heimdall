@@ -294,7 +294,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
     fetchData();
   }, [fetchData]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("minecraft:updated", () => {
     fetchData();
   });
 

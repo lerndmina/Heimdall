@@ -14,7 +14,7 @@ import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import { ChannelType, PermissionFlagsBits, EmbedBuilder, TextChannel, type Client } from "discord.js";
 import log from "../utils/logger";
-import { broadcast } from "./broadcast";
+import { broadcastDashboardChange } from "./broadcast";
 import { resolveRouteAction } from "./dashboardRoutePermissions";
 import { ThingGetter } from "../../plugins/lib/utils/ThingGetter.js";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
@@ -112,9 +112,12 @@ export class ApiManager {
         if (!guildId) return;
         const pathSegments = path.split("/").filter(Boolean).slice(3);
         const plugin = pathSegments[0] || "unknown";
-        const requiredAction = resolveRouteAction(method, pathSegments);
-        const requiredCategory = requiredAction ? undefined : plugin;
-        broadcast(guildId, "dashboard:data_changed", { method, path, plugin, requiredAction }, { requiredAction, requiredCategory });
+        const requiredAction = resolveRouteAction(method, pathSegments) ?? undefined;
+        const type = `api_${method.toLowerCase()}`;
+        broadcastDashboardChange(guildId, plugin, type, {
+          requiredAction,
+          data: { method, path },
+        });
       });
 
       next();

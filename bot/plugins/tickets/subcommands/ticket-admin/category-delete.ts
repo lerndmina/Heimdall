@@ -3,6 +3,7 @@
  */
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { TicketsAPI } from "../../index.js";
 
 export async function handleCategoryDelete(context: CommandContext): Promise<void> {
@@ -29,6 +30,9 @@ export async function handleCategoryDelete(context: CommandContext): Promise<voi
 
     if (result.success) {
       await interaction.editReply({ content: `✅ Deleted category: **${category.name}**` });
+      broadcastDashboardChange(interaction.guild.id, "tickets", "category_deleted", {
+        requiredAction: "tickets.manage_categories",
+      });
     } else {
       await interaction.editReply({ content: `❌ ${result.message}` });
     }

@@ -7,6 +7,7 @@
 
 import { SlashCommandBuilder, time, TimestampStyles } from "discord.js";
 import type { CommandContext } from "../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import type { RemindersPluginAPI } from "../index.js";
 
 export const data = new SlashCommandBuilder()
@@ -85,6 +86,12 @@ export async function execute(context: CommandContext): Promise<void> {
       guildName,
       ...contextData,
     });
+
+    if (interaction.guildId) {
+      broadcastDashboardChange(interaction.guildId, "reminders", "reminder_created", {
+        requiredAction: "reminders.view_reminders",
+      });
+    }
 
     // Build confirmation
     const contextNote = contextData.contextType ? ` (linked to ${contextData.contextType})` : "";

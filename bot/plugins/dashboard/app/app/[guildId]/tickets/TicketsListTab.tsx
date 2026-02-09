@@ -116,7 +116,7 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
     fetchTickets();
   }, [fetchTickets]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("tickets:updated", () => {
     fetchTickets();
   });
 

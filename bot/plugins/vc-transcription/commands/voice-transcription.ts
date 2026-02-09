@@ -8,6 +8,7 @@
 
 import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { CommandContext } from "../../../src/core/CommandManager.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import VoiceTranscriptionConfig from "../models/VoiceTranscriptionConfig.js";
 import { TranscriptionMode, WhisperProvider } from "../types/index.js";
 import { createLogger } from "../../../src/core/Logger.js";
@@ -18,9 +19,7 @@ export const data = new SlashCommandBuilder()
   .setName("voice-transcription")
   .setDescription("Configure voice message transcription settings")
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-  .addSubcommand((sub) =>
-    sub.setName("status").setDescription("View current transcription configuration"),
-  )
+  .addSubcommand((sub) => sub.setName("status").setDescription("View current transcription configuration"))
   .addSubcommand((sub) =>
     sub
       .setName("set")
@@ -59,9 +58,7 @@ export async function execute(context: CommandContext): Promise<void> {
   }
 }
 
-async function handleStatus(
-  interaction: import("discord.js").ChatInputCommandInteraction,
-): Promise<void> {
+async function handleStatus(interaction: import("discord.js").ChatInputCommandInteraction): Promise<void> {
   try {
     const config = await VoiceTranscriptionConfig.findOne({ guildId: interaction.guild!.id });
     const mode = (config?.mode as TranscriptionMode) || TranscriptionMode.DISABLED;
@@ -84,9 +81,7 @@ async function handleStatus(
       filterInfo.push(`Channel filter: **${config.channelFilter.mode}** (${config.channelFilter.channels.length} channels)`);
     }
 
-    const filterSection = filterInfo.length > 0
-      ? `\n\n**Filters:**\n${filterInfo.join("\n")}`
-      : "\n\n**Filters:** None configured";
+    const filterSection = filterInfo.length > 0 ? `\n\n**Filters:**\n${filterInfo.join("\n")}` : "\n\n**Filters:** None configured";
 
     await interaction.reply({
       content:
@@ -104,34 +99,26 @@ async function handleStatus(
   }
 }
 
-async function handleSet(
-  interaction: import("discord.js").ChatInputCommandInteraction,
-): Promise<void> {
+async function handleSet(interaction: import("discord.js").ChatInputCommandInteraction): Promise<void> {
   const mode = interaction.options.getString("mode", true) as TranscriptionMode;
 
   try {
-    await VoiceTranscriptionConfig.findOneAndUpdate(
-      { guildId: interaction.guild!.id },
-      { mode },
-      { upsert: true, new: true },
-    );
+    await VoiceTranscriptionConfig.findOneAndUpdate({ guildId: interaction.guild!.id }, { mode }, { upsert: true, new: true });
 
     const modeMessages: Record<TranscriptionMode, string> = {
-      [TranscriptionMode.DISABLED]:
-        "🚫 Voice transcription has been **disabled**. Voice messages will not be transcribed.",
-      [TranscriptionMode.REACTIONS]:
-        "✍️ Voice transcription set to **reactions mode**. Users can react with ✍️ to transcribe, or ❌ to dismiss.",
-      [TranscriptionMode.AUTO]:
-        "🤖 Voice transcription set to **auto mode**. All voice messages will be automatically transcribed.",
+      [TranscriptionMode.DISABLED]: "🚫 Voice transcription has been **disabled**. Voice messages will not be transcribed.",
+      [TranscriptionMode.REACTIONS]: "✍️ Voice transcription set to **reactions mode**. Users can react with ✍️ to transcribe, or ❌ to dismiss.",
+      [TranscriptionMode.AUTO]: "🤖 Voice transcription set to **auto mode**. All voice messages will be automatically transcribed.",
     };
 
-    log.info(
-      `Voice transcription mode changed to ${mode} in guild ${interaction.guild!.id} by ${interaction.user.username}`,
-    );
+    log.info(`Voice transcription mode changed to ${mode} in guild ${interaction.guild!.id} by ${interaction.user.username}`);
 
     await interaction.reply({
       content: `## Settings Updated\n\n${modeMessages[mode]}`,
       ephemeral: false,
+    });
+    broadcastDashboardChange(interaction.guild!.id, "vc-transcription", "config_updated", {
+      requiredAction: "vc-transcription.manage_config",
     });
   } catch (error) {
     log.error("Failed to update transcription config:", error);

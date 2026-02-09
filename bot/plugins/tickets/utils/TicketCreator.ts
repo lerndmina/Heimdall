@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import type { PluginLogger } from "../../../src/types/Plugin.js";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import type { LibAPI } from "../../lib/index.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import Ticket, { type ITicket } from "../models/Ticket.js";
 import TicketCategory, { type ITicketCategory } from "../models/TicketCategory.js";
 import { TicketSessionService } from "../services/TicketSessionService.js";
@@ -270,6 +271,10 @@ export async function createTicketFromSession(
   await sessionService.deleteSession(sessionId);
 
   logger.info(`Created ticket #${ticketNumber} in channel ${channelResult.channel.id}`);
+
+  broadcastDashboardChange(session.guildId, "tickets", "ticket_created", {
+    requiredAction: "tickets.manage_tickets",
+  });
 
   return { success: true, message: "Ticket created successfully.", ticket };
 }

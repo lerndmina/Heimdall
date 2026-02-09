@@ -9,6 +9,7 @@ import { Events, type GuildChannel } from "discord.js";
 import type { HeimdallClient } from "../../../../src/types/Client.js";
 import ActiveTempChannels from "../../models/ActiveTempChannels.js";
 import { createLogger } from "../../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 
 const log = createLogger("tempvc:orphan");
 
@@ -21,6 +22,9 @@ export async function execute(client: HeimdallClient, channel: GuildChannel): Pr
 
     if (result) {
       log.debug(`Cleaned up orphaned temp channel record for ${channel.id}`);
+      broadcastDashboardChange(channel.guild.id, "tempvc", "active_updated", {
+        requiredAction: "tempvc.view_config",
+      });
     }
   } catch (error) {
     log.error("Error handling channel delete:", error);

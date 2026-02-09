@@ -83,7 +83,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
     loadCategories();
   }, [loadCategories]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("modmail:updated", () => {
     loadCategories();
   });
 

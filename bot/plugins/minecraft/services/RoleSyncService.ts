@@ -112,8 +112,9 @@ export class RoleSyncService {
 
       const targetGroups = RoleSyncService.getTargetGroups(discordRoles, config.roleSync.roleMappings);
       const managedGroups = config.roleSync.roleMappings.filter((m) => m.enabled).map((m) => m.minecraftGroup);
+      const currentManagedGroups = currentMinecraftGroups.filter((g) => managedGroups.includes(g));
 
-      const comparison = RoleSyncService.compareGroups(currentMinecraftGroups, targetGroups);
+      const comparison = RoleSyncService.compareGroups(currentManagedGroups, targetGroups);
 
       let operation: RoleSyncOperation | undefined;
       if (comparison.toAdd.length > 0 || comparison.toRemove.length > 0) {
@@ -124,7 +125,7 @@ export class RoleSyncService {
           syncTrigger: "login",
           discordRolesBefore: player.lastDiscordRoles || [],
           discordRolesAfter: discordRoles.map((r) => r.id),
-          minecraftGroupsBefore: currentMinecraftGroups,
+          minecraftGroupsBefore: currentManagedGroups,
           minecraftGroupsAfter: targetGroups,
           groupsAdded: comparison.toAdd,
           groupsRemoved: comparison.toRemove,
@@ -135,7 +136,7 @@ export class RoleSyncService {
       // Update tracking fields
       await MinecraftPlayer.findByIdAndUpdate(playerId, {
         lastDiscordRoles: discordRoles.map((r) => r.id),
-        lastMinecraftGroups: currentMinecraftGroups,
+        lastMinecraftGroups: currentManagedGroups,
         lastRoleSyncAt: new Date(),
       });
 

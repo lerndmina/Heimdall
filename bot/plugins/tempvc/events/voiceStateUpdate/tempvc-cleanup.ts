@@ -8,6 +8,7 @@ import { Events, type VoiceState, type VoiceChannel } from "discord.js";
 import type { HeimdallClient } from "../../../../src/types/Client.js";
 import ActiveTempChannels from "../../models/ActiveTempChannels.js";
 import { createLogger } from "../../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 
 const log = createLogger("tempvc:cleanup");
 
@@ -34,6 +35,9 @@ export async function execute(client: HeimdallClient, oldState: VoiceState, newS
   if (!channel) {
     // Channel already deleted — clean up the record
     await ActiveTempChannels.findOneAndUpdate({ guildId }, { $pull: { channelIds: oldState.channelId } });
+    broadcastDashboardChange(guildId, "tempvc", "active_updated", {
+      requiredAction: "tempvc.view_config",
+    });
     return;
   }
 
@@ -44,6 +48,9 @@ export async function execute(client: HeimdallClient, oldState: VoiceState, newS
     await channel.delete();
     await ActiveTempChannels.findOneAndUpdate({ guildId }, { $pull: { channelIds: oldState.channelId } });
     log.info(`Deleted empty temp channel ${oldState.channelId} in guild ${guildId}`);
+    broadcastDashboardChange(guildId, "tempvc", "active_updated", {
+      requiredAction: "tempvc.view_config",
+    });
   } catch (error) {
     log.error("Failed to delete empty temp channel:", error);
   }

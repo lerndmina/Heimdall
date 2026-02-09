@@ -123,7 +123,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
     fetchAll();
   }, [fetchAll]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("tickets:updated", () => {
     fetchAll();
   });
 

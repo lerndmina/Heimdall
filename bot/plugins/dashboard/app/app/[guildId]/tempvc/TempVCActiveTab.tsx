@@ -74,7 +74,7 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
     fetchData();
   }, [fetchData]);
 
-  useRealtimeEvent("dashboard:data_changed", () => {
+  useRealtimeEvent("tempvc:updated", () => {
     fetchData();
   });
 
