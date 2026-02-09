@@ -163,13 +163,7 @@ export class InfractionService {
    * Set a user's active points to a specific value.
    * Clears all existing active infractions and creates a single adjustment infraction.
    */
-  async setPoints(
-    guildId: string,
-    userId: string,
-    points: number,
-    moderatorId: string,
-    reason?: string,
-  ): Promise<{ previousPoints: number; newPoints: number }> {
+  async setPoints(guildId: string, userId: string, points: number, moderatorId: string, reason?: string): Promise<{ previousPoints: number; newPoints: number }> {
     try {
       const previousPoints = await this.getActivePoints(guildId, userId);
 

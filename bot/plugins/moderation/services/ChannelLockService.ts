@@ -16,15 +16,7 @@
  * 3. Removes the lock record
  */
 
-import {
-  type Guild,
-  type GuildTextBasedChannel,
-  type TextChannel,
-  type NewsChannel,
-  PermissionsBitField,
-  OverwriteType,
-  ChannelType,
-} from "discord.js";
+import { type Guild, type GuildTextBasedChannel, type TextChannel, type NewsChannel, PermissionsBitField, OverwriteType, ChannelType } from "discord.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import type { LibAPI } from "../../lib/index.js";
@@ -59,13 +51,7 @@ export class ChannelLockService {
   private moderationService: ModerationService;
   private expiryInterval: ReturnType<typeof setInterval> | null = null;
 
-  constructor(
-    client: HeimdallClient,
-    redis: RedisClientType,
-    lib: LibAPI,
-    logging: LoggingPluginAPI | null,
-    moderationService: ModerationService,
-  ) {
+  constructor(client: HeimdallClient, redis: RedisClientType, lib: LibAPI, logging: LoggingPluginAPI | null, moderationService: ModerationService) {
     this.client = client;
     this.redis = redis;
     this.lib = lib;
@@ -85,12 +71,7 @@ export class ChannelLockService {
 
   // ── Lock a Channel ─────────────────────────────────────
 
-  async lockChannel(
-    channel: TextChannel | NewsChannel,
-    moderatorId: string,
-    reason: string,
-    duration?: number | null,
-  ): Promise<{ success: boolean; error?: string }> {
+  async lockChannel(channel: TextChannel | NewsChannel, moderatorId: string, reason: string, duration?: number | null): Promise<{ success: boolean; error?: string }> {
     try {
       const guild = channel.guild;
 
@@ -117,13 +98,17 @@ export class ChannelLockService {
 
       // Deny write permissions for @everyone
       const denyBits = lockDenyBitfield();
-      await channel.permissionOverwrites.edit(guild.roles.everyone, {
-        SendMessages: false,
-        SendMessagesInThreads: false,
-        CreatePublicThreads: false,
-        CreatePrivateThreads: false,
-        AddReactions: false,
-      }, { reason: `Channel locked by <@${moderatorId}>: ${reason}` });
+      await channel.permissionOverwrites.edit(
+        guild.roles.everyone,
+        {
+          SendMessages: false,
+          SendMessagesInThreads: false,
+          CreatePublicThreads: false,
+          CreatePrivateThreads: false,
+          AddReactions: false,
+        },
+        { reason: `Channel locked by <@${moderatorId}>: ${reason}` },
+      );
 
       // Deny write permissions for all roles that have overwrites
       for (const overwrite of channel.permissionOverwrites.cache.values()) {
@@ -131,13 +116,17 @@ export class ChannelLockService {
           // Skip bypass roles
           if (bypassRoles.includes(overwrite.id)) continue;
 
-          await channel.permissionOverwrites.edit(overwrite.id, {
-            SendMessages: false,
-            SendMessagesInThreads: false,
-            CreatePublicThreads: false,
-            CreatePrivateThreads: false,
-            AddReactions: false,
-          }, { reason: `Channel locked by <@${moderatorId}>: ${reason}` });
+          await channel.permissionOverwrites.edit(
+            overwrite.id,
+            {
+              SendMessages: false,
+              SendMessagesInThreads: false,
+              CreatePublicThreads: false,
+              CreatePrivateThreads: false,
+              AddReactions: false,
+            },
+            { reason: `Channel locked by <@${moderatorId}>: ${reason}` },
+          );
         }
       }
 
@@ -145,13 +134,17 @@ export class ChannelLockService {
       for (const roleId of bypassRoles) {
         const role = guild.roles.cache.get(roleId);
         if (role) {
-          await channel.permissionOverwrites.edit(role, {
-            SendMessages: true,
-            SendMessagesInThreads: true,
-            CreatePublicThreads: true,
-            CreatePrivateThreads: true,
-            AddReactions: true,
-          }, { reason: `Lock bypass role` });
+          await channel.permissionOverwrites.edit(
+            role,
+            {
+              SendMessages: true,
+              SendMessagesInThreads: true,
+              CreatePublicThreads: true,
+              CreatePrivateThreads: true,
+              AddReactions: true,
+            },
+            { reason: `Lock bypass role` },
+          );
         }
       }
 
@@ -184,10 +177,7 @@ export class ChannelLockService {
 
   // ── Unlock a Channel ───────────────────────────────────
 
-  async unlockChannel(
-    channel: TextChannel | NewsChannel,
-    moderatorId?: string,
-  ): Promise<{ success: boolean; error?: string }> {
+  async unlockChannel(channel: TextChannel | NewsChannel, moderatorId?: string): Promise<{ success: boolean; error?: string }> {
     try {
       const guild = channel.guild;
 
@@ -226,12 +216,8 @@ export class ChannelLockService {
             await channel.permissionOverwrites.create(
               saved.id,
               {
-                ...Object.fromEntries(
-                  new PermissionsBitField(BigInt(saved.allow)).toArray().map((p) => [p, true]),
-                ),
-                ...Object.fromEntries(
-                  new PermissionsBitField(BigInt(saved.deny)).toArray().map((p) => [p, false]),
-                ),
+                ...Object.fromEntries(new PermissionsBitField(BigInt(saved.allow)).toArray().map((p) => [p, true])),
+                ...Object.fromEntries(new PermissionsBitField(BigInt(saved.deny)).toArray().map((p) => [p, false])),
               },
               {
                 type: saved.type === 0 ? OverwriteType.Role : OverwriteType.Member,
@@ -278,18 +264,11 @@ export class ChannelLockService {
       }
 
       // Send new sticky
-      const stickyEmbed = this.buildLockEmbed(
-        lockRecord.reason,
-        lockRecord.moderatorId,
-        lockRecord.expiresAt ?? null,
-      );
+      const stickyEmbed = this.buildLockEmbed(lockRecord.reason, lockRecord.moderatorId, lockRecord.expiresAt ?? null);
       const newMsg = await channel.send({ embeds: [stickyEmbed] });
 
       // Update record with new message ID
-      await ChannelLock.updateOne(
-        { channelId: channel.id },
-        { $set: { stickyMessageId: newMsg.id } },
-      );
+      await ChannelLock.updateOne({ channelId: channel.id }, { $set: { stickyMessageId: newMsg.id } });
     } catch (error) {
       log.error("Failed to refresh sticky lock message:", error);
     }
@@ -385,10 +364,7 @@ export class ChannelLockService {
       .setColor(0xef4444)
       .setTitle("🔒 Channel Locked")
       .setDescription(`This channel has been locked by a moderator.`)
-      .addFields(
-        { name: "Reason", value: reason || "No reason provided" },
-        { name: "Locked by", value: `<@${moderatorId}>`, inline: true },
-      );
+      .addFields({ name: "Reason", value: reason || "No reason provided" }, { name: "Locked by", value: `<@${moderatorId}>`, inline: true });
 
     if (expiresAt) {
       embed.addFields({

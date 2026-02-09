@@ -11,11 +11,7 @@ export const data = new SlashCommandBuilder()
   .setDescription("Unlock a locked channel, restoring its previous permissions")
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
   .addChannelOption((opt) =>
-    opt
-      .setName("channel")
-      .setDescription("The channel to unlock (defaults to current channel)")
-      .setRequired(false)
-      .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
+    opt.setName("channel").setDescription("The channel to unlock (defaults to current channel)").setRequired(false).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
   );
 
 export const config = { allowInDMs: false };
@@ -47,21 +43,14 @@ export async function execute(context: CommandContext): Promise<void> {
       .createEmbedBuilder()
       .setColor(0x22c55e)
       .setTitle("🔓 Channel Unlocked")
-      .addFields(
-        { name: "Channel", value: `${channel}`, inline: true },
-      )
+      .addFields({ name: "Channel", value: `${channel}`, inline: true })
       .setDescription("Permissions have been restored to their pre-lock state.");
 
     await interaction.editReply({ embeds: [embed] });
 
     // Send a notification in the unlocked channel
     try {
-      const notifyEmbed = mod.lib
-        .createEmbedBuilder()
-        .setColor(0x22c55e)
-        .setTitle("🔓 Channel Unlocked")
-        .setDescription(`This channel has been unlocked by ${interaction.user}.`)
-        .setTimestamp();
+      const notifyEmbed = mod.lib.createEmbedBuilder().setColor(0x22c55e).setTitle("🔓 Channel Unlocked").setDescription(`This channel has been unlocked by ${interaction.user}.`).setTimestamp();
       await channel.send({ embeds: [notifyEmbed] });
     } catch {
       // Channel might not be sendable
@@ -75,10 +64,7 @@ export async function execute(context: CommandContext): Promise<void> {
         .createEmbedBuilder()
         .setColor(0x22c55e)
         .setTitle("🔓 Channel Unlocked")
-        .addFields(
-          { name: "Channel", value: `${channel} (${channel.name})`, inline: true },
-          { name: "Moderator", value: `${interaction.user}`, inline: true },
-        )
+        .addFields({ name: "Channel", value: `${channel} (${channel.name})`, inline: true }, { name: "Moderator", value: `${interaction.user}`, inline: true })
         .setFooter({ text: `Channel ID: ${channel.id}` }),
     );
   } else {

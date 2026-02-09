@@ -11,11 +11,7 @@ export const data = new SlashCommandBuilder()
   .setDescription("Lock a channel, preventing members from sending messages")
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
   .addChannelOption((opt) =>
-    opt
-      .setName("channel")
-      .setDescription("The channel to lock (defaults to current channel)")
-      .setRequired(false)
-      .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
+    opt.setName("channel").setDescription("The channel to lock (defaults to current channel)").setRequired(false).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
   )
   .addStringOption((opt) => opt.setName("reason").setDescription("Reason for locking the channel").setRequired(false))
   .addStringOption((opt) => opt.setName("duration").setDescription("How long to lock the channel (e.g. 1h, 30m, 2d)").setRequired(false));
@@ -64,10 +60,7 @@ export async function execute(context: CommandContext): Promise<void> {
       .createEmbedBuilder()
       .setColor(0xef4444)
       .setTitle("🔒 Channel Locked")
-      .addFields(
-        { name: "Channel", value: `${channel}`, inline: true },
-        { name: "Reason", value: reason },
-      );
+      .addFields({ name: "Channel", value: `${channel}`, inline: true }, { name: "Reason", value: reason });
 
     if (duration) {
       const expiresAt = new Date(Date.now() + duration);
@@ -92,9 +85,7 @@ export async function execute(context: CommandContext): Promise<void> {
           { name: "Channel", value: `${channel} (${channel.name})`, inline: true },
           { name: "Moderator", value: `${interaction.user}`, inline: true },
           { name: "Reason", value: reason },
-          ...(duration
-            ? [{ name: "Duration", value: `<t:${Math.floor((Date.now() + duration) / 1000)}:R>`, inline: true }]
-            : []),
+          ...(duration ? [{ name: "Duration", value: `<t:${Math.floor((Date.now() + duration) / 1000)}:R>`, inline: true }] : []),
         )
         .setFooter({ text: `Channel ID: ${channel.id}` }),
     );
