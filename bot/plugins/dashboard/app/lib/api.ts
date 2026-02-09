@@ -2,9 +2,20 @@
  * Client-side API helper — calls the dashboard proxy route which
  * forwards to the bot API with auth.
  *
- * Supports optional client-side caching via localStorage.
+ * Supports optional client-side caching via localStorage and
+ * in-flight request deduplication (multiple callers for the same
+ * URL share a single network request).
  */
 import { cache } from "./cache";
+
+/**
+ * In-flight request map for deduplication.
+ * Key = URL, Value = pending promise.
+ * When multiple components request the same URL before the first
+ * resolves, they all await the same promise instead of firing
+ * duplicate network requests.
+ */
+const inflightRequests = new Map<string, Promise<ApiResponse<any>>>();
 
 /** Standard API response envelope from the bot */
 export interface ApiResponse<T = unknown> {
@@ -39,56 +50,74 @@ export async function fetchApi<T = unknown>(guildId: string, path: string, optio
 
   const url = `/api/guilds/${guildId}/${path}`;
 
-  const res = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...fetchOptions?.headers,
-    },
-    ...fetchOptions,
-  });
+  // Only deduplicate GET requests (or requests with no method / body)
+  const isGet = !fetchOptions?.method || fetchOptions.method === "GET";
 
-  let data: ApiResponse<T>;
+  if (isGet) {
+    const inflight = inflightRequests.get(url);
+    if (inflight) return inflight as Promise<ApiResponse<T>>;
+  }
 
-  try {
-    data = (await res.json()) as ApiResponse<T>;
-  } catch {
-    // If JSON parsing fails, create error response based on HTTP status
-    data = {
-      success: false,
-      error: {
-        code: res.status === 403 ? "FORBIDDEN" : res.status === 401 ? "UNAUTHORIZED" : "PARSE_ERROR",
-        message: res.status === 403 ? "Access denied" : res.status === 401 ? "Unauthorized" : "Failed to parse response",
+  const request = (async (): Promise<ApiResponse<T>> => {
+    const res = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        ...fetchOptions?.headers,
       },
-    };
-    return data;
-  }
+      ...fetchOptions,
+    });
 
-  // If HTTP status indicates error, ensure error object includes proper code
-  if (!res.ok) {
-    // Create error object if it doesn't exist
-    if (!data.error) {
-      data.error = {
-        code: "UNKNOWN",
-        message: `HTTP ${res.status}: ${res.statusText}`,
+    let data: ApiResponse<T>;
+
+    try {
+      data = (await res.json()) as ApiResponse<T>;
+    } catch {
+      // If JSON parsing fails, create error response based on HTTP status
+      data = {
+        success: false,
+        error: {
+          code: res.status === 403 ? "FORBIDDEN" : res.status === 401 ? "UNAUTHORIZED" : "PARSE_ERROR",
+          message: res.status === 403 ? "Access denied" : res.status === 401 ? "Unauthorized" : "Failed to parse response",
+        },
       };
+      return data;
     }
 
-    // Override error code based on HTTP status
-    if (res.status === 403) {
-      data.error.code = "FORBIDDEN";
-    } else if (res.status === 401) {
-      data.error.code = "UNAUTHORIZED";
+    // If HTTP status indicates error, ensure error object includes proper code
+    if (!res.ok) {
+      // Create error object if it doesn't exist
+      if (!data.error) {
+        data.error = {
+          code: "UNKNOWN",
+          message: `HTTP ${res.status}: ${res.statusText}`,
+        };
+      }
+
+      // Override error code based on HTTP status
+      if (res.status === 403) {
+        data.error.code = "FORBIDDEN";
+      } else if (res.status === 401) {
+        data.error.code = "UNAUTHORIZED";
+      }
+
+      data.success = false;
     }
 
-    data.success = false;
+    // Write to cache on success
+    if (cacheKey && data.success) {
+      cache.set(cacheKey, data, cacheTtl);
+    }
+
+    return data;
+  })();
+
+  // Register in-flight promise and clean up when done
+  if (isGet) {
+    inflightRequests.set(url, request);
+    request.finally(() => inflightRequests.delete(url));
   }
 
-  // Write to cache on success
-  if (cacheKey && data.success) {
-    cache.set(cacheKey, data, cacheTtl);
-  }
-
-  return data;
+  return request;
 }
 
 /**
@@ -103,19 +132,38 @@ export async function fetchDashboardApi<T = unknown>(path: string, options?: Fet
     if (cached) return cached;
   }
 
-  const res = await fetch(`/api/${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...fetchOptions?.headers,
-    },
-    ...fetchOptions,
-  });
+  const url = `/api/${path}`;
 
-  const data = (await res.json()) as ApiResponse<T>;
+  // Only deduplicate GET requests
+  const isGet = !fetchOptions?.method || fetchOptions.method === "GET";
 
-  if (cacheKey && data.success) {
-    cache.set(cacheKey, data, cacheTtl);
+  if (isGet) {
+    const inflight = inflightRequests.get(url);
+    if (inflight) return inflight as Promise<ApiResponse<T>>;
   }
 
-  return data;
+  const request = (async (): Promise<ApiResponse<T>> => {
+    const res = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        ...fetchOptions?.headers,
+      },
+      ...fetchOptions,
+    });
+
+    const data = (await res.json()) as ApiResponse<T>;
+
+    if (cacheKey && data.success) {
+      cache.set(cacheKey, data, cacheTtl);
+    }
+
+    return data;
+  })();
+
+  if (isGet) {
+    inflightRequests.set(url, request);
+    request.finally(() => inflightRequests.delete(url));
+  }
+
+  return request;
 }
