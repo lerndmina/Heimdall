@@ -17,6 +17,7 @@ import type { HeimdallClient } from "../../src/types/Client.js";
 import "./models/ModerationConfig.js";
 import "./models/AutomodRule.js";
 import "./models/Infraction.js";
+import "./models/ChannelLock.js";
 
 import { ModerationService } from "./services/ModerationService.js";
 import { RuleEngine } from "./services/RuleEngine.js";
@@ -24,6 +25,7 @@ import { InfractionService } from "./services/InfractionService.js";
 import { EscalationService } from "./services/EscalationService.js";
 import { ModActionService } from "./services/ModActionService.js";
 import { AutomodEnforcer } from "./services/AutomodEnforcer.js";
+import { ChannelLockService } from "./services/ChannelLockService.js";
 
 export interface ModerationPluginAPI extends PluginAPI {
   version: string;
@@ -33,6 +35,8 @@ export interface ModerationPluginAPI extends PluginAPI {
   escalationService: EscalationService;
   modActionService: ModActionService;
   automodEnforcer: AutomodEnforcer;
+  channelLockService: ChannelLockService;
+  client: HeimdallClient;
   lib: LibAPI;
   logging: LoggingPluginAPI | null;
 }
@@ -43,6 +47,7 @@ let infractionService: InfractionService;
 let escalationService: EscalationService;
 let modActionService: ModActionService;
 let automodEnforcer: AutomodEnforcer;
+let channelLockService: ChannelLockService;
 
 export async function onLoad(context: PluginContext): Promise<ModerationPluginAPI> {
   const { client, logger, dependencies, redis } = context;
@@ -58,6 +63,7 @@ export async function onLoad(context: PluginContext): Promise<ModerationPluginAP
   escalationService = new EscalationService(lib, logging);
   modActionService = new ModActionService(client, lib, logging, infractionService, escalationService);
   automodEnforcer = new AutomodEnforcer(client, lib, logging, moderationService, ruleEngine, infractionService, escalationService, modActionService);
+  channelLockService = new ChannelLockService(client, redis, lib, logging, moderationService);
 
   logger.info("✅ Moderation plugin loaded");
 
@@ -69,12 +75,15 @@ export async function onLoad(context: PluginContext): Promise<ModerationPluginAP
     escalationService,
     modActionService,
     automodEnforcer,
+    channelLockService,
+    client,
     lib,
     logging,
   };
 }
 
 export async function onDisable(logger: PluginLogger): Promise<void> {
+  if (channelLockService) channelLockService.dispose();
   logger.info("🛑 Moderation plugin unloaded");
 }
 

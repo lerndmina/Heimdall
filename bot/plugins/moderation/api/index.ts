@@ -17,6 +17,7 @@ import { createRulesTestRoutes } from "./rules-test.js";
 import { createInfractionsRoutes } from "./infractions.js";
 import { createPresetsRoutes } from "./presets.js";
 import { createStatsRoutes } from "./stats.js";
+import { createLockRoutes, type LockApiDeps } from "./locks.js";
 
 export type ModerationApiDeps = Pick<ModerationPluginAPI, "moderationService" | "ruleEngine" | "infractionService" | "escalationService" | "lib">;
 
@@ -51,6 +52,14 @@ export function createRouter(api: ModerationPluginAPI): Router {
 
   // Stats
   router.use("/stats", createStatsRoutes(deps));
+
+  // Channel locks
+  const lockDeps: LockApiDeps = {
+    ...deps,
+    channelLockService: api.channelLockService,
+    client: api.client,
+  };
+  router.use("/locks", createLockRoutes(lockDeps));
 
   return router;
 }

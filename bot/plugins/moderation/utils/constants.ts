@@ -23,10 +23,14 @@ export const CONFIG_CACHE_TTL = 300;
 /** Redis cache TTL for automod rules (5 minutes) */
 export const RULES_CACHE_TTL = 300;
 
+/** Redis cache TTL for channel locks (2 minutes) */
+export const LOCK_CACHE_TTL = 120;
+
 /** Redis key prefixes */
 export const CACHE_KEYS = {
   CONFIG: "moderation:config",
   RULES: "moderation:rules",
+  LOCKS: "moderation:locks",
 } as const;
 
 /** Default DM template */
@@ -43,4 +47,6 @@ export const ACTION_COLORS = {
   escalation: 0xdc2626,
   purge: 0x6366f1,
   infraction: 0x64748b,
+  lock: 0xef4444,
+  unlock: 0x22c55e,
 } as const;

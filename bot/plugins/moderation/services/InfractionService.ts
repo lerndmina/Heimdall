@@ -160,6 +160,51 @@ export class InfractionService {
   }
 
   /**
+   * Set a user's active points to a specific value.
+   * Clears all existing active infractions and creates a single adjustment infraction.
+   */
+  async setPoints(
+    guildId: string,
+    userId: string,
+    points: number,
+    moderatorId: string,
+    reason?: string,
+  ): Promise<{ previousPoints: number; newPoints: number }> {
+    try {
+      const previousPoints = await this.getActivePoints(guildId, userId);
+
+      // Deactivate all current active infractions
+      await Infraction.updateMany({ guildId, userId, active: true }, { $set: { active: false } });
+
+      if (points > 0) {
+        const config = await this.moderationService.getConfig(guildId);
+        let expiresAt: Date | null = null;
+        if (config?.pointDecayEnabled && config.pointDecayDays > 0) {
+          expiresAt = new Date(Date.now() + config.pointDecayDays * 24 * 60 * 60 * 1000);
+        }
+
+        await Infraction.create({
+          guildId,
+          userId,
+          moderatorId,
+          source: InfractionSource.MANUAL,
+          type: InfractionType.WARN,
+          reason: reason ?? `Points set to ${points} (was ${previousPoints})`,
+          pointsAssigned: points,
+          totalPointsAfter: points,
+          expiresAt,
+          active: true,
+        });
+      }
+
+      return { previousPoints, newPoints: points };
+    } catch (error) {
+      log.error("Error setting points:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Clear all active infractions for a user (set active: false).
    */
   async clearUserInfractions(guildId: string, userId: string): Promise<number> {

@@ -99,6 +99,11 @@ const ModerationConfigSchema = new Schema(
       type: [EscalationTierSchema],
       default: [],
     },
+    /** Role IDs that bypass channel locks (can still type in locked channels) */
+    lockBypassRoles: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true },
 );
