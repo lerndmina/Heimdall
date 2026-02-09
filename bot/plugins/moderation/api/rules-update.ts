@@ -19,7 +19,6 @@ export function createRulesUpdateRoutes(deps: ModerationApiDeps): Router {
         name,
         patterns: rawPatterns,
         wildcardPatterns,
-        patternMode,
         matchMode,
         target,
         actions,
@@ -44,48 +43,56 @@ export function createRulesUpdateRoutes(deps: ModerationApiDeps): Router {
         return;
       }
 
-      // Build patterns from either wildcard or regex input (if provided)
+      // Build patterns — both wildcard and regex can be provided and are merged
       let patterns: Array<{ regex: string; flags?: string; label?: string }> | undefined;
 
-      if (patternMode === "wildcard" && wildcardPatterns) {
-        const input = Array.isArray(wildcardPatterns) ? wildcardPatterns.join(",") : wildcardPatterns;
-        const result = parseWildcardPatterns(input);
+      const hasWildcard = wildcardPatterns && (typeof wildcardPatterns === "string" ? wildcardPatterns.trim() : true);
+      const hasRegex = rawPatterns && Array.isArray(rawPatterns) && rawPatterns.length > 0;
 
-        if (!result.success || result.patterns.length === 0) {
-          res.status(400).json({
-            success: false,
-            error: { code: "INVALID_INPUT", message: result.errors.join("; ") || "Invalid wildcard patterns" },
-          });
-          return;
-        }
+      if (hasWildcard || hasRegex) {
+        patterns = [];
 
-        patterns = result.patterns.map((p) => ({ regex: p.regex, flags: p.flags, label: p.label }));
-      } else if (rawPatterns) {
-        if (!Array.isArray(rawPatterns) || rawPatterns.length === 0) {
-          res.status(400).json({
-            success: false,
-            error: { code: "INVALID_INPUT", message: "patterns must be a non-empty array" },
-          });
-          return;
-        }
-        for (const p of rawPatterns) {
-          if (!p.regex) {
+        if (hasWildcard) {
+          const input = Array.isArray(wildcardPatterns) ? wildcardPatterns.join(",") : wildcardPatterns;
+          const result = parseWildcardPatterns(input);
+          if (!result.success) {
             res.status(400).json({
               success: false,
-              error: { code: "INVALID_INPUT", message: "Each pattern must have a regex field" },
+              error: { code: "INVALID_INPUT", message: result.errors.join("; ") || "Invalid wildcard patterns" },
             });
             return;
           }
-          const validation = validateRegex(p.regex, p.flags);
-          if (!validation.valid) {
-            res.status(400).json({
-              success: false,
-              error: { code: "INVALID_REGEX", message: `Invalid regex "${p.regex}": ${validation.error}` },
-            });
-            return;
-          }
+          patterns.push(...result.patterns.map((p) => ({ regex: p.regex, flags: p.flags, label: p.label })));
         }
-        patterns = rawPatterns;
+
+        if (hasRegex) {
+          for (const p of rawPatterns) {
+            if (!p.regex) {
+              res.status(400).json({
+                success: false,
+                error: { code: "INVALID_INPUT", message: "Each pattern must have a regex field" },
+              });
+              return;
+            }
+            const validation = validateRegex(p.regex, p.flags);
+            if (!validation.valid) {
+              res.status(400).json({
+                success: false,
+                error: { code: "INVALID_REGEX", message: `Invalid regex "${p.regex}": ${validation.error}` },
+              });
+              return;
+            }
+          }
+          patterns.push(...rawPatterns);
+        }
+
+        if (patterns.length === 0) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: "At least one pattern (wildcard or regex) is required" },
+          });
+          return;
+        }
       }
 
       const updates: Record<string, any> = {};

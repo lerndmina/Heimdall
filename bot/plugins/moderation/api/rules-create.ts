@@ -19,7 +19,6 @@ export function createRulesCreateRoutes(deps: ModerationApiDeps): Router {
         name,
         patterns: rawPatterns,
         wildcardPatterns,
-        patternMode,
         matchMode,
         target,
         actions,
@@ -51,25 +50,27 @@ export function createRulesCreateRoutes(deps: ModerationApiDeps): Router {
         return;
       }
 
-      // Build patterns from either wildcard or regex input
-      let patterns: Array<{ regex: string; flags?: string; label?: string }>;
+      // Build patterns — both wildcard and regex can be provided and are merged
+      const patterns: Array<{ regex: string; flags?: string; label?: string }> = [];
 
-      if (patternMode === "wildcard" && wildcardPatterns) {
-        // Convert wildcard patterns (comma-separated string or array) to regex
+      // Convert wildcard patterns if provided
+      if (wildcardPatterns) {
         const input = Array.isArray(wildcardPatterns) ? wildcardPatterns.join(",") : wildcardPatterns;
-        const result = parseWildcardPatterns(input);
-
-        if (!result.success || result.patterns.length === 0) {
-          res.status(400).json({
-            success: false,
-            error: { code: "INVALID_INPUT", message: result.errors.join("; ") || "Invalid wildcard patterns" },
-          });
-          return;
+        if (input.trim()) {
+          const result = parseWildcardPatterns(input);
+          if (!result.success) {
+            res.status(400).json({
+              success: false,
+              error: { code: "INVALID_INPUT", message: result.errors.join("; ") || "Invalid wildcard patterns" },
+            });
+            return;
+          }
+          patterns.push(...result.patterns.map((p) => ({ regex: p.regex, flags: p.flags, label: p.label })));
         }
+      }
 
-        patterns = result.patterns.map((p) => ({ regex: p.regex, flags: p.flags, label: p.label }));
-      } else if (rawPatterns && Array.isArray(rawPatterns) && rawPatterns.length > 0) {
-        // Legacy: raw regex patterns
+      // Add raw regex patterns if provided
+      if (rawPatterns && Array.isArray(rawPatterns) && rawPatterns.length > 0) {
         for (const p of rawPatterns) {
           if (!p.regex) {
             res.status(400).json({
@@ -87,11 +88,13 @@ export function createRulesCreateRoutes(deps: ModerationApiDeps): Router {
             return;
           }
         }
-        patterns = rawPatterns;
-      } else {
+        patterns.push(...rawPatterns);
+      }
+
+      if (patterns.length === 0) {
         res.status(400).json({
           success: false,
-          error: { code: "INVALID_INPUT", message: "Either patterns (regex array) or wildcardPatterns (wildcard string) is required" },
+          error: { code: "INVALID_INPUT", message: "At least one pattern (wildcard or regex) is required" },
         });
         return;
       }

@@ -282,7 +282,6 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
 
   // Step 1: Basics
   const [name, setName] = useState("");
-  const [patternMode, setPatternMode] = useState<"wildcard" | "regex">("wildcard");
 
   // Step 2: Patterns
   const [wildcardText, setWildcardText] = useState("");
@@ -321,7 +320,6 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
   function resetWizard() {
     setWizardStep(1);
     setName("");
-    setPatternMode("wildcard");
     setWildcardText("");
     setPatternsText("");
     setTestInput("");
@@ -347,8 +345,8 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     resetWizard();
     setEditRule(rule);
     setName(rule.name);
-    setPatternMode("regex"); // Editing always shows raw regex
     setPatternsText(rule.patterns.map((p) => p.regex).join("\n"));
+    setWildcardText("");
     setTarget(Array.isArray(rule.target) ? rule.target : [rule.target]);
     setActions(rule.actions);
     setWarnPoints(rule.warnPoints);
@@ -415,16 +413,16 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     if (roleInclude.length > 0) body.roleInclude = roleInclude;
     if (roleExclude.length > 0) body.roleExclude = roleExclude;
 
-    if (patternMode === "wildcard") {
-      body.patternMode = "wildcard";
+    // Send both wildcard and regex — API merges them
+    if (wildcardText.trim()) {
       body.wildcardPatterns = wildcardText;
-    } else {
-      const patterns = patternsText
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .map((regex) => ({ regex }));
-      body.patterns = patterns;
+    }
+    const regexLines = patternsText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (regexLines.length > 0) {
+      body.patterns = regexLines.map((regex) => ({ regex }));
     }
 
     if (editRule) {
@@ -485,7 +483,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
 
   // ── Validation per-step ──
   const step1Valid = name.trim().length > 0;
-  const step2Valid = patternMode === "wildcard" ? wildcardText.trim().length > 0 : patternsText.trim().length > 0;
+  const step2Valid = wildcardText.trim().length > 0 || patternsText.trim().length > 0;
   const step3Valid = actions.length > 0 && target.length > 0;
 
   if (loading) return <Spinner />;
@@ -625,35 +623,10 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
           <span className="w-1/4 text-center">Scoping</span>
         </div>
 
-        {/* ── Step 1: Name & Pattern Mode ── */}
+        {/* ── Step 1: Name ── */}
         {wizardStep === 1 && (
           <div className="space-y-4">
             <TextInput label="Rule Name" description="A unique identifier for this rule" value={name} onChange={setName} placeholder="e.g. slur-filter, meme-blocker" required />
-
-            <div>
-              <label className="block text-sm font-medium text-zinc-200 mb-2">Pattern Mode</label>
-              <p className="text-xs text-zinc-500 mb-3">Choose how you want to define what this rule matches.</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setPatternMode("wildcard")}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    patternMode === "wildcard" ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
-                  }`}>
-                  <div className="text-sm font-medium text-zinc-100">Wildcard</div>
-                  <div className="text-xs text-zinc-400 mt-1">Discord-style matching with * wildcards. Easy to use.</div>
-                  <code className="text-xs text-amber-400/70 mt-2 block">*word*, st*rt, *end</code>
-                </button>
-                <button
-                  onClick={() => setPatternMode("regex")}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    patternMode === "regex" ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
-                  }`}>
-                  <div className="text-sm font-medium text-zinc-100">Regex</div>
-                  <div className="text-xs text-zinc-400 mt-1">Full regular expression support. For power users.</div>
-                  <code className="text-xs text-amber-400/70 mt-2 block">{"\\bword\\b, [a-z]+, .*"}</code>
-                </button>
-              </div>
-            </div>
 
             <div className="flex justify-end">
               <button
@@ -666,125 +639,99 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
           </div>
         )}
 
-        {/* ── Step 2: Patterns ── */}
+        {/* ── Step 2: Patterns (both wildcard + regex) ── */}
         {wizardStep === 2 && (
           <div className="space-y-4">
-            {patternMode === "wildcard" ? (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-200 mb-1">
-                    Wildcard Patterns
-                    <span className="ml-1 text-red-400">*</span>
-                  </label>
-                  <p className="text-xs text-zinc-500 mb-2">
-                    Separate multiple patterns with commas. Use <code className="text-amber-400/70">*</code> to match any characters.
-                  </p>
-                  <div className="space-y-2">
-                    <Textarea label="" value={wildcardText} onChange={setWildcardText} placeholder={"*m*m, d*d, exact-word\n*bad*, sl*r, *hate*"} rows={3} />
-                  </div>
-                </div>
+            <p className="text-xs text-zinc-500">Add patterns using simple wildcards, regex, or both. At least one pattern is required.</p>
 
-                {/* Pattern syntax reference */}
-                <div className="bg-zinc-800/60 rounded-lg p-3 space-y-1.5">
-                  <p className="text-xs font-medium text-zinc-300">Pattern Guide</p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-400">
-                    <div>
-                      <code className="text-amber-400/70">word</code> — exact match
-                    </div>
-                    <div>
-                      <code className="text-amber-400/70">*word</code> — ends with &quot;word&quot;
-                    </div>
-                    <div>
-                      <code className="text-amber-400/70">word*</code> — starts with &quot;word&quot;
-                    </div>
-                    <div>
-                      <code className="text-amber-400/70">*word*</code> — contains &quot;word&quot;
-                    </div>
-                    <div>
-                      <code className="text-amber-400/70">*w*rd</code> — inner wildcard
-                    </div>
-                    <div>
-                      <code className="text-amber-400/70">a, b, c</code> — multiple patterns
-                    </div>
-                  </div>
-                </div>
+            {/* Wildcard section */}
+            <div className="bg-zinc-800/30 rounded-lg p-3 space-y-2 border border-zinc-700/40">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-medium text-zinc-200">Simple Patterns</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">Easy</span>
+              </div>
+              <p className="text-xs text-zinc-500">
+                Separate with commas. Use <code className="text-amber-400/70">*</code> to match any characters.
+              </p>
+              <Textarea label="" value={wildcardText} onChange={setWildcardText} placeholder={"*m*m, d*d, exact-word\n*bad*, sl*r, *hate*"} rows={2} />
 
-                {/* Live test */}
-                <div className="bg-zinc-800/40 rounded-lg p-3 space-y-2 border border-zinc-700/50">
-                  <p className="text-xs font-medium text-zinc-300">Live Test</p>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        value={testInput}
-                        onChange={(e) => setTestInput(e.target.value)}
-                        placeholder="Type a test message…"
-                        className="w-full rounded-md border border-zinc-700 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <button
-                      onClick={handleTestWildcard}
-                      disabled={!wildcardText.trim() || !testInput.trim()}
-                      className="px-3 py-1.5 bg-zinc-700 text-zinc-200 rounded-md text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                      Test
-                    </button>
+              {/* Pattern guide (collapsed) */}
+              <details className="text-xs">
+                <summary className="text-zinc-400 cursor-pointer hover:text-zinc-300">Pattern guide</summary>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-zinc-400">
+                  <div>
+                    <code className="text-amber-400/70">word</code> — exact match
                   </div>
-                  {testMatched !== null && (
-                    <div className={`text-sm font-medium ${testMatched ? "text-red-400" : "text-green-400"}`}>
-                      {testMatched ? "⚠ Matched — this message would be caught" : "✓ No match — this message would pass"}
-                    </div>
-                  )}
-                  {testResults.length > 0 && (
-                    <div className="space-y-1">
-                      {testResults.map((r, i) => (
-                        <div key={i} className={`text-xs px-2 py-1 rounded ${r.matched ? "bg-red-500/10 text-red-300" : "bg-zinc-800 text-zinc-500"}`}>
-                          <code className="text-amber-400/70">{r.wildcard}</code> → {r.label} {r.matched ? "— MATCHED" : "— no match"}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div>
+                    <code className="text-amber-400/70">*word</code> — ends with &quot;word&quot;
+                  </div>
+                  <div>
+                    <code className="text-amber-400/70">word*</code> — starts with &quot;word&quot;
+                  </div>
+                  <div>
+                    <code className="text-amber-400/70">*word*</code> — contains &quot;word&quot;
+                  </div>
+                  <div>
+                    <code className="text-amber-400/70">*w*rd</code> — inner wildcard
+                  </div>
+                  <div>
+                    <code className="text-amber-400/70">a, b, c</code> — multiple patterns
+                  </div>
                 </div>
-              </>
-            ) : (
-              <>
-                <Textarea
-                  label="Regex Patterns"
-                  description="One regular expression per line. Flags default to case-insensitive (i)."
-                  value={patternsText}
-                  onChange={setPatternsText}
-                  placeholder={"\\bslur1\\b\n\\bslur2\\b\n<a?:emote_name:\\d+>"}
-                  rows={4}
-                  required
-                />
+              </details>
+            </div>
 
-                {/* Regex live test */}
-                <div className="bg-zinc-800/40 rounded-lg p-3 space-y-2 border border-zinc-700/50">
-                  <p className="text-xs font-medium text-zinc-300">Live Test</p>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        value={testInput}
-                        onChange={(e) => setTestInput(e.target.value)}
-                        placeholder="Type a test message…"
-                        className="w-full rounded-md border border-zinc-700 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <button
-                      onClick={handleTestRegex}
-                      disabled={!patternsText.trim() || !testInput.trim()}
-                      className="px-3 py-1.5 bg-zinc-700 text-zinc-200 rounded-md text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                      Test
-                    </button>
-                  </div>
-                  {testMatched !== null && (
-                    <div className={`text-sm font-medium ${testMatched ? "text-red-400" : "text-green-400"}`}>
-                      {testMatched ? "⚠ Matched — this message would be caught" : "✓ No match — this message would pass"}
-                    </div>
-                  )}
+            {/* Regex section */}
+            <div className="bg-zinc-800/30 rounded-lg p-3 space-y-2 border border-zinc-700/40">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-medium text-zinc-200">Regex Patterns</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Advanced</span>
+              </div>
+              <Textarea
+                label=""
+                description="One regular expression per line. Flags default to case-insensitive (i)."
+                value={patternsText}
+                onChange={setPatternsText}
+                placeholder={"\\bslur1\\b\n\\bslur2\\b\n<a?:emote_name:\\d+>"}
+                rows={2}
+              />
+            </div>
+
+            {/* Live test — tests combined */}
+            <div className="bg-zinc-800/40 rounded-lg p-3 space-y-2 border border-zinc-700/50">
+              <p className="text-xs font-medium text-zinc-300">Live Test</p>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={testInput}
+                    onChange={(e) => setTestInput(e.target.value)}
+                    placeholder="Type a test message…"
+                    className="w-full rounded-md border border-zinc-700 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
                 </div>
-              </>
-            )}
+                <button
+                  onClick={wildcardText.trim() ? handleTestWildcard : handleTestRegex}
+                  disabled={(!wildcardText.trim() && !patternsText.trim()) || !testInput.trim()}
+                  className="px-3 py-1.5 bg-zinc-700 text-zinc-200 rounded-md text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                  Test
+                </button>
+              </div>
+              {testMatched !== null && (
+                <div className={`text-sm font-medium ${testMatched ? "text-red-400" : "text-green-400"}`}>
+                  {testMatched ? "⚠ Matched — this message would be caught" : "✓ No match — this message would pass"}
+                </div>
+              )}
+              {testResults.length > 0 && (
+                <div className="space-y-1">
+                  {testResults.map((r, i) => (
+                    <div key={i} className={`text-xs px-2 py-1 rounded ${r.matched ? "bg-red-500/10 text-red-300" : "bg-zinc-800 text-zinc-500"}`}>
+                      <code className="text-amber-400/70">{r.wildcard}</code> → {r.label} {r.matched ? "— MATCHED" : "— no match"}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex justify-between">
               <button onClick={() => setWizardStep(1)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
@@ -902,19 +849,25 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                   <span className="text-zinc-300">Name:</span> {name}
                 </div>
                 <div>
-                  <span className="text-zinc-300">Mode:</span> {patternMode === "wildcard" ? "Wildcard" : "Regex"}
+                  <span className="text-zinc-300">Points:</span> {warnPoints}
                 </div>
                 <div>
                   <span className="text-zinc-300">Target:</span> {target.map((t) => TARGET_OPTIONS.find((o) => o.value === t)?.label ?? t).join(", ")}
                 </div>
                 <div>
-                  <span className="text-zinc-300">Points:</span> {warnPoints}
+                  <span className="text-zinc-300">Match:</span> {matchMode === "all" ? "All patterns" : "Any pattern"}
                 </div>
                 <div className="col-span-2">
                   <span className="text-zinc-300">Actions:</span> {actions.map((a) => ACTION_OPTIONS.find((o) => o.value === a)?.label ?? a).join(", ")}
                 </div>
                 <div className="col-span-2">
-                  <span className="text-zinc-300">Patterns:</span> {patternMode === "wildcard" ? wildcardText : `${patternsText.split("\n").filter(Boolean).length} regex pattern(s)`}
+                  <span className="text-zinc-300">Patterns:</span>{" "}
+                  {[
+                    wildcardText.trim() ? `${wildcardText.split(",").filter((s) => s.trim()).length} wildcard` : "",
+                    patternsText.trim() ? `${patternsText.split("\n").filter(Boolean).length} regex` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" + ")}
                 </div>
               </div>
             </div>
