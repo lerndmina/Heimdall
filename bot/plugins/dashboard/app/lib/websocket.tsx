@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
+import { fetchRuntimeConfig } from "./runtimeConfig";
 
 interface WebSocketContextValue {
   connected: boolean;
@@ -20,16 +21,32 @@ const WebSocketContext = createContext<WebSocketContextValue>({
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
   const [connected, setConnected] = useState(false);
+  const [wsUrl, setWsUrl] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const listenersRef = useRef<Map<string, Set<(data: any) => void>>>(new Map());
   const subscribedGuildsRef = useRef<Map<string, number>>(new Map());
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
 
-  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3002";
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveConfig = async () => {
+      const config = await fetchRuntimeConfig();
+      if (cancelled) return;
+      const fallback = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3002";
+      setWsUrl(config?.wsUrl ?? fallback);
+    };
+
+    resolveConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const connect = useCallback(() => {
-    if (!session?.accessToken) return;
+    if (!session?.accessToken || !wsUrl) return;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -100,6 +117,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   }, [connect]);
 
   useEffect(() => {
+    if (!wsUrl) return;
+
     connect();
 
     return () => {
@@ -109,7 +128,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         reconnectTimeoutRef.current = null;
       }
     };
-  }, [connect]);
+  }, [connect, wsUrl]);
 
   const subscribe = useCallback((guildId: string, event: string, handler: (data: any) => void) => {
     const key = `${guildId}:${event}`;

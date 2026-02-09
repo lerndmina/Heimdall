@@ -5,5 +5,5 @@
   "dependencies": ["lib"],
   "optionalDependencies": ["minecraft", "modmail", "tickets", "suggestions", "tags", "logging", "welcome", "tempvc", "reminders", "vc-transcription", "attachment-blocker", "moderation"],
   "requiredEnv": ["INTERNAL_API_KEY", "NEXTAUTH_SECRET", "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "OWNER_IDS"],
-  "optionalEnv": ["DASHBOARD_PORT", "NEXT_PUBLIC_WS_URL"]
+  "optionalEnv": ["DASHBOARD_PORT", "NEXT_PUBLIC_WS_URL", "WS_PUBLIC_URL"]
 }

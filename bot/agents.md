@@ -9,6 +9,12 @@ Heimdall is a **personal Discord bot** with a plugin-based architecture. It runs
 - **Dev command**: `bun run dev` from `bot/`
 - **Ports**: API on `3001` (Express), Dashboard on `3000` (Next.js)
 
+## Dashboard Environment Rules
+
+- Any `NEXT_PUBLIC_*` value referenced in client code is baked into the Next.js build.
+- If a value must be configurable per deployment, expose it via `/api/runtime-config` and read it from `plugins/dashboard/app/lib/runtimeConfig.ts`.
+- Prefer `WS_PUBLIC_URL` (runtime) over adding new `NEXT_PUBLIC_*` variables when the value must vary by server.
+
 ---
 
 ## Project Structure
