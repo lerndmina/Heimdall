@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 interface ModalProps {
   open: boolean;
@@ -18,6 +18,15 @@ interface ModalProps {
 
 export default function Modal({ open, onClose, title, children, footer, maxWidth = "max-w-lg" }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
 
   if (!open) return null;
 
