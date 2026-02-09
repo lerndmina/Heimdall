@@ -36,12 +36,27 @@ export class RoleSyncService {
   }
 
   /** Map Discord roles → Minecraft groups using enabled mappings */
-  static getTargetGroups(discordRoles: string[], roleMappings: RoleMapping[]): string[] {
+  static getTargetGroups(discordRoles: { id: string; name: string }[], roleMappings: RoleMapping[]): string[] {
     const groups: string[] = [];
-    for (const roleId of discordRoles) {
-      const mapping = roleMappings.find((m) => m.discordRoleId === roleId && m.enabled);
-      if (mapping) groups.push(mapping.minecraftGroup);
+    const roleIds = new Set(discordRoles.map((r) => r.id));
+    const roleNames = new Set(discordRoles.map((r) => r.name.toLowerCase()));
+    const looksLikeSnowflake = (value: string) => /^\d{16,20}$/.test(value);
+
+    for (const mapping of roleMappings) {
+      if (!mapping.enabled) continue;
+
+      const rawId = (mapping.discordRoleId ?? "").trim();
+      const rawName = (mapping.discordRoleName ?? "").trim();
+
+      const matchesById = rawId !== "" && looksLikeSnowflake(rawId) && roleIds.has(rawId);
+      const matchesByName = rawName !== "" && roleNames.has(rawName.toLowerCase());
+      const matchesLegacyIdAsName = rawId !== "" && !looksLikeSnowflake(rawId) && roleNames.has(rawId.toLowerCase());
+
+      if (matchesById || matchesByName || matchesLegacyIdAsName) {
+        groups.push(mapping.minecraftGroup);
+      }
     }
+
     return [...new Set(groups)];
   }
 
@@ -56,17 +71,17 @@ export class RoleSyncService {
     };
   }
 
-  /** Fetch a member's Discord roles (excluding @everyone) */
-  async getPlayerDiscordRoles(guildId: string, discordId: string): Promise<string[]> {
+  /** Fetch a member's Discord roles (excluding @everyone). Returns null if lookup fails. */
+  async getPlayerDiscordRoles(guildId: string, discordId: string): Promise<{ id: string; name: string }[] | null> {
     try {
       const guild = await this.lib.thingGetter.getGuild(guildId);
-      if (!guild) return [];
+      if (!guild) return null;
       const member = await this.lib.thingGetter.getMember(guild, discordId);
-      if (!member) return [];
-      return member.roles.cache.map((r: { id: string }) => r.id).filter((id: string) => id !== guild.id);
+      if (!member) return null;
+      return member.roles.cache.map((r: { id: string; name: string }) => ({ id: r.id, name: r.name })).filter((r: { id: string }) => r.id !== guild.id);
     } catch (error) {
       log.error(`Failed to get Discord roles for ${discordId} in ${guildId}:`, error);
-      return [];
+      return null;
     }
   }
 
@@ -90,6 +105,11 @@ export class RoleSyncService {
       if (player.roleSyncEnabled === false) return { enabled: false, targetGroups: [], managedGroups: [] };
 
       const discordRoles = await this.getPlayerDiscordRoles(guildId, player.discordId);
+      if (!discordRoles) {
+        log.warn(`Role sync skipped for ${player.minecraftUsername}: failed to resolve Discord roles for ${player.discordId}`);
+        return { enabled: false, targetGroups: [], managedGroups: [] };
+      }
+
       const targetGroups = RoleSyncService.getTargetGroups(discordRoles, config.roleSync.roleMappings);
       const managedGroups = config.roleSync.roleMappings.filter((m) => m.enabled).map((m) => m.minecraftGroup);
 
@@ -103,7 +123,7 @@ export class RoleSyncService {
           discordId: player.discordId,
           syncTrigger: "login",
           discordRolesBefore: player.lastDiscordRoles || [],
-          discordRolesAfter: discordRoles,
+          discordRolesAfter: discordRoles.map((r) => r.id),
           minecraftGroupsBefore: currentMinecraftGroups,
           minecraftGroupsAfter: targetGroups,
           groupsAdded: comparison.toAdd,
@@ -114,7 +134,7 @@ export class RoleSyncService {
 
       // Update tracking fields
       await MinecraftPlayer.findByIdAndUpdate(playerId, {
-        lastDiscordRoles: discordRoles,
+        lastDiscordRoles: discordRoles.map((r) => r.id),
         lastMinecraftGroups: currentMinecraftGroups,
         lastRoleSyncAt: new Date(),
       });
@@ -146,7 +166,12 @@ export class RoleSyncService {
       if (!player) return;
 
       const currentDiscordRoles = await this.getPlayerDiscordRoles(guildId, discordId);
-      await MinecraftPlayer.findByIdAndUpdate(player._id, { lastDiscordRoles: currentDiscordRoles });
+      if (!currentDiscordRoles) {
+        log.warn(`Role sync skipped for Discord change: failed to resolve Discord roles for ${discordId}`);
+        return;
+      }
+
+      await MinecraftPlayer.findByIdAndUpdate(player._id, { lastDiscordRoles: currentDiscordRoles.map((r) => r.id) });
 
       log.debug(`Updated Discord roles tracking for ${player.minecraftUsername}`);
 
@@ -168,7 +193,7 @@ export class RoleSyncService {
             discordId: player.discordId ?? undefined,
             syncTrigger: "discord_role_change",
             discordRolesBefore: player.lastDiscordRoles || [],
-            discordRolesAfter: currentDiscordRoles,
+            discordRolesAfter: currentDiscordRoles.map((r) => r.id),
             minecraftGroupsBefore: currentMcGroups,
             minecraftGroupsAfter: targetGroups,
             groupsAdded: comparison.toAdd,
