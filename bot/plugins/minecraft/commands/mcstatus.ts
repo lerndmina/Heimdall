@@ -83,15 +83,28 @@ export async function execute(context: CommandContext): Promise<void> {
 
     // Verify server is reachable
     const serverDoc = { serverIp, serverPort, serverName };
+    let pingData;
     try {
-      await pingMcServer(serverDoc);
+      pingData = await pingMcServer(serverDoc);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       await interaction.editReply(`❌ ${msg}\n\nThe server needs to be online to be added.`);
       return;
     }
 
-    await McServerStatus.findOneAndUpdate({ id: serverName.toLowerCase() }, { id: serverName.toLowerCase(), guildId, serverIp, serverPort, serverName }, { upsert: true, new: true });
+    await McServerStatus.findOneAndUpdate(
+      { id: serverName.toLowerCase() },
+      {
+        id: serverName.toLowerCase(),
+        guildId,
+        serverIp,
+        serverPort,
+        serverName,
+        lastPingData: pingData,
+        lastPingTime: new Date(),
+      },
+      { upsert: true, new: true },
+    );
 
     await interaction.editReply(`✅ Server **${serverName}** (\`${serverIp}:${serverPort}\`) added.`);
     return;
@@ -137,6 +150,13 @@ export async function execute(context: CommandContext): Promise<void> {
     try {
       const pingData = await pingMcServer(server);
       const embedData = createStatusEmbed(pingData, server, client);
+
+      // Save ping results to DB
+      await McServerStatus.findOneAndUpdate(
+        { id: serverName.toLowerCase(), guildId },
+        { lastPingData: pingData, lastPingTime: new Date() },
+      );
+
       await interaction.editReply(embedData);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -169,6 +189,10 @@ export async function execute(context: CommandContext): Promise<void> {
       await interaction.editReply(`❌ ${msg}`);
       return;
     }
+
+    // Save ping results to DB
+    server.lastPingData = pingData;
+    server.lastPingTime = new Date();
 
     const resolvedChannel = await client.channels.fetch(channel.id);
     if (!resolvedChannel?.isTextBased() || !("send" in resolvedChannel)) {

@@ -78,6 +78,12 @@ export async function beginPersistentLoop(client: Client, server: IMcServerStatu
       const embedData = createStatusEmbed(pingData, server, client);
       await message.edit(embedData);
 
+      // Save ping results to DB so the dashboard can display current data
+      await McServerStatus.findOneAndUpdate(
+        { id: server.id },
+        { lastPingData: pingData, lastPingTime: new Date() },
+      );
+
       const sleepMs = pingData.nextPingInSeconds * 1000;
       log.debug(`${server.serverName}: next ping in ${Math.round(sleepMs / 1000)}s`);
       await sleep(sleepMs);

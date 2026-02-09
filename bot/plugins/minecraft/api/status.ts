@@ -14,16 +14,32 @@ import { pingMcServer } from "../utils/mcstatus-utils.js";
 export function createStatusRoutes(_deps: MinecraftApiDependencies): Router {
   const router = Router({ mergeParams: true });
 
-  // GET /status — List all monitored servers
+  // GET /status — List all monitored servers (with live ping data)
   router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId } = req.params;
 
-      const servers = await McServerStatus.find({ guildId }).lean();
+      const servers = await McServerStatus.find({ guildId });
+
+      // Ping all servers in parallel and update DB with results
+      const enriched = await Promise.all(
+        servers.map(async (server) => {
+          try {
+            const pingData = await pingMcServer(server);
+            server.lastPingData = pingData;
+            server.lastPingTime = new Date();
+            await server.save();
+            return server.toObject();
+          } catch {
+            // Return existing DB data if ping fails
+            return server.toObject();
+          }
+        }),
+      );
 
       res.json({
         success: true,
-        data: { servers, total: servers.length },
+        data: { servers: enriched, total: enriched.length },
       });
     } catch (error) {
       next(error);
@@ -65,8 +81,9 @@ export function createStatusRoutes(_deps: MinecraftApiDependencies): Router {
       }
 
       // Ping to verify reachable
+      let pingData;
       try {
-        await pingMcServer({ serverIp, serverPort, serverName });
+        pingData = await pingMcServer({ serverIp, serverPort, serverName });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         res.status(422).json({
@@ -76,7 +93,19 @@ export function createStatusRoutes(_deps: MinecraftApiDependencies): Router {
         return;
       }
 
-      const server = await McServerStatus.findOneAndUpdate({ id: serverName.toLowerCase() }, { id: serverName.toLowerCase(), guildId, serverIp, serverPort, serverName }, { upsert: true, new: true });
+      const server = await McServerStatus.findOneAndUpdate(
+        { id: serverName.toLowerCase() },
+        {
+          id: serverName.toLowerCase(),
+          guildId,
+          serverIp,
+          serverPort,
+          serverName,
+          lastPingData: pingData,
+          lastPingTime: new Date(),
+        },
+        { upsert: true, new: true },
+      );
 
       res.status(201).json({ success: true, data: { server: server.toObject() } });
     } catch (error) {
