@@ -66,7 +66,7 @@ interface AutomodRule {
   enabled: boolean;
   patterns: { regex: string; flags?: string; label?: string }[];
   matchMode: "any" | "all";
-  target: string;
+  target: string[];
   actions: string[];
   warnPoints: number;
   priority: number;
@@ -85,7 +85,7 @@ interface Preset {
   name: string;
   description: string;
   patterns: { regex: string; flags?: string; label?: string }[];
-  target: string;
+  target: string[];
   matchMode: "any" | "all";
   actions: string[];
   warnPoints: number;
@@ -292,7 +292,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
   const [testMatched, setTestMatched] = useState<boolean | null>(null);
 
   // Step 3: Target + Actions
-  const [target, setTarget] = useState("message_content");
+  const [target, setTarget] = useState<string[]>(["message_content"]);
   const [actions, setActions] = useState<string[]>(["delete", "warn", "log"]);
   const [warnPoints, setWarnPoints] = useState(1);
   const [matchMode, setMatchMode] = useState<"any" | "all">("any");
@@ -327,7 +327,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     setTestInput("");
     setTestResults([]);
     setTestMatched(null);
-    setTarget("message_content");
+    setTarget(["message_content"]);
     setActions(["delete", "warn", "log"]);
     setWarnPoints(1);
     setMatchMode("any");
@@ -349,7 +349,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     setName(rule.name);
     setPatternMode("regex"); // Editing always shows raw regex
     setPatternsText(rule.patterns.map((p) => p.regex).join("\n"));
-    setTarget(rule.target);
+    setTarget(Array.isArray(rule.target) ? rule.target : [rule.target]);
     setActions(rule.actions);
     setWarnPoints(rule.warnPoints);
     setMatchMode(rule.matchMode);
@@ -486,7 +486,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
   // ── Validation per-step ──
   const step1Valid = name.trim().length > 0;
   const step2Valid = patternMode === "wildcard" ? wildcardText.trim().length > 0 : patternsText.trim().length > 0;
-  const step3Valid = actions.length > 0;
+  const step3Valid = actions.length > 0 && target.length > 0;
 
   if (loading) return <Spinner />;
 
@@ -520,8 +520,8 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                         {rule.isPreset && <span className="ml-2 text-xs bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded">Preset</span>}
                       </p>
                       <p className="text-sm text-zinc-400">
-                        {TARGET_OPTIONS.find((t) => t.value === rule.target)?.label ?? rule.target} · {rule.patterns.length} pattern{rule.patterns.length !== 1 ? "s" : ""} · {rule.actions.join(", ")}{" "}
-                        · {rule.warnPoints} pts
+                        {(Array.isArray(rule.target) ? rule.target : [rule.target]).map((t) => TARGET_OPTIONS.find((o) => o.value === t)?.label ?? t).join(", ")} · {rule.patterns.length} pattern
+                        {rule.patterns.length !== 1 ? "s" : ""} · {rule.actions.join(", ")} · {rule.warnPoints} pts
                       </p>
                     </div>
                   </div>
@@ -544,7 +544,9 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                 {expandedRuleId === rule._id && (
                   <div className="mt-3 pt-3 border-t border-zinc-700/50 space-y-2">
                     <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Target: {TARGET_OPTIONS.find((t) => t.value === rule.target)?.label ?? rule.target}</span>
+                      <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">
+                        Target: {(Array.isArray(rule.target) ? rule.target : [rule.target]).map((t) => TARGET_OPTIONS.find((o) => o.value === t)?.label ?? t).join(", ")}
+                      </span>
                       <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Match: {rule.matchMode === "all" ? "All patterns" : "Any pattern"}</span>
                       <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Points: {rule.warnPoints}</span>
                     </div>
@@ -803,15 +805,17 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
           <div className="space-y-4">
             {/* Target */}
             <div>
-              <label className="block text-sm font-medium text-zinc-200 mb-2">Target</label>
-              <p className="text-xs text-zinc-500 mb-2">What type of content should this rule scan?</p>
+              <label className="block text-sm font-medium text-zinc-200 mb-2">
+                Target <span className="text-red-400">*</span>
+              </label>
+              <p className="text-xs text-zinc-500 mb-2">What type of content should this rule scan? Select one or more.</p>
               <div className="grid grid-cols-2 gap-2">
                 {TARGET_OPTIONS.map((t) => (
                   <button
                     key={t.value}
-                    onClick={() => setTarget(t.value)}
+                    onClick={() => setTarget((prev) => (prev.includes(t.value) ? prev.filter((v) => v !== t.value) : [...prev, t.value]))}
                     className={`p-2.5 rounded-lg border text-left transition-all text-sm ${
-                      target === t.value ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+                      target.includes(t.value) ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
                     }`}>
                     <div className="font-medium text-zinc-100">{t.label}</div>
                     <div className="text-xs text-zinc-400">{t.description}</div>
@@ -901,7 +905,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                   <span className="text-zinc-300">Mode:</span> {patternMode === "wildcard" ? "Wildcard" : "Regex"}
                 </div>
                 <div>
-                  <span className="text-zinc-300">Target:</span> {TARGET_OPTIONS.find((t) => t.value === target)?.label}
+                  <span className="text-zinc-300">Target:</span> {target.map((t) => TARGET_OPTIONS.find((o) => o.value === t)?.label ?? t).join(", ")}
                 </div>
                 <div>
                   <span className="text-zinc-300">Points:</span> {warnPoints}
@@ -1055,7 +1059,9 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
             {expandedId === preset.id && (
               <div className="mt-3 pt-3 border-t border-zinc-700/50 space-y-2">
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Target: {TARGET_OPTIONS.find((t) => t.value === preset.target)?.label ?? preset.target}</span>
+                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">
+                    Target: {(Array.isArray(preset.target) ? preset.target : [preset.target]).map((t) => TARGET_OPTIONS.find((o) => o.value === t)?.label ?? t).join(", ")}
+                  </span>
                   <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Match: {preset.matchMode === "all" ? "All patterns" : "Any pattern"}</span>
                   <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Points: {preset.warnPoints}</span>
                 </div>

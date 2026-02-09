@@ -101,7 +101,7 @@ export function createRulesCreateRoutes(deps: ModerationApiDeps): Router {
         patterns,
         actions,
         matchMode: matchMode ?? "any",
-        target: target ?? "message_content",
+        target: Array.isArray(target) ? target : [target ?? "message_content"],
         warnPoints: warnPoints ?? 0,
         priority: priority ?? 0,
         enabled: enabled ?? true,

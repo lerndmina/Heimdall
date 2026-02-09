@@ -64,11 +64,15 @@ const AutomodRuleSchema = new Schema(
       type: Number,
       default: 0,
     },
-    /** What content type this rule scans */
+    /** What content type(s) this rule scans */
     target: {
-      type: String,
+      type: [String],
       enum: Object.values(AutomodTarget),
       required: true,
+      validate: {
+        validator: (v: string[]) => v.length > 0,
+        message: "At least one target is required",
+      },
     },
     /** Regex patterns to match against */
     patterns: {
@@ -157,8 +161,8 @@ const AutomodRuleSchema = new Schema(
 
 // Compound unique index: one rule name per guild
 AutomodRuleSchema.index({ guildId: 1, name: 1 }, { unique: true });
-// Index for efficient rule fetching by guild + target
-AutomodRuleSchema.index({ guildId: 1, target: 1, enabled: 1 });
+// Index for efficient rule fetching by guild + enabled status
+AutomodRuleSchema.index({ guildId: 1, enabled: 1 });
 
 type IAutomodRule = InferSchemaType<typeof AutomodRuleSchema>;
 

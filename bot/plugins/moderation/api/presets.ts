@@ -73,7 +73,7 @@ export function createPresetsRoutes(deps: ModerationApiDeps): Router {
           name: preset.name,
           patterns: preset.patterns,
           matchMode: preset.matchMode,
-          target: preset.target,
+          target: Array.isArray(preset.target) ? preset.target : [preset.target],
           actions: preset.actions,
           warnPoints: preset.warnPoints,
           enabled: true,

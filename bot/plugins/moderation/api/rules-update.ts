@@ -92,7 +92,7 @@ export function createRulesUpdateRoutes(deps: ModerationApiDeps): Router {
       if (name !== undefined) updates.name = name;
       if (patterns !== undefined) updates.patterns = patterns;
       if (matchMode !== undefined) updates.matchMode = matchMode;
-      if (target !== undefined) updates.target = target;
+      if (target !== undefined) updates.target = Array.isArray(target) ? target : [target];
       if (actions !== undefined) updates.actions = actions;
       if (warnPoints !== undefined) updates.warnPoints = warnPoints;
       if (priority !== undefined) updates.priority = priority;

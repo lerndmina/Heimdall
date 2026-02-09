@@ -24,25 +24,33 @@ export class RuleEngine {
   /**
    * Evaluate a message against all applicable rules.
    * Returns the first matching rule (highest priority) or null.
+   * A rule is applicable if ANY of its targets are message-applicable.
    */
   evaluateMessage(message: Message, rules: RuleDoc[]): RuleMatch | null {
     // Filter to message-applicable targets
     const messageTargets = new Set([AutomodTarget.MESSAGE_CONTENT, AutomodTarget.MESSAGE_EMOJI, AutomodTarget.STICKER, AutomodTarget.LINK]);
 
-    const applicableRules = rules.filter((r) => r.enabled && messageTargets.has(r.target as AutomodTarget)).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    const applicableRules = rules
+      .filter((r) => r.enabled && (r.target as unknown as string[]).some((t) => messageTargets.has(t as AutomodTarget)))
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
     for (const rule of applicableRules) {
-      const content = this.extractContentForTarget(message, rule.target as AutomodTarget);
-      if (!content) continue;
+      // Try each of the rule's targets that apply to messages
+      const ruleTargets = (rule.target as unknown as string[]).filter((t) => messageTargets.has(t as AutomodTarget));
 
-      const result = testPatterns(rule.patterns as Array<{ regex: string; flags: string; label: string }>, content, rule.matchMode as "any" | "all");
+      for (const t of ruleTargets) {
+        const content = this.extractContentForTarget(message, t as AutomodTarget);
+        if (!content) continue;
 
-      if (result.matched && result.matchedPattern) {
-        return {
-          rule,
-          matchedContent: result.matchedPattern.match,
-          matchedPattern: result.matchedPattern.regex,
-        };
+        const result = testPatterns(rule.patterns as Array<{ regex: string; flags: string; label: string }>, content, rule.matchMode as "any" | "all");
+
+        if (result.matched && result.matchedPattern) {
+          return {
+            rule,
+            matchedContent: result.matchedPattern.match,
+            matchedPattern: result.matchedPattern.regex,
+          };
+        }
       }
     }
 
@@ -51,9 +59,10 @@ export class RuleEngine {
 
   /**
    * Evaluate a reaction against reaction-targeting rules.
+   * A rule matches if its targets array includes REACTION_EMOJI.
    */
   evaluateReaction(reaction: MessageReaction | PartialMessageReaction, rules: RuleDoc[]): RuleMatch | null {
-    const applicableRules = rules.filter((r) => r.enabled && r.target === AutomodTarget.REACTION_EMOJI).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    const applicableRules = rules.filter((r) => r.enabled && (r.target as unknown as string[]).includes(AutomodTarget.REACTION_EMOJI)).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
     // Build content string from reaction emoji
     const emoji = reaction.emoji;
@@ -76,11 +85,12 @@ export class RuleEngine {
 
   /**
    * Evaluate a member's username or nickname against targeting rules.
+   * A rule matches if its targets array includes the relevant target type.
    */
   evaluateMember(member: GuildMember, rules: RuleDoc[], target: "username" | "nickname"): RuleMatch | null {
     const targetEnum = target === "username" ? AutomodTarget.USERNAME : AutomodTarget.NICKNAME;
 
-    const applicableRules = rules.filter((r) => r.enabled && r.target === targetEnum).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    const applicableRules = rules.filter((r) => r.enabled && (r.target as unknown as string[]).includes(targetEnum)).sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
     const content = target === "username" ? member.user.username : (member.nickname ?? "");
 
