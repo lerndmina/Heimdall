@@ -16,6 +16,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -99,6 +100,10 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
     fetchConfig();
     fetchVariables();
   }, [fetchConfig, fetchVariables]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchConfig();
+  });
 
   // ── Save handler ──
   const handleSave = async () => {

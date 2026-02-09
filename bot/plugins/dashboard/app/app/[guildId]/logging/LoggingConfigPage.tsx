@@ -19,6 +19,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -109,6 +110,10 @@ export default function LoggingConfigPage({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchData();
+  });
 
   // ── Get category config ──
   const getCategoryConfig = (categoryId: string): CategoryConfig | null => {

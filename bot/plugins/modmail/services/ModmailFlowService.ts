@@ -16,6 +16,8 @@ import type { PluginLogger } from "../../../src/types/Plugin.js";
 import type { LibAPI } from "../../lib/index.js";
 import type { Document } from "mongoose";
 import { nanoid } from "nanoid";
+import { ModmailWebSocketService } from "../websocket/ModmailWebSocketService.js";
+import { broadcast } from "../../../src/core/broadcast.js";
 
 /** Discord DM file size limit for bots (8 MB) */
 const DM_FILE_SIZE_LIMIT = 8 * 1024 * 1024;
@@ -45,12 +47,18 @@ interface AddMessageData {
  * ModmailFlowService - Message relay between DM and thread
  */
 export class ModmailFlowService {
+  private websocketService: ModmailWebSocketService | null = null;
+
   constructor(
     private client: Client,
     private modmailService: ModmailService,
     private lib: LibAPI,
     private logger: PluginLogger,
   ) {}
+
+  setWebSocketService(service: ModmailWebSocketService | null): void {
+    this.websocketService = service;
+  }
 
   /**
    * Relay a user's DM message to the modmail thread via webhook
@@ -435,6 +443,34 @@ export class ModmailFlowService {
     }
 
     await modmailDoc.save();
+
+    const guildId = modmail.guildId as string;
+    if (data.authorType === MessageType.USER) {
+      this.websocketService?.messageReceived(guildId, modmail.modmailId as string, {
+        messageId: message.messageId as string,
+        authorId: data.authorId,
+        authorType: data.authorType,
+        content: data.content,
+        attachments: data.attachments ?? [],
+        timestamp: message.timestamp as Date,
+        context: data.context,
+      });
+      broadcast(guildId, "dashboard:data_changed", { plugin: "modmail", type: "message_received", modmailId: modmail.modmailId });
+    } else if (data.authorType === MessageType.STAFF) {
+      const deliveredToDm = data.context === MessageContext.DM || data.context === MessageContext.BOTH;
+      const deliveredToThread = data.context === MessageContext.THREAD || data.context === MessageContext.BOTH;
+      this.websocketService?.messageSent(guildId, modmail.modmailId as string, {
+        messageId: message.messageId as string,
+        authorId: data.authorId,
+        authorType: data.authorType,
+        content: data.content,
+        isStaffOnly: data.isStaffOnly,
+        deliveredToDm,
+        deliveredToThread,
+        timestamp: message.timestamp as Date,
+      });
+      broadcast(guildId, "dashboard:data_changed", { plugin: "modmail", type: "message_sent", modmailId: modmail.modmailId });
+    }
   }
 
   /**

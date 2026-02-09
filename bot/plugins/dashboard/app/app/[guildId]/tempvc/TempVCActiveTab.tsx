@@ -9,6 +9,7 @@ import Spinner from "@/components/ui/Spinner";
 import Modal from "@/components/ui/Modal";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -72,6 +73,10 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchData();
+  });
 
   // ── Force-delete ──
   const handleDelete = async () => {

@@ -19,6 +19,7 @@ import Tabs from "@/components/ui/Tabs";
 import SetupWizard, { NotConfigured, ReviewSection, ReviewRow } from "@/components/ui/SetupWizard";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -196,6 +197,10 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchData();
+  });
 
   // ── Guild config dirty check ──
   const isGuildDirty =

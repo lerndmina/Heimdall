@@ -14,6 +14,7 @@ import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import { ChannelType, PermissionFlagsBits, EmbedBuilder, TextChannel, type Client } from "discord.js";
 import log from "../utils/logger";
+import { broadcast } from "./broadcast";
 import { ThingGetter } from "../../plugins/lib/utils/ThingGetter.js";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
 import DashboardSettings from "../../plugins/dashboard/models/DashboardSettings.js";
@@ -88,6 +89,30 @@ export class ApiManager {
     // Request logging
     this.app.use((req: Request, _res: Response, next: NextFunction) => {
       log.debug(`[API] ${req.method} ${req.path}`);
+      next();
+    });
+
+    // Broadcast successful writes for live dashboard refresh
+    this.app.use((req: Request, res: Response, next: NextFunction) => {
+      const method = req.method.toUpperCase();
+      const shouldBroadcast = method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
+
+      if (!shouldBroadcast) {
+        next();
+        return;
+      }
+
+      const path = req.path;
+      res.on("finish", () => {
+        if (res.statusCode >= 400) return;
+        const match = path.match(/^\/api\/guilds\/([^/]+)/);
+        if (!match) return;
+        const guildId = match[1] ?? "";
+        if (!guildId) return;
+        const plugin = path.split("/")[4] || "unknown";
+        broadcast(guildId, "dashboard:data_changed", { method, path, plugin });
+      });
+
       next();
     });
 

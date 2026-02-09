@@ -16,6 +16,7 @@ import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -116,6 +117,10 @@ export default function TempVCConfigTab({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchConfig();
+  });
 
   // ── Save all channels ──
   const handleSave = async () => {

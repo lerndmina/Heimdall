@@ -15,6 +15,7 @@ import type { GuildEnvService } from "./services/GuildEnvService";
 import type { CommandManager } from "./CommandManager";
 import type { EventManager } from "./EventManager";
 import type { ApiManager } from "./ApiManager";
+import type { WebSocketManager } from "./WebSocketManager";
 
 export interface PluginLoaderOptions {
   pluginsDir: string;
@@ -25,6 +26,7 @@ export interface PluginLoaderOptions {
   commandManager: CommandManager;
   eventManager: EventManager;
   apiManager: ApiManager;
+  wsManager: WebSocketManager;
 }
 
 export class PluginLoader {
@@ -38,6 +40,7 @@ export class PluginLoader {
   private readonly commandManager: CommandManager;
   private readonly eventManager: EventManager;
   private readonly apiManager: ApiManager;
+  private readonly wsManager: WebSocketManager;
 
   private manifests: Map<string, PluginManifest> = new Map();
   private pluginPaths: Map<string, string> = new Map();
@@ -53,6 +56,7 @@ export class PluginLoader {
     this.commandManager = options.commandManager;
     this.eventManager = options.eventManager;
     this.apiManager = options.apiManager;
+    this.wsManager = options.wsManager;
   }
 
   /**
@@ -631,6 +635,7 @@ export class PluginLoader {
       commandManager: this.commandManager,
       eventManager: this.eventManager,
       apiManager: this.apiManager,
+      wsManager: this.wsManager,
     };
   }
 

@@ -21,6 +21,7 @@ import { permissionCategories } from "@/lib/permissionDefs";
 import { DENY_ACCESS_KEY } from "@/lib/permissions";
 import { usePermissions } from "@/components/providers/PermissionsProvider";
 import { useUnsavedChanges } from "@/components/providers/UnsavedChangesProvider";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 
 interface Role {
   id: string;
@@ -114,6 +115,11 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    loadData();
+    void refreshUserPerms();
+  });
 
   // ── Helpers ──────────────────────────────────────────────
   function showToast(message: string, type: "success" | "error") {

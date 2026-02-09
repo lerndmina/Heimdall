@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import GuildIcon from "@/components/ui/GuildIcon";
 import { useUnsavedChanges } from "@/components/providers/UnsavedChangesProvider";
+import ConnectionIndicator from "@/components/layout/ConnectionIndicator";
 
 /** A navigation item in the sidebar */
 export interface NavItem {
@@ -98,6 +99,9 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
       {/* User footer */}
       {session?.user && (
         <div className="relative border-t border-zinc-700/30 p-3">
+          <div className="mb-2 px-3">
+            <ConnectionIndicator />
+          </div>
           <div className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-white/5">
             {session.user.image && <img src={session.user.image} alt="" className="h-8 w-8 rounded-full ring-2 ring-zinc-600/50" />}
             <div className="min-w-0 flex-1">

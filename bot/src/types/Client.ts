@@ -6,6 +6,7 @@
 import type { Client } from "discord.js";
 import type { RedisClientType } from "redis";
 import type { Connection } from "mongoose";
+import type { WebSocketManager } from "../core/WebSocketManager.js";
 
 /**
  * Core HeimdallClient - Extended by plugins via declaration merging
@@ -25,6 +26,9 @@ export interface HeimdallClient extends Client<true> {
 
   /** Mongoose connection instance */
   mongoConnection: Connection;
+
+  /** WebSocket manager for dashboard live updates */
+  wsManager: WebSocketManager;
 
   /**
    * Plugin APIs registered by loaded plugins

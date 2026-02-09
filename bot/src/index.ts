@@ -34,6 +34,8 @@ import { EventManager } from "./core/EventManager";
 import { ApiManager } from "./core/ApiManager";
 import { InteractionHandler } from "./core/InteractionHandler";
 import { OwnerCommands } from "./core/OwnerCommands";
+import { WebSocketManager } from "./core/WebSocketManager";
+import { setWebSocketManager, clearWebSocketManager } from "./core/broadcast";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -112,6 +114,7 @@ let commandManager: CommandManager;
 let eventManager: EventManager;
 let apiManager: ApiManager;
 let interactionHandler: InteractionHandler;
+let wsManager: WebSocketManager | null = null;
 
 // ============================================================================
 // Phase 4: Ready event handler
@@ -119,6 +122,8 @@ let interactionHandler: InteractionHandler;
 
 async function onReady(readyClient: Client<true>): Promise<void> {
   log.info(`✅ Ready! Serving ${readyClient.guilds.cache.size} guilds as ${readyClient.user.tag}`);
+
+  const heimdallClient = readyClient as unknown as HeimdallClient;
 
   // Set last restart time in Redis
   try {
@@ -131,9 +136,14 @@ async function onReady(readyClient: Client<true>): Promise<void> {
   // This ensures Discord entities (channels, guilds, users) are fetchable
   // during plugin initialization (e.g. BackgroundModmailService orphan checks).
   log.debug("Phase 4: Loading plugins...");
+  const wsPort = parseInt(process.env.WS_PORT || "3002", 10);
+  wsManager = new WebSocketManager(wsPort, heimdallClient, redis);
+  heimdallClient.wsManager = wsManager;
+  setWebSocketManager(wsManager);
+
   pluginLoader = new PluginLoader({
     pluginsDir: path.join(__dirname, "..", "plugins"),
-    client: readyClient as unknown as HeimdallClient,
+    client: heimdallClient,
     redis,
 
     componentCallbackService,
@@ -141,6 +151,7 @@ async function onReady(readyClient: Client<true>): Promise<void> {
     commandManager,
     eventManager,
     apiManager,
+    wsManager,
   });
 
   try {
@@ -153,7 +164,7 @@ async function onReady(readyClient: Client<true>): Promise<void> {
 
   // Create and attach interaction handler
   interactionHandler = new InteractionHandler({
-    client: readyClient as unknown as HeimdallClient,
+    client: heimdallClient,
     commandManager,
     componentCallbackService,
   });
@@ -161,7 +172,7 @@ async function onReady(readyClient: Client<true>): Promise<void> {
 
   // Create and attach owner commands handler
   const ownerCommands = new OwnerCommands({
-    client: readyClient as unknown as HeimdallClient,
+    client: heimdallClient,
     commandManager,
     prefix: env.PREFIX,
     ownerIds: env.OWNER_IDS,
@@ -173,7 +184,7 @@ async function onReady(readyClient: Client<true>): Promise<void> {
   eventManager.attachEvents();
 
   // Set exported client reference
-  client = readyClient as unknown as HeimdallClient;
+  client = heimdallClient;
 
   // Register commands now that plugins are loaded
   try {
@@ -192,6 +203,9 @@ async function onReady(readyClient: Client<true>): Promise<void> {
   // Start API server
   try {
     await apiManager.start();
+    if (wsManager) {
+      await wsManager.start();
+    }
   } catch (error) {
     log.error("Failed to start API server:", error);
     captureException(error, { context: "API Server Start" });
@@ -258,6 +272,13 @@ async function shutdown(signal: string): Promise<void> {
     if (pluginLoader) {
       await pluginLoader.unloadAll();
       log.debug("Plugins unloaded");
+    }
+
+    if (wsManager) {
+      await wsManager.stop();
+      wsManager = null;
+      clearWebSocketManager();
+      log.debug("WebSocket server stopped");
     }
 
     // Destroy Discord client

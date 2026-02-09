@@ -23,6 +23,7 @@ import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import DateTimePicker from "@/components/ui/DateTimePicker";
 import { useSession } from "next-auth/react";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -113,6 +114,10 @@ export default function RemindersPage({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchReminders();
   }, [fetchReminders]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchReminders();
+  });
 
   useEffect(() => {
     setPage(0);

@@ -14,6 +14,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
@@ -292,6 +293,10 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchData();
+  });
 
   // ---- Actions ----
 

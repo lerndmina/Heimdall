@@ -9,6 +9,7 @@ import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/C
 import Spinner from "@/components/ui/Spinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -181,6 +182,10 @@ export default function GuildOverviewPage() {
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchStats();
+  });
 
   if (loading) {
     return (

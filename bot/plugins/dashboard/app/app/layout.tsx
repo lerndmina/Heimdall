@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import SessionProvider from "@/components/providers/SessionProvider";
 import AnimatedBackground from "@/components/layout/AnimatedBackground";
+import { WebSocketProvider } from "@/lib/websocket";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -16,7 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AnimatedBackground />
 
         <div className="relative z-10">
-          <SessionProvider>{children}</SessionProvider>
+          <SessionProvider>
+            <WebSocketProvider>{children}</WebSocketProvider>
+          </SessionProvider>
         </div>
         <Toaster
           theme="dark"

@@ -17,6 +17,7 @@ import Toggle from "@/components/ui/Toggle";
 import SetupWizard, { NotConfigured, EditButton, FieldDisplay, ReviewSection, ReviewRow, type WizardStep } from "@/components/ui/SetupWizard";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -113,6 +114,10 @@ export default function ModmailConfigTab({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchConfig();
+  });
 
   // ── Save (upsert) ──
   const handleSave = async () => {

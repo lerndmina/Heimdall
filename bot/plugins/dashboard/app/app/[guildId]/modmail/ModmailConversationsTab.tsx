@@ -11,6 +11,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import TextInput from "@/components/ui/TextInput";
 import Modal from "@/components/ui/Modal";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -123,6 +124,10 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchConversations();
+  });
 
   useEffect(() => {
     setPage(1);

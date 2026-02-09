@@ -7,7 +7,7 @@
  */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useGuild } from "@/components/providers/GuildProvider";
 import PermissionGate from "@/components/guards/PermissionGate";
 import Tabs from "@/components/ui/Tabs";
@@ -16,6 +16,7 @@ import PlayersTab from "./PlayersTab";
 import ConfigTab from "./ConfigTab";
 import StatusTab from "./StatusTab";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 
 type DashboardTab = "players" | "pending" | "config" | "status";
 
@@ -24,28 +25,29 @@ export default function MinecraftPage() {
   const [defaultTab, setDefaultTab] = useState<DashboardTab | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchDefaultTab = useCallback(async () => {
+    try {
+      const res = await fetchApi<{ defaultDashboardTab?: DashboardTab }>(guild.id, "minecraft/config");
+      if (res.success && res.data?.defaultDashboardTab) {
+        setDefaultTab(res.data.defaultDashboardTab);
+      } else {
+        setDefaultTab("players");
+      }
+    } catch {
+      setDefaultTab("players");
+    } finally {
+      setLoading(false);
+    }
+  }, [guild.id]);
+
   // Fetch config to determine default tab
   useEffect(() => {
-    let cancelled = false;
-    fetchApi<{ defaultDashboardTab?: DashboardTab }>(guild.id, "minecraft/config")
-      .then((res) => {
-        if (cancelled) return;
-        if (res.success && res.data?.defaultDashboardTab) {
-          setDefaultTab(res.data.defaultDashboardTab);
-        } else {
-          setDefaultTab("players");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setDefaultTab("players");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [guild.id]);
+    fetchDefaultTab();
+  }, [fetchDefaultTab]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchDefaultTab();
+  });
 
   // "pending" maps to the players tab with default filter set to "pending"
   const resolvedTab = defaultTab === "pending" ? "players" : (defaultTab ?? "players");

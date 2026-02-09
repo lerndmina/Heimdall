@@ -12,6 +12,7 @@ import Modal from "@/components/ui/Modal";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { useSession } from "next-auth/react";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -114,6 +115,10 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchTickets();
   }, [fetchTickets]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchTickets();
+  });
 
   useEffect(() => {
     setPage(0);

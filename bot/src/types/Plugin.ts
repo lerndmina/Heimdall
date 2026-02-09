@@ -10,6 +10,7 @@ import type { GuildEnvService } from "../core/services/GuildEnvService";
 import type { CommandManager } from "../core/CommandManager";
 import type { EventManager } from "../core/EventManager";
 import type { ApiManager } from "../core/ApiManager";
+import type { WebSocketManager } from "../core/WebSocketManager";
 
 /**
  * Plugin manifest (manifest.json)
@@ -93,6 +94,9 @@ export interface PluginContext {
 
   /** API manager for registering API routes */
   apiManager: ApiManager;
+
+  /** WebSocket manager for dashboard live updates */
+  wsManager: WebSocketManager;
 }
 
 /**

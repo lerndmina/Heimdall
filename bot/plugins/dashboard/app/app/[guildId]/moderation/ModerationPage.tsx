@@ -34,6 +34,7 @@ import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -171,13 +172,19 @@ function OverviewTab({ guildId }: { guildId: string }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      const res = await fetchApi<Stats>(guildId, "moderation/stats", { skipCache: true });
-      if (res.success && res.data) setStats(res.data);
-      setLoading(false);
-    })();
+  const loadStats = useCallback(async () => {
+    const res = await fetchApi<Stats>(guildId, "moderation/stats", { skipCache: true });
+    if (res.success && res.data) setStats(res.data);
+    setLoading(false);
   }, [guildId]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    loadStats();
+  });
 
   if (loading) return <Spinner />;
   if (!stats) return <p className="text-zinc-400">Failed to load statistics.</p>;
@@ -358,6 +365,10 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
   useEffect(() => {
     loadRules();
   }, [loadRules]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    loadRules();
+  });
 
   function resetWizard() {
     setWizardStep(1);
@@ -1122,6 +1133,10 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
     loadPresets();
   }, [loadPresets]);
 
+  useRealtimeEvent("dashboard:data_changed", () => {
+    loadPresets();
+  });
+
   async function install(presetId: string) {
     const res = await fetchApi(guildId, `moderation/presets/${presetId}/install`, { method: "POST" });
     if (res.success) {
@@ -1255,21 +1270,27 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
   const [saving, setSaving] = useState(false);
   const [tiers, setTiers] = useState<EscalationTier[]>([]);
 
-  useEffect(() => {
-    (async () => {
-      const res = await fetchApi<ModerationConfig>(guildId, "moderation/config", { skipCache: true });
-      if (res.success && res.data) {
-        setConfig(res.data);
-        setTiers(
-          (res.data.escalationTiers ?? []).map((t: any) => ({
-            ...t,
-            duration: msToHumanDuration(t.duration),
-          })),
-        );
-      }
-      setLoading(false);
-    })();
+  const loadConfig = useCallback(async () => {
+    const res = await fetchApi<ModerationConfig>(guildId, "moderation/config", { skipCache: true });
+    if (res.success && res.data) {
+      setConfig(res.data);
+      setTiers(
+        (res.data.escalationTiers ?? []).map((t: any) => ({
+          ...t,
+          duration: msToHumanDuration(t.duration),
+        })),
+      );
+    }
+    setLoading(false);
   }, [guildId]);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    loadConfig();
+  });
 
   function addTier() {
     setTiers([...tiers, { name: "", pointsThreshold: 10, action: "timeout", duration: "1h" }]);
@@ -1386,6 +1407,10 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
   useEffect(() => {
     loadInfractions();
   }, [loadInfractions]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    loadInfractions();
+  });
 
   function clearInfractions(userId: string) {
     setConfirmUserId(userId);
@@ -1539,23 +1564,29 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
   const [defaultDmTemplate, setDefaultDmTemplate] = useState("");
   const [dmMode, setDmMode] = useState("text");
 
-  useEffect(() => {
-    (async () => {
-      const res = await fetchApi<ModerationConfig>(guildId, "moderation/config", { skipCache: true });
-      if (res.success && res.data) {
-        const c = res.data;
-        setConfig(c);
-        setAutomodEnabled(c.automodEnabled);
-        setLogChannelId(c.logChannelId ?? "");
-        setPointDecayEnabled(c.pointDecayEnabled);
-        setPointDecayDays(c.pointDecayDays);
-        setDmOnInfraction(c.dmOnInfraction);
-        setDefaultDmTemplate(c.defaultDmTemplate ?? "");
-        setDmMode(c.dmMode);
-      }
-      setLoading(false);
-    })();
+  const loadConfig = useCallback(async () => {
+    const res = await fetchApi<ModerationConfig>(guildId, "moderation/config", { skipCache: true });
+    if (res.success && res.data) {
+      const c = res.data;
+      setConfig(c);
+      setAutomodEnabled(c.automodEnabled);
+      setLogChannelId(c.logChannelId ?? "");
+      setPointDecayEnabled(c.pointDecayEnabled);
+      setPointDecayDays(c.pointDecayDays);
+      setDmOnInfraction(c.dmOnInfraction);
+      setDefaultDmTemplate(c.defaultDmTemplate ?? "");
+      setDmMode(c.dmMode);
+    }
+    setLoading(false);
   }, [guildId]);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    loadConfig();
+  });
 
   async function handleSave() {
     setSaving(true);

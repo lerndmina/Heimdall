@@ -22,6 +22,7 @@ import Modal from "@/components/ui/Modal";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -121,6 +122,10 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchAll();
+  });
 
   const getCategoryName = (id: string) => {
     const cat = categories.find((c) => c.id === id);

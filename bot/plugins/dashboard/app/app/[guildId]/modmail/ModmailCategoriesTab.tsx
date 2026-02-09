@@ -5,11 +5,12 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
 import TextInput from "@/components/ui/TextInput";
 import Toggle from "@/components/ui/Toggle";
 import { fetchDashboardApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 interface Category {
@@ -61,11 +62,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
     enabled: true,
   });
 
-  useEffect(() => {
-    loadCategories();
-  }, [guildId]);
-
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetchDashboardApi<{ categories: Category[] }>(`guilds/${guildId}/modmail/config`, {
@@ -80,7 +77,15 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
     } finally {
       setLoading(false);
     }
-  };
+  }, [guildId]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    loadCategories();
+  });
 
   const handleSave = async () => {
     if (!formData.name?.trim() || !formData.forumChannelId?.trim() || !formData.webhookId?.trim()) {

@@ -58,7 +58,9 @@ services:
       # Dashboard
       DASHBOARD_PORT: 3000
       API_PORT: 3001
+      WS_PORT: 3002
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:3002}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
 
@@ -79,6 +81,7 @@ services:
     ports:
       - "${DASHBOARD_PORT:-3000}:3000"
       - "${API_PORT:-3001}:3001"
+      - "${WS_PORT:-3002}:3002"
     volumes:
       # Mount logs directory (optional)
       - ./logs:/app/logs

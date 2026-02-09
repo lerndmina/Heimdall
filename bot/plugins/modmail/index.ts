@@ -18,6 +18,7 @@ import { ModmailFlowService } from "./services/ModmailFlowService.js";
 import { ModmailInteractionService } from "./services/ModmailInteractionService.js";
 import { BackgroundModmailService } from "./services/BackgroundModmailService.js";
 import { ModmailQuestionHandler } from "./utils/ModmailQuestionHandler.js";
+import { ModmailWebSocketService, type WebSocketServer } from "./websocket/ModmailWebSocketService.js";
 
 // Re-export models
 export * from "./models/index.js";
@@ -66,7 +67,7 @@ export function getModmailAPI(): ModmailPluginAPI | null {
  * Plugin load handler
  */
 export async function onLoad(context: PluginContext): Promise<ModmailPluginAPI> {
-  const { logger, redis, client, dependencies } = context;
+  const { logger, redis, client, dependencies, wsManager } = context;
 
   // Get encryption key from environment
   const encryptionKey = process.env.ENCRYPTION_KEY;
@@ -96,6 +97,25 @@ export async function onLoad(context: PluginContext): Promise<ModmailPluginAPI> 
 
   // Initialize flow service
   const flowService = new ModmailFlowService(client, modmailService, lib, logger);
+
+  // Initialize WebSocket service (optional)
+  let modmailWebSocket: ModmailWebSocketService | null = null;
+  if (wsManager) {
+    const adapter: WebSocketServer = {
+      to(room: string) {
+        return {
+          emit(event: string, data: unknown) {
+            const guildId = room.replace("guild:", "");
+            wsManager.broadcastToGuild(guildId, event, data);
+          },
+        };
+      },
+    };
+
+    modmailWebSocket = new ModmailWebSocketService(adapter);
+    modmailService.setWebSocketService(modmailWebSocket);
+    flowService.setWebSocketService(modmailWebSocket);
+  }
 
   // Wire up flow service reference in creation service (avoids circular dep at construction)
   creationService.setFlowService(flowService);

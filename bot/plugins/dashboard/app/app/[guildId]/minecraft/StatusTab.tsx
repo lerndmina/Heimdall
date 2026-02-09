@@ -16,6 +16,7 @@ import Modal from "@/components/ui/Modal";
 import TextInput from "@/components/ui/TextInput";
 import NumberInput from "@/components/ui/NumberInput";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 
 // ---------------------------------------------------------------------------
 // Types (matching McServerStatus + mcstatus.io lastPingData)
@@ -121,6 +122,10 @@ export default function StatusTab({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchStatus();
+  });
 
   // Callback after a server is added
   const handleServerAdded = useCallback(() => {

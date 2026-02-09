@@ -13,6 +13,8 @@ import { SupportBanSystem } from "../../support-core/index.js";
 import type { SupportCoreAPI } from "../../support-core/index.js";
 import { nanoid } from "nanoid";
 import type { PluginLogger } from "../../../src/types/Plugin.js";
+import { ModmailWebSocketService } from "../websocket/ModmailWebSocketService.js";
+import { broadcast } from "../../../src/core/broadcast.js";
 
 // Re-export enums for consumers
 export { ModmailStatus, MessageType, MessageContext };
@@ -92,6 +94,7 @@ export interface ModmailCategoryInput {
 export class ModmailService {
   // Expose client for category service
   public readonly client: Client;
+  private websocketService: ModmailWebSocketService | null = null;
 
   constructor(
     client: Client,
@@ -104,6 +107,10 @@ export class ModmailService {
     if (!encryptionKey) {
       throw new Error("ENCRYPTION_KEY is required for ModmailService");
     }
+  }
+
+  setWebSocketService(service: ModmailWebSocketService | null): void {
+    this.websocketService = service;
   }
 
   // ========================================
@@ -198,6 +205,11 @@ export class ModmailService {
       // Invalidate cache after update
       await this.invalidateConfigCache(options.guildId);
 
+      if (config) {
+        this.websocketService?.configurationUpdated(options.guildId, config, "system");
+        broadcast(options.guildId, "dashboard:data_changed", { plugin: "modmail", type: "config_updated" });
+      }
+
       return config;
     } catch (error) {
       this.logger.error("Failed to create/update modmail config:", error);
@@ -215,6 +227,8 @@ export class ModmailService {
       if (result.deletedCount > 0) {
         await this.invalidateConfigCache(guildId);
         this.logger.info(`Deleted modmail config for guild ${guildId}`);
+        this.websocketService?.configurationRemoved(guildId, "system");
+        broadcast(guildId, "dashboard:data_changed", { plugin: "modmail", type: "config_removed" });
       }
 
       return result.deletedCount > 0;
@@ -294,6 +308,9 @@ export class ModmailService {
       });
 
       this.logger.info(`Created modmail ${modmail.modmailId} for user ${data.userId} in guild ${data.guildId}`);
+
+      this.websocketService?.conversationCreated(data.guildId, modmail);
+      broadcast(data.guildId, "dashboard:data_changed", { plugin: "modmail", type: "conversation_created", modmailId: modmail.modmailId });
 
       return modmail;
     } catch (error) {
@@ -380,6 +397,9 @@ export class ModmailService {
 
       // Update forum tags to Closed
       await this.updateThreadForumTags(modmail, "closed");
+
+      this.websocketService?.conversationClosed(modmail.guildId as string, modmail, data.closedBy, data.reason);
+      broadcast(modmail.guildId as string, "dashboard:data_changed", { plugin: "modmail", type: "conversation_closed", modmailId: modmail.modmailId });
 
       this.logger.info(`Modmail ${data.modmailId} closed by ${data.closedBy}`);
       return true;
@@ -576,6 +596,9 @@ export class ModmailService {
       // Update forum tags back to Open
       await this.updateThreadForumTags(modmail, "open");
 
+      this.websocketService?.additionalHelpRequested(modmail.guildId as string, modmail);
+      broadcast(modmail.guildId as string, "dashboard:data_changed", { plugin: "modmail", type: "additional_help_requested", modmailId: modmail.modmailId });
+
       this.logger.info(`Resolve timer cancelled for modmail ${modmailId}`);
       return true;
     } catch (error) {
@@ -613,6 +636,9 @@ export class ModmailService {
       modmail.resolveAutoCloseAt = new Date(Date.now() + resolveAutoCloseHours * 60 * 60 * 1000);
 
       await modmail.save();
+
+      this.websocketService?.conversationResolved(modmail.guildId as string, modmail.modmailId, modmail.ticketNumber, staffId);
+      broadcast(modmail.guildId as string, "dashboard:data_changed", { plugin: "modmail", type: "conversation_resolved", modmailId: modmail.modmailId });
 
       this.logger.info(`Modmail ${modmailId} marked resolved by ${staffId}`);
       return true;
@@ -663,6 +689,8 @@ export class ModmailService {
       }
 
       this.logger.info(`Modmail ${modmailId} claimed by ${staffId}`);
+      this.websocketService?.conversationClaimed(result.guildId as string, result.modmailId as string, result.ticketNumber as number, staffId);
+      broadcast(result.guildId as string, "dashboard:data_changed", { plugin: "modmail", type: "conversation_claimed", modmailId: result.modmailId });
       return { success: true };
     } catch (error) {
       this.logger.error(`Failed to claim modmail ${modmailId}:`, error);
@@ -693,6 +721,9 @@ export class ModmailService {
       modmail.claimedAt = undefined;
 
       await modmail.save();
+
+      this.websocketService?.conversationUnclaimed(modmail.guildId as string, modmail.modmailId as string, modmail.ticketNumber as number, staffId);
+      broadcast(modmail.guildId as string, "dashboard:data_changed", { plugin: "modmail", type: "conversation_unclaimed", modmailId: modmail.modmailId });
 
       this.logger.info(`Modmail ${modmailId} unclaimed (was claimed by ${previousClaimer})`);
       return true;

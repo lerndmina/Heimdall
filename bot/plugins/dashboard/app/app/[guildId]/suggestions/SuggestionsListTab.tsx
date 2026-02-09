@@ -11,6 +11,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import Modal from "@/components/ui/Modal";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -116,6 +117,10 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchSuggestions();
   }, [fetchSuggestions]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchSuggestions();
+  });
 
   useEffect(() => {
     setPage(0);

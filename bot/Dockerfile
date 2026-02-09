@@ -104,8 +104,8 @@ COPY --chown=heimdall:nodejs --from=dashboard-builder /app/plugins/dashboard/app
 USER heimdall
 
 # Expose ports
-# API_PORT (default 3001) and DASHBOARD_PORT (default 3000)
-EXPOSE 3000 3001
+# API_PORT (default 3001), DASHBOARD_PORT (default 3000), WS_PORT (default 3002)
+EXPOSE 3000 3001 3002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \

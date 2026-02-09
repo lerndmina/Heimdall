@@ -19,6 +19,7 @@ import Modal from "@/components/ui/Modal";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { useSession } from "next-auth/react";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -107,6 +108,10 @@ export default function TagsPage({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchTags();
   }, [fetchTags]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchTags();
+  });
 
   // Reset to page 0 when search/sort changes
   useEffect(() => {

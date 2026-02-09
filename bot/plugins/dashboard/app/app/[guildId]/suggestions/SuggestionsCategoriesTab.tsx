@@ -21,6 +21,7 @@ import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import { NotConfigured } from "@/components/ui/SetupWizard";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -78,6 +79,10 @@ export default function SuggestionsCategoriesTab({ guildId }: { guildId: string 
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchCategories();
+  });
 
   // ── Create/Edit ──
   const openCreateModal = () => {

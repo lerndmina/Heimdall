@@ -19,6 +19,7 @@ import DayTimePicker from "@/components/ui/DayTimePicker";
 import Combobox from "@/components/ui/Combobox";
 import SetupWizard, { NotConfigured, EditButton, FieldDisplay, ReviewSection, ReviewRow, type WizardStep } from "@/components/ui/SetupWizard";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -145,6 +146,10 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchConfig();
+  });
 
   // ------ Save handler ------
   const handleSave = async () => {

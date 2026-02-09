@@ -20,6 +20,7 @@ import Modal from "@/components/ui/Modal";
 import SetupWizard, { NotConfigured, EditButton, FieldDisplay, ReviewSection, ReviewRow, type WizardStep } from "@/components/ui/SetupWizard";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
+import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────
@@ -123,6 +124,10 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  useRealtimeEvent("dashboard:data_changed", () => {
+    fetchAll();
+  });
 
   // ── Save (upsert) ──
   const handleSave = async () => {
