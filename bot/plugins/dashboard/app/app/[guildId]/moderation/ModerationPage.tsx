@@ -86,6 +86,7 @@ interface Preset {
   description: string;
   patterns: { regex: string; flags?: string; label?: string }[];
   target: string;
+  matchMode: "any" | "all";
   actions: string[];
   warnPoints: number;
   installed: boolean;
@@ -444,6 +445,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
 function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolean }) {
   const [presets, setPresets] = useState<Preset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const loadPresets = useCallback(async () => {
     const res = await fetchApi<Preset[]>(guildId, "moderation/presets", { skipCache: true });
@@ -475,6 +477,27 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
     }
   }
 
+  const targetLabels: Record<string, string> = {
+    message_content: "Message Content",
+    reaction_emoji: "Reaction Emoji",
+    message_emoji: "Message Emoji",
+    username: "Username",
+    nickname: "Nickname",
+    sticker: "Sticker",
+    link: "Link",
+  };
+
+  const actionLabels: Record<string, string> = {
+    delete: "Delete",
+    remove_reaction: "Remove Reaction",
+    dm: "DM User",
+    warn: "Warn",
+    timeout: "Timeout",
+    kick: "Kick",
+    ban: "Ban",
+    log: "Log",
+  };
+
   if (loading) return <Spinner />;
 
   return (
@@ -485,7 +508,12 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
           <CardDescription>{preset.description}</CardDescription>
           <CardContent>
             <div className="flex items-center justify-between mt-2">
-              <span className={`text-sm ${preset.installed ? "text-green-400" : "text-zinc-500"}`}>{preset.installed ? "Installed" : "Not installed"}</span>
+              <div className="flex items-center gap-3">
+                <span className={`text-sm ${preset.installed ? "text-green-400" : "text-zinc-500"}`}>{preset.installed ? "Installed" : "Not installed"}</span>
+                <button onClick={() => setExpandedId(expandedId === preset.id ? null : preset.id)} className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors">
+                  {expandedId === preset.id ? "Hide Preview" : "Preview"}
+                </button>
+              </div>
               {canManage &&
                 (preset.installed ? (
                   <button onClick={() => uninstall(preset.id)} className="text-sm text-red-400 hover:text-red-300">
@@ -497,6 +525,30 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
                   </button>
                 ))}
             </div>
+
+            {expandedId === preset.id && (
+              <div className="mt-3 pt-3 border-t border-zinc-700/50 space-y-2">
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Target: {targetLabels[preset.target] ?? preset.target}</span>
+                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Match: {preset.matchMode === "all" ? "All patterns" : "Any pattern"}</span>
+                  <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300">Points: {preset.warnPoints}</span>
+                </div>
+                <div className="text-xs text-zinc-400">
+                  <span className="font-medium text-zinc-300">Actions:</span> {preset.actions.map((a) => actionLabels[a] ?? a).join(", ")}
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-zinc-300">Patterns ({preset.patterns.length}):</span>
+                  {preset.patterns.map((p, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs bg-zinc-800/60 rounded px-2 py-1.5">
+                      <code className="text-amber-400/80 break-all font-mono">
+                        /{p.regex}/{p.flags ?? ""}
+                      </code>
+                      {p.label && <span className="text-zinc-500 shrink-0">— {p.label}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}
