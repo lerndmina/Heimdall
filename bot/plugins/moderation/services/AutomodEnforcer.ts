@@ -225,7 +225,6 @@ export class AutomodEnforcer {
     await this.recordAndEscalate(guildId, member, match, InfractionType.AUTOMOD_DELETE, message.channelId, message.id, config);
   }
 
-
   private async recordAndEscalate(guildId: string, member: GuildMember, match: RuleMatch, type: InfractionType, channelId: string | null, messageId: string | null, config: any): Promise<void> {
     const actions = match.rule.actions as string[];
     const points = actions.includes(AutomodAction.WARN) ? (match.rule.warnPoints ?? 1) : 0;

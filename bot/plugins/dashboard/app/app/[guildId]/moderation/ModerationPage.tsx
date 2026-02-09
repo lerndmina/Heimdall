@@ -30,6 +30,8 @@ import Toggle from "@/components/ui/Toggle";
 import TextInput from "@/components/ui/TextInput";
 import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
+import ChannelCombobox from "@/components/ui/ChannelCombobox";
+import RoleCombobox from "@/components/ui/RoleCombobox";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -104,10 +106,19 @@ interface Infraction {
   type: string;
   reason?: string;
   ruleName?: string;
+  matchedContent?: string;
+  matchedPattern?: string;
+  channelId?: string;
+  messageId?: string;
   pointsAssigned: number;
   totalPointsAfter: number;
   active: boolean;
   createdAt: string;
+  // Enriched fields from API
+  userUsername?: string;
+  userDisplayName?: string;
+  moderatorUsername?: string;
+  moderatorDisplayName?: string;
 }
 
 interface Stats {
@@ -846,10 +857,10 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
           <div className="space-y-4">
             <p className="text-xs text-zinc-500">Optionally restrict where this rule applies. Leave empty to apply everywhere.</p>
 
-            <ScopingSection title="Channel Include" description="Only apply in these channels (empty = all)" values={channelInclude} onChange={setChannelInclude} placeholder="Channel ID" />
-            <ScopingSection title="Channel Exclude" description="Never apply in these channels" values={channelExclude} onChange={setChannelExclude} placeholder="Channel ID" />
-            <ScopingSection title="Role Include" description="Only apply to users with these roles (empty = all)" values={roleInclude} onChange={setRoleInclude} placeholder="Role ID" />
-            <ScopingSection title="Role Exclude" description="Never apply to users with these roles (immune)" values={roleExclude} onChange={setRoleExclude} placeholder="Role ID" />
+            <ChannelScopingSection guildId={guildId} title="Channel Include" description="Only apply in these channels (empty = all)" values={channelInclude} onChange={setChannelInclude} />
+            <ChannelScopingSection guildId={guildId} title="Channel Exclude" description="Never apply in these channels" values={channelExclude} onChange={setChannelExclude} />
+            <RoleScopingSection guildId={guildId} title="Role Include" description="Only apply to users with these roles (empty = all)" values={roleInclude} onChange={setRoleInclude} />
+            <RoleScopingSection guildId={guildId} title="Role Exclude" description="Never apply to users with these roles (immune)" values={roleExclude} onChange={setRoleExclude} />
 
             {/* Summary */}
             <div className="bg-zinc-800/60 rounded-lg p-3 space-y-1.5 border border-zinc-700/50">
@@ -873,9 +884,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                 <div className="col-span-2">
                   <span className="text-zinc-300">Patterns:</span>{" "}
                   {[
-                    wildcardText.trim()
-                      ? `${wildcardText.split(/[,\n]/).filter((s) => s.trim()).length} wildcard`
-                      : "",
+                    wildcardText.trim() ? `${wildcardText.split(/[,\n]/).filter((s) => s.trim()).length} wildcard` : "",
                     patternsText.trim() ? `${patternsText.split("\n").filter(Boolean).length} regex` : "",
                   ]
                     .filter(Boolean)
@@ -902,48 +911,54 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
   );
 }
 
-/** Reusable scoping input — add/remove ID strings */
-function ScopingSection({ title, description, values, onChange, placeholder }: { title: string; description: string; values: string[]; onChange: (v: string[]) => void; placeholder: string }) {
-  const [input, setInput] = useState("");
-
-  function add() {
-    const trimmed = input.trim();
-    if (trimmed && !values.includes(trimmed)) {
-      onChange([...values, trimmed]);
-      setInput("");
-    }
+/** Reusable channel scoping — pick channels via Combobox, add/remove */
+function ChannelScopingSection({ guildId, title, description, values, onChange }: { guildId: string; title: string; description: string; values: string[]; onChange: (v: string[]) => void }) {
+  function add(id: string) {
+    if (id && !values.includes(id)) onChange([...values, id]);
   }
 
-  function remove(val: string) {
-    onChange(values.filter((v) => v !== val));
+  function remove(id: string) {
+    onChange(values.filter((v) => v !== id));
   }
 
   return (
     <div>
-      <label className="block text-sm font-medium text-zinc-200 mb-0.5">{title}</label>
-      <p className="text-xs text-zinc-500 mb-1.5">{description}</p>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-          placeholder={placeholder}
-          className="flex-1 rounded-md border border-zinc-700 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-        />
-        <button onClick={add} disabled={!input.trim()} className="px-3 py-1.5 bg-zinc-700 text-zinc-200 rounded-md text-xs hover:bg-zinc-600 disabled:opacity-50">
-          Add
-        </button>
-      </div>
+      <ChannelCombobox guildId={guildId} value="" onChange={(id) => add(id)} channelType="text" label={title} description={description} placeholder="Select a channel…" />
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
           {values.map((v) => (
             <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-700 text-xs text-zinc-300">
+              <span className="text-zinc-400">#</span>
+              {v}
+              <button onClick={() => remove(v)} className="text-zinc-500 hover:text-red-400">
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Reusable role scoping — pick roles via Combobox, add/remove */
+function RoleScopingSection({ guildId, title, description, values, onChange }: { guildId: string; title: string; description: string; values: string[]; onChange: (v: string[]) => void }) {
+  function add(id: string) {
+    if (id && !values.includes(id)) onChange([...values, id]);
+  }
+
+  function remove(id: string) {
+    onChange(values.filter((v) => v !== id));
+  }
+
+  return (
+    <div>
+      <RoleCombobox guildId={guildId} value="" onChange={(id) => add(id)} excludeIds={values} label={title} description={description} placeholder="Select a role…" />
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {values.map((v) => (
+            <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-700 text-xs text-zinc-300">
+              <span className="text-zinc-400">@</span>
               {v}
               <button onClick={() => remove(v)} className="text-zinc-500 hover:text-red-400">
                 ×
@@ -1228,29 +1243,53 @@ function InfractionsTab({ guildId, canManage }: { guildId: string; canManage: bo
           {infractions.map((inf) => (
             <Card key={inf._id}>
               <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className={`text-xs px-1.5 py-0.5 rounded ${inf.source === "automod" ? "bg-blue-900 text-blue-300" : "bg-purple-900 text-purple-300"}`}>{inf.source}</span>
                       <span className="text-xs bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded">{inf.type}</span>
                       <span className={`text-xs ${inf.active ? "text-green-400" : "text-zinc-500"}`}>{inf.active ? "Active" : "Cleared"}</span>
                     </div>
-                    <p className="text-sm text-zinc-300 mt-1">
-                      User: <code className="text-zinc-100">{inf.userId}</code>
-                      {inf.moderatorId && (
+                    <p className="text-sm text-zinc-200 mt-1.5">
+                      {inf.userDisplayName ?? inf.userUsername ?? inf.userId}
+                      {inf.userUsername && inf.userDisplayName && inf.userDisplayName !== inf.userUsername && <span className="text-zinc-500 ml-1">(@{inf.userUsername})</span>}
+                      <span className="text-zinc-600 ml-1 text-xs font-mono">{inf.userId}</span>
+                    </p>
+                    {inf.moderatorId && (
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        By: {inf.moderatorDisplayName ?? inf.moderatorUsername ?? inf.moderatorId}
+                        {inf.moderatorUsername && inf.moderatorDisplayName && inf.moderatorDisplayName !== inf.moderatorUsername && (
+                          <span className="text-zinc-500 ml-1">(@{inf.moderatorUsername})</span>
+                        )}
+                      </p>
+                    )}
+                    {inf.ruleName && <p className="text-sm text-zinc-300 mt-1">Automod rule: {inf.ruleName}</p>}
+                    <p className="text-sm text-zinc-400 mt-0.5">{inf.reason ?? "No reason"}</p>
+                    {inf.matchedContent && (
+                      <p className="text-xs text-zinc-500 mt-1 truncate max-w-md" title={inf.matchedContent}>
+                        Matched:{" "}
+                        <span className="text-zinc-400">
+                          {inf.matchedContent.substring(0, 100)}
+                          {inf.matchedContent.length > 100 ? "…" : ""}
+                        </span>
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs text-zinc-500">
+                      <span>
+                        {inf.pointsAssigned} pts · Total: {inf.totalPointsAfter} pts
+                      </span>
+                      <span>·</span>
+                      <span>{new Date(inf.createdAt).toLocaleString()}</span>
+                      {inf.channelId && (
                         <>
-                          {" "}
-                          · By: <code className="text-zinc-100">{inf.moderatorId}</code>
+                          <span>·</span>
+                          <span className="text-zinc-400">#{inf.channelId}</span>
                         </>
                       )}
-                    </p>
-                    <p className="text-sm text-zinc-400">{inf.reason ?? "No reason"}</p>
-                    <p className="text-xs text-zinc-500 mt-1">
-                      {inf.pointsAssigned} pts · Total: {inf.totalPointsAfter} pts · {new Date(inf.createdAt).toLocaleString()}
-                    </p>
+                    </div>
                   </div>
                   {canManage && inf.active && (
-                    <button onClick={() => clearInfractions(inf.userId)} className="text-sm text-red-400 hover:text-red-300">
+                    <button onClick={() => clearInfractions(inf.userId)} className="text-sm text-red-400 hover:text-red-300 whitespace-nowrap">
                       Clear All
                     </button>
                   )}
