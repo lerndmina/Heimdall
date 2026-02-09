@@ -152,10 +152,7 @@ export async function execute(context: CommandContext): Promise<void> {
       const embedData = createStatusEmbed(pingData, server, client);
 
       // Save ping results to DB
-      await McServerStatus.findOneAndUpdate(
-        { id: serverName.toLowerCase(), guildId },
-        { lastPingData: pingData, lastPingTime: new Date() },
-      );
+      await McServerStatus.findOneAndUpdate({ id: serverName.toLowerCase(), guildId }, { lastPingData: pingData, lastPingTime: new Date() });
 
       await interaction.editReply(embedData);
     } catch (error) {
