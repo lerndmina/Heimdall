@@ -6,9 +6,10 @@
  */
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Combobox, { type ComboboxOption } from "@/components/ui/Combobox";
 import { fetchApi } from "@/lib/api";
+import { cache } from "@/lib/cache";
 
 interface ChannelData {
   id: string;
@@ -35,28 +36,30 @@ export default function ChannelCombobox({ guildId, value, onChange, channelType 
   const [channels, setChannels] = useState<ChannelData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+  const cacheKey = `channels-${guildId}-${channelType}`;
 
-    fetchApi<{ channels: ChannelData[] }>(guildId, `channels?type=${channelType}`, {
-      cacheKey: `channels-${guildId}-${channelType}`,
-      cacheTtl: 60_000,
-    })
-      .then((res) => {
-        if (cancelled) return;
-        if (res.success && res.data) {
-          setChannels(res.data.channels);
-        }
+  const fetchChannels = useCallback(
+    (bustCache = false) => {
+      setLoading(true);
+      if (bustCache) cache.invalidate(cacheKey);
+
+      fetchApi<{ channels: ChannelData[] }>(guildId, `channels?type=${channelType}`, {
+        cacheKey,
+        cacheTtl: 60_000,
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+        .then((res) => {
+          if (res.success && res.data) {
+            setChannels(res.data.channels);
+          }
+        })
+        .finally(() => setLoading(false));
+    },
+    [guildId, channelType, cacheKey],
+  );
 
-    return () => {
-      cancelled = true;
-    };
-  }, [guildId, channelType]);
+  useEffect(() => {
+    fetchChannels();
+  }, [fetchChannels]);
 
   const options: ComboboxOption[] = useMemo(() => {
     return channels.map((ch) => ({
@@ -79,6 +82,7 @@ export default function ChannelCombobox({ guildId, value, onChange, channelType 
         loading={loading}
         disabled={disabled}
         error={error}
+        onRefresh={() => fetchChannels(true)}
       />
     </div>
   );

@@ -107,18 +107,18 @@ function describeWildcard(pattern: string): string {
 }
 
 /**
- * Parse a comma-separated wildcard string into an array of regex patterns.
+ * Parse a wildcard string (comma-separated or one per line) into regex patterns.
  *
- * Input: `"*m*m, d*d, exact"`
+ * Input: `"*m*m, d*d, exact"` or `"*m*m\nd*d\nexact"`
  * Output: Array of WildcardConversion objects ready for the automod engine.
  */
 export function parseWildcardPatterns(input: string): WildcardParseResult {
   const errors: string[] = [];
   const patterns: WildcardConversion[] = [];
 
-  // Split by comma, trim whitespace, filter empties
+  // Split by comma or newline, trim whitespace, filter empties
   const wildcards = input
-    .split(",")
+    .split(/[,\n]/)
     .map((s) => s.trim())
     .filter(Boolean);
 

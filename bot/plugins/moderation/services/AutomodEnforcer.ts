@@ -119,7 +119,8 @@ export class AutomodEnforcer {
 
       if (actions.includes(AutomodAction.REMOVE_REACTION)) {
         try {
-          await reaction.users.remove(user.id);
+          // Remove ALL reactions of this emoji from the message, not just the user's
+          await reaction.remove();
         } catch (err) {
           log.error("Failed to remove reaction:", err);
         }
@@ -224,6 +225,7 @@ export class AutomodEnforcer {
     await this.recordAndEscalate(guildId, member, match, InfractionType.AUTOMOD_DELETE, message.channelId, message.id, config);
   }
 
+
   private async recordAndEscalate(guildId: string, member: GuildMember, match: RuleMatch, type: InfractionType, channelId: string | null, messageId: string | null, config: any): Promise<void> {
     const actions = match.rule.actions as string[];
     const points = actions.includes(AutomodAction.WARN) ? (match.rule.warnPoints ?? 1) : 0;
@@ -265,7 +267,7 @@ export class AutomodEnforcer {
 
     // Log
     if (actions.includes(AutomodAction.LOG)) {
-      await this.sendAutomodLog(member.guild, member, match, activePoints);
+      await this.sendAutomodLog(member.guild, member, match, activePoints, channelId, messageId);
     }
 
     // Check escalation
@@ -287,8 +289,18 @@ export class AutomodEnforcer {
 
   // ── Logging ────────────────────────────────────────────
 
-  private async sendAutomodLog(guild: any, member: GuildMember, match: RuleMatch, activePoints: number): Promise<void> {
+  private async sendAutomodLog(guild: any, member: GuildMember, match: RuleMatch, activePoints: number, channelId: string | null, messageId: string | null): Promise<void> {
     try {
+      // Build context line with links based on trigger type
+      const contextParts: string[] = [];
+      if (channelId) {
+        contextParts.push(`Channel: <#${channelId}>`);
+        if (messageId) {
+          contextParts.push(`[Jump to message](https://discord.com/channels/${guild.id}/${channelId}/${messageId})`);
+        }
+      }
+      const contextValue = contextParts.length > 0 ? contextParts.join(" · ") : "N/A";
+
       const embed = this.lib
         .createEmbedBuilder()
         .setColor(ACTION_COLORS.automod)
@@ -298,6 +310,7 @@ export class AutomodEnforcer {
           { name: "User", value: `${member.user.tag} (${member.user})`, inline: true },
           { name: "Rule", value: match.rule.name as string, inline: true },
           { name: "Points", value: `+${match.rule.warnPoints ?? 0} (Total: ${activePoints})`, inline: true },
+          { name: "Context", value: contextValue },
           { name: "Matched Content", value: match.matchedContent?.substring(0, 200) || "N/A" },
           { name: "Actions", value: (match.rule.actions as string[]).join(", ") },
         )

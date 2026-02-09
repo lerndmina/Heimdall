@@ -661,9 +661,9 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">Easy</span>
               </div>
               <p className="text-xs text-zinc-500">
-                Separate with commas. Use <code className="text-amber-400/70">*</code> to match any characters.
+                Separate with commas or one per line. Use <code className="text-amber-400/70">*</code> to match any characters.
               </p>
-              <Textarea label="" value={wildcardText} onChange={setWildcardText} placeholder={"*m*m, d*d, exact-word\n*bad*, sl*r, *hate*"} rows={2} />
+              <Textarea label="" value={wildcardText} onChange={setWildcardText} placeholder={"*m*m, d*d, exact-word\n*bad*\nsl*r\n*hate*"} rows={2} />
 
               {/* Pattern guide (collapsed) */}
               <details className="text-xs">
@@ -873,7 +873,9 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                 <div className="col-span-2">
                   <span className="text-zinc-300">Patterns:</span>{" "}
                   {[
-                    wildcardText.trim() ? `${wildcardText.split(",").filter((s) => s.trim()).length} wildcard` : "",
+                    wildcardText.trim()
+                      ? `${wildcardText.split(/[,\n]/).filter((s) => s.trim()).length} wildcard`
+                      : "",
                     patternsText.trim() ? `${patternsText.split("\n").filter(Boolean).length} regex` : "",
                   ]
                     .filter(Boolean)

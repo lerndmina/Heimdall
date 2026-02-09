@@ -6,9 +6,10 @@
  */
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Combobox, { type ComboboxOption } from "@/components/ui/Combobox";
 import { fetchApi } from "@/lib/api";
+import { cache } from "@/lib/cache";
 
 interface RoleData {
   id: string;
@@ -30,38 +31,32 @@ interface RoleComboboxProps {
   excludeIds?: string[];
 }
 
-export default function RoleCombobox({
-  guildId,
-  value,
-  onChange,
-  placeholder,
-  disabled,
-  error,
-  label,
-  description,
-  excludeIds = [],
-}: RoleComboboxProps) {
+export default function RoleCombobox({ guildId, value, onChange, placeholder, disabled, error, label, description, excludeIds = [] }: RoleComboboxProps) {
   const [roles, setRoles] = useState<RoleData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetchApi<{ roles: RoleData[] }>(guildId, "roles", {
-      cacheKey: `roles-${guildId}`,
-      cacheTtl: 60_000,
-    })
-      .then((res) => {
-        if (cancelled) return;
-        if (res.success && res.data) setRoles(res.data.roles);
+  const cacheKey = `roles-${guildId}`;
+
+  const fetchRoles = useCallback(
+    (bustCache = false) => {
+      setLoading(true);
+      if (bustCache) cache.invalidate(cacheKey);
+
+      fetchApi<{ roles: RoleData[] }>(guildId, "roles", {
+        cacheKey,
+        cacheTtl: 60_000,
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [guildId]);
+        .then((res) => {
+          if (res.success && res.data) setRoles(res.data.roles);
+        })
+        .finally(() => setLoading(false));
+    },
+    [guildId, cacheKey],
+  );
+
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
 
   const options: ComboboxOption[] = useMemo(() => {
     const excludeSet = new Set(excludeIds);
@@ -88,6 +83,7 @@ export default function RoleCombobox({
         loading={loading}
         disabled={disabled}
         error={error}
+        onRefresh={() => fetchRoles(true)}
       />
     </div>
   );

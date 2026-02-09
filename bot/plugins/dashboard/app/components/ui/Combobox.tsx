@@ -27,6 +27,8 @@ interface ComboboxProps {
   disabled?: boolean;
   loading?: boolean;
   error?: boolean;
+  /** When provided, a refresh button is shown at the top of the dropdown. */
+  onRefresh?: () => void;
 }
 
 export default function Combobox({
@@ -39,6 +41,7 @@ export default function Combobox({
   disabled = false,
   loading = false,
   error = false,
+  onRefresh,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -151,6 +154,22 @@ export default function Combobox({
       {open &&
         createPortal(
           <div ref={popoverRef} style={popoverStyle} className="rounded-lg border border-zinc-700/30 bg-zinc-900/90 shadow-xl shadow-black/40 backdrop-blur-2xl" onKeyDown={handleKeyDown}>
+            {/* Refresh button */}
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRefresh();
+                }}
+                className="flex w-full items-center gap-2 border-b border-zinc-700/30 px-3 py-2 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
+                <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh list
+              </button>
+            )}
+
             {/* Search input */}
             <div className="flex items-center gap-2 border-b border-zinc-700/30 px-3 py-2">
               <svg className="h-4 w-4 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

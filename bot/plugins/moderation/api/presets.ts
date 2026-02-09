@@ -9,6 +9,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { ModerationApiDeps } from "./index.js";
 import { getAllPresets, getPreset } from "../utils/presets.js";
+import { parseWildcardPatterns } from "../utils/wildcard.js";
 
 export function createPresetsRoutes(deps: ModerationApiDeps): Router {
   const router = Router({ mergeParams: true });
@@ -67,11 +68,23 @@ export function createPresetsRoutes(deps: ModerationApiDeps): Router {
       }
 
       // Create rule from preset
+      // Merge wildcard patterns (converted to regex) with raw regex patterns
+      const allPatterns = [...preset.patterns];
+      let wildcardStr: string | undefined;
+
+      if (preset.wildcardPatterns) {
+        wildcardStr = preset.wildcardPatterns;
+        const parsed = parseWildcardPatterns(wildcardStr);
+        if (parsed.success) {
+          allPatterns.push(...parsed.patterns.map((p) => ({ regex: p.regex, flags: p.flags, label: p.label })));
+        }
+      }
+
       const rule = await deps.moderationService.createRule(
         guildId as string,
         {
           name: preset.name,
-          patterns: preset.patterns,
+          patterns: allPatterns,
           matchMode: preset.matchMode,
           target: Array.isArray(preset.target) ? preset.target : [preset.target],
           actions: preset.actions,
@@ -79,6 +92,7 @@ export function createPresetsRoutes(deps: ModerationApiDeps): Router {
           enabled: true,
           isPreset: true,
           presetId: preset.id,
+          ...(wildcardStr ? { wildcardPatterns: wildcardStr } : {}),
         } as any,
       );
 
