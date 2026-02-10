@@ -307,7 +307,7 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
                       </td>
                       <td className="py-3 pr-4">
                         {canManage ? (
-                          <Toggle checked={sticky.enabled} onChange={(v) => handleToggle(sticky, v)} />
+                          <Toggle label="" checked={sticky.enabled} onChange={(v) => handleToggle(sticky, v)} />
                         ) : (
                           <span
                             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${sticky.enabled ? "border-emerald-500/40 text-emerald-300" : "border-zinc-700/50 text-zinc-500"}`}>
