@@ -10,6 +10,7 @@ import { getUserGuilds } from "@/lib/guildCache";
 import { resolveRouteAction } from "@/lib/routePermissions";
 import { resolvePermissions, type RoleOverrides, type MemberInfo } from "@/lib/permissions";
 import { checkBotOwner } from "@/lib/botOwner";
+import { permissionCategories } from "@/lib/permissionDefs";
 
 const API_PORT = process.env.API_PORT || "3001";
 const API_BASE = `http://localhost:${API_PORT}`;
@@ -92,18 +93,24 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
 
     // Guild owner or bot owner bypasses all checks
     if (!memberData.isOwner && !isBotOwner) {
-      // Fetch guild permission overrides
-      const permData = await fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(
-        `/api/guilds/${guildId}/dashboard-permissions`,
-        `perms:${guildId}`,
-      );
+      // Fetch guild permission overrides and definitions
+      const [permData, permissionDefs] = await Promise.all([
+        fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(
+          `/api/guilds/${guildId}/dashboard-permissions`,
+          `perms:${guildId}`,
+        ),
+        fetchBotApi<{ categories: Array<{ key: string; label: string; description: string; actions: Array<{ key: string; label: string; description: string }> }> }>(
+          `/api/guilds/${guildId}/permission-defs`,
+          `permdefs:${guildId}`,
+        ),
+      ]);
 
       // Build role overrides for the user's roles only, including position for hierarchy resolution
       const roleOverrides: RoleOverrides[] = (permData?.permissions ?? [])
         .filter((p) => memberData.roleIds.includes(p.discordRoleId))
         .map((p) => ({ overrides: p.overrides, position: p.position ?? 0 }));
 
-      const resolved = resolvePermissions(memberData, roleOverrides);
+      const resolved = resolvePermissions(memberData, roleOverrides, permissionDefs?.categories ?? permissionCategories);
 
       // If dashboard access is denied entirely, block all requests
       if (resolved.denyAccess) {

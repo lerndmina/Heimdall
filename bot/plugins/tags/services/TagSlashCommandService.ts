@@ -16,6 +16,7 @@ import { SlashCommandBuilder, userMention, ActionRowBuilder, ButtonStyle } from 
 import type { RESTPostAPIChatInputApplicationCommandsJSONBody } from "discord.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import type { CommandContext, CommandManager } from "../../../src/core/CommandManager.js";
+import type { PermissionRegistry } from "../../../src/core/PermissionRegistry.js";
 import type { LibAPI } from "../../lib/index.js";
 import type { TagService } from "./TagService.js";
 import TagModel from "../models/Tag.js";
@@ -28,11 +29,13 @@ export class TagSlashCommandService {
   private commandManager: CommandManager;
   private tagService: TagService;
   private lib: LibAPI;
+  private permissionRegistry?: PermissionRegistry;
 
-  constructor(commandManager: CommandManager, tagService: TagService, lib: LibAPI) {
+  constructor(commandManager: CommandManager, tagService: TagService, lib: LibAPI, permissionRegistry?: PermissionRegistry) {
     this.commandManager = commandManager;
     this.tagService = tagService;
     this.lib = lib;
+    this.permissionRegistry = permissionRegistry;
   }
 
   /**
@@ -45,6 +48,26 @@ export class TagSlashCommandService {
 
     // Resolver: handles execution of tag slash commands
     this.commandManager.registerDynamicCommandResolver((commandName, guildId) => this.resolveTagCommand(commandName, guildId));
+
+    // Resolver: handles dynamic tag permission keys
+    this.commandManager.registerDynamicPermissionResolver((commandName, guildId) => this.resolveTagPermissionKey(commandName, guildId));
+
+    // Dynamic permission definitions for slash-command tags
+    if (this.permissionRegistry) {
+      this.permissionRegistry.registerDynamicProvider("tags.slash-commands", async (guildId) => {
+        const tags = await TagModel.find({ guildId, registerAsSlashCommand: true }).select("name").lean();
+        return [
+          {
+            categoryKey: "tags",
+            actions: tags.map((tag) => ({
+              key: `commands.${tag.name}`,
+              label: `/${tag.name}`,
+              description: "Tag slash command",
+            })),
+          },
+        ];
+      });
+    }
 
     log.info("Tag slash command provider and resolver registered");
   }
@@ -166,6 +189,22 @@ export class TagSlashCommandService {
         ...(forwardRow ? { components: [forwardRow] } : {}),
       });
     };
+  }
+
+  private async resolveTagPermissionKey(commandName: string, guildId: string | null): Promise<string | null> {
+    if (!guildId) return null;
+
+    const tag = await TagModel.findOne({
+      guildId,
+      name: commandName.toLowerCase(),
+      registerAsSlashCommand: true,
+    })
+      .select("name")
+      .lean();
+
+    if (!tag) return null;
+
+    return `tags.commands.${tag.name}`;
   }
 
   /**

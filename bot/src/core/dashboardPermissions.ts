@@ -2,7 +2,7 @@
  * Server-side permission resolver for dashboard access.
  */
 
-import { permissionCategories } from "./dashboardPermissionDefs.js";
+import type { PermissionCategory } from "./dashboardPermissionDefs.js";
 
 export interface RoleOverrides {
   overrides: Map<string, "allow" | "deny"> | Record<string, "allow" | "deny">;
@@ -29,7 +29,7 @@ function toMap(input: Map<string, "allow" | "deny"> | Record<string, "allow" | "
   return new Map(Object.entries(input));
 }
 
-export function resolvePermissions(member: MemberInfo, roleOverridesList: RoleOverrides[]): ResolvedPermissions {
+export function resolvePermissions(member: MemberInfo, roleOverridesList: RoleOverrides[], permissionCategories: PermissionCategory[]): ResolvedPermissions {
   const allActions: string[] = [];
   const categoryActions: Record<string, string[]> = {};
 

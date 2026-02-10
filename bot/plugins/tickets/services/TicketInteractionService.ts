@@ -65,143 +65,42 @@ export class TicketInteractionService {
     });
 
     // Handler: Ticket Control - Close
-    this.lib.componentCallbackService.registerPersistentHandler("ticket.control.close", async (interaction) => {
-      if (!interaction.isButton()) return;
+    this.lib.componentCallbackService.registerPersistentHandler(
+      "ticket.control.close",
+      async (interaction) => {
+        if (!interaction.isButton()) return;
 
-      const flow = new InteractionFlow(interaction);
-      const ticket = await this.getTicketFromChannel(interaction.channelId);
-      if (!ticket) {
-        await flow.send({ content: "❌ Could not find ticket.", ephemeral: true });
-        return;
-      }
-
-      if (ticket.status === TicketStatus.ARCHIVED || ticket.status === TicketStatus.CLOSED) {
-        await flow.send({ content: "❌ This ticket is already closed.", ephemeral: true });
-        return;
-      }
-
-      // Build confirmation buttons
-      const confirmBtn = this.lib.createButtonBuilder(async (i) => {
-        const iFlow = new InteractionFlow(i);
-        const t = await this.getTicketFromChannel(i.channelId);
-        if (!t) return;
-
-        await iFlow.update({ content: "⏳ Closing ticket...", components: [] });
-        const result = await this.lifecycleService.closeTicket(t, i.user, i.member as GuildMember);
-        await iFlow.show({ content: result.success ? "✅ Ticket closed successfully." : `❌ ${result.message}`, components: [] });
-      }, 300);
-      confirmBtn.setLabel("Confirm Close").setStyle(ButtonStyle.Danger).setEmoji("🔒");
-
-      const reasonBtn = this.lib.createButtonBuilder(async (i) => {
-        const modalId = nanoid();
-        const modal = new ModalBuilder().setCustomId(modalId).setTitle("Close Ticket");
-        modal.addComponents(
-          new ActionRowBuilder<TextInputBuilder>().addComponents(new TextInputBuilder().setCustomId("reason").setLabel("Reason").setStyle(TextInputStyle.Paragraph).setRequired(true)),
-        );
-
-        await i.showModal(modal);
-
-        const submit = await i
-          .awaitModalSubmit({
-            filter: (s) => s.customId === modalId && s.user.id === i.user.id,
-            time: 300000,
-          })
-          .catch(() => null);
-
-        if (submit) {
-          const sFlow = new InteractionFlow(submit);
-          const ticket = await this.getTicketFromChannel(submit.channelId);
-          if (ticket) {
-            const reason = submit.fields.getTextInputValue("reason");
-            const result = await this.lifecycleService.closeTicket(ticket, submit.user, submit.member as GuildMember, reason);
-            await sFlow.update({ content: result.success ? "✅ Ticket closed." : `❌ ${result.message}`, components: [] });
-          } else {
-            await sFlow.update({ content: "❌ Could not find ticket.", components: [] });
-          }
+        const flow = new InteractionFlow(interaction);
+        const ticket = await this.getTicketFromChannel(interaction.channelId);
+        if (!ticket) {
+          await flow.send({ content: "❌ Could not find ticket.", ephemeral: true });
+          return;
         }
-      }, 300);
-      reasonBtn.setLabel("Close with Reason").setStyle(ButtonStyle.Primary).setEmoji("📝");
 
-      const cancelBtn = this.lib.createButtonBuilder(async (i) => {
-        const cFlow = new InteractionFlow(i);
-        await cFlow.update({ content: "Action cancelled.", components: [] });
-      }, 300);
-      cancelBtn.setLabel("Cancel").setStyle(ButtonStyle.Secondary).setEmoji("✖️");
+        if (ticket.status === TicketStatus.ARCHIVED || ticket.status === TicketStatus.CLOSED) {
+          await flow.send({ content: "❌ This ticket is already closed.", ephemeral: true });
+          return;
+        }
 
-      await Promise.all([confirmBtn.ready(), reasonBtn.ready(), cancelBtn.ready()]);
+        // Build confirmation buttons
+        const confirmBtn = this.lib.createButtonBuilder(async (i) => {
+          const iFlow = new InteractionFlow(i);
+          const t = await this.getTicketFromChannel(i.channelId);
+          if (!t) return;
 
-      await flow.send({
-        content: "Are you sure you want to close this ticket?",
-        components: [new ActionRowBuilder<any>().addComponents(confirmBtn, reasonBtn, cancelBtn)],
-        ephemeral: true,
-      });
-    });
+          await iFlow.update({ content: "⏳ Closing ticket...", components: [] });
+          const result = await this.lifecycleService.closeTicket(t, i.user, i.member as GuildMember);
+          await iFlow.show({ content: result.success ? "✅ Ticket closed successfully." : `❌ ${result.message}`, components: [] });
+        }, 300);
+        confirmBtn.setLabel("Confirm Close").setStyle(ButtonStyle.Danger).setEmoji("🔒");
 
-    // Handler: Ticket Control - Claim
-    this.lib.componentCallbackService.registerPersistentHandler("ticket.control.claim", async (interaction) => {
-      if (!interaction.isButton()) return;
-      const flow = new InteractionFlow(interaction);
-
-      const ticket = await this.getTicketFromChannel(interaction.channelId);
-      if (!ticket) {
-        await flow.send({ content: "❌ Could not find ticket.", ephemeral: true });
-        return;
-      }
-
-      if (ticket.status === TicketStatus.ARCHIVED || ticket.status === TicketStatus.CLOSED) {
-        await flow.send({ content: "❌ This ticket is already closed.", ephemeral: true });
-        return;
-      }
-
-      await flow.send({ content: "⏳ Claiming ticket...", ephemeral: true });
-      const result = await this.lifecycleService.claimTicket(ticket, interaction.user, interaction.member as GuildMember);
-      await flow.show({ content: result.success ? `✅ ${result.message}` : `❌ ${result.message}` });
-    });
-
-    // Handler: Ticket Control - Manage (unclaim, move, rename, add user)
-    this.lib.componentCallbackService.registerPersistentHandler("ticket.control.manage", async (interaction) => {
-      if (!interaction.isButton()) return;
-      const flow = new InteractionFlow(interaction);
-
-      const ticket = await this.getTicketFromChannel(interaction.channelId);
-      if (!ticket) {
-        await flow.send({ content: "❌ Could not find ticket.", ephemeral: true });
-        return;
-      }
-
-      if (ticket.status === TicketStatus.ARCHIVED || ticket.status === TicketStatus.CLOSED) {
-        await flow.send({ content: "❌ This ticket is already closed.", ephemeral: true });
-        return;
-      }
-
-      const category = await TicketCategory.findOne({ id: ticket.categoryId, guildId: ticket.guildId });
-      if (!category || !this.hasStaffPermission(interaction.member as GuildMember, category)) {
-        await flow.send({ content: "❌ You do not have permission to manage this ticket.", ephemeral: true });
-        return;
-      }
-
-      // Build manage menu
-      const menu = this.lib.createStringSelectMenuBuilder(async (i) => {
-        const iFlow = new InteractionFlow(i);
-        const value = i.values[0];
-
-        if (value === "unclaim") {
-          await iFlow.update({ content: "⏳ Unclaiming ticket...", components: [] });
-          const res = await this.lifecycleService.unclaimTicket(ticket, i.user, i.member as GuildMember);
-          await iFlow.show({ content: res.success ? `✅ ${res.message}` : `❌ ${res.message}` });
-        } else if (value === "rename") {
+        const reasonBtn = this.lib.createButtonBuilder(async (i) => {
           const modalId = nanoid();
-          const modal = new ModalBuilder().setCustomId(modalId).setTitle("Rename Ticket");
+          const modal = new ModalBuilder().setCustomId(modalId).setTitle("Close Ticket");
           modal.addComponents(
-            new ActionRowBuilder<TextInputBuilder>().addComponents(
-              new TextInputBuilder()
-                .setCustomId("name")
-                .setLabel("New Name")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setValue(ticket.customChannelName || `ticket-${ticket.ticketNumber}`),
-            ),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(new TextInputBuilder().setCustomId("reason").setLabel("Reason").setStyle(TextInputStyle.Paragraph).setRequired(true)),
           );
+
           await i.showModal(modal);
 
           const submit = await i
@@ -213,28 +112,153 @@ export class TicketInteractionService {
 
           if (submit) {
             const sFlow = new InteractionFlow(submit);
-            const name = submit.fields.getTextInputValue("name");
-            const res = await this.lifecycleService.renameTicket(ticket, name, submit.user, submit.member as GuildMember);
-            await sFlow.update({ content: res.success ? `✅ ${res.message}` : `❌ ${res.message}`, components: [] });
+            const ticket = await this.getTicketFromChannel(submit.channelId);
+            if (ticket) {
+              const reason = submit.fields.getTextInputValue("reason");
+              const result = await this.lifecycleService.closeTicket(ticket, submit.user, submit.member as GuildMember, reason);
+              await sFlow.update({ content: result.success ? "✅ Ticket closed." : `❌ ${result.message}`, components: [] });
+            } else {
+              await sFlow.update({ content: "❌ Could not find ticket.", components: [] });
+            }
           }
+        }, 300);
+        reasonBtn.setLabel("Close with Reason").setStyle(ButtonStyle.Primary).setEmoji("📝");
+
+        const cancelBtn = this.lib.createButtonBuilder(async (i) => {
+          const cFlow = new InteractionFlow(i);
+          await cFlow.update({ content: "Action cancelled.", components: [] });
+        }, 300);
+        cancelBtn.setLabel("Cancel").setStyle(ButtonStyle.Secondary).setEmoji("✖️");
+
+        await Promise.all([confirmBtn.ready(), reasonBtn.ready(), cancelBtn.ready()]);
+
+        await flow.send({
+          content: "Are you sure you want to close this ticket?",
+          components: [new ActionRowBuilder<any>().addComponents(confirmBtn, reasonBtn, cancelBtn)],
+          ephemeral: true,
+        });
+      },
+      {
+        actionKey: "interactions.tickets.manage",
+        label: "Manage Tickets",
+        description: "Close and manage active tickets.",
+      },
+    );
+
+    // Handler: Ticket Control - Claim
+    this.lib.componentCallbackService.registerPersistentHandler(
+      "ticket.control.claim",
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        const flow = new InteractionFlow(interaction);
+
+        const ticket = await this.getTicketFromChannel(interaction.channelId);
+        if (!ticket) {
+          await flow.send({ content: "❌ Could not find ticket.", ephemeral: true });
+          return;
         }
-        // TODO: Add more manage options (move, adduser) in step 7e
-      }, 300);
 
-      menu.setPlaceholder("Select action...").addOptions([
-        { label: "Unclaim", value: "unclaim", emoji: "🔓", description: "Remove your claim on this ticket" },
-        { label: "Rename", value: "rename", emoji: "✏️", description: "Rename the ticket channel" },
-        // More options added in step 7e
-      ]);
+        if (ticket.status === TicketStatus.ARCHIVED || ticket.status === TicketStatus.CLOSED) {
+          await flow.send({ content: "❌ This ticket is already closed.", ephemeral: true });
+          return;
+        }
 
-      await menu.ready();
+        await flow.send({ content: "⏳ Claiming ticket...", ephemeral: true });
+        const result = await this.lifecycleService.claimTicket(ticket, interaction.user, interaction.member as GuildMember);
+        await flow.show({ content: result.success ? `✅ ${result.message}` : `❌ ${result.message}` });
+      },
+      {
+        actionKey: "interactions.tickets.manage",
+        label: "Manage Tickets",
+        description: "Claim and manage active tickets.",
+      },
+    );
 
-      await flow.send({
-        content: "Select a management action:",
-        components: [new ActionRowBuilder<any>().addComponents(menu)],
-        ephemeral: true,
-      });
-    });
+    // Handler: Ticket Control - Manage (unclaim, move, rename, add user)
+    this.lib.componentCallbackService.registerPersistentHandler(
+      "ticket.control.manage",
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        const flow = new InteractionFlow(interaction);
+
+        const ticket = await this.getTicketFromChannel(interaction.channelId);
+        if (!ticket) {
+          await flow.send({ content: "❌ Could not find ticket.", ephemeral: true });
+          return;
+        }
+
+        if (ticket.status === TicketStatus.ARCHIVED || ticket.status === TicketStatus.CLOSED) {
+          await flow.send({ content: "❌ This ticket is already closed.", ephemeral: true });
+          return;
+        }
+
+        const category = await TicketCategory.findOne({ id: ticket.categoryId, guildId: ticket.guildId });
+        if (!category || !this.hasStaffPermission(interaction.member as GuildMember, category)) {
+          await flow.send({ content: "❌ You do not have permission to manage this ticket.", ephemeral: true });
+          return;
+        }
+
+        // Build manage menu
+        const menu = this.lib.createStringSelectMenuBuilder(async (i) => {
+          const iFlow = new InteractionFlow(i);
+          const value = i.values[0];
+
+          if (value === "unclaim") {
+            await iFlow.update({ content: "⏳ Unclaiming ticket...", components: [] });
+            const res = await this.lifecycleService.unclaimTicket(ticket, i.user, i.member as GuildMember);
+            await iFlow.show({ content: res.success ? `✅ ${res.message}` : `❌ ${res.message}` });
+          } else if (value === "rename") {
+            const modalId = nanoid();
+            const modal = new ModalBuilder().setCustomId(modalId).setTitle("Rename Ticket");
+            modal.addComponents(
+              new ActionRowBuilder<TextInputBuilder>().addComponents(
+                new TextInputBuilder()
+                  .setCustomId("name")
+                  .setLabel("New Name")
+                  .setStyle(TextInputStyle.Short)
+                  .setRequired(true)
+                  .setValue(ticket.customChannelName || `ticket-${ticket.ticketNumber}`),
+              ),
+            );
+            await i.showModal(modal);
+
+            const submit = await i
+              .awaitModalSubmit({
+                filter: (s) => s.customId === modalId && s.user.id === i.user.id,
+                time: 300000,
+              })
+              .catch(() => null);
+
+            if (submit) {
+              const sFlow = new InteractionFlow(submit);
+              const name = submit.fields.getTextInputValue("name");
+              const res = await this.lifecycleService.renameTicket(ticket, name, submit.user, submit.member as GuildMember);
+              await sFlow.update({ content: res.success ? `✅ ${res.message}` : `❌ ${res.message}`, components: [] });
+            }
+          }
+          // TODO: Add more manage options (move, adduser) in step 7e
+        }, 300);
+
+        menu.setPlaceholder("Select action...").addOptions([
+          { label: "Unclaim", value: "unclaim", emoji: "🔓", description: "Remove your claim on this ticket" },
+          { label: "Rename", value: "rename", emoji: "✏️", description: "Rename the ticket channel" },
+          // More options added in step 7e
+        ]);
+
+        await menu.ready();
+
+        await flow.send({
+          content: "Select a management action:",
+          components: [new ActionRowBuilder<any>().addComponents(menu)],
+          ephemeral: true,
+        });
+      },
+      {
+        actionKey: "interactions.tickets.manage",
+        label: "Manage Tickets",
+        description: "Manage ticket actions and settings.",
+      },
+    );
 
     // Handler: Question select menu answer
     this.lib.componentCallbackService.registerPersistentHandler("ticket.question.select", async (interaction) => {

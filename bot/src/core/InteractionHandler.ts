@@ -20,6 +20,7 @@ import type { HeimdallClient } from "../types/Client";
 import type { CommandManager, CommandContext, AutocompleteContext, ContextMenuCommandContext } from "./CommandManager";
 import type { ComponentCallbackService } from "./services/ComponentCallbackService";
 import type { PluginAPI } from "../types/Plugin";
+import type { PermissionService } from "./PermissionService";
 import log from "../utils/logger";
 import { captureException } from "../utils/sentry";
 
@@ -27,17 +28,20 @@ export interface InteractionHandlerOptions {
   client: HeimdallClient;
   commandManager: CommandManager;
   componentCallbackService: ComponentCallbackService;
+  permissionService: PermissionService;
 }
 
 export class InteractionHandler {
   private client: HeimdallClient;
   private commandManager: CommandManager;
   private componentCallbackService: ComponentCallbackService;
+  private permissionService: PermissionService;
 
   constructor(options: InteractionHandlerOptions) {
     this.client = options.client;
     this.commandManager = options.commandManager;
     this.componentCallbackService = options.componentCallbackService;
+    this.permissionService = options.permissionService;
   }
 
   /**
@@ -104,6 +108,16 @@ export class InteractionHandler {
       // Try dynamic command resolution (e.g., tag slash commands)
       const dynamicHandler = await this.commandManager.resolveDynamicCommand(commandName, interaction.guildId);
       if (dynamicHandler) {
+        const permissionKey = await this.commandManager.resolveDynamicPermissionKey(commandName, interaction.guildId);
+        const member = await this.getGuildMember(interaction);
+        if (permissionKey && interaction.guild && member) {
+          const allowed = await this.permissionService.canPerformAction(interaction.guild.id, member, interaction.user.id, permissionKey);
+          if (!allowed) {
+            await interaction.reply({ content: "❌ You do not have permission to use this command.", ephemeral: true }).catch(() => {});
+            return;
+          }
+        }
+
         const context: CommandContext = {
           interaction,
           client: this.client,
@@ -145,6 +159,17 @@ export class InteractionHandler {
       client: this.client,
       getPluginAPI: <T = PluginAPI>(name: string) => this.client.plugins.get(name) as T | undefined,
     };
+
+    const subcommandPath = this.getSubcommandPath(interaction);
+    const permissionKey = this.commandManager.getCommandPermissionKey(commandName, subcommandPath);
+    const member = await this.getGuildMember(interaction);
+    if (permissionKey && interaction.guild && member) {
+      const allowed = await this.permissionService.canPerformAction(interaction.guild.id, member, interaction.user.id, permissionKey);
+      if (!allowed) {
+        await interaction.reply({ content: "❌ You do not have permission to use this command.", ephemeral: true }).catch(() => {});
+        return;
+      }
+    }
 
     try {
       await command.execute(context);
@@ -194,6 +219,16 @@ export class InteractionHandler {
       client: this.client,
       getPluginAPI: <T = PluginAPI>(name: string) => this.client.plugins.get(name) as T | undefined,
     };
+
+    const permissionKey = this.commandManager.getContextMenuPermissionKey(commandName);
+    const member = await this.getGuildMember(interaction);
+    if (permissionKey && interaction.guild && member) {
+      const allowed = await this.permissionService.canPerformAction(interaction.guild.id, member, interaction.user.id, permissionKey);
+      if (!allowed) {
+        await interaction.reply({ content: "❌ You do not have permission to use this command.", ephemeral: true }).catch(() => {});
+        return;
+      }
+    }
 
     try {
       await command.execute(context);
@@ -248,6 +283,39 @@ export class InteractionHandler {
         user: interaction.user.id,
       });
       await interaction.respond([]).catch(() => {});
+    }
+  }
+
+  private getSubcommandPath(interaction: ChatInputCommandInteraction): string | null {
+    let subcommand: string | null = null;
+    try {
+      subcommand = interaction.options.getSubcommand(false);
+    } catch {
+      subcommand = null;
+    }
+
+    if (!subcommand) return null;
+
+    let group: string | null = null;
+    try {
+      group = interaction.options.getSubcommandGroup(false);
+    } catch {
+      group = null;
+    }
+
+    return group ? `${group}.${subcommand}` : subcommand;
+  }
+
+  private async getGuildMember(interaction: ChatInputCommandInteraction | MessageContextMenuCommandInteraction | UserContextMenuCommandInteraction): Promise<import("discord.js").GuildMember | null> {
+    if (!interaction.guild) return null;
+
+    const member = interaction.member as import("discord.js").GuildMember | null | undefined;
+    if (member?.roles?.cache) return member;
+
+    try {
+      return await interaction.guild.members.fetch(interaction.user.id);
+    } catch {
+      return null;
     }
   }
 }

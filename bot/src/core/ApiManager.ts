@@ -20,6 +20,7 @@ import { ThingGetter } from "../../plugins/lib/utils/ThingGetter.js";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
 import DashboardSettings from "../../plugins/dashboard/models/DashboardSettings.js";
 import LoggingConfig, { LoggingCategory } from "../../plugins/logging/models/LoggingConfig.js";
+import { permissionRegistry } from "./PermissionRegistry.js";
 
 export interface PluginRouter {
   /** Which plugin owns this router */
@@ -617,6 +618,23 @@ export class ApiManager {
       } catch (err) {
         log.error("[API] Error fetching dashboard permissions:", err);
         res.status(500).json({ success: false, error: "Database error" });
+      }
+    });
+
+    // ── Permission Definitions (dynamic) ───────────────────────
+    this.app.get("/api/guilds/:guildId/permission-defs", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || key !== this.apiKey) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      try {
+        const categories = await permissionRegistry.getCategories(req.params.guildId as string);
+        res.json({ success: true, data: { categories } });
+      } catch (err) {
+        log.error("[API] Error fetching permission definitions:", err);
+        res.status(500).json({ success: false, error: "Failed to load permission definitions" });
       }
     });
 

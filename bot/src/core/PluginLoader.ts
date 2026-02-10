@@ -16,6 +16,9 @@ import type { CommandManager } from "./CommandManager";
 import type { EventManager } from "./EventManager";
 import type { ApiManager } from "./ApiManager";
 import type { WebSocketManager } from "./WebSocketManager";
+import type { CommandPermissionDefinition, CommandPermissionKeys } from "./CommandManager";
+import { permissionRegistry } from "./PermissionRegistry.js";
+import { ApplicationCommandOptionType } from "discord.js";
 
 export interface PluginLoaderOptions {
   pluginsDir: string;
@@ -430,6 +433,8 @@ export class PluginLoader {
         }
 
         const config = commandModule.config ?? {};
+        const commandName = commandModule.data.name ?? commandModule.data.toJSON?.().name;
+        const permissionKeys = this.buildCommandPermissionKeys(pluginName, commandName, commandModule.data.toJSON ? commandModule.data.toJSON() : commandModule.data, commandModule.permissions);
 
         this.commandManager.registerCommand({
           data: commandModule.data.toJSON ? commandModule.data.toJSON() : commandModule.data,
@@ -439,6 +444,7 @@ export class PluginLoader {
           },
           execute,
           autocomplete: commandModule.autocomplete,
+          permissionKeys,
         });
 
         log.debug(`Loaded command: ${commandModule.data.name} from plugin ${pluginName}`);
@@ -479,6 +485,8 @@ export class PluginLoader {
         }
 
         const config = commandModule.config ?? {};
+        const commandName = commandModule.data.name ?? commandModule.data.toJSON?.().name;
+        const permissionKey = this.buildContextMenuPermissionKey(pluginName, commandName, commandModule.permissions);
 
         this.commandManager.registerContextMenuCommand({
           data: commandModule.data.toJSON ? commandModule.data.toJSON() : commandModule.data,
@@ -487,6 +495,7 @@ export class PluginLoader {
             cooldown: config.cooldown,
           },
           execute: commandModule.execute,
+          permissionKey,
         });
 
         log.debug(`Loaded context menu command: ${commandModule.data.name} from plugin ${pluginName}`);
@@ -494,6 +503,81 @@ export class PluginLoader {
         log.error(`Failed to load context menu command from ${file}:`, error);
       }
     }
+  }
+
+  private buildCommandPermissionKeys(pluginName: string, commandName: string | undefined, commandData: any, permissions?: CommandPermissionDefinition): CommandPermissionKeys | undefined {
+    if (!commandName) return undefined;
+    if (pluginName === "dev") return undefined;
+
+    const subcommands = this.getSubcommandPaths(commandData);
+    const keys: CommandPermissionKeys = { base: undefined, subcommands: {} };
+
+    if (subcommands.length > 0) {
+      for (const sub of subcommands) {
+        const actionKey = `commands.${commandName}.${sub.path}`;
+        const fullKey = `${pluginName}.${actionKey}`;
+        keys.subcommands[sub.path] = fullKey;
+
+        const override = permissions?.subcommands?.[sub.path];
+        const label = override?.label ?? `/${commandName} ${sub.path.replace(/\./g, " ")}`;
+        const description = override?.description ?? sub.description ?? permissions?.description ?? "";
+
+        permissionRegistry.registerAction(pluginName, {
+          key: actionKey,
+          label,
+          description,
+        });
+      }
+
+      return keys;
+    }
+
+    const actionKey = `commands.${commandName}`;
+    keys.base = `${pluginName}.${actionKey}`;
+
+    permissionRegistry.registerAction(pluginName, {
+      key: actionKey,
+      label: permissions?.label ?? `/${commandName}`,
+      description: permissions?.description ?? commandData?.description ?? "",
+    });
+
+    return keys;
+  }
+
+  private buildContextMenuPermissionKey(pluginName: string, commandName: string | undefined, permissions?: CommandPermissionDefinition): string | undefined {
+    if (!commandName) return undefined;
+    if (pluginName === "dev") return undefined;
+
+    const actionKey = `commands.${commandName}`;
+    const fullKey = `${pluginName}.${actionKey}`;
+
+    permissionRegistry.registerAction(pluginName, {
+      key: actionKey,
+      label: permissions?.label ?? commandName,
+      description: permissions?.description ?? "",
+    });
+
+    return fullKey;
+  }
+
+  private getSubcommandPaths(commandData: any): Array<{ path: string; description?: string }> {
+    const options: any[] = commandData?.options ?? [];
+    const results: Array<{ path: string; description?: string }> = [];
+
+    const walk = (opts: any[], prefix?: string): void => {
+      for (const opt of opts) {
+        if (opt.type === ApplicationCommandOptionType.Subcommand) {
+          const path = prefix ? `${prefix}.${opt.name}` : opt.name;
+          results.push({ path, description: opt.description });
+        } else if (opt.type === ApplicationCommandOptionType.SubcommandGroup && Array.isArray(opt.options)) {
+          const nextPrefix = prefix ? `${prefix}.${opt.name}` : opt.name;
+          walk(opt.options, nextPrefix);
+        }
+      }
+    };
+
+    walk(options);
+    return results;
   }
 
   /**
@@ -636,6 +720,7 @@ export class PluginLoader {
       eventManager: this.eventManager,
       apiManager: this.apiManager,
       wsManager: this.wsManager,
+      permissionRegistry,
     };
   }
 

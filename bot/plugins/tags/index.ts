@@ -37,7 +37,7 @@ let tagService: TagService;
 let tagSlashCommandService: TagSlashCommandService;
 
 export async function onLoad(context: PluginContext): Promise<TagsPluginAPI> {
-  const { logger, dependencies, client, commandManager } = context;
+  const { logger, dependencies, client, commandManager, permissionRegistry } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI | undefined;
@@ -45,98 +45,106 @@ export async function onLoad(context: PluginContext): Promise<TagsPluginAPI> {
 
   // Initialize services
   tagService = new TagService();
-  tagSlashCommandService = new TagSlashCommandService(commandManager, tagService, lib);
+  tagSlashCommandService = new TagSlashCommandService(commandManager, tagService, lib, permissionRegistry);
   tagSlashCommandService.register();
 
   // Register the persistent handler for forwarding tags to modmail recipients
-  lib.componentCallbackService.registerPersistentHandler(TAG_FORWARD_HANDLER_ID, async (interaction) => {
-    if (!interaction.isButton()) return;
+  lib.componentCallbackService.registerPersistentHandler(
+    TAG_FORWARD_HANDLER_ID,
+    async (interaction) => {
+      if (!interaction.isButton()) return;
 
-    const metadata = await lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
-    if (!metadata || !metadata.tagContent) {
-      await interaction.reply({ content: "❌ Could not retrieve tag content.", ephemeral: true });
-      return;
-    }
-
-    const tagContent = metadata.tagContent as string;
-    const tagName = metadata.tagName as string;
-
-    // Find the modmail for this thread
-    const threadId = interaction.channelId;
-    const modmail = await Modmail.findOne({
-      forumThreadId: threadId,
-      status: { $ne: ModmailStatus.CLOSED },
-    });
-
-    if (!modmail) {
-      await interaction.reply({ content: "❌ This thread is not an active modmail ticket.", ephemeral: true });
-      return;
-    }
-
-    // Get the modmail recipient
-    const user = await lib.thingGetter.getUser(modmail.userId as string);
-    if (!user) {
-      await interaction.reply({ content: "❌ Could not find the modmail recipient.", ephemeral: true });
-      return;
-    }
-
-    // Get staff display name
-    const guild = await lib.thingGetter.getGuild(modmail.guildId as string);
-    const staffMember = guild ? await lib.thingGetter.getMember(guild, interaction.user.id) : null;
-    const staffName = staffMember ? lib.thingGetter.getMemberName(staffMember) : lib.thingGetter.getUsername(interaction.user);
-
-    // Format the tag content as a staff reply
-    const formattedContent =
-      `**${staffName}:**\n${tagContent}\n\n` +
-      `-# This message was sent by the staff of ${guild?.name || "the server"} in response to your modmail.\n` +
-      `-# To reply, simply send a message in this DM.\n` +
-      `-# If you want to close this thread, just click the close button above.`;
-
-    try {
-      const dm = await user.send({ content: formattedContent });
-
-      // React with 📨 on the message containing the button
-      try {
-        await interaction.message?.react("📨");
-      } catch {
-        // Ignore reaction failures
+      const metadata = await lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
+      if (!metadata || !metadata.tagContent) {
+        await interaction.reply({ content: "❌ Could not retrieve tag content.", ephemeral: true });
+        return;
       }
 
-      // Add to modmail message history
-      const modmailDoc = modmail as any;
-      modmailDoc.messages.push({
-        messageId: `tag-fwd-${Date.now()}`,
-        authorId: interaction.user.id,
-        authorType: MessageType.STAFF,
-        context: MessageContext.BOTH,
-        content: tagContent,
-        discordMessageId: interaction.message?.id,
-        discordDmMessageId: dm.id,
-        isStaffOnly: false,
-        attachments: [],
-        timestamp: new Date(),
-        isEdited: false,
-        isDeleted: false,
-        deliveredToDm: true,
-        deliveredToThread: true,
+      const tagContent = metadata.tagContent as string;
+      const tagName = metadata.tagName as string;
+
+      // Find the modmail for this thread
+      const threadId = interaction.channelId;
+      const modmail = await Modmail.findOne({
+        forumThreadId: threadId,
+        status: { $ne: ModmailStatus.CLOSED },
       });
 
-      // Update activity timestamps
-      modmail.lastStaffActivityAt = new Date();
-      modmail.autoCloseWarningAt = null as any;
-      await modmail.save();
+      if (!modmail) {
+        await interaction.reply({ content: "❌ This thread is not an active modmail ticket.", ephemeral: true });
+        return;
+      }
 
-      await interaction.reply({ content: `📨 Tag **${tagName}** forwarded to user.`, ephemeral: true });
+      // Get the modmail recipient
+      const user = await lib.thingGetter.getUser(modmail.userId as string);
+      if (!user) {
+        await interaction.reply({ content: "❌ Could not find the modmail recipient.", ephemeral: true });
+        return;
+      }
 
-      logger.debug(`Tag "${tagName}" forwarded to user ${modmail.userId} in modmail ${modmail.modmailId}`);
-    } catch (error) {
-      logger.error(`Failed to forward tag to user for modmail ${modmail.modmailId}:`, error);
-      await interaction.reply({
-        content: "❌ Failed to send message. The user may have DMs disabled or blocked the bot.",
-        ephemeral: true,
-      });
-    }
-  });
+      // Get staff display name
+      const guild = await lib.thingGetter.getGuild(modmail.guildId as string);
+      const staffMember = guild ? await lib.thingGetter.getMember(guild, interaction.user.id) : null;
+      const staffName = staffMember ? lib.thingGetter.getMemberName(staffMember) : lib.thingGetter.getUsername(interaction.user);
+
+      // Format the tag content as a staff reply
+      const formattedContent =
+        `**${staffName}:**\n${tagContent}\n\n` +
+        `-# This message was sent by the staff of ${guild?.name || "the server"} in response to your modmail.\n` +
+        `-# To reply, simply send a message in this DM.\n` +
+        `-# If you want to close this thread, just click the close button above.`;
+
+      try {
+        const dm = await user.send({ content: formattedContent });
+
+        // React with 📨 on the message containing the button
+        try {
+          await interaction.message?.react("📨");
+        } catch {
+          // Ignore reaction failures
+        }
+
+        // Add to modmail message history
+        const modmailDoc = modmail as any;
+        modmailDoc.messages.push({
+          messageId: `tag-fwd-${Date.now()}`,
+          authorId: interaction.user.id,
+          authorType: MessageType.STAFF,
+          context: MessageContext.BOTH,
+          content: tagContent,
+          discordMessageId: interaction.message?.id,
+          discordDmMessageId: dm.id,
+          isStaffOnly: false,
+          attachments: [],
+          timestamp: new Date(),
+          isEdited: false,
+          isDeleted: false,
+          deliveredToDm: true,
+          deliveredToThread: true,
+        });
+
+        // Update activity timestamps
+        modmail.lastStaffActivityAt = new Date();
+        modmail.autoCloseWarningAt = null as any;
+        await modmail.save();
+
+        await interaction.reply({ content: `📨 Tag **${tagName}** forwarded to user.`, ephemeral: true });
+
+        logger.debug(`Tag "${tagName}" forwarded to user ${modmail.userId} in modmail ${modmail.modmailId}`);
+      } catch (error) {
+        logger.error(`Failed to forward tag to user for modmail ${modmail.modmailId}:`, error);
+        await interaction.reply({
+          content: "❌ Failed to send message. The user may have DMs disabled or blocked the bot.",
+          ephemeral: true,
+        });
+      }
+    },
+    {
+      actionKey: "interactions.tags.forward_to_modmail",
+      label: "Forward Tags to Modmail",
+      description: "Forward tag content to modmail recipients.",
+    },
+  );
 
   logger.info("✅ Tags plugin loaded");
 

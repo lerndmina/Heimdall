@@ -79,57 +79,105 @@ export class SuggestionService {
     });
 
     // Register manage button handler
-    this.componentCallbackService.registerPersistentHandler(SuggestionButtonIds.MANAGE, async (interaction) => {
-      if (!interaction.isButton()) return;
-      const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
-      const suggestionId = metadata?.suggestionId as string | undefined;
-      if (!suggestionId) {
-        await interaction.reply({ content: "❌ Invalid interaction data.", ephemeral: true });
-        return;
-      }
-      await this.showManagementMenu(interaction, suggestionId);
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      SuggestionButtonIds.MANAGE,
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
+        const suggestionId = metadata?.suggestionId as string | undefined;
+        if (!suggestionId) {
+          await interaction.reply({ content: "❌ Invalid interaction data.", ephemeral: true });
+          return;
+        }
+        await this.showManagementMenu(interaction, suggestionId);
+      },
+      {
+        actionKey: "interactions.suggestions.manage",
+        label: "Manage Suggestions",
+        description: "Open the suggestion management menu.",
+      },
+    );
 
     // Register management action handlers
-    this.componentCallbackService.registerPersistentHandler(SuggestionManagementButtonIds.APPROVE, async (interaction) => {
-      if (!interaction.isButton()) return;
-      const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
-      const suggestionId = metadata?.suggestionId as string | undefined;
-      if (!suggestionId) return;
-      await this.handleManagement(interaction, suggestionId, "approve");
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      SuggestionManagementButtonIds.APPROVE,
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
+        const suggestionId = metadata?.suggestionId as string | undefined;
+        if (!suggestionId) return;
+        await this.handleManagement(interaction, suggestionId, "approve");
+      },
+      {
+        actionKey: "interactions.suggestions.manage",
+        label: "Manage Suggestions",
+        description: "Approve, deny, or update suggestion status.",
+      },
+    );
 
-    this.componentCallbackService.registerPersistentHandler(SuggestionManagementButtonIds.DENY, async (interaction) => {
-      if (!interaction.isButton()) return;
-      const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
-      const suggestionId = metadata?.suggestionId as string | undefined;
-      if (!suggestionId) return;
-      await this.handleManagement(interaction, suggestionId, "deny");
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      SuggestionManagementButtonIds.DENY,
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
+        const suggestionId = metadata?.suggestionId as string | undefined;
+        if (!suggestionId) return;
+        await this.handleManagement(interaction, suggestionId, "deny");
+      },
+      {
+        actionKey: "interactions.suggestions.manage",
+        label: "Manage Suggestions",
+        description: "Approve, deny, or update suggestion status.",
+      },
+    );
 
-    this.componentCallbackService.registerPersistentHandler(SuggestionManagementButtonIds.PENDING, async (interaction) => {
-      if (!interaction.isButton()) return;
-      const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
-      const suggestionId = metadata?.suggestionId as string | undefined;
-      if (!suggestionId) return;
-      await this.handleManagement(interaction, suggestionId, "pending");
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      SuggestionManagementButtonIds.PENDING,
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
+        const suggestionId = metadata?.suggestionId as string | undefined;
+        if (!suggestionId) return;
+        await this.handleManagement(interaction, suggestionId, "pending");
+      },
+      {
+        actionKey: "interactions.suggestions.manage",
+        label: "Manage Suggestions",
+        description: "Approve, deny, or update suggestion status.",
+      },
+    );
 
-    this.componentCallbackService.registerPersistentHandler(SuggestionManagementButtonIds.CANCEL, async (interaction) => {
-      if (!interaction.isButton()) return;
-      const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
-      const suggestionId = metadata?.suggestionId as string | undefined;
-      if (!suggestionId) return;
-      await this.handleManagement(interaction, suggestionId, "cancel");
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      SuggestionManagementButtonIds.CANCEL,
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        const metadata = await this.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
+        const suggestionId = metadata?.suggestionId as string | undefined;
+        if (!suggestionId) return;
+        await this.handleManagement(interaction, suggestionId, "cancel");
+      },
+      {
+        actionKey: "interactions.suggestions.manage",
+        label: "Manage Suggestions",
+        description: "Approve, deny, or update suggestion status.",
+      },
+    );
 
     // Register opener dropdown handler
-    this.componentCallbackService.registerPersistentHandler("suggestion.opener", async (interaction) => {
-      if (!interaction.isStringSelectMenu()) return;
-      const selectedChannelId = interaction.values[0];
-      if (!selectedChannelId) return;
-      await this.handleOpenerSelection(interaction, selectedChannelId);
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      "suggestion.opener",
+      async (interaction) => {
+        if (!interaction.isStringSelectMenu()) return;
+        const selectedChannelId = interaction.values[0];
+        if (!selectedChannelId) return;
+        await this.handleOpenerSelection(interaction, selectedChannelId);
+      },
+      {
+        actionKey: "interactions.suggestions.manage",
+        label: "Manage Suggestions",
+        description: "Manage suggestion openers and configuration.",
+      },
+    );
 
     this.isInitialized = true;
     log.debug("SuggestionService initialized with persistent handlers");

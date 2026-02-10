@@ -6,6 +6,7 @@ const routeMap: Record<string, string> = {
   "GET /dashboard-permissions": "dashboard.manage_permissions",
   "PUT /dashboard-permissions/*": "dashboard.manage_permissions",
   "DELETE /dashboard-permissions/*": "dashboard.manage_permissions",
+  "GET /permission-defs": "dashboard.manage_permissions",
   "GET /dashboard-settings": "dashboard.manage_settings",
   "PUT /dashboard-settings": "dashboard.manage_settings",
 

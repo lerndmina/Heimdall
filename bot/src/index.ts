@@ -36,6 +36,7 @@ import { InteractionHandler } from "./core/InteractionHandler";
 import { OwnerCommands } from "./core/OwnerCommands";
 import { WebSocketManager } from "./core/WebSocketManager";
 import { setWebSocketManager, clearWebSocketManager } from "./core/broadcast";
+import { PermissionService } from "./core/PermissionService";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -114,6 +115,7 @@ let commandManager: CommandManager;
 let eventManager: EventManager;
 let apiManager: ApiManager;
 let interactionHandler: InteractionHandler;
+let permissionService: PermissionService;
 let wsManager: WebSocketManager | null = null;
 
 // ============================================================================
@@ -167,6 +169,7 @@ async function onReady(readyClient: Client<true>): Promise<void> {
     client: heimdallClient,
     commandManager,
     componentCallbackService,
+    permissionService,
   });
   interactionHandler.attach();
 
@@ -429,8 +432,11 @@ async function start(): Promise<void> {
     // ========================================================================
     log.debug("Phase 3b: Initializing core services...");
 
+    // Permission service
+    permissionService = new PermissionService(baseClient as HeimdallClient);
+
     // Component callback service
-    componentCallbackService = new ComponentCallbackService(redis, env.NANOID_LENGTH ?? 12);
+    componentCallbackService = new ComponentCallbackService(redis, env.NANOID_LENGTH ?? 12, permissionService);
     await componentCallbackService.loadPersistentComponents();
 
     // Guild environment service

@@ -240,34 +240,74 @@ export class ModmailInteractionService {
     // ========================================
 
     // Staff claim button
-    this.componentCallbackService.registerPersistentHandler("modmail.staff.claim", async (interaction) => {
-      if (!interaction.isButton()) return;
-      await this.handleStaffClaim(interaction);
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      "modmail.staff.claim",
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        await this.handleStaffClaim(interaction);
+      },
+      {
+        actionKey: "interactions.modmail.manage",
+        label: "Manage Modmail",
+        description: "Claim and manage modmail threads.",
+      },
+    );
 
     // Staff resolve button
-    this.componentCallbackService.registerPersistentHandler("modmail.staff.resolve", async (interaction) => {
-      if (!interaction.isButton()) return;
-      await this.handleStaffResolve(interaction);
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      "modmail.staff.resolve",
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        await this.handleStaffResolve(interaction);
+      },
+      {
+        actionKey: "interactions.modmail.manage",
+        label: "Manage Modmail",
+        description: "Resolve modmail threads.",
+      },
+    );
 
     // Staff close button
-    this.componentCallbackService.registerPersistentHandler("modmail.staff.close", async (interaction) => {
-      if (!interaction.isButton()) return;
-      await this.handleStaffClose(interaction);
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      "modmail.staff.close",
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        await this.handleStaffClose(interaction);
+      },
+      {
+        actionKey: "interactions.modmail.manage",
+        label: "Manage Modmail",
+        description: "Close modmail threads.",
+      },
+    );
 
     // Staff close WITH final message button
-    this.componentCallbackService.registerPersistentHandler("modmail.staff.close_with_message", async (interaction) => {
-      if (!interaction.isButton()) return;
-      await this.handleStaffCloseWithMessage(interaction);
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      "modmail.staff.close_with_message",
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        await this.handleStaffCloseWithMessage(interaction);
+      },
+      {
+        actionKey: "interactions.modmail.manage",
+        label: "Manage Modmail",
+        description: "Close modmail threads with a final message.",
+      },
+    );
 
     // Staff ban button
-    this.componentCallbackService.registerPersistentHandler("modmail.staff.ban", async (interaction) => {
-      if (!interaction.isButton()) return;
-      await this.handleStaffBan(interaction);
-    });
+    this.componentCallbackService.registerPersistentHandler(
+      "modmail.staff.ban",
+      async (interaction) => {
+        if (!interaction.isButton()) return;
+        await this.handleStaffBan(interaction);
+      },
+      {
+        actionKey: "interactions.modmail.manage",
+        label: "Manage Modmail",
+        description: "Ban users from modmail.",
+      },
+    );
 
     this.logger.debug("Registered all modmail persistent handlers");
   }

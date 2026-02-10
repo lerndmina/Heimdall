@@ -11,6 +11,7 @@ import type { CommandManager } from "../core/CommandManager";
 import type { EventManager } from "../core/EventManager";
 import type { ApiManager } from "../core/ApiManager";
 import type { WebSocketManager } from "../core/WebSocketManager";
+import type { PermissionRegistry } from "../core/PermissionRegistry";
 
 /**
  * Plugin manifest (manifest.json)
@@ -97,6 +98,9 @@ export interface PluginContext {
 
   /** WebSocket manager for dashboard live updates */
   wsManager: WebSocketManager;
+
+  /** Permission registry for command/interaction permissions */
+  permissionRegistry: PermissionRegistry;
 }
 
 /**

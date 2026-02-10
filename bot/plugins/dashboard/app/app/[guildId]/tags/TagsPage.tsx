@@ -16,6 +16,7 @@ import Spinner from "@/components/ui/Spinner";
 import TextInput from "@/components/ui/TextInput";
 import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
+import Combobox from "@/components/ui/Combobox";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { useSession } from "next-auth/react";
 import { fetchApi } from "@/lib/api";
@@ -31,6 +32,7 @@ interface Tag {
   content: string;
   createdBy: string;
   uses: number;
+  registerAsSlashCommand?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -227,6 +229,24 @@ export default function TagsPage({ guildId }: { guildId: string }) {
     }
   };
 
+  const toggleSlashCommand = async (tag: Tag, enabled: boolean) => {
+    if (!canManage) return;
+    try {
+      const res = await fetchApi(guildId, `tags/${encodeURIComponent(tag.name)}/slash-command`, {
+        method: "PATCH",
+        body: JSON.stringify({ enabled }),
+      });
+      if (res.success) {
+        toast.success(enabled ? `/${tag.name} enabled` : `/${tag.name} disabled`);
+        fetchTags();
+      } else {
+        toast.error(res.error?.message ?? "Failed to update command status");
+      }
+    } catch {
+      toast.error("Failed to connect to API");
+    }
+  };
+
   // ====== Loading (initial) ======
   if (loading && tags.length === 0) {
     return (
@@ -256,16 +276,16 @@ export default function TagsPage({ guildId }: { guildId: string }) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <TextInput label="Search" placeholder="Search tags…" value={search} onChange={setSearch} />
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-2 text-sm text-zinc-200 outline-none transition focus:border-primary-500">
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                Sort: {opt.label}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-[160px]">
+            <Combobox
+              options={SORT_OPTIONS.map((opt) => ({ value: opt.value, label: `Sort: ${opt.label}` }))}
+              value={sort}
+              onChange={setSort}
+              placeholder="Sort: Name"
+              searchPlaceholder="Filter sort…"
+              emptyMessage="No sort options"
+            />
+          </div>
         </div>
 
         {canManage && (
@@ -306,6 +326,7 @@ export default function TagsPage({ guildId }: { guildId: string }) {
                     <th className="pb-3 pr-4">Name</th>
                     <th className="pb-3 pr-4">Content</th>
                     <th className="pb-3 pr-4">Uses</th>
+                    <th className="pb-3 pr-4">Command</th>
                     <th className="pb-3 pr-4">Created</th>
                     {canManage && <th className="pb-3 text-right">Actions</th>}
                   </tr>
@@ -320,10 +341,20 @@ export default function TagsPage({ guildId }: { guildId: string }) {
                         {tag.content}
                       </td>
                       <td className="py-3 pr-4 text-zinc-400">{tag.uses}</td>
+                      <td className="py-3 pr-4">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${tag.registerAsSlashCommand ? "border-emerald-500/40 text-emerald-300" : "border-zinc-700/50 text-zinc-500"}`}>
+                          {tag.registerAsSlashCommand ? "Enabled" : "Disabled"}
+                        </span>
+                      </td>
                       <td className="py-3 pr-4 text-zinc-500">{new Date(tag.createdAt).toLocaleDateString()}</td>
                       {canManage && (
                         <td className="py-3 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+                            <button
+                              onClick={() => toggleSlashCommand(tag, !tag.registerAsSlashCommand)}
+                              className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
+                              {tag.registerAsSlashCommand ? "Disable Command" : "Enable Command"}
+                            </button>
                             <button onClick={() => openEditModal(tag)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
                               Edit
                             </button>

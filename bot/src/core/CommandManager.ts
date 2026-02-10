@@ -26,6 +26,17 @@ export interface PluginCommandConfig {
   cooldown?: number;
 }
 
+export interface CommandPermissionDefinition {
+  label?: string;
+  description?: string;
+  subcommands?: Record<string, { label?: string; description?: string }>;
+}
+
+export interface CommandPermissionKeys {
+  base?: string;
+  subcommands: Record<string, string>;
+}
+
 export interface AutocompleteContext extends Omit<CommandContext, "interaction"> {
   interaction: import("discord.js").AutocompleteInteraction;
 }
@@ -35,12 +46,14 @@ export interface PluginCommand {
   config: PluginCommandConfig;
   execute: (context: CommandContext) => Promise<void>;
   autocomplete?: (context: AutocompleteContext) => Promise<void>;
+  permissionKeys?: CommandPermissionKeys;
 }
 
 export interface PluginContextMenuCommand {
   data: RESTPostAPIContextMenuApplicationCommandsJSONBody;
   config: PluginCommandConfig;
   execute: (context: ContextMenuCommandContext) => Promise<void>;
+  permissionKey?: string;
 }
 
 export interface CommandContext {
@@ -62,6 +75,7 @@ export type GuildCommandProvider = (guildId: string) => Promise<RESTPostAPIChatI
 
 /** Resolver that returns a handler for dynamically registered commands */
 export type DynamicCommandResolver = (commandName: string, guildId: string | null) => Promise<((context: CommandContext) => Promise<void>) | null>;
+export type DynamicPermissionResolver = (commandName: string, guildId: string | null) => Promise<string | null>;
 
 export class CommandManager {
   private rest: REST;
@@ -70,6 +84,7 @@ export class CommandManager {
   private contextMenuCommands: Map<string, PluginContextMenuCommand> = new Map();
   private guildCommandProviders: GuildCommandProvider[] = [];
   private dynamicCommandResolvers: DynamicCommandResolver[] = [];
+  private dynamicPermissionResolvers: DynamicPermissionResolver[] = [];
 
   constructor(client: HeimdallClient, botToken: string) {
     this.client = client;
@@ -147,6 +162,13 @@ export class CommandManager {
   }
 
   /**
+   * Register a resolver for dynamically registered command permissions.
+   */
+  registerDynamicPermissionResolver(resolver: DynamicPermissionResolver): void {
+    this.dynamicPermissionResolvers.push(resolver);
+  }
+
+  /**
    * Attempt to resolve a dynamic command handler.
    * Returns null if no resolver can handle the command.
    */
@@ -160,6 +182,38 @@ export class CommandManager {
       }
     }
     return null;
+  }
+
+  /**
+   * Resolve a dynamic command permission key.
+   */
+  async resolveDynamicPermissionKey(commandName: string, guildId: string | null): Promise<string | null> {
+    for (const resolver of this.dynamicPermissionResolvers) {
+      try {
+        const key = await resolver(commandName, guildId);
+        if (key) return key;
+      } catch (error) {
+        log.error(`Dynamic permission resolver failed for "${commandName}":`, error);
+      }
+    }
+    return null;
+  }
+
+  getCommandPermissionKey(commandName: string, subcommandPath?: string | null): string | null {
+    const command = this.commands.get(commandName);
+    if (!command?.permissionKeys) return null;
+
+    if (subcommandPath) {
+      const key = command.permissionKeys.subcommands[subcommandPath];
+      if (key) return key;
+    }
+
+    return command.permissionKeys.base ?? null;
+  }
+
+  getContextMenuPermissionKey(commandName: string): string | null {
+    const command = this.contextMenuCommands.get(commandName);
+    return command?.permissionKey ?? null;
   }
 
   /**

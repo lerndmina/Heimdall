@@ -3,8 +3,9 @@ import type { HeimdallClient } from "../types/Client.js";
 import type { RedisClientType } from "redis";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
 import type { BroadcastOptions } from "./broadcast.js";
-import { permissionCategories } from "./dashboardPermissionDefs.js";
+import type { PermissionCategory } from "./dashboardPermissionDefs.js";
 import { resolvePermissions, type MemberInfo, type RoleOverrides, type ResolvedPermissions } from "./dashboardPermissions.js";
+import { permissionRegistry } from "./PermissionRegistry.js";
 import { createLogger } from "./Logger.js";
 
 const log = createLogger("ws");
@@ -289,8 +290,9 @@ export class WebSocketManager {
 
   private async resolveGuildPermissions(guildId: string, member: any, userId: string): Promise<ResolvedPermissions | null> {
     const permDocs = await DashboardPermission.find({ guildId }).lean();
+    const categories = await permissionRegistry.getCategories(guildId);
     if (permDocs.length === 0) {
-      return this.buildAllowAllPermissions();
+      return this.buildAllowAllPermissions(categories);
     }
 
     const memberInfo: MemberInfo = {
@@ -306,10 +308,10 @@ export class WebSocketManager {
         position: member.guild.roles.cache.get(doc.discordRoleId)?.position ?? 0,
       }));
 
-    return resolvePermissions(memberInfo, roleOverrides);
+    return resolvePermissions(memberInfo, roleOverrides, categories);
   }
 
-  private buildAllowAllPermissions(): ResolvedPermissions {
+  private buildAllowAllPermissions(permissionCategories: PermissionCategory[]): ResolvedPermissions {
     const resolved: Record<string, boolean> = {};
     const categoryActions: Record<string, string[]> = {};
 

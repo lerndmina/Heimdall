@@ -17,7 +17,7 @@ import Combobox from "@/components/ui/Combobox";
 import TriStateSlider, { type TriState } from "@/components/ui/TriStateSlider";
 import Spinner from "@/components/ui/Spinner";
 import { fetchApi } from "@/lib/api";
-import { permissionCategories } from "@/lib/permissionDefs";
+import { permissionCategories as fallbackPermissionCategories, type PermissionCategory } from "@/lib/permissionDefs";
 import { DENY_ACCESS_KEY } from "@/lib/permissions";
 import { usePermissions } from "@/components/providers/PermissionsProvider";
 import { useUnsavedChanges } from "@/components/providers/UnsavedChangesProvider";
@@ -49,6 +49,7 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
   // ── State ────────────────────────────────────────────────
   const [roles, setRoles] = useState<Role[]>([]);
   const [permDocs, setPermDocs] = useState<PermissionDoc[]>([]);
+  const [permissionCategories, setPermissionCategories] = useState<PermissionCategory[]>(fallbackPermissionCategories);
   const [hideDeniedFeatures, setHideDeniedFeatures] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -86,10 +87,11 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [rolesRes, permsRes, settingsRes] = await Promise.all([
+      const [rolesRes, permsRes, settingsRes, defsRes] = await Promise.all([
         fetchApi<{ roles: Role[] }>(guildId, "roles", { cacheKey: `roles-${guildId}`, cacheTtl: 60_000 }),
         fetchApi<{ permissions: PermissionDoc[] }>(guildId, "dashboard-permissions"),
         fetchApi<{ settings: { hideDeniedFeatures: boolean } }>(guildId, "dashboard-settings"),
+        fetchApi<{ categories: PermissionCategory[] }>(guildId, "permission-defs"),
       ]);
 
       if (rolesRes.success && rolesRes.data) setRoles(rolesRes.data.roles);
@@ -103,6 +105,11 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
         savedOverridesRef.current = snap;
       }
       if (settingsRes.success && settingsRes.data) setHideDeniedFeatures(settingsRes.data.settings.hideDeniedFeatures);
+      if (defsRes.success && defsRes.data) {
+        setPermissionCategories(defsRes.data.categories ?? fallbackPermissionCategories);
+      } else {
+        setPermissionCategories(fallbackPermissionCategories);
+      }
       // Clear any pending changes on fresh load
       setPendingOverrides(new Map());
     } catch {

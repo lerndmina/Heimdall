@@ -12,7 +12,7 @@
  * - Across roles: highest-positioned role wins (matching Discord's hierarchy)
  */
 
-import { permissionCategories } from "./permissionDefs";
+import type { PermissionCategory } from "./permissionDefs";
 
 export interface RoleOverrides {
   /** Map of override key → "allow" | "deny" */
@@ -58,7 +58,7 @@ function toMap(input: Map<string, "allow" | "deny"> | Record<string, "allow" | "
  */
 export const DENY_ACCESS_KEY = "_deny_access";
 
-export function resolvePermissions(member: MemberInfo, roleOverridesList: RoleOverrides[]): ResolvedPermissions {
+export function resolvePermissions(member: MemberInfo, roleOverridesList: RoleOverrides[], permissionCategories: PermissionCategory[]): ResolvedPermissions {
   // Build the full list of action keys from the registry
   const allActions: string[] = [];
   const categoryActions: Record<string, string[]> = {};

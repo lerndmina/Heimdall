@@ -11,9 +11,17 @@ import { nanoid } from "nanoid";
 import type { RedisClientType } from "redis";
 import log from "../../utils/logger";
 import { PersistentComponent } from "../models";
+import type { PermissionService } from "../PermissionService";
+import { permissionRegistry } from "../PermissionRegistry.js";
 
 export type ComponentInteraction = ButtonInteraction | AnySelectMenuInteraction;
 export type ComponentCallback = (interaction: ComponentInteraction) => Promise<void>;
+
+export interface ComponentPermission {
+  actionKey: string;
+  label?: string;
+  description?: string;
+}
 
 interface StoredCallback {
   callback: ComponentCallback;
@@ -30,21 +38,25 @@ export interface ComponentStats {
 export class ComponentCallbackService {
   private redis: RedisClientType;
   private nanoidLength: number;
+  private permissionService?: PermissionService;
 
   // Ephemeral callbacks (with TTL, stored in memory + Redis marker)
   private callbacks: Map<string, StoredCallback> = new Map();
+  private callbackPermissions: Map<string, string> = new Map();
 
   // Persistent handler registry (named handlers, registered at startup)
   private persistentHandlers: Map<string, ComponentCallback> = new Map();
+  private persistentHandlerPermissions: Map<string, string> = new Map();
 
   // Persistent component mapping (customId -> handlerId, loaded from MongoDB)
   private persistentComponents: Map<string, string> = new Map();
 
   private loaded = false;
 
-  constructor(redis: RedisClientType, nanoidLength: number = 12) {
+  constructor(redis: RedisClientType, nanoidLength: number = 12, permissionService?: PermissionService) {
     this.redis = redis;
     this.nanoidLength = nanoidLength;
+    this.permissionService = permissionService;
   }
 
   /**
@@ -53,13 +65,18 @@ export class ComponentCallbackService {
    * @param ttl - TTL in seconds (required for ephemeral components)
    * @returns The custom ID (nanoid) to use for the component
    */
-  async register(callback: ComponentCallback, ttl: number = 300): Promise<string> {
+  async register(callback: ComponentCallback, ttl: number = 300, permission?: ComponentPermission): Promise<string> {
     const customId = nanoid(this.nanoidLength);
 
     log.debug(`[ComponentCallbackService] register() called with TTL: ${ttl}, customId: ${customId}`);
 
     // Store in memory with TTL tracking
     this.callbacks.set(customId, { callback, ttl });
+
+    if (permission?.actionKey) {
+      this.callbackPermissions.set(customId, permission.actionKey);
+      this.registerPermissionAction(permission);
+    }
 
     // Store a marker in Redis so we know this component exists
     await this.redis.setEx(`component:${customId}`, ttl, "1");
@@ -79,12 +96,17 @@ export class ComponentCallbackService {
    * @param handlerId - Unique ID for this handler
    * @param callback - The function to call when interaction received
    */
-  registerPersistentHandler(handlerId: string, callback: ComponentCallback): void {
+  registerPersistentHandler(handlerId: string, callback: ComponentCallback, permission?: ComponentPermission): void {
     if (this.persistentHandlers.has(handlerId)) {
       log.warn(`[ComponentCallbackService] Handler "${handlerId}" already registered, overwriting`);
     }
 
     this.persistentHandlers.set(handlerId, callback);
+
+    if (permission?.actionKey) {
+      this.persistentHandlerPermissions.set(handlerId, permission.actionKey);
+      this.registerPermissionAction(permission);
+    }
     log.debug(`[ComponentCallbackService] Registered persistent handler: ${handlerId}`);
   }
 
@@ -169,6 +191,12 @@ export class ComponentCallbackService {
       log.debug(`[ComponentCallbackService] 🔄 Executing ephemeral ${componentType}: ${customId} (user: ${userId}, guild: ${guildId}, time: ${executionTime}ms)`);
 
       try {
+        const permissionKey = this.callbackPermissions.get(customId);
+        if (permissionKey) {
+          const allowed = await this.checkInteractionPermission(interaction, permissionKey);
+          if (!allowed) return true;
+        }
+
         await stored.callback(interaction);
         const totalTime = Date.now() - startTime;
         log.debug(`[ComponentCallbackService] ✅ Ephemeral ${componentType} completed: ${customId} (time: ${totalTime}ms)`);
@@ -254,6 +282,12 @@ export class ComponentCallbackService {
       log.debug(`[ComponentCallbackService] 🔄 Executing persistent ${componentType}: ${customId} -> "${handlerId}" (user: ${userId}, guild: ${guildId}, time: ${executionTime}ms)`);
 
       try {
+        const permissionKey = this.persistentHandlerPermissions.get(handlerId);
+        if (permissionKey) {
+          const allowed = await this.checkInteractionPermission(interaction, permissionKey);
+          if (!allowed) return true;
+        }
+
         await handler(interaction);
         const totalTime = Date.now() - startTime;
         log.debug(`[ComponentCallbackService] ✅ Persistent ${componentType} completed: ${customId} -> "${handlerId}" (time: ${totalTime}ms)`);
@@ -309,6 +343,7 @@ export class ComponentCallbackService {
    */
   async unregister(customId: string): Promise<void> {
     this.callbacks.delete(customId);
+    this.callbackPermissions.delete(customId);
     await this.redis.del(`component:${customId}`);
   }
 
@@ -319,6 +354,50 @@ export class ComponentCallbackService {
     await PersistentComponent.deleteOne({ customId });
     this.persistentComponents.delete(customId);
     log.debug(`[ComponentCallbackService] Deleted persistent component: ${customId}`);
+  }
+
+  private registerPermissionAction(permission: ComponentPermission): void {
+    const parts = permission.actionKey.split(".");
+    if (parts.length < 2) return;
+
+    const categoryKey = parts[0];
+    const actionKey = parts.slice(1).join(".");
+
+    permissionRegistry.registerAction(categoryKey, {
+      key: actionKey,
+      label: permission.label ?? permission.actionKey,
+      description: permission.description ?? "",
+    });
+  }
+
+  private async checkInteractionPermission(interaction: ComponentInteraction, actionKey: string): Promise<boolean> {
+    if (!this.permissionService) return true;
+    if (!interaction.guild) return true;
+
+    const member = await this.getGuildMember(interaction);
+    if (!member) return false;
+
+    const allowed = await this.permissionService.canPerformAction(interaction.guild.id, member, interaction.user.id, actionKey);
+    if (allowed) return true;
+
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: "❌ You do not have permission to use this interaction.", ephemeral: true }).catch(() => {});
+    }
+
+    return false;
+  }
+
+  private async getGuildMember(interaction: ComponentInteraction): Promise<import("discord.js").GuildMember | null> {
+    if (!interaction.guild) return null;
+
+    const member = interaction.member as import("discord.js").GuildMember | null | undefined;
+    if (member?.roles?.cache) return member;
+
+    try {
+      return await interaction.guild.members.fetch(interaction.user.id);
+    } catch {
+      return null;
+    }
   }
 
   /**

@@ -28,6 +28,12 @@ export const permissionCategories: PermissionCategory[] = [
     ],
   },
   {
+    key: "interactions",
+    label: "Interactions",
+    description: "Control access to interactive buttons, menus, and modals.",
+    actions: [],
+  },
+  {
     key: "minecraft",
     label: "Minecraft",
     description: "Manage the Minecraft integration, players, and server settings.",

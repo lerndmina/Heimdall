@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getUserGuilds } from "@/lib/guildCache";
 import { resolvePermissions, type RoleOverrides, type MemberInfo } from "@/lib/permissions";
+import { permissionCategories, type PermissionCategory } from "@/lib/permissionDefs";
 import { checkBotOwner } from "@/lib/botOwner";
 
 const API_PORT = process.env.API_PORT || "3001";
@@ -46,10 +47,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   }
 
   // Fetch member info + permission overrides + settings + bot owner in parallel
-  const [memberData, permData, settingsData, isBotOwner] = await Promise.all([
+  const [memberData, permData, settingsData, permissionDefs, isBotOwner] = await Promise.all([
     fetchBotApi<MemberInfo>(`/api/guilds/${guildId}/members/${session.user.id}`),
     fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(`/api/guilds/${guildId}/dashboard-permissions`),
     fetchBotApi<{ settings: { hideDeniedFeatures: boolean } }>(`/api/guilds/${guildId}/dashboard-settings`),
+    fetchBotApi<{ categories: PermissionCategory[] }>(`/api/guilds/${guildId}/permission-defs`),
     checkBotOwner(session.user.id),
   ]);
 
@@ -74,7 +76,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   // Build role overrides for the user's roles only, including position for hierarchy resolution
   const roleOverrides: RoleOverrides[] = (permData?.permissions ?? []).filter((p) => memberData.roleIds.includes(p.discordRoleId)).map((p) => ({ overrides: p.overrides, position: p.position ?? 0 }));
 
-  const resolved = resolvePermissions(effectiveMember, roleOverrides);
+  const resolved = resolvePermissions(effectiveMember, roleOverrides, permissionDefs?.categories ?? permissionCategories);
 
   return NextResponse.json({
     success: true,
