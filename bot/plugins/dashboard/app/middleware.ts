@@ -38,6 +38,19 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  response.headers.set(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' https://cdn.discordapp.com https://mc-heads.net https://r2-bifrost.lerndmina.dev data:",
+      "font-src 'self'",
+      `connect-src 'self' ${process.env.WEBSOCKET_URL ? process.env.WEBSOCKET_URL : ""}`.trim(),
+      "frame-ancestors 'none'",
+    ].join("; "),
+  );
 
   return response;
 }

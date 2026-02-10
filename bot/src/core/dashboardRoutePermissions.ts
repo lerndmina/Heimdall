@@ -10,6 +10,16 @@ const routeMap: Record<string, string> = {
   "GET /dashboard-settings": "dashboard.manage_settings",
   "PUT /dashboard-settings": "dashboard.manage_settings",
 
+  // Attachment Blocker
+  "GET /attachment-blocker/config": "attachment-blocker.view_config",
+  "PUT /attachment-blocker/config": "attachment-blocker.manage_config",
+  "GET /attachment-blocker/channels": "attachment-blocker.view_config",
+  "PUT /attachment-blocker/channels/*": "attachment-blocker.manage_config",
+  "DELETE /attachment-blocker/channels/*": "attachment-blocker.manage_config",
+  "GET /attachment-blocker/openers": "attachment-blocker.view_config",
+  "PUT /attachment-blocker/openers/*": "attachment-blocker.manage_config",
+  "DELETE /attachment-blocker/openers/*": "attachment-blocker.manage_config",
+
   "GET /minecraft/players": "minecraft.view_players",
   "GET /minecraft/players/*": "minecraft.view_players",
   "POST /minecraft/players": "minecraft.manage_players",
@@ -56,6 +66,7 @@ const routeMap: Record<string, string> = {
   "GET /modmail/config": "modmail.manage_config",
   "PUT /modmail/config": "modmail.manage_config",
   "GET /modmail/stats": "modmail.view_conversations",
+  "PATCH /modmail/conversations/bulk-update-categories": "modmail.manage_config",
 
   "GET /suggestions": "suggestions.view_suggestions",
   "GET /suggestions/*": "suggestions.view_suggestions",
@@ -79,6 +90,8 @@ const routeMap: Record<string, string> = {
   "POST /tags": "tags.manage_tags",
   "PUT /tags/*": "tags.manage_tags",
   "DELETE /tags/*": "tags.manage_tags",
+  "POST /tags/*/use": "tags.manage_tags",
+  "PATCH /tags/*/slash-command": "tags.manage_tags",
 
   "GET /logging": "logging.view_config",
   "GET /logging/config": "logging.view_config",
@@ -135,6 +148,11 @@ const routeMap: Record<string, string> = {
   "POST /moderation/presets/*/install": "moderation.manage_presets",
   "DELETE /moderation/presets/*": "moderation.manage_presets",
   "GET /moderation/stats": "moderation.view_config",
+  "GET /moderation/locks": "moderation.view_config",
+  "GET /moderation/locks/*": "moderation.view_config",
+  "GET /moderation/locks/config": "moderation.view_config",
+  "PUT /moderation/locks/config": "moderation.manage_config",
+  "POST /moderation/locks/*/unlock": "moderation.manage_config",
 };
 
 export function resolveRouteAction(method: string, pathSegments: string[]): string | null {
@@ -159,5 +177,6 @@ export function resolveRouteAction(method: string, pathSegments: string[]): stri
     if (routeMap[key]) return routeMap[key];
   }
 
-  return null;
+  // No restriction found — require basic dashboard access (default-closed)
+  return "dashboard.can_access";
 }

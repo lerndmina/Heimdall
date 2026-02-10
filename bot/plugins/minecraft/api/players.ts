@@ -15,6 +15,7 @@ import type { MinecraftApiDependencies } from "./index.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import { mapOldToNew, type OldPlayerDoc } from "../lib/whitelistImport.js";
+import { escapeRegex } from "../../lib/utils/escapeRegex.js";
 
 const log = createLogger("minecraft:api:players");
 
@@ -50,7 +51,8 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       }
 
       if (search && typeof search === "string") {
-        query.$or = [{ minecraftUsername: { $regex: search, $options: "i" } }, { discordUsername: { $regex: search, $options: "i" } }, { discordDisplayName: { $regex: search, $options: "i" } }];
+        const escaped = escapeRegex(search);
+        query.$or = [{ minecraftUsername: { $regex: escaped, $options: "i" } }, { discordUsername: { $regex: escaped, $options: "i" } }, { discordDisplayName: { $regex: escaped, $options: "i" } }];
       }
 
       const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
@@ -93,7 +95,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       // Check for existing
       const existing = await MinecraftPlayer.findOne({
         guildId,
-        minecraftUsername: { $regex: new RegExp(`^${minecraftUsername}$`, "i") },
+        minecraftUsername: { $regex: new RegExp(`^${escapeRegex(minecraftUsername)}$`, "i") },
       }).lean();
 
       if (existing) {

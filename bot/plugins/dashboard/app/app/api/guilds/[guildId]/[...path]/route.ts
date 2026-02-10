@@ -18,7 +18,7 @@ const API_KEY = process.env.INTERNAL_API_KEY!;
 
 /** Simple in-memory cache with TTL */
 const cache = new Map<string, { data: unknown; expiresAt: number }>();
-const CACHE_TTL = 30_000; // 30 seconds
+const CACHE_TTL = 10_000; // 10 seconds
 
 function getCached<T>(key: string): T | null {
   const entry = cache.get(key);

@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
 
   // Allow dev origins for HMR through tunnels/proxies
-  allowedDevOrigins: ["*", "cope-sound-amanda-thanks.trycloudflare.com"],
+  allowedDevOrigins: process.env.DEV_ORIGIN ? [process.env.DEV_ORIGIN] : [],
 
   // Disable Next.js telemetry
   env: {
@@ -33,6 +33,9 @@ const nextConfig = {
     removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
   },
 
+  // Disable X-Powered-By header in all environments
+  poweredByHeader: false,
+
   // Compression - enable gzip/brotli
   compress: true,
 
@@ -43,7 +46,6 @@ const nextConfig = {
 
   // Production only: aggressive caching
   ...(process.env.NODE_ENV === "production" && {
-    poweredByHeader: false,
     generateEtags: true,
   }),
 };

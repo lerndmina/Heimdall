@@ -6,6 +6,37 @@
  */
 
 import mongoose, { Schema, model, type InferSchemaType, type Model } from "mongoose";
+import crypto from "crypto";
+
+/**
+ * Encrypt a value using AES-256-CBC with the global ENCRYPTION_KEY.
+ */
+export function encryptRconPassword(value: string): string {
+  const encryptionKey = process.env.ENCRYPTION_KEY;
+  if (!encryptionKey) throw new Error("ENCRYPTION_KEY is required for RCON password encryption");
+  const iv = crypto.randomBytes(16);
+  const key = crypto.scryptSync(encryptionKey, "salt", 32);
+  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+  let encrypted = cipher.update(value, "utf8", "hex");
+  encrypted += cipher.final("hex");
+  return iv.toString("hex") + ":" + encrypted;
+}
+
+/**
+ * Decrypt a value encrypted with encryptRconPassword.
+ */
+export function decryptRconPassword(encryptedValue: string): string {
+  const encryptionKey = process.env.ENCRYPTION_KEY;
+  if (!encryptionKey) throw new Error("ENCRYPTION_KEY is required for RCON password decryption");
+  const [ivHex, encrypted] = encryptedValue.split(":");
+  if (!ivHex || !encrypted) throw new Error("Invalid encrypted RCON password format");
+  const iv = Buffer.from(ivHex, "hex");
+  const key = crypto.scryptSync(encryptionKey, "salt", 32);
+  const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+  let decrypted = decipher.update(encrypted, "hex", "utf8");
+  decrypted += decipher.final("utf8");
+  return decrypted;
+}
 
 export interface RoleMapping {
   discordRoleId: string;
@@ -33,7 +64,8 @@ const MinecraftConfigSchema = new Schema(
     rconEnabled: { type: Boolean, default: false },
     rconHost: { type: String },
     rconPort: { type: Number, default: 25575, min: 1, max: 65535 },
-    rconPassword: { type: String },
+    rconPassword: { type: String },  // Legacy plaintext (migrated to encrypted)
+    encryptedRconPassword: { type: String },  // AES-256-CBC encrypted
 
     // Auth settings
     authCodeExpiry: { type: Number, default: 300, min: 60, max: 3600 },

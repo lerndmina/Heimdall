@@ -37,6 +37,14 @@ export class WebSocketManager {
   private wss: WebSocketServer | null = null;
   private guildRooms = new Map<string, Set<AuthenticatedSocket>>();
   private heartbeatInterval: NodeJS.Timer | null = null;
+  private permissionRefreshInterval: NodeJS.Timer | null = null;
+  /** Track connections per user ID for connection limiting */
+  private connectionsByUser = new Map<string, Set<AuthenticatedSocket>>();
+  /** Track auth attempts per IP for rate limiting */
+  private authAttempts = new Map<string, { count: number; resetAt: number }>();
+  private static readonly MAX_CONNECTIONS_PER_USER = 5;
+  private static readonly AUTH_RATE_LIMIT = 10; // max auth attempts per minute per IP
+  private static readonly PERMISSION_REFRESH_INTERVAL = 5 * 60_000; // 5 minutes
 
   constructor(
     private port: number,
@@ -73,6 +81,7 @@ export class WebSocketManager {
     });
 
     this.startHeartbeat();
+    this.startPermissionRefresh();
 
     if (this.redis) {
       void this.setupRedis();
@@ -85,6 +94,11 @@ export class WebSocketManager {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
+    }
+
+    if (this.permissionRefreshInterval) {
+      clearInterval(this.permissionRefreshInterval);
+      this.permissionRefreshInterval = null;
     }
 
     if (this.wss) {
@@ -134,6 +148,26 @@ export class WebSocketManager {
         return;
       }
 
+      // Rate limit auth attempts
+      const ip = (socket as any)._socket?.remoteAddress || "unknown";
+      const now = Date.now();
+      const attempts = this.authAttempts.get(ip);
+      if (attempts) {
+        if (now > attempts.resetAt) {
+          attempts.count = 1;
+          attempts.resetAt = now + 60_000;
+        } else {
+          attempts.count++;
+          if (attempts.count > WebSocketManager.AUTH_RATE_LIMIT) {
+            this.send(socket, "error", { code: "RATE_LIMITED", message: "Too many auth attempts" });
+            socket.close();
+            return;
+          }
+        }
+      } else {
+        this.authAttempts.set(ip, { count: 1, resetAt: now + 60_000 });
+      }
+
       const user = await this.fetchDiscordUser(message.token);
       if (!user) {
         this.send(socket, "error", { code: "INVALID_TOKEN", message: "Invalid or expired token" });
@@ -141,8 +175,22 @@ export class WebSocketManager {
         return;
       }
 
+      // Enforce per-user connection limit
+      const existingConns = this.connectionsByUser.get(user.id);
+      if (existingConns && existingConns.size >= WebSocketManager.MAX_CONNECTIONS_PER_USER) {
+        this.send(socket, "error", { code: "TOO_MANY_CONNECTIONS", message: `Maximum ${WebSocketManager.MAX_CONNECTIONS_PER_USER} concurrent connections per user` });
+        socket.close();
+        return;
+      }
+
       socket.userId = user.id;
       socket.accessToken = message.token;
+
+      // Track connection
+      if (!this.connectionsByUser.has(user.id)) {
+        this.connectionsByUser.set(user.id, new Set());
+      }
+      this.connectionsByUser.get(user.id)!.add(socket);
 
       this.send(socket, "authenticated", { userId: user.id, username: user.username });
       return;
@@ -207,6 +255,17 @@ export class WebSocketManager {
     for (const guildId of socket.guildIds) {
       this.leaveGuild(socket, guildId);
     }
+
+    // Clean up user connection tracking
+    if (socket.userId) {
+      const conns = this.connectionsByUser.get(socket.userId);
+      if (conns) {
+        conns.delete(socket);
+        if (conns.size === 0) {
+          this.connectionsByUser.delete(socket.userId);
+        }
+      }
+    }
   }
 
   private send(socket: AuthenticatedSocket, event: string, data: unknown): void {
@@ -228,6 +287,59 @@ export class WebSocketManager {
         ws.ping();
       }
     }, 30_000);
+  }
+
+  /**
+   * Periodically re-validate permissions for all connected sockets.
+   * Disconnects sockets whose users have lost guild access.
+   */
+  private startPermissionRefresh(): void {
+    this.permissionRefreshInterval = setInterval(async () => {
+      if (!this.wss) return;
+
+      for (const socket of this.wss.clients) {
+        const ws = socket as AuthenticatedSocket;
+        if (!ws.userId || !ws.accessToken || ws.guildIds.size === 0) continue;
+
+        for (const guildId of ws.guildIds) {
+          try {
+            const guild = this.client.guilds.cache.get(guildId);
+            if (!guild) {
+              this.send(ws, "error", { code: "ACCESS_REVOKED", message: `Access to guild ${guildId} revoked` });
+              this.leaveGuild(ws, guildId);
+              continue;
+            }
+
+            let member;
+            try {
+              member = await guild.members.fetch(ws.userId);
+            } catch {
+              this.send(ws, "error", { code: "ACCESS_REVOKED", message: `Access to guild ${guildId} revoked` });
+              this.leaveGuild(ws, guildId);
+              continue;
+            }
+
+            // Re-resolve permissions
+            const resolved = await this.resolveGuildPermissions(guildId, member, ws.userId);
+            if (!resolved || resolved.denyAccess) {
+              this.send(ws, "error", { code: "ACCESS_REVOKED", message: `Dashboard access to guild ${guildId} revoked` });
+              this.leaveGuild(ws, guildId);
+              continue;
+            }
+
+            ws.permissionsByGuild.set(guildId, resolved);
+          } catch (err) {
+            log.warn(`Permission refresh failed for user ${ws.userId} in guild ${guildId}:`, err);
+          }
+        }
+
+        // If no guilds left, disconnect
+        if (ws.guildIds.size === 0) {
+          this.send(ws, "error", { code: "NO_GUILDS", message: "No guild subscriptions remaining" });
+          ws.close();
+        }
+      }
+    }, WebSocketManager.PERMISSION_REFRESH_INTERVAL);
   }
 
   private async fetchDiscordUser(accessToken: string): Promise<DiscordUser | null> {
@@ -292,7 +404,15 @@ export class WebSocketManager {
     const permDocs = await DashboardPermission.find({ guildId }).lean();
     const categories = await permissionRegistry.getCategories(guildId);
     if (permDocs.length === 0) {
-      return this.buildAllowAllPermissions(categories);
+      // Default-closed: no permission docs means only owners/admins get full access
+      const isOwner = member.guild.ownerId === userId;
+      const ownerIds = (process.env.OWNER_IDS || "").split(",").map((id: string) => id.trim()).filter(Boolean);
+      const isBotOwner = ownerIds.includes(userId);
+      const isAdmin = member.permissions.has("Administrator");
+      if (isOwner || isBotOwner || isAdmin) {
+        return this.buildAllowAllPermissions(categories);
+      }
+      return this.buildDenyAllPermissions(categories);
     }
 
     const memberInfo: MemberInfo = {
@@ -320,6 +440,35 @@ export class WebSocketManager {
       for (const action of cat.actions) {
         const key = `${cat.key}.${action.key}`;
         resolved[key] = true;
+        categoryActions[cat.key]!.push(key);
+      }
+    }
+
+    return {
+      denyAccess: false,
+      has(actionKey: string): boolean {
+        return resolved[actionKey] === true;
+      },
+      getAll(): Record<string, boolean> {
+        return { ...resolved };
+      },
+      hasAnyInCategory(categoryKey: string): boolean {
+        const actions = categoryActions[categoryKey];
+        if (!actions) return false;
+        return actions.some((key) => resolved[key] === true);
+      },
+    };
+  }
+
+  private buildDenyAllPermissions(permissionCategories: PermissionCategory[]): ResolvedPermissions {
+    const resolved: Record<string, boolean> = {};
+    const categoryActions: Record<string, string[]> = {};
+
+    for (const cat of permissionCategories) {
+      categoryActions[cat.key] = [];
+      for (const action of cat.actions) {
+        const key = `${cat.key}.${action.key}`;
+        resolved[key] = false;
         categoryActions[cat.key]!.push(key);
       }
     }

@@ -7,7 +7,7 @@
 
 import { Rcon } from "rcon-client";
 import { createLogger } from "../../../src/core/Logger.js";
-import MinecraftConfig from "../models/MinecraftConfig.js";
+import MinecraftConfig, { decryptRconPassword } from "../models/MinecraftConfig.js";
 
 const log = createLogger("minecraft:rcon");
 
@@ -95,12 +95,21 @@ export class RconService {
    */
   static async getConnectionInfo(guildId: string): Promise<RconConnectionInfo | null> {
     const config = await MinecraftConfig.findOne({ guildId }).lean();
-    if (!config?.rconEnabled || !config.rconPassword) return null;
+    if (!config?.rconEnabled) return null;
+
+    // Support both encrypted and legacy plaintext passwords
+    let password: string | undefined;
+    if (config.encryptedRconPassword) {
+      try { password = decryptRconPassword(config.encryptedRconPassword); } catch { return null; }
+    } else if (config.rconPassword) {
+      password = config.rconPassword;
+    }
+    if (!password) return null;
 
     return {
       host: config.rconHost || config.serverHost || "localhost",
       port: config.rconPort || 25575,
-      password: config.rconPassword,
+      password,
     };
   }
 
@@ -115,8 +124,18 @@ export class RconService {
     groupsToRemove: string[],
   ): Promise<{ success: boolean; results: { command: string; response: string; success: boolean; error?: string }[] }> {
     const config = await MinecraftConfig.findOne({ guildId }).lean();
-    if (!config?.rconEnabled || !config.rconPassword) {
+    if (!config?.rconEnabled) {
       return { success: false, results: [{ command: "", response: "RCON not configured", success: false, error: "RCON not configured" }] };
+    }
+
+    let password: string | undefined;
+    if (config.encryptedRconPassword) {
+      try { password = decryptRconPassword(config.encryptedRconPassword); } catch { /* ignore */ }
+    } else if (config.rconPassword) {
+      password = config.rconPassword;
+    }
+    if (!password) {
+      return { success: false, results: [{ command: "", response: "RCON password not configured", success: false, error: "RCON password not configured" }] };
     }
 
     const addTemplate = config.roleSync?.rconAddCommand || "lp user {player} parent add {group}";

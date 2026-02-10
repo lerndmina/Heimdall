@@ -56,18 +56,24 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   ]);
 
   if (!memberData) {
-    // If member not in cache, default to basic access (no special permissions)
-    // But if they're a bot owner, grant full access
-    return NextResponse.json({
-      success: true,
-      data: {
-        permissions: {},
-        hideDeniedFeatures: false,
-        isOwner: false,
-        isBotOwner,
-        isAdministrator: false,
-      },
-    });
+    // If member data cannot be fetched, deny access (unless bot owner)
+    if (isBotOwner) {
+      // Bot owners still get full access even without member data
+      return NextResponse.json({
+        success: true,
+        data: {
+          permissions: {},
+          hideDeniedFeatures: false,
+          isOwner: false,
+          isBotOwner: true,
+          isAdministrator: false,
+        },
+      });
+    }
+    return NextResponse.json(
+      { error: "Could not verify guild membership" },
+      { status: 403 },
+    );
   }
 
   // Bot owners bypass all permission checks — treat as guild owner

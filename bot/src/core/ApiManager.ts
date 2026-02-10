@@ -10,6 +10,9 @@
 
 import express, { Router, type Application, type Request, type Response, type NextFunction } from "express";
 import type { Server } from "http";
+import crypto from "crypto";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import { ChannelType, PermissionFlagsBits, EmbedBuilder, TextChannel, type Client } from "discord.js";
@@ -77,16 +80,108 @@ export class ApiManager {
     this.port = port;
     this.apiKey = apiKey;
     this.app = express();
+
+    // Reject obviously weak API keys at startup
+    this.validateApiKeyStrength(apiKey);
+
     this.setupMiddleware();
+  }
+
+  /**
+   * Validate that the API key meets minimum security requirements.
+   * Rejects keys that are too short, use trivial patterns, or have low entropy.
+   */
+  private validateApiKeyStrength(key: string): void {
+    const warnings: string[] = [];
+
+    if (key.length < 32) {
+      warnings.push(`INTERNAL_API_KEY is only ${key.length} chars (minimum 32 recommended)`);
+    }
+
+    // Check for all-same-character keys like "aaaa..." or "1111..."
+    if (/^(.)\1+$/.test(key)) {
+      warnings.push("INTERNAL_API_KEY consists of a single repeated character");
+    }
+
+    // Check for trivially guessable patterns
+    const trivial = ["password", "secret", "apikey", "changeme", "test", "1234", "abcd"];
+    if (trivial.some((t) => key.toLowerCase().includes(t))) {
+      warnings.push("INTERNAL_API_KEY contains a trivially guessable pattern");
+    }
+
+    // Check for low character diversity (e.g. only digits)
+    const uniqueChars = new Set(key).size;
+    if (uniqueChars < 8) {
+      warnings.push(`INTERNAL_API_KEY has very low character diversity (${uniqueChars} unique chars)`);
+    }
+
+    if (warnings.length > 0) {
+      log.warn("⚠️  Weak INTERNAL_API_KEY detected:");
+      for (const w of warnings) {
+        log.warn(`   - ${w}`);
+      }
+      log.warn("   Generate a strong key: openssl rand -hex 32");
+    }
+  }
+
+  /**
+   * Constant-time API key verification to prevent timing attacks.
+   */
+  private verifyApiKey(key: string): boolean {
+    try {
+      const keyBuf = Buffer.from(key);
+      const expectedBuf = Buffer.from(this.apiKey);
+      if (keyBuf.length !== expectedBuf.length) return false;
+      return crypto.timingSafeEqual(keyBuf, expectedBuf);
+    } catch {
+      return false;
+    }
   }
 
   /**
    * Setup base middleware
    */
   private setupMiddleware(): void {
-    // Request parsing
-    this.app.use(express.json({ limit: "10mb" }));
-    this.app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+    // Request parsing — default 1MB limit for most routes
+    this.app.use(express.json({ limit: "1mb" }));
+    this.app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+    // Global rate limiting — 100 requests/minute per IP
+    this.app.use(
+      rateLimit({
+        windowMs: 60_000,
+        max: 100,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Too many requests, please try again later" },
+      }),
+    );
+
+    // Stricter rate limit for auth endpoints — 20 requests/minute
+    this.app.use(
+      "/api/dashboard-access",
+      rateLimit({
+        windowMs: 60_000,
+        max: 20,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Too many requests, please try again later" },
+      }),
+    );
+
+    // Stricter rate limit for mutation routes — 30 requests/minute
+    this.app.use((req: Request, _res: Response, next: NextFunction) => {
+      if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+        return rateLimit({
+          windowMs: 60_000,
+          max: 30,
+          standardHeaders: true,
+          legacyHeaders: false,
+          message: { error: "Too many write requests, please try again later" },
+        })(req, _res, next);
+      }
+      next();
+    });
 
     // Request logging
     this.app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -124,20 +219,16 @@ export class ApiManager {
       next();
     });
 
-    // CORS - allow all origins for now (configure properly in production)
-    this.app.use((_req: Request, res: Response, next: NextFunction) => {
-      res.header("Access-Control-Allow-Origin", "*");
-      res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-      res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-API-Key");
-
-      // Handle OPTIONS preflight
-      if (_req.method === "OPTIONS") {
-        res.sendStatus(200);
-        return;
-      }
-
-      next();
-    });
+    // CORS — restrict to dashboard origin only
+    const dashboardUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.DASHBOARD_PORT || "3000"}`;
+    this.app.use(
+      cors({
+        origin: dashboardUrl,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization", "X-API-Key", "X-User-Id"],
+        credentials: true,
+      }),
+    );
   }
 
   /**
@@ -152,10 +243,14 @@ export class ApiManager {
    * Mount all registered routers
    */
   private mountRouters(): void {
+    // Higher body size limit for bulk import and migration routes
+    this.app.use("/api/guilds/:guildId/minecraft/import-whitelist", express.json({ limit: "10mb" }));
+    this.app.use("/api/dev/migrate", express.json({ limit: "10mb" }));
+
     // API key auth middleware — applied to all guild-scoped routes
     this.app.use("/api/guilds", (req: Request, res: Response, next: NextFunction) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -224,10 +319,19 @@ export class ApiManager {
       apis: this.routers.flatMap((r) => r.swaggerPaths || []),
     });
 
-    this.app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-    this.app.get("/api-docs.json", (_req: Request, res: Response) => res.json(swaggerSpec));
+    // Gate Swagger docs behind API key authentication
+    const swaggerAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
+      const key = req.header("X-API-Key");
+      if (!key || !this.verifyApiKey(key)) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      next();
+    };
+    this.app.use("/api-docs", swaggerAuthMiddleware, swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+    this.app.get("/api-docs.json", swaggerAuthMiddleware, (_req: Request, res: Response) => res.json(swaggerSpec));
 
-    log.debug("Swagger documentation mounted at /api-docs");
+    log.debug("Swagger documentation mounted at /api-docs (auth required)");
   }
 
   /**
@@ -258,25 +362,23 @@ export class ApiManager {
     this.mountRouters();
     this.setupSwagger();
 
-    // Health check endpoint
+    // Health check endpoint — no sensitive info exposed publicly
     this.app.get("/", (_req: Request, res: Response) => {
-      res.json({ status: "ok", version: "1.0.0" });
+      res.json({ status: "ok" });
     });
 
-    // API health check
+    // API health check — no version/router count exposed publicly
     this.app.get("/api/health", (_req: Request, res: Response) => {
       res.json({
         status: "ok",
-        version: "1.0.0",
         timestamp: new Date().toISOString(),
-        routers: this.routers.length,
       });
     });
 
     // Bot owner check — is the authenticated user a bot owner?
     this.app.get("/api/bot-owner", (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -309,7 +411,7 @@ export class ApiManager {
     // Mutual guild check — which of the given guilds is the bot in?
     this.app.post("/api/mutual-guilds", (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -334,7 +436,7 @@ export class ApiManager {
     // overrides configured in each guild.
     this.app.post("/api/dashboard-access", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -350,17 +452,17 @@ export class ApiManager {
         const allPerms = await DashboardPermission.find({ guildId: { $in: guildIds } }).lean();
 
         // Group by guildId
-        const permsByGuild = new Map<string, Array<{ discordRoleId: string }>>();
+        const permsByGuild = new Map<string, Array<{ discordRoleId: string; overrides: Record<string, string> }>>();
         for (const perm of allPerms) {
           const list = permsByGuild.get(perm.guildId) ?? [];
-          list.push({ discordRoleId: perm.discordRoleId });
+          list.push({ discordRoleId: perm.discordRoleId, overrides: (perm.overrides as Record<string, string>) ?? {} });
           permsByGuild.set(perm.guildId, list);
         }
 
-        // For each guild with overrides, check if the user has any of those roles
+        const ownerIds = (process.env.OWNER_IDS || "").trim().split(",").filter(Boolean);
         const accessibleGuildIds: string[] = [];
 
-        for (const [guildId, rolePerms] of permsByGuild) {
+        for (const guildId of guildIds) {
           if (!this.client) continue;
           const guild = this.client.guilds.cache.get(guildId);
           if (!guild) continue;
@@ -368,11 +470,31 @@ export class ApiManager {
           const member = await this.thingGetter?.getMember(guild, userId);
           if (!member) continue;
 
-          const memberRoleIds = member.roles.cache.map((r) => r.id);
-          const hasOverriddenRole = rolePerms.some((p) => memberRoleIds.includes(p.discordRoleId));
-          if (hasOverriddenRole) {
+          // Bot owners, guild owners, and administrators always have access
+          const isOwner = guild.ownerId === userId || ownerIds.includes(userId);
+          const isAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
+          if (isOwner || isAdmin) {
             accessibleGuildIds.push(guildId);
+            continue;
           }
+
+          // Check role-based permissions
+          const rolePerms = permsByGuild.get(guildId);
+          if (!rolePerms || rolePerms.length === 0) {
+            // Default-closed: no permission docs = no access for non-admins
+            continue;
+          }
+
+          const memberRoleIds = member.roles.cache.map((r) => r.id);
+          const userRoleOverrides = rolePerms.filter((p) => memberRoleIds.includes(p.discordRoleId));
+
+          if (userRoleOverrides.length === 0) continue;
+
+          // Check that the user isn't explicitly denied access via _deny_access
+          const hasDeny = userRoleOverrides.some((p) => p.overrides["_deny_access"] === "deny");
+          if (hasDeny) continue;
+
+          accessibleGuildIds.push(guildId);
         }
 
         res.json({ success: true, data: { accessibleGuildIds } });
@@ -385,7 +507,7 @@ export class ApiManager {
     // Dev migration endpoint — import data from old bot (owner only)
     this.app.post("/api/dev/migrate", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -445,16 +567,18 @@ export class ApiManager {
         res.end();
       } catch (error: any) {
         log.error("[API] Migration failed:", error);
+        const isProduction = process.env.NODE_ENV === "production";
+        const safeMessage = isProduction ? "Migration failed" : (error.message || "Migration failed");
         // If headers already sent (SSE mode), send error as event
         if (res.headersSent) {
-          res.write(`data: ${JSON.stringify({ type: "error", message: error.message || "Migration failed" })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: "error", message: safeMessage })}\n\n`);
           res.end();
         } else {
           res.status(500).json({
             success: false,
             error: {
               code: "MIGRATION_FAILED",
-              message: error.message || "Migration failed",
+              message: safeMessage,
             },
           });
         }
@@ -464,7 +588,7 @@ export class ApiManager {
     // Guild status check — is the bot in this guild?
     this.app.get("/api/guilds/:guildId/status", (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -490,7 +614,7 @@ export class ApiManager {
     // Supports ?type=text|voice|category|all (default: text)
     this.app.get("/api/guilds/:guildId/channels", (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -534,7 +658,7 @@ export class ApiManager {
     // Guild roles — for role pickers in the dashboard
     this.app.get("/api/guilds/:guildId/roles", (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -570,7 +694,7 @@ export class ApiManager {
     // ── Member info (roles, isOwner, isAdministrator) ──────────
     this.app.get("/api/guilds/:guildId/members/:userId", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -605,7 +729,7 @@ export class ApiManager {
     // GET all role overrides for a guild
     this.app.get("/api/guilds/:guildId/dashboard-permissions", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -627,7 +751,7 @@ export class ApiManager {
     // ── Permission Definitions (dynamic) ───────────────────────
     this.app.get("/api/guilds/:guildId/permission-defs", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -644,7 +768,7 @@ export class ApiManager {
     // PUT upsert overrides for a specific role
     this.app.put("/api/guilds/:guildId/dashboard-permissions/:roleId", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -678,7 +802,7 @@ export class ApiManager {
     // DELETE overrides for a specific role
     this.app.delete("/api/guilds/:guildId/dashboard-permissions/:roleId", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -706,7 +830,7 @@ export class ApiManager {
     // GET settings for a guild
     this.app.get("/api/guilds/:guildId/dashboard-settings", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -725,7 +849,7 @@ export class ApiManager {
     // PUT update settings
     this.app.put("/api/guilds/:guildId/dashboard-settings", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
-      if (!key || key !== this.apiKey) {
+      if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }

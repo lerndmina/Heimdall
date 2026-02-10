@@ -68,8 +68,8 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
   }
 
   const envLocalPath = path.join(appDir, ".env.local");
-  fs.writeFileSync(envLocalPath, lines.join("\n") + "\n", "utf-8");
-  logger.debug(`Wrote ${allKeys.length} env vars to .env.local`);
+  fs.writeFileSync(envLocalPath, lines.join("\n") + "\n", { encoding: "utf-8", mode: 0o600 });
+  logger.debug(`Wrote ${allKeys.length} env vars to .env.local (mode 0600)`);
 
   // Boot Next.js
 
@@ -117,5 +117,18 @@ export async function onDisable(logger: PluginLogger): Promise<void> {
     });
     server = null;
   }
+
+  // Clean up .env.local to avoid leaving secrets on disk
+  try {
+    const appDir = path.join(__dirname, "app");
+    const envLocalPath = path.join(appDir, ".env.local");
+    if (fs.existsSync(envLocalPath)) {
+      fs.unlinkSync(envLocalPath);
+      logger.debug("Cleaned up .env.local");
+    }
+  } catch {
+    // Best-effort cleanup
+  }
+
   logger.info("🛑 Dashboard plugin unloaded");
 }

@@ -360,7 +360,7 @@ export class ComponentCallbackService {
     const parts = permission.actionKey.split(".");
     if (parts.length < 2) return;
 
-    const categoryKey = parts[0];
+    const categoryKey = parts[0]!;
     const actionKey = parts.slice(1).join(".");
 
     permissionRegistry.registerAction(categoryKey, {

@@ -6,7 +6,7 @@
 
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { MinecraftApiDependencies } from "./index.js";
-import MinecraftConfig from "../models/MinecraftConfig.js";
+import MinecraftConfig, { decryptRconPassword } from "../models/MinecraftConfig.js";
 import { RconService } from "../services/RconService.js";
 
 export function createRconRoutes(deps: MinecraftApiDependencies): Router {
@@ -25,7 +25,15 @@ export function createRconRoutes(deps: MinecraftApiDependencies): Router {
         return;
       }
 
-      if (!config.rconPassword) {
+      // Resolve RCON password (encrypted or legacy plaintext)
+      let rconPassword: string | undefined;
+      if (config.encryptedRconPassword) {
+        try { rconPassword = decryptRconPassword(config.encryptedRconPassword); } catch { /* ignore */ }
+      } else if (config.rconPassword) {
+        rconPassword = config.rconPassword;
+      }
+
+      if (!rconPassword) {
         res.status(400).json({
           success: false,
           error: { code: "NOT_CONFIGURED", message: "RCON password is not set" },
@@ -36,7 +44,7 @@ export function createRconRoutes(deps: MinecraftApiDependencies): Router {
       const conn = {
         host: config.rconHost || config.serverHost || "localhost",
         port: config.rconPort || 25575,
-        password: config.rconPassword,
+        password: rconPassword,
       };
 
       const result = await RconService.testConnection(conn);

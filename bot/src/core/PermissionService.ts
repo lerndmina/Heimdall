@@ -14,7 +14,8 @@ export class PermissionService {
 
   async canPerformAction(guildId: string, member: GuildMember, userId: string, actionKey: string): Promise<boolean> {
     const knownActions = await permissionRegistry.getAllActionKeys(guildId);
-    if (!knownActions.has(actionKey)) return true;
+    // Default-closed: unknown actions are denied
+    if (!knownActions.has(actionKey)) return false;
 
     const resolved = await this.resolveForMember(guildId, member, userId);
     if (!resolved) return false;
@@ -29,7 +30,12 @@ export class PermissionService {
     const memberInfo: MemberInfo = this.buildMemberInfo(member, userId);
 
     if (permDocs.length === 0) {
-      return this.buildAllowAllPermissions(categories);
+      // Default-closed: no permission docs means only owners/admins get full access
+      const memberInfo: MemberInfo = this.buildMemberInfo(member, userId);
+      if (memberInfo.isOwner || memberInfo.isAdministrator) {
+        return this.buildAllowAllPermissions(categories);
+      }
+      return this.buildDenyAllPermissions(categories);
     }
 
     const roleOverrides: RoleOverrides[] = permDocs
@@ -66,6 +72,35 @@ export class PermissionService {
       for (const action of cat.actions) {
         const key = `${cat.key}.${action.key}`;
         resolved[key] = true;
+        categoryActions[cat.key]!.push(key);
+      }
+    }
+
+    return {
+      denyAccess: false,
+      has(actionKey: string): boolean {
+        return resolved[actionKey] === true;
+      },
+      getAll(): Record<string, boolean> {
+        return { ...resolved };
+      },
+      hasAnyInCategory(categoryKey: string): boolean {
+        const actions = categoryActions[categoryKey];
+        if (!actions) return false;
+        return actions.some((key) => resolved[key] === true);
+      },
+    };
+  }
+
+  private buildDenyAllPermissions(permissionCategories: PermissionCategory[]): ResolvedPermissions {
+    const resolved: Record<string, boolean> = {};
+    const categoryActions: Record<string, string[]> = {};
+
+    for (const cat of permissionCategories) {
+      categoryActions[cat.key] = [];
+      for (const action of cat.actions) {
+        const key = `${cat.key}.${action.key}`;
+        resolved[key] = false;
         categoryActions[cat.key]!.push(key);
       }
     }

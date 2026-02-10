@@ -5,7 +5,7 @@
 
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { MinecraftApiDependencies } from "./index.js";
-import MinecraftConfig from "../models/MinecraftConfig.js";
+import MinecraftConfig, { encryptRconPassword, decryptRconPassword } from "../models/MinecraftConfig.js";
 
 /**
  * Maps dashboard field names to model field names.
@@ -104,7 +104,7 @@ function modelToDashboard(config: Record<string, any>): Record<string, any> {
     rconEnabled: config.rconEnabled ?? false,
     rconHost: config.rconHost ?? "",
     rconPort: config.rconPort ?? 25575,
-    rconPassword: config.rconPassword ? "***" : null,
+    rconPassword: (config.rconPassword || config.encryptedRconPassword) ? "***" : null,
     cacheTimeout: config.authCodeExpiry ?? 300,
     maxPlayersPerUser: config.maxPlayersPerUser ?? 1,
     requireDiscordLink: config.requireConfirmation ?? true,
@@ -177,6 +177,14 @@ export function createConfigRoutes(deps: MinecraftApiDependencies): Router {
 
       // Map dashboard field names to model fields
       const modelData = dashboardToModel(updateData);
+
+      // Encrypt RCON password if provided
+      if (modelData.rconPassword && modelData.rconPassword !== "***") {
+        modelData.encryptedRconPassword = encryptRconPassword(modelData.rconPassword);
+        delete modelData.rconPassword;
+      } else {
+        delete modelData.rconPassword; // Never store plaintext
+      }
 
       const config = await MinecraftConfig.findOneAndUpdate({ guildId }, { ...modelData, guildId }, { upsert: true, new: true, runValidators: true }).lean();
 

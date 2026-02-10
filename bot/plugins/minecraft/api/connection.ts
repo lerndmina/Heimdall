@@ -12,6 +12,7 @@ import MinecraftPlayer from "../models/MinecraftPlayer.js";
 import { RconService } from "../services/RconService.js";
 import { RoleSyncService } from "../services/RoleSyncService.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { escapeRegex } from "../../lib/utils/escapeRegex.js";
 
 const log = createLogger("minecraft:api:connection");
 
@@ -41,7 +42,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
         // Check by username (may be a pending auth from /link-minecraft — no UUID yet)
         player = await MinecraftPlayer.findOne({
           guildId,
-          minecraftUsername: { $regex: new RegExp(`^${username}$`, "i") },
+          minecraftUsername: { $regex: new RegExp(`^${escapeRegex(username)}$`, "i") },
           $or: [{ minecraftUuid: { $exists: false } }, { minecraftUuid: null }],
         });
 
@@ -56,7 +57,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
           // Check if the new username conflicts with another player
           const duplicate = await MinecraftPlayer.findOne({
             guildId,
-            minecraftUsername: { $regex: new RegExp(`^${username}$`, "i") },
+            minecraftUsername: { $regex: new RegExp(`^${escapeRegex(username)}$`, "i") },
             minecraftUuid: { $ne: uuid },
           }).lean();
 
