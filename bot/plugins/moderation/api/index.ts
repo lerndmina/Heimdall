@@ -18,6 +18,7 @@ import { createInfractionsRoutes } from "./infractions.js";
 import { createPresetsRoutes } from "./presets.js";
 import { createStatsRoutes } from "./stats.js";
 import { createLockRoutes, type LockApiDeps } from "./locks.js";
+import { createStickyRoutes, type StickyApiDeps } from "./stickies.js";
 
 export type ModerationApiDeps = Pick<ModerationPluginAPI, "moderationService" | "ruleEngine" | "infractionService" | "escalationService" | "lib">;
 
@@ -60,6 +61,14 @@ export function createRouter(api: ModerationPluginAPI): Router {
     client: api.client,
   };
   router.use("/locks", createLockRoutes(lockDeps));
+
+  // Sticky messages
+  const stickyDeps: StickyApiDeps = {
+    ...deps,
+    stickyMessageService: api.stickyMessageService,
+    client: api.client,
+  };
+  router.use("/stickies", createStickyRoutes(stickyDeps));
 
   return router;
 }

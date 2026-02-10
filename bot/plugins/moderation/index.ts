@@ -18,6 +18,7 @@ import "./models/ModerationConfig.js";
 import "./models/AutomodRule.js";
 import "./models/Infraction.js";
 import "./models/ChannelLock.js";
+import "./models/StickyMessage.js";
 
 import { ModerationService } from "./services/ModerationService.js";
 import { RuleEngine } from "./services/RuleEngine.js";
@@ -26,6 +27,7 @@ import { EscalationService } from "./services/EscalationService.js";
 import { ModActionService } from "./services/ModActionService.js";
 import { AutomodEnforcer } from "./services/AutomodEnforcer.js";
 import { ChannelLockService } from "./services/ChannelLockService.js";
+import { StickyMessageService } from "./services/StickyMessageService.js";
 
 export interface ModerationPluginAPI extends PluginAPI {
   version: string;
@@ -36,6 +38,7 @@ export interface ModerationPluginAPI extends PluginAPI {
   modActionService: ModActionService;
   automodEnforcer: AutomodEnforcer;
   channelLockService: ChannelLockService;
+  stickyMessageService: StickyMessageService;
   client: HeimdallClient;
   lib: LibAPI;
   logging: LoggingPluginAPI | null;
@@ -48,6 +51,7 @@ let escalationService: EscalationService;
 let modActionService: ModActionService;
 let automodEnforcer: AutomodEnforcer;
 let channelLockService: ChannelLockService;
+let stickyMessageService: StickyMessageService;
 
 export async function onLoad(context: PluginContext): Promise<ModerationPluginAPI> {
   const { client, logger, dependencies, redis } = context;
@@ -64,6 +68,7 @@ export async function onLoad(context: PluginContext): Promise<ModerationPluginAP
   modActionService = new ModActionService(client, lib, logging, infractionService, escalationService);
   automodEnforcer = new AutomodEnforcer(client, lib, logging, moderationService, ruleEngine, infractionService, escalationService, modActionService);
   channelLockService = new ChannelLockService(client, redis, lib, logging, moderationService);
+  stickyMessageService = new StickyMessageService(client);
 
   logger.info("✅ Moderation plugin loaded");
 
@@ -76,6 +81,7 @@ export async function onLoad(context: PluginContext): Promise<ModerationPluginAP
     modActionService,
     automodEnforcer,
     channelLockService,
+    stickyMessageService,
     client,
     lib,
     logging,

@@ -177,6 +177,13 @@ const routeMap: Record<string, string> = {
   "GET /moderation/locks/config": "moderation.view_config",
   "PUT /moderation/locks/config": "moderation.manage_config",
   "POST /moderation/locks/*/unlock": "moderation.manage_config",
+
+  // ── Sticky Messages ──
+  "GET /moderation/stickies": "moderation.view_config",
+  "GET /moderation/stickies/*": "moderation.view_config",
+  "PUT /moderation/stickies/*": "moderation.manage_config",
+  "DELETE /moderation/stickies/*": "moderation.manage_config",
+  "PATCH /moderation/stickies/*/toggle": "moderation.manage_config",
 };
 
 /**

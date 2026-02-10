@@ -1,7 +1,7 @@
 /**
  * ModerationPage — Dashboard page for managing moderation settings.
  *
- * Tabs: Overview · Rules · Presets · Escalation · Infractions · Settings
+ * Tabs: Overview · Rules · Presets · Escalation · Infractions · Stickies · Settings
  *
  * API endpoints:
  *   GET    /moderation/config                    → config
@@ -36,6 +36,7 @@ import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
+import StickyMessagesTab from "./StickyMessagesTab";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -159,6 +160,7 @@ export default function ModerationPage({ guildId }: { guildId: string }) {
           { id: "presets", label: "Presets", content: <PresetsTab guildId={guildId} canManage={canManagePresets} /> },
           { id: "escalation", label: "Escalation", content: <EscalationTab guildId={guildId} canManage={canManageConfig} /> },
           { id: "infractions", label: "Infractions", content: <InfractionsTab guildId={guildId} canManage={canManageInfractions} /> },
+          { id: "stickies", label: "Stickies", content: <StickyMessagesTab guildId={guildId} canManage={canManageConfig} /> },
           { id: "settings", label: "Settings", content: <SettingsTab guildId={guildId} canManage={canManageConfig} /> },
         ]}
       />
