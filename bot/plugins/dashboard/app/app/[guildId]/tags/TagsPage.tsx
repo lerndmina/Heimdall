@@ -342,7 +342,8 @@ export default function TagsPage({ guildId }: { guildId: string }) {
                       </td>
                       <td className="py-3 pr-4 text-zinc-400">{tag.uses}</td>
                       <td className="py-3 pr-4">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${tag.registerAsSlashCommand ? "border-emerald-500/40 text-emerald-300" : "border-zinc-700/50 text-zinc-500"}`}>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${tag.registerAsSlashCommand ? "border-emerald-500/40 text-emerald-300" : "border-zinc-700/50 text-zinc-500"}`}>
                           {tag.registerAsSlashCommand ? "Enabled" : "Disabled"}
                         </span>
                       </td>
