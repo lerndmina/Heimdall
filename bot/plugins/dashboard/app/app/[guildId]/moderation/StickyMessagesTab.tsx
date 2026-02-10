@@ -248,9 +248,7 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
     <div className="space-y-6">
       {/* Header bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-zinc-400">
-          Sticky messages are automatically re-posted at the bottom of a channel whenever new messages are sent.
-        </p>
+        <p className="text-sm text-zinc-400">Sticky messages are automatically re-posted at the bottom of a channel whenever new messages are sent.</p>
 
         {canManage && (
           <button onClick={openCreateModal} className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-500 shrink-0">
@@ -271,9 +269,7 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
             </svg>
           </div>
           <CardTitle>No Sticky Messages</CardTitle>
-          <CardDescription className="mt-2 max-w-md">
-            Add a sticky message to keep important information visible at the bottom of a channel.
-          </CardDescription>
+          <CardDescription className="mt-2 max-w-md">Add a sticky message to keep important information visible at the bottom of a channel.</CardDescription>
         </Card>
       ) : (
         <Card>
@@ -313,7 +309,8 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
                         {canManage ? (
                           <Toggle checked={sticky.enabled} onChange={(v) => handleToggle(sticky, v)} />
                         ) : (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${sticky.enabled ? "border-emerald-500/40 text-emerald-300" : "border-zinc-700/50 text-zinc-500"}`}>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${sticky.enabled ? "border-emerald-500/40 text-emerald-300" : "border-zinc-700/50 text-zinc-500"}`}>
                             {sticky.enabled ? "Active" : "Paused"}
                           </span>
                         )}
@@ -407,26 +404,16 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
                   type="button"
                   onClick={() => selectColorPreset(preset.value)}
                   className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                    draftColor === preset.value
-                      ? "border-primary-500 bg-primary-500/10 text-primary-300"
-                      : "border-zinc-700/30 text-zinc-400 hover:bg-white/5"
+                    draftColor === preset.value ? "border-primary-500 bg-primary-500/10 text-primary-300" : "border-zinc-700/30 text-zinc-400 hover:bg-white/5"
                   }`}>
-                  {preset.value !== 0 && (
-                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getColorDot(preset.value) }} />
-                  )}
+                  {preset.value !== 0 && <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getColorDot(preset.value) }} />}
                   {preset.label}
                 </button>
               ))}
             </div>
 
             {/* Custom hex input */}
-            <TextInput
-              label=""
-              value={draftColorHex}
-              onChange={handleHexChange}
-              placeholder="#5865f2"
-              description="Or enter a custom hex color"
-            />
+            <TextInput label="" value={draftColorHex} onChange={handleHexChange} placeholder="#5865f2" description="Or enter a custom hex color" />
           </div>
         </div>
       </Modal>
@@ -456,8 +443,8 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
           </>
         }>
         <p className="text-sm text-zinc-400">
-          Are you sure you want to remove the sticky message from <span className="font-mono text-primary-400">#{deleteTarget?.channelName}</span>?
-          The current sticky message in the channel will also be deleted.
+          Are you sure you want to remove the sticky message from <span className="font-mono text-primary-400">#{deleteTarget?.channelName}</span>? The current sticky message in the channel will also
+          be deleted.
         </p>
       </Modal>
     </div>

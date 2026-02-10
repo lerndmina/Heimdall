@@ -20,9 +20,7 @@ export const data = new SlashCommandBuilder()
       .setName("set")
       .setDescription("Set a sticky message in a channel")
       .addStringOption((opt) => opt.setName("content").setDescription("The message content (max 2000 chars)").setRequired(true).setMaxLength(2000))
-      .addChannelOption((opt) =>
-        opt.setName("channel").setDescription("Target channel (defaults to current)").setRequired(false).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
-      )
+      .addChannelOption((opt) => opt.setName("channel").setDescription("Target channel (defaults to current)").setRequired(false).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
       .addIntegerOption((opt) => opt.setName("color").setDescription("Embed colour (decimal). 0 or omit for plain text").setRequired(false)),
   )
   .addSubcommand((sub) =>
@@ -46,9 +44,7 @@ export const data = new SlashCommandBuilder()
       .setName("from-tag")
       .setDescription("Set a sticky message using a tag's content")
       .addStringOption((opt) => opt.setName("tag").setDescription("The tag name to use").setRequired(true).setAutocomplete(true))
-      .addChannelOption((opt) =>
-        opt.setName("channel").setDescription("Target channel (defaults to current)").setRequired(false).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
-      )
+      .addChannelOption((opt) => opt.setName("channel").setDescription("Target channel (defaults to current)").setRequired(false).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
       .addIntegerOption((opt) => opt.setName("color").setDescription("Embed colour (decimal). 0 or omit for plain text").setRequired(false)),
   );
 
@@ -96,13 +92,7 @@ export async function execute(context: CommandContext): Promise<void> {
       }
 
       await interaction.editReply({
-        embeds: [
-          mod.lib
-            .createEmbedBuilder()
-            .setColor(0x22c55e)
-            .setTitle("📌 Sticky Message Removed")
-            .setDescription(`Sticky message removed from ${channel}.`),
-        ],
+        embeds: [mod.lib.createEmbedBuilder().setColor(0x22c55e).setTitle("📌 Sticky Message Removed").setDescription(`Sticky message removed from ${channel}.`)],
       });
       broadcastDashboardChange(guild.id, "moderation", "sticky_updated", { requiredAction: "moderation.manage_config" });
       break;

@@ -35,13 +35,7 @@ export class StickyMessageService {
   /**
    * Set (create or update) a sticky message for a channel.
    */
-  async setSticky(
-    guildId: string,
-    channelId: string,
-    content: string,
-    moderatorId: string,
-    options?: { color?: number },
-  ): Promise<StickyDoc> {
+  async setSticky(guildId: string, channelId: string, content: string, moderatorId: string, options?: { color?: number }): Promise<StickyDoc> {
     const channel = this.client.channels.cache.get(channelId) as TextChannel | NewsChannel | undefined;
 
     // Remove existing sticky message from chat if present
@@ -121,11 +115,7 @@ export class StickyMessageService {
    * Toggle a sticky message on/off without deleting the config.
    */
   async toggleSticky(channelId: string, enabled: boolean): Promise<StickyDoc | null> {
-    const doc = await StickyMessage.findOneAndUpdate(
-      { channelId },
-      { enabled },
-      { new: true },
-    );
+    const doc = await StickyMessage.findOneAndUpdate({ channelId }, { enabled }, { new: true });
     if (!doc) return null;
 
     if (!enabled && doc.currentMessageId) {
