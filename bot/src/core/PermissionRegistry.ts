@@ -5,6 +5,7 @@ export interface PermissionActionDefinition {
   key: string;
   label: string;
   description: string;
+  defaultAllow?: boolean;
 }
 
 export interface DynamicPermissionCategory {
@@ -40,7 +41,7 @@ export class PermissionRegistry {
     for (const cat of baseCategories) {
       const actionMap = new Map<string, PermissionActionDefinition>();
       for (const action of cat.actions) {
-        actionMap.set(action.key, { key: action.key, label: action.label, description: action.description });
+        actionMap.set(action.key, { key: action.key, label: action.label, description: action.description, defaultAllow: action.defaultAllow });
       }
       this.registeredActions.set(cat.key, actionMap);
     }

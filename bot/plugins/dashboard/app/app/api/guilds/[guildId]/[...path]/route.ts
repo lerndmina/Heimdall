@@ -117,6 +117,12 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: "Dashboard access denied for your role" }, { status: 403 });
       }
 
+      const isAdminBypass = memberData.isAdministrator && !resolved.denyAccess;
+
+      if (!isAdminBypass && !resolved.has("dashboard.can_access")) {
+        return NextResponse.json({ error: "Dashboard access denied for your role" }, { status: 403 });
+      }
+
       if (!resolved.has(requiredAction)) {
         return NextResponse.json({ error: "You do not have permission to perform this action", requiredAction }, { status: 403 });
       }

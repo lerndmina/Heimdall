@@ -28,6 +28,7 @@ interface Role {
   name: string;
   color: string;
   position: number;
+  isAdministrator: boolean;
 }
 
 interface PermissionDoc {
@@ -135,9 +136,22 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
   }
 
   const selectedDoc = permDocs.find((d) => d.discordRoleId === selectedRoleId);
+  const selectedRole = roles.find((r) => r.id === selectedRoleId);
   // Merge saved overrides with any pending (unsaved) changes for the selected role
   const savedOverrides = selectedDoc?.overrides ?? {};
   const overrides = pendingOverrides.has(selectedRoleId) ? pendingOverrides.get(selectedRoleId)! : savedOverrides;
+
+  function buildDefaultOverrides(): Record<string, "allow" | "deny"> {
+    const defaults: Record<string, "allow" | "deny"> = {};
+    for (const cat of permissionCategories) {
+      for (const action of cat.actions) {
+        if (action.defaultAllow) {
+          defaults[`${cat.key}.${action.key}`] = "allow";
+        }
+      }
+    }
+    return defaults;
+  }
 
   function getActionState(categoryKey: string, actionKey: string): TriState {
     const fullKey = `${categoryKey}.${actionKey}`;
@@ -438,14 +452,15 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
                       const role = roles.find((r) => r.id === roleId);
                       if (role && !configuredRoleIds.has(roleId)) {
                         try {
+                          const defaultOverrides = buildDefaultOverrides();
                           const res = await fetchApi(guildId, `dashboard-permissions/${roleId}`, {
                             method: "PUT",
-                            body: JSON.stringify({ roleName: role.name, overrides: {} }),
+                            body: JSON.stringify({ roleName: role.name, overrides: defaultOverrides }),
                           });
                           if (res.success) {
-                            const doc: PermissionDoc = { guildId, discordRoleId: roleId, roleName: role.name, overrides: {} };
+                            const doc: PermissionDoc = { guildId, discordRoleId: roleId, roleName: role.name, overrides: defaultOverrides };
                             setPermDocs((prev) => [...prev, doc]);
-                            savedOverridesRef.current.set(roleId, {});
+                            savedOverridesRef.current.set(roleId, { ...defaultOverrides });
                           }
                         } catch {
                           showToast("Failed to add role", "error");
@@ -510,23 +525,25 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {/* Deny Dashboard Access toggle */}
-                    <div className="rounded-lg border border-red-900/50 bg-red-950/20 px-4 py-3">
-                      <Toggle
-                        label="Deny Dashboard Access"
-                        description="When enabled, members with only this role cannot access the dashboard — even if the role has Discord Administrator permissions. Other role overrides can still grant access."
-                        checked={overrides[DENY_ACCESS_KEY] === "deny"}
-                        onChange={(checked) => {
-                          const newOverrides = { ...overrides };
-                          if (checked) {
-                            newOverrides[DENY_ACCESS_KEY] = "deny";
-                          } else {
-                            delete (newOverrides as Record<string, string>)[DENY_ACCESS_KEY];
-                          }
-                          stageOverrides(selectedRoleId, newOverrides);
-                        }}
-                      />
-                    </div>
+                    {/* Deny Dashboard Access toggle (admin roles only) */}
+                    {selectedRole?.isAdministrator && (
+                      <div className="rounded-lg border border-red-900/50 bg-red-950/20 px-4 py-3">
+                        <Toggle
+                          label="Deny Dashboard Access"
+                          description="When enabled, members with only this role cannot access the dashboard — even if the role has Discord Administrator permissions. Other role overrides can still grant access."
+                          checked={overrides[DENY_ACCESS_KEY] === "deny"}
+                          onChange={(checked) => {
+                            const newOverrides = { ...overrides };
+                            if (checked) {
+                              newOverrides[DENY_ACCESS_KEY] = "deny";
+                            } else {
+                              delete (newOverrides as Record<string, string>)[DENY_ACCESS_KEY];
+                            }
+                            stageOverrides(selectedRoleId, newOverrides);
+                          }}
+                        />
+                      </div>
+                    )}
 
                     {permissionCategories.map((cat) => {
                       const isExpanded = expandedCategories.has(cat.key);

@@ -19,6 +19,12 @@ export const data = new SlashCommandBuilder()
 
 export const config = { allowInDMs: false };
 
+export const permissions = {
+  label: "Confirm Minecraft Code",
+  description: "Confirm your Minecraft authentication code",
+  defaultAllow: true,
+};
+
 export async function execute(context: CommandContext): Promise<void> {
   const { interaction, getPluginAPI } = context;
   await interaction.deferReply({ ephemeral: true });

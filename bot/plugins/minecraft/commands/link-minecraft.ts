@@ -26,6 +26,12 @@ export const data = new SlashCommandBuilder()
 
 export const config = { allowInDMs: false };
 
+export const permissions = {
+  label: "Link Minecraft",
+  description: "Manage your Minecraft account linking",
+  defaultAllow: true,
+};
+
 export async function execute(context: CommandContext): Promise<void> {
   const { interaction, getPluginAPI } = context;
   await interaction.deferReply({ ephemeral: true });

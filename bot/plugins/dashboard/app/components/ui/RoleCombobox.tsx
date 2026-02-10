@@ -29,20 +29,23 @@ interface RoleComboboxProps {
   description?: string;
   /** Role IDs to exclude from the list (e.g., already selected roles) */
   excludeIds?: string[];
+  /** Include @everyone in the list (default: true) */
+  includeEveryone?: boolean;
 }
 
-export default function RoleCombobox({ guildId, value, onChange, placeholder, disabled, error, label, description, excludeIds = [] }: RoleComboboxProps) {
+export default function RoleCombobox({ guildId, value, onChange, placeholder, disabled, error, label, description, excludeIds = [], includeEveryone = true }: RoleComboboxProps) {
   const [roles, setRoles] = useState<RoleData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const cacheKey = `roles-${guildId}`;
+  const cacheKey = `roles-${guildId}-${includeEveryone ? "all" : "no-everyone"}`;
 
   const fetchRoles = useCallback(
     (bustCache = false) => {
       setLoading(true);
       if (bustCache) cache.invalidate(cacheKey);
 
-      fetchApi<{ roles: RoleData[] }>(guildId, "roles", {
+      const query = includeEveryone ? "roles?includeEveryone=true" : "roles";
+      fetchApi<{ roles: RoleData[] }>(guildId, query, {
         cacheKey,
         cacheTtl: 60_000,
       })
@@ -61,7 +64,7 @@ export default function RoleCombobox({ guildId, value, onChange, placeholder, di
   const options: ComboboxOption[] = useMemo(() => {
     const excludeSet = new Set(excludeIds);
     return roles
-      .filter((r) => r.name !== "@everyone" && !excludeSet.has(r.id))
+      .filter((r) => !excludeSet.has(r.id))
       .sort((a, b) => b.position - a.position)
       .map((r) => ({
         value: r.id,

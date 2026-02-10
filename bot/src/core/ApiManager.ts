@@ -561,6 +561,7 @@ export class ApiManager {
           name: r.name,
           color: r.hexColor,
           position: r.position,
+          isAdministrator: r.permissions.has(PermissionFlagsBits.Administrator),
         }));
 
       res.json({ success: true, data: { roles } });

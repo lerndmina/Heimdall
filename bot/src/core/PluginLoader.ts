@@ -521,11 +521,13 @@ export class PluginLoader {
         const override = permissions?.subcommands?.[sub.path];
         const label = override?.label ?? `/${commandName} ${sub.path.replace(/\./g, " ")}`;
         const description = override?.description ?? sub.description ?? permissions?.description ?? "";
+        const defaultAllow = override?.defaultAllow ?? permissions?.defaultAllow;
 
         permissionRegistry.registerAction(pluginName, {
           key: actionKey,
           label,
           description,
+          defaultAllow,
         });
       }
 
@@ -539,6 +541,7 @@ export class PluginLoader {
       key: actionKey,
       label: permissions?.label ?? `/${commandName}`,
       description: permissions?.description ?? commandData?.description ?? "",
+      defaultAllow: permissions?.defaultAllow,
     });
 
     return keys;
@@ -555,6 +558,7 @@ export class PluginLoader {
       key: actionKey,
       label: permissions?.label ?? commandName,
       description: permissions?.description ?? "",
+      defaultAllow: permissions?.defaultAllow,
     });
 
     return fullKey;

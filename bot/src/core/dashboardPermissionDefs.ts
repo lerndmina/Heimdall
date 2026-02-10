@@ -8,6 +8,7 @@ export interface PermissionAction {
   key: string;
   label: string;
   description: string;
+  defaultAllow?: boolean;
 }
 
 export interface PermissionCategory {
@@ -23,6 +24,7 @@ export const permissionCategories: PermissionCategory[] = [
     label: "Dashboard",
     description: "Control who can manage dashboard permissions and settings.",
     actions: [
+      { key: "can_access", label: "Can Access Dashboard", description: "Allow access to the dashboard UI and API.", defaultAllow: false },
       { key: "manage_permissions", label: "Manage Permissions", description: "Add, edit, or remove role permission overrides." },
       { key: "manage_settings", label: "Manage Settings", description: "Toggle dashboard display settings like hiding denied features." },
     ],
