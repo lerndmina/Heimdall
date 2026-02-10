@@ -39,9 +39,9 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
   }
 
   return (
-    <aside className="relative flex h-screen w-64 flex-col border-r border-zinc-700/30 bg-zinc-900/30 backdrop-blur-2xl">
+    <aside className="relative flex w-full flex-col border-b border-zinc-700/30 bg-zinc-900/30 backdrop-blur-2xl lg:h-screen lg:w-64 lg:border-b-0 lg:border-r">
       {/* Sidebar glow accent */}
-      <div className="pointer-events-none absolute inset-0 w-64 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 w-full overflow-hidden lg:w-64">
         <div className="absolute -left-20 top-[30%] h-60 w-60 animate-pulse rounded-full bg-primary-500/5 blur-[60px]" />
       </div>
 
@@ -55,8 +55,8 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
       </a>
 
       {/* Navigation */}
-      <nav className="relative flex-1 overflow-y-auto p-3">
-        <ul className="space-y-1">
+      <nav className="relative overflow-x-auto overflow-y-hidden p-3 lg:flex-1 lg:overflow-y-auto">
+        <ul className="flex items-center gap-2 lg:block lg:space-y-1">
           {items.map((item) => {
             const normalizedHref = item.href.replace(/\/+$/, "") || "/";
             const isGuildRoot = normalizedHref === guildRoot;
@@ -68,7 +68,7 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
                   <a
                     href={item.href}
                     onClick={(e) => guardedNavigate(e, item.href)}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 cursor-not-allowed opacity-50">
+                    className="flex shrink-0 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 cursor-not-allowed opacity-50 whitespace-nowrap">
                     <span className="h-5 w-5 shrink-0">{item.icon}</span>
                     {item.label}
                     <svg className="ml-auto h-4 w-4 shrink-0 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,7 +84,7 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
                 <a
                   href={item.href}
                   onClick={(e) => guardedNavigate(e, item.href)}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 ${
+                  className={`flex shrink-0 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 whitespace-nowrap ${
                     isActive ? "bg-primary-500/15 text-primary-400 shadow-sm shadow-primary-500/10" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
                   }`}>
                   <span className={`h-5 w-5 shrink-0 transition-colors duration-300 ${isActive ? "text-primary-400" : ""}`}>{item.icon}</span>

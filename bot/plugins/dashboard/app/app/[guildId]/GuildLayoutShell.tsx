@@ -96,10 +96,10 @@ function GuildLayoutInner({ guild, children }: { guild: GuildInfo; children: Rea
   }).filter((item): item is NavItem => item !== null);
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen flex-col lg:flex-row">
       <Sidebar guildId={guild.id} guildName={guild.name} guildIcon={guild.icon} items={navItems} />
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl p-6">{children}</div>
+      <main className="flex-1 overflow-y-auto lg:min-h-0">
+        <div className="mx-auto max-w-6xl p-4 sm:p-6">{children}</div>
       </main>
     </div>
   );
