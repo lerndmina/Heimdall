@@ -100,7 +100,11 @@ export class RconService {
     // Support both encrypted and legacy plaintext passwords
     let password: string | undefined;
     if (config.encryptedRconPassword) {
-      try { password = decryptRconPassword(config.encryptedRconPassword); } catch { return null; }
+      try {
+        password = decryptRconPassword(config.encryptedRconPassword);
+      } catch {
+        return null;
+      }
     } else if (config.rconPassword) {
       password = config.rconPassword;
     }
@@ -130,7 +134,11 @@ export class RconService {
 
     let password: string | undefined;
     if (config.encryptedRconPassword) {
-      try { password = decryptRconPassword(config.encryptedRconPassword); } catch { /* ignore */ }
+      try {
+        password = decryptRconPassword(config.encryptedRconPassword);
+      } catch {
+        /* ignore */
+      }
     } else if (config.rconPassword) {
       password = config.rconPassword;
     }

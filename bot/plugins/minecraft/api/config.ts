@@ -104,7 +104,7 @@ function modelToDashboard(config: Record<string, any>): Record<string, any> {
     rconEnabled: config.rconEnabled ?? false,
     rconHost: config.rconHost ?? "",
     rconPort: config.rconPort ?? 25575,
-    rconPassword: (config.rconPassword || config.encryptedRconPassword) ? "***" : null,
+    rconPassword: config.rconPassword || config.encryptedRconPassword ? "***" : null,
     cacheTimeout: config.authCodeExpiry ?? 300,
     maxPlayersPerUser: config.maxPlayersPerUser ?? 1,
     requireDiscordLink: config.requireConfirmation ?? true,

@@ -64,8 +64,8 @@ const MinecraftConfigSchema = new Schema(
     rconEnabled: { type: Boolean, default: false },
     rconHost: { type: String },
     rconPort: { type: Number, default: 25575, min: 1, max: 65535 },
-    rconPassword: { type: String },  // Legacy plaintext (migrated to encrypted)
-    encryptedRconPassword: { type: String },  // AES-256-CBC encrypted
+    rconPassword: { type: String }, // Legacy plaintext (migrated to encrypted)
+    encryptedRconPassword: { type: String }, // AES-256-CBC encrypted
 
     // Auth settings
     authCodeExpiry: { type: Number, default: 300, min: 60, max: 3600 },

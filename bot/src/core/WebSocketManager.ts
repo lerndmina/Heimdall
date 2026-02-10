@@ -406,7 +406,10 @@ export class WebSocketManager {
     if (permDocs.length === 0) {
       // Default-closed: no permission docs means only owners/admins get full access
       const isOwner = member.guild.ownerId === userId;
-      const ownerIds = (process.env.OWNER_IDS || "").split(",").map((id: string) => id.trim()).filter(Boolean);
+      const ownerIds = (process.env.OWNER_IDS || "")
+        .split(",")
+        .map((id: string) => id.trim())
+        .filter(Boolean);
       const isBotOwner = ownerIds.includes(userId);
       const isAdmin = member.permissions.has("Administrator");
       if (isOwner || isBotOwner || isAdmin) {

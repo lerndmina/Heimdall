@@ -28,7 +28,11 @@ export function createRconRoutes(deps: MinecraftApiDependencies): Router {
       // Resolve RCON password (encrypted or legacy plaintext)
       let rconPassword: string | undefined;
       if (config.encryptedRconPassword) {
-        try { rconPassword = decryptRconPassword(config.encryptedRconPassword); } catch { /* ignore */ }
+        try {
+          rconPassword = decryptRconPassword(config.encryptedRconPassword);
+        } catch {
+          /* ignore */
+        }
       } else if (config.rconPassword) {
         rconPassword = config.rconPassword;
       }

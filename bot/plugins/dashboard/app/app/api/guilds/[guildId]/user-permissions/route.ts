@@ -70,10 +70,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         },
       });
     }
-    return NextResponse.json(
-      { error: "Could not verify guild membership" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "Could not verify guild membership" }, { status: 403 });
   }
 
   // Bot owners bypass all permission checks — treat as guild owner

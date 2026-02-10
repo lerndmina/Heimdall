@@ -568,7 +568,7 @@ export class ApiManager {
       } catch (error: any) {
         log.error("[API] Migration failed:", error);
         const isProduction = process.env.NODE_ENV === "production";
-        const safeMessage = isProduction ? "Migration failed" : (error.message || "Migration failed");
+        const safeMessage = isProduction ? "Migration failed" : error.message || "Migration failed";
         // If headers already sent (SSE mode), send error as event
         if (res.headersSent) {
           res.write(`data: ${JSON.stringify({ type: "error", message: safeMessage })}\n\n`);
