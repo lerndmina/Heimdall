@@ -551,8 +551,10 @@ export class ApiManager {
         return;
       }
 
+      const includeEveryone = String(req.query.includeEveryone ?? "").toLowerCase() === "true";
+
       const roles = guild.roles.cache
-        .filter((r) => r.id !== guild.id) // exclude @everyone
+        .filter((r) => includeEveryone || r.id !== guild.id) // exclude @everyone unless requested
         .sort((a, b) => b.position - a.position) // highest first
         .map((r) => ({
           id: r.id,

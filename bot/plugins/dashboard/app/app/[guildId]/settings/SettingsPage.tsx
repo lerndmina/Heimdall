@@ -88,7 +88,7 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
     setLoading(true);
     try {
       const [rolesRes, permsRes, settingsRes, defsRes] = await Promise.all([
-        fetchApi<{ roles: Role[] }>(guildId, "roles", { cacheKey: `roles-${guildId}`, cacheTtl: 60_000 }),
+        fetchApi<{ roles: Role[] }>(guildId, "roles?includeEveryone=true", { cacheKey: `roles-${guildId}`, cacheTtl: 60_000 }),
         fetchApi<{ permissions: PermissionDoc[] }>(guildId, "dashboard-permissions"),
         fetchApi<{ settings: { hideDeniedFeatures: boolean } }>(guildId, "dashboard-settings"),
         fetchApi<{ categories: PermissionCategory[] }>(guildId, "permission-defs"),
