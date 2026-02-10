@@ -10,7 +10,7 @@
     "dev:bun": "bun run src/index.ts --watch",
     "start": "tsx src/index.ts",
     "start:bun": "bun run src/index.ts",
-    "build": "bunx tsc",
+    "build": "bunx tsc && bun run build:dashboard",
     "build:dashboard": "cd plugins/dashboard/app && next build",
     "build:dashboard:analyze": "cd plugins/dashboard/app && ANALYZE=true next build",
     "build:prod": "npm run build && npm run build:dashboard",
