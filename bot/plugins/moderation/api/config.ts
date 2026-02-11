@@ -82,7 +82,7 @@ export function createConfigRoutes(deps: ModerationApiDeps): Router {
             });
             return;
           }
-          if (!["timeout", "kick", "ban"].includes(tier.action)) {
+          if (!["timeout", "kick", "ban", "dm"].includes(tier.action)) {
             res.status(400).json({
               success: false,
               error: { code: "INVALID_INPUT", message: `Invalid escalation action: ${tier.action}` },
@@ -93,6 +93,7 @@ export function createConfigRoutes(deps: ModerationApiDeps): Router {
         updates.escalationTiers = escalationTiers.map((tier: any) => ({
           ...tier,
           duration: tier.action === "timeout" ? parseDuration(tier.duration) : null,
+          dmMessage: tier.action === "dm" ? (tier.dmMessage ?? null) : null,
         }));
       }
 

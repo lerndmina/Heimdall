@@ -18,13 +18,15 @@ const log = createLogger("moderation:sticky");
 
 type StickyDoc = IStickyMessage & { _id: any; createdAt: Date; updatedAt: Date };
 
-/** Minimum interval between sticky refreshes per channel (in ms) */
+/** Minimum interval between sticky refreshes per channel (instant mode, in ms) */
 const REFRESH_COOLDOWN_MS = 5_000;
 
 export class StickyMessageService {
   private client: HeimdallClient;
-  /** Per-channel timestamp of last refresh to enforce cooldown */
+  /** Per-channel timestamp of last refresh to enforce cooldown (instant mode) */
   private lastRefresh = new Map<string, number>();
+  /** Per-channel debounce timers for conversation-aware mode */
+  private conversationTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(client: HeimdallClient) {
     this.client = client;
@@ -35,7 +37,20 @@ export class StickyMessageService {
   /**
    * Set (create or update) a sticky message for a channel.
    */
-  async setSticky(guildId: string, channelId: string, content: string, moderatorId: string, options?: { color?: number }): Promise<StickyDoc> {
+  async setSticky(
+    guildId: string,
+    channelId: string,
+    content: string,
+    moderatorId: string,
+    options?: {
+      color?: number;
+      detectionBehavior?: string;
+      detectionDelay?: number;
+      conversationDuration?: number;
+      conversationDeleteBehavior?: string;
+      sendOrder?: number;
+    },
+  ): Promise<StickyDoc> {
     const channel = this.client.channels.cache.get(channelId) as TextChannel | NewsChannel | undefined;
 
     // Remove existing sticky message from chat if present
@@ -49,20 +64,24 @@ export class StickyMessageService {
       }
     }
 
+    // Build update document, only including provided options
+    const updateDoc: Record<string, any> = {
+      guildId,
+      channelId,
+      content,
+      moderatorId,
+      color: options?.color ?? 0,
+      enabled: true,
+      currentMessageId: null,
+    };
+    if (options?.detectionBehavior !== undefined) updateDoc.detectionBehavior = options.detectionBehavior;
+    if (options?.detectionDelay !== undefined) updateDoc.detectionDelay = options.detectionDelay;
+    if (options?.conversationDuration !== undefined) updateDoc.conversationDuration = options.conversationDuration;
+    if (options?.conversationDeleteBehavior !== undefined) updateDoc.conversationDeleteBehavior = options.conversationDeleteBehavior;
+    if (options?.sendOrder !== undefined) updateDoc.sendOrder = options.sendOrder;
+
     // Upsert the sticky record
-    const doc = await StickyMessage.findOneAndUpdate(
-      { channelId },
-      {
-        guildId,
-        channelId,
-        content,
-        moderatorId,
-        color: options?.color ?? 0,
-        enabled: true,
-        currentMessageId: null,
-      },
-      { upsert: true, new: true, runValidators: true },
-    );
+    const doc = await StickyMessage.findOneAndUpdate({ channelId }, updateDoc, { upsert: true, new: true, runValidators: true });
 
     // Send initial sticky message
     if (channel) {
@@ -94,6 +113,12 @@ export class StickyMessageService {
 
     await StickyMessage.deleteOne({ channelId });
     this.lastRefresh.delete(channelId);
+    // Clear any pending conversation timer
+    const timer = this.conversationTimers.get(channelId);
+    if (timer) {
+      clearTimeout(timer);
+      this.conversationTimers.delete(channelId);
+    }
     return true;
   }
 
@@ -143,18 +168,30 @@ export class StickyMessageService {
 
   /**
    * Called from the messageCreate event handler.
-   * Checks if the channel has an active sticky and refreshes it
-   * (delete old → send new) with cooldown protection.
+   * Routes to instant or conversation-aware refresh depending on config.
    */
   async handleNewMessage(channel: TextChannel | NewsChannel): Promise<void> {
+    const sticky = await StickyMessage.findOne({ channelId: channel.id, enabled: true });
+    if (!sticky) return;
+
+    const doc = sticky as unknown as StickyDoc;
+
+    if (doc.detectionBehavior === "delay") {
+      await this.handleConversationAware(channel, doc);
+    } else {
+      await this.handleInstant(channel, doc);
+    }
+  }
+
+  /**
+   * Instant mode: delete old → send new with a simple cooldown.
+   */
+  private async handleInstant(channel: TextChannel | NewsChannel, sticky: StickyDoc): Promise<void> {
     const now = Date.now();
     const last = this.lastRefresh.get(channel.id) ?? 0;
 
     // Enforce cooldown to avoid API spam
     if (now - last < REFRESH_COOLDOWN_MS) return;
-
-    const sticky = await StickyMessage.findOne({ channelId: channel.id, enabled: true });
-    if (!sticky) return;
 
     this.lastRefresh.set(channel.id, now);
 
@@ -169,7 +206,61 @@ export class StickyMessageService {
     }
 
     // Send new sticky
-    await this.postSticky(channel, sticky as unknown as StickyDoc);
+    await this.postSticky(channel, sticky);
+  }
+
+  /**
+   * Conversation-aware mode: debounce the sticky refresh.
+   * When a new message arrives, (optionally) delete the old sticky immediately,
+   * then reset a timer. Only resend the sticky after the configured delay
+   * has elapsed with no new messages (= conversation ended).
+   */
+  private async handleConversationAware(channel: TextChannel | NewsChannel, sticky: StickyDoc): Promise<void> {
+    const delayMs = ((sticky.conversationDuration ?? 10) + (sticky.detectionDelay ?? 5)) * 1000;
+
+    // If configured to delete immediately, remove the old sticky on first message
+    if (sticky.conversationDeleteBehavior === "immediate" && sticky.currentMessageId) {
+      // Only delete once — check if we already removed it for this conversation
+      const existingTimer = this.conversationTimers.get(channel.id);
+      if (!existingTimer) {
+        try {
+          const oldMsg = await channel.messages.fetch(sticky.currentMessageId);
+          await oldMsg.delete();
+        } catch {
+          // Already deleted
+        }
+        await StickyMessage.updateOne({ channelId: channel.id }, { currentMessageId: null });
+      }
+    }
+
+    // Clear any existing timer and set a new one (debounce)
+    const existingTimer = this.conversationTimers.get(channel.id);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    const timer = setTimeout(async () => {
+      this.conversationTimers.delete(channel.id);
+
+      // Refetch to get latest state
+      const current = await StickyMessage.findOne({ channelId: channel.id, enabled: true });
+      if (!current) return;
+
+      const currentDoc = current as unknown as StickyDoc;
+
+      // Delete old sticky if not already deleted (after_conversation mode)
+      if (currentDoc.currentMessageId) {
+        try {
+          const oldMsg = await channel.messages.fetch(currentDoc.currentMessageId);
+          await oldMsg.delete();
+        } catch {
+          // Already deleted
+        }
+      }
+
+      // Resend sticky
+      await this.postSticky(channel, currentDoc);
+    }, delayMs);
+
+    this.conversationTimers.set(channel.id, timer);
   }
 
   /**

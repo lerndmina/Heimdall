@@ -23,6 +23,11 @@ interface StickyMessage {
   currentMessageId?: string;
   moderatorId: string;
   enabled: boolean;
+  detectionBehavior: "instant" | "delay";
+  detectionDelay: number;
+  conversationDuration: number;
+  conversationDeleteBehavior: "immediate" | "after_conversation";
+  sendOrder: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -72,6 +77,11 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
   const [draftContent, setDraftContent] = useState("");
   const [draftColor, setDraftColor] = useState(0);
   const [draftColorHex, setDraftColorHex] = useState("");
+  const [draftDetectionBehavior, setDraftDetectionBehavior] = useState<"instant" | "delay">("instant");
+  const [draftDetectionDelay, setDraftDetectionDelay] = useState(5);
+  const [draftConversationDuration, setDraftConversationDuration] = useState(10);
+  const [draftConversationDeleteBehavior, setDraftConversationDeleteBehavior] = useState<"immediate" | "after_conversation">("after_conversation");
+  const [draftSendOrder, setDraftSendOrder] = useState(1);
   const [saving, setSaving] = useState(false);
 
   // Delete state
@@ -110,6 +120,11 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
     setDraftContent("");
     setDraftColor(0);
     setDraftColorHex("");
+    setDraftDetectionBehavior("instant");
+    setDraftDetectionDelay(5);
+    setDraftConversationDuration(10);
+    setDraftConversationDeleteBehavior("after_conversation");
+    setDraftSendOrder(1);
     setModalOpen(true);
   };
 
@@ -119,6 +134,11 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
     setDraftContent(sticky.content);
     setDraftColor(sticky.color);
     setDraftColorHex(decimalToHex(sticky.color));
+    setDraftDetectionBehavior(sticky.detectionBehavior ?? "instant");
+    setDraftDetectionDelay(sticky.detectionDelay ?? 5);
+    setDraftConversationDuration(sticky.conversationDuration ?? 10);
+    setDraftConversationDeleteBehavior(sticky.conversationDeleteBehavior ?? "after_conversation");
+    setDraftSendOrder(sticky.sendOrder ?? 1);
     setModalOpen(true);
   };
 
@@ -152,6 +172,11 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
         body: JSON.stringify({
           content: draftContent.trim(),
           color: draftColor,
+          detectionBehavior: draftDetectionBehavior,
+          detectionDelay: draftDetectionDelay,
+          conversationDuration: draftConversationDuration,
+          conversationDeleteBehavior: draftConversationDeleteBehavior,
+          sendOrder: draftSendOrder,
         }),
       });
 
@@ -414,6 +439,90 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
 
             {/* Custom hex input */}
             <TextInput label="" value={draftColorHex} onChange={handleHexChange} placeholder="#5865f2" description="Or enter a custom hex color" />
+          </div>
+
+          {/* Conversation Detection Settings */}
+          <div className="border-t border-zinc-700/30 pt-4 mt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300">Conversation Detection</label>
+                <p className="text-xs text-zinc-500 mt-0.5">Set how new user messages should be detected. Either instantly delete and resend the sticky message or wait until a conversation ends.</p>
+              </div>
+              <Toggle label="" checked={draftDetectionBehavior === "delay"} onChange={(v) => setDraftDetectionBehavior(v ? "delay" : "instant")} />
+            </div>
+
+            {draftDetectionBehavior === "delay" && (
+              <div className="space-y-3 pl-0">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Detection behavior
+                      <span className="ml-1 text-zinc-500 text-xs cursor-help" title="How to detect when a new message appears in the channel">
+                        ⓘ
+                      </span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select value="delay" disabled className="rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm">
+                      <option value="delay">With delay</option>
+                    </select>
+                    <div className="w-20">
+                      <TextInput label="" value={String(draftDetectionDelay)} onChange={(v) => setDraftDetectionDelay(Math.max(1, parseInt(v) || 5))} type="number" />
+                    </div>
+                    <span className="text-sm text-zinc-400">seconds</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Conversation duration
+                      <span className="ml-1 text-zinc-500 text-xs cursor-help" title="How long to wait after the last message before considering the conversation ended">
+                        ⓘ
+                      </span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-20">
+                      <TextInput label="" value={String(draftConversationDuration)} onChange={(v) => setDraftConversationDuration(Math.max(1, parseInt(v) || 10))} type="number" />
+                    </div>
+                    <span className="text-sm text-zinc-400">seconds</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Conversation delete behavior
+                      <span className="ml-1 text-zinc-500 text-xs cursor-help" title="When to delete the old sticky message">
+                        ⓘ
+                      </span>
+                    </label>
+                  </div>
+                  <select
+                    value={draftConversationDeleteBehavior}
+                    onChange={(e) => setDraftConversationDeleteBehavior(e.target.value as "immediate" | "after_conversation")}
+                    className="rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm">
+                    <option value="after_conversation">After conversation end</option>
+                    <option value="immediate">Immediately</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                      Send order
+                      <span className="ml-1 text-zinc-500 text-xs cursor-help" title="Order priority when channel has multiple automations (lower = first)">
+                        ⓘ
+                      </span>
+                    </label>
+                  </div>
+                  <div className="w-20">
+                    <TextInput label="" value={String(draftSendOrder)} onChange={(v) => setDraftSendOrder(Math.max(1, parseInt(v) || 1))} type="number" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </Modal>

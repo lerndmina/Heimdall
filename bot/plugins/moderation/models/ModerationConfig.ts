@@ -16,11 +16,13 @@ const EscalationTierSchema = new Schema(
     pointsThreshold: { type: Number, required: true },
     action: {
       type: String,
-      enum: ["timeout", "kick", "ban"],
+      enum: ["timeout", "kick", "ban", "dm"],
       required: true,
     },
     /** Duration in ms (for timeout action) */
     duration: { type: Number, default: null },
+    /** Custom DM message content (for dm action). Supports {variable} placeholders. */
+    dmMessage: { type: String, default: null },
     /** Per-tier DM template override */
     dmTemplate: { type: String, default: null },
     /** Per-tier DM embed override */

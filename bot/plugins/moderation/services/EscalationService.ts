@@ -12,7 +12,7 @@ import type { LoggingPluginAPI } from "../../logging/index.js";
 import type { IModerationConfig } from "../models/ModerationConfig.js";
 import Infraction, { InfractionType } from "../models/Infraction.js";
 import { ACTION_COLORS, MAX_TIMEOUT_MS } from "../utils/constants.js";
-import { formatDuration } from "../utils/dm-templates.js";
+import { formatDuration, renderTemplate, type TemplateVars } from "../utils/dm-templates.js";
 
 const log = createLogger("moderation:escalation");
 
@@ -55,28 +55,27 @@ export class EscalationService {
     // Sort tiers by threshold descending to find the highest applicable tier
     const sortedTiers = [...config.escalationTiers].sort((a, b) => (b.pointsThreshold ?? 0) - (a.pointsThreshold ?? 0));
 
-    for (const tier of sortedTiers) {
-      if (currentPoints >= (tier.pointsThreshold ?? Infinity)) {
-        // Skip if this tier has already been triggered
-        if (alreadyTriggered.has(tier.name ?? "")) {
-          continue;
-        }
+    // Find the single highest tier the user qualifies for — only that tier matters.
+    // If it's already been triggered, do NOT fall through to lower tiers.
+    const applicableTier = sortedTiers.find((tier) => currentPoints >= (tier.pointsThreshold ?? Infinity));
+    if (!applicableTier) return { triggered: false };
 
-        try {
-          await this.executeEscalation(guild, member, tier as any, config);
-          return {
-            triggered: true,
-            tierName: tier.name ?? "Unknown",
-            action: tier.action ?? "unknown",
-          };
-        } catch (error) {
-          log.error(`Failed to execute escalation tier "${tier.name}":`, error);
-          return { triggered: false };
-        }
-      }
+    // Already triggered this tier — don't re-fire or fall through
+    if (alreadyTriggered.has(applicableTier.name ?? "")) {
+      return { triggered: false };
     }
 
-    return { triggered: false };
+    try {
+      await this.executeEscalation(guild, member, applicableTier as any, config);
+      return {
+        triggered: true,
+        tierName: applicableTier.name ?? "Unknown",
+        action: applicableTier.action ?? "unknown",
+      };
+    } catch (error) {
+      log.error(`Failed to execute escalation tier "${applicableTier.name}":`, error);
+      return { triggered: false };
+    }
   }
 
   /**
@@ -108,7 +107,7 @@ export class EscalationService {
     }
   }
 
-  private async executeEscalation(guild: Guild, member: GuildMember, tier: { name: string; action: string; duration?: number | null }, config: ConfigDoc): Promise<void> {
+  private async executeEscalation(guild: Guild, member: GuildMember, tier: { name: string; action: string; duration?: number | null; dmMessage?: string | null }, config: ConfigDoc): Promise<void> {
     const reason = `Escalation: ${tier.name} (points threshold reached)`;
 
     switch (tier.action) {
@@ -128,6 +127,32 @@ export class EscalationService {
         log.info(`Escalation: banned ${member.user.tag} from ${guild.name}`);
         break;
       }
+      case "dm": {
+        const template = tier.dmMessage ?? "You have reached a moderation threshold in **{server}**.\n\n**Tier:** {tier}\n**Action:** DM Warning";
+        const vars: TemplateVars = {
+          user: `${member.user}`,
+          username: member.user.username,
+          server: guild.name,
+          rule: tier.name,
+          action: "Escalation DM",
+          reason,
+          timestamp: new Date().toISOString(),
+        };
+        // Also provide {tier} as a substitution
+        const rendered = renderTemplate(template, { ...vars }).replace(/\{tier\}/g, tier.name);
+        try {
+          await member.user.send({ content: rendered });
+          log.info(`Escalation: sent DM to ${member.user.tag} in ${guild.name} for tier "${tier.name}"`);
+        } catch (err) {
+          const error = err as { code?: number };
+          if (error.code === 50007) {
+            log.debug(`Cannot DM user ${member.user.id} — DMs disabled`);
+          } else {
+            log.error(`Failed to DM user ${member.user.id}:`, err);
+          }
+        }
+        break;
+      }
       default:
         log.warn(`Unknown escalation action: ${tier.action}`);
     }
@@ -136,7 +161,7 @@ export class EscalationService {
     await this.sendEscalationLog(guild, member, tier, config);
   }
 
-  private async sendEscalationLog(guild: Guild, member: GuildMember, tier: { name: string; action: string; duration?: number | null }, config: ConfigDoc): Promise<void> {
+  private async sendEscalationLog(guild: Guild, member: GuildMember, tier: { name: string; action: string; duration?: number | null; dmMessage?: string | null }, config: ConfigDoc): Promise<void> {
     try {
       const embed = this.lib
         .createEmbedBuilder()

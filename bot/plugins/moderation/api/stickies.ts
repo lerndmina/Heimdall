@@ -82,7 +82,7 @@ export function createStickyRoutes(deps: StickyApiDeps): Router {
     try {
       const guildId = req.params.guildId as string;
       const channelId = req.params.channelId as string;
-      const { content, color, moderatorId } = req.body;
+      const { content, color, moderatorId, detectionBehavior, detectionDelay, conversationDuration, conversationDeleteBehavior, sendOrder } = req.body;
 
       if (!content || typeof content !== "string") {
         res.status(400).json({
@@ -105,6 +105,11 @@ export function createStickyRoutes(deps: StickyApiDeps): Router {
 
       const sticky = await deps.stickyMessageService.setSticky(guildId, channelId, content, modId, {
         color: typeof color === "number" ? color : 0,
+        detectionBehavior: detectionBehavior ?? undefined,
+        detectionDelay: typeof detectionDelay === "number" ? detectionDelay : undefined,
+        conversationDuration: typeof conversationDuration === "number" ? conversationDuration : undefined,
+        conversationDeleteBehavior: conversationDeleteBehavior ?? undefined,
+        sendOrder: typeof sendOrder === "number" ? sendOrder : undefined,
       });
 
       broadcastDashboardChange(guildId, "moderation", "sticky_updated", {

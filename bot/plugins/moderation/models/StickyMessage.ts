@@ -26,6 +26,36 @@ const StickyMessageSchema = new Schema(
 
     /** Whether the sticky is currently active */
     enabled: { type: Boolean, default: true },
+
+    /**
+     * Detection behavior: "instant" deletes-and-resends immediately,
+     * "delay" waits for a conversation to end before resending.
+     */
+    detectionBehavior: {
+      type: String,
+      enum: ["instant", "delay"],
+      default: "instant",
+    },
+
+    /** Seconds to wait after the last message before resending (delay mode) */
+    detectionDelay: { type: Number, default: 5 },
+
+    /** How long (seconds) of inactivity before a conversation is considered ended */
+    conversationDuration: { type: Number, default: 10 },
+
+    /**
+     * When to delete the old sticky:
+     * "immediate" — delete as soon as a new message arrives
+     * "after_conversation" — delete and resend only after conversation ends
+     */
+    conversationDeleteBehavior: {
+      type: String,
+      enum: ["immediate", "after_conversation"],
+      default: "after_conversation",
+    },
+
+    /** Order priority when channel has multiple automations (lower = first) */
+    sendOrder: { type: Number, default: 1 },
   },
   { timestamps: true },
 );

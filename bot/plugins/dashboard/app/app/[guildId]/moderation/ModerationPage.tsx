@@ -57,10 +57,11 @@ interface ModerationConfig {
 interface EscalationTier {
   name: string;
   pointsThreshold: number;
-  action: "timeout" | "kick" | "ban";
+  action: "timeout" | "kick" | "ban" | "dm";
   duration?: string;
   dmTemplate?: string;
   dmEmbed?: boolean;
+  dmMessage?: string;
 }
 
 interface AutomodRule {
@@ -1349,11 +1350,27 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
                     <option value="timeout">Timeout</option>
                     <option value="kick">Kick</option>
                     <option value="ban">Ban</option>
+                    <option value="dm">DM Message</option>
                   </select>
                 </div>
                 {tier.action === "timeout" && (
                   <div className="w-28">
                     <TextInput label="Duration" value={tier.duration ?? ""} onChange={(v) => updateTier(i, "duration", v)} placeholder="e.g. 1h, 1d" />
+                  </div>
+                )}
+                {tier.action === "dm" && (
+                  <div className="flex-1">
+                    <Textarea
+                      label="DM Message"
+                      value={tier.dmMessage ?? ""}
+                      onChange={(v) => updateTier(i, "dmMessage", v)}
+                      placeholder="You have reached {tier} in **{server}**. Please review the rules."
+                      rows={2}
+                      maxLength={2000}
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Variables: {"{user}"} {"{username}"} {"{server}"} {"{tier}"} {"{rule}"}
+                    </p>
                   </div>
                 )}
                 {canManage && (
