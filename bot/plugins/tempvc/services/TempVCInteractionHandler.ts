@@ -106,12 +106,13 @@ export class TempVCInteractionHandler {
   async buildControlPanel(channelId: string, ownerId: string): Promise<MessageCreateOptions> {
     const cbs = this.lib.componentCallbackService;
 
-    const deleteId = await cbs.createPersistentComponent("tempvc.delete_request", "button", { channelId });
-    const renameId = await cbs.createPersistentComponent("tempvc.rename", "button", { channelId });
-    const inviteId = await cbs.createPersistentComponent("tempvc.invite_menu", "button", { channelId });
-    const banId = await cbs.createPersistentComponent("tempvc.ban_menu", "button", { channelId });
-    const limitId = await cbs.createPersistentComponent("tempvc.limit", "button", { channelId });
-    const lockId = await cbs.createPersistentComponent("tempvc.lock_toggle", "button", { channelId });
+    const metadata = { channelId, ownerId };
+    const deleteId = await cbs.createPersistentComponent("tempvc.delete_request", "button", metadata);
+    const renameId = await cbs.createPersistentComponent("tempvc.rename", "button", metadata);
+    const inviteId = await cbs.createPersistentComponent("tempvc.invite_menu", "button", metadata);
+    const banId = await cbs.createPersistentComponent("tempvc.ban_menu", "button", metadata);
+    const limitId = await cbs.createPersistentComponent("tempvc.limit", "button", metadata);
+    const lockId = await cbs.createPersistentComponent("tempvc.lock_toggle", "button", metadata);
 
     const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId(deleteId).setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
@@ -162,8 +163,24 @@ export class TempVCInteractionHandler {
     try {
       const metadata = await this.lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
       const channelId = metadata?.channelId as string | undefined;
+      const ownerId = metadata?.ownerId as string | undefined;
       if (!channelId) {
         await interaction.reply({ content: "❌ Channel information not found.", ephemeral: true });
+        return;
+      }
+
+      if (!interaction.guild) {
+        await interaction.reply({ content: "❌ This command can only be used in a server.", ephemeral: true });
+        return;
+      }
+
+      const channel = interaction.guild.channels.cache.get(channelId) as VoiceChannel | undefined;
+      if (!channel) {
+        await interaction.reply({ content: "❌ Channel not found or was deleted.", ephemeral: true });
+        return;
+      }
+
+      if (!(await this.ensureCanManageChannel(interaction, channel, ownerId))) {
         return;
       }
 
@@ -172,7 +189,7 @@ export class TempVCInteractionHandler {
       // Ephemeral confirm/cancel buttons (5 min TTL)
       const confirmId = await cbs.register(async (i) => {
         if (!i.isButton()) return;
-        await this.executeDelete(i, channelId);
+        await this.executeDelete(i, channelId, ownerId);
       }, 300);
 
       const cancelId = await cbs.register(async (i) => {
@@ -199,11 +216,16 @@ export class TempVCInteractionHandler {
   /**
    * Execute channel deletion after confirmation
    */
-  private async executeDelete(interaction: ButtonInteraction, channelId: string): Promise<void> {
+  private async executeDelete(interaction: ButtonInteraction, channelId: string, ownerId?: string): Promise<void> {
     try {
       await interaction.deferUpdate();
       if (!interaction.guild) {
         await interaction.editReply({ content: "❌ This command can only be used in a server.", components: [] });
+        return;
+      }
+
+      const channel = interaction.guild.channels.cache.get(channelId) as VoiceChannel | undefined;
+      if (channel && !(await this.ensureCanManageChannel(interaction, channel, ownerId))) {
         return;
       }
 
@@ -232,6 +254,7 @@ export class TempVCInteractionHandler {
     try {
       const metadata = await this.lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
       const channelId = metadata?.channelId as string | undefined;
+      const ownerId = metadata?.ownerId as string | undefined;
       if (!channelId || !interaction.guild) {
         await interaction.reply({ content: "❌ Channel information not found.", ephemeral: true });
         return;
@@ -246,6 +269,10 @@ export class TempVCInteractionHandler {
       const botMember = interaction.guild.members.me;
       if (!botMember || !channel.permissionsFor(botMember)?.has(PermissionFlagsBits.ManageChannels)) {
         await interaction.reply({ content: "❌ I don't have permission to manage this channel.", ephemeral: true });
+        return;
+      }
+
+      if (!(await this.ensureCanManageChannel(interaction, channel, ownerId))) {
         return;
       }
 
@@ -265,7 +292,7 @@ export class TempVCInteractionHandler {
         time: 120_000,
       });
 
-      await this.handleRenameSubmit(modalSubmit, channelId);
+      await this.handleRenameSubmit(modalSubmit, channelId, ownerId);
     } catch (error) {
       if (error instanceof Error && error.message.includes("time")) {
         log.debug("Rename modal timed out");
@@ -279,7 +306,7 @@ export class TempVCInteractionHandler {
   /**
    * Process rename modal submission
    */
-  private async handleRenameSubmit(interaction: ModalSubmitInteraction, channelId: string): Promise<void> {
+  private async handleRenameSubmit(interaction: ModalSubmitInteraction, channelId: string, ownerId?: string): Promise<void> {
     try {
       await interaction.deferReply({ ephemeral: true });
 
@@ -300,6 +327,10 @@ export class TempVCInteractionHandler {
         return;
       }
 
+      if (!(await this.ensureCanManageChannel(interaction, channel, ownerId))) {
+        return;
+      }
+
       await this.service.renameTempChannel(channel, newName);
       await interaction.editReply({ content: `✅ Channel renamed to **${newName}**!` });
     } catch (error) {
@@ -315,6 +346,7 @@ export class TempVCInteractionHandler {
     try {
       const metadata = await this.lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
       const channelId = metadata?.channelId as string | undefined;
+      const ownerId = metadata?.ownerId as string | undefined;
       if (!channelId || !interaction.guild) {
         await interaction.reply({ content: "❌ Channel information not found.", ephemeral: true });
         return;
@@ -326,7 +358,11 @@ export class TempVCInteractionHandler {
         return;
       }
 
-      const selectId = await this.lib.componentCallbackService.createPersistentComponent("tempvc.invite_user", "selectMenu", { channelId });
+      if (!(await this.ensureCanManageChannel(interaction, channel as VoiceChannel, ownerId))) {
+        return;
+      }
+
+      const selectId = await this.lib.componentCallbackService.createPersistentComponent("tempvc.invite_user", "selectMenu", { channelId, ownerId });
 
       const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
         new UserSelectMenuBuilder().setCustomId(selectId).setPlaceholder("Select users to invite").setMinValues(1).setMaxValues(25),
@@ -352,6 +388,7 @@ export class TempVCInteractionHandler {
 
       const metadata = await this.lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
       const channelId = metadata?.channelId as string | undefined;
+      const ownerId = metadata?.ownerId as string | undefined;
       if (!channelId || !interaction.guild) {
         await interaction.editReply({ content: "❌ Channel information not found." });
         return;
@@ -360,6 +397,10 @@ export class TempVCInteractionHandler {
       const channel = interaction.guild.channels.cache.get(channelId) as VoiceChannel | undefined;
       if (!channel) {
         await interaction.editReply({ content: "❌ Channel not found or was deleted." });
+        return;
+      }
+
+      if (!(await this.ensureCanManageChannel(interaction, channel, ownerId))) {
         return;
       }
 
@@ -400,6 +441,7 @@ export class TempVCInteractionHandler {
     try {
       const metadata = await this.lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
       const channelId = metadata?.channelId as string | undefined;
+      const ownerId = metadata?.ownerId as string | undefined;
       if (!channelId || !interaction.guild) {
         await interaction.reply({ content: "❌ Channel information not found.", ephemeral: true });
         return;
@@ -411,7 +453,11 @@ export class TempVCInteractionHandler {
         return;
       }
 
-      const selectId = await this.lib.componentCallbackService.createPersistentComponent("tempvc.ban_user", "selectMenu", { channelId });
+      if (!(await this.ensureCanManageChannel(interaction, channel as VoiceChannel, ownerId))) {
+        return;
+      }
+
+      const selectId = await this.lib.componentCallbackService.createPersistentComponent("tempvc.ban_user", "selectMenu", { channelId, ownerId });
 
       const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
         new UserSelectMenuBuilder().setCustomId(selectId).setPlaceholder("Select a user to ban from this channel").setMinValues(1).setMaxValues(1),
@@ -437,6 +483,7 @@ export class TempVCInteractionHandler {
 
       const metadata = await this.lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
       const channelId = metadata?.channelId as string | undefined;
+      const ownerId = metadata?.ownerId as string | undefined;
       if (!channelId || !interaction.guild) {
         await interaction.editReply({ content: "❌ Channel information not found." });
         return;
@@ -448,9 +495,18 @@ export class TempVCInteractionHandler {
         return;
       }
 
+      if (!(await this.ensureCanManageChannel(interaction, channel, ownerId))) {
+        return;
+      }
+
       const targetUserId = interaction.values[0];
       if (!targetUserId) {
         await interaction.editReply({ content: "❌ No user selected." });
+        return;
+      }
+
+      if (ownerId && targetUserId === ownerId) {
+        await interaction.editReply({ content: "❌ You can't ban the channel owner from their own Temp VC." });
         return;
       }
 
@@ -475,6 +531,7 @@ export class TempVCInteractionHandler {
     try {
       const metadata = await this.lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
       const channelId = metadata?.channelId as string | undefined;
+      const ownerId = metadata?.ownerId as string | undefined;
       if (!channelId || !interaction.guild) {
         await interaction.reply({ content: "❌ Channel information not found.", ephemeral: true });
         return;
@@ -483,6 +540,10 @@ export class TempVCInteractionHandler {
       const channel = interaction.guild.channels.cache.get(channelId) as VoiceChannel | undefined;
       if (!channel) {
         await interaction.reply({ content: "❌ Channel not found or was deleted.", ephemeral: true });
+        return;
+      }
+
+      if (!(await this.ensureCanManageChannel(interaction, channel, ownerId))) {
         return;
       }
 
@@ -508,7 +569,7 @@ export class TempVCInteractionHandler {
         time: 120_000,
       });
 
-      await this.handleLimitSubmit(modalSubmit, channelId);
+      await this.handleLimitSubmit(modalSubmit, channelId, ownerId);
     } catch (error) {
       if (error instanceof Error && error.message.includes("time")) {
         log.debug("Limit modal timed out");
@@ -522,7 +583,7 @@ export class TempVCInteractionHandler {
   /**
    * Process limit modal submission
    */
-  private async handleLimitSubmit(interaction: ModalSubmitInteraction, channelId: string): Promise<void> {
+  private async handleLimitSubmit(interaction: ModalSubmitInteraction, channelId: string, ownerId?: string): Promise<void> {
     try {
       await interaction.deferReply({ ephemeral: true });
 
@@ -545,6 +606,10 @@ export class TempVCInteractionHandler {
         return;
       }
 
+      if (!(await this.ensureCanManageChannel(interaction, channel, ownerId))) {
+        return;
+      }
+
       await this.service.setUserLimit(channel, limit);
 
       const display = limit === 0 ? "no limit" : `${limit} users`;
@@ -564,6 +629,7 @@ export class TempVCInteractionHandler {
 
       const metadata = await this.lib.componentCallbackService.getPersistentComponentMetadata(interaction.customId);
       const channelId = metadata?.channelId as string | undefined;
+      const ownerId = this.resolveOwnerIdForControlPanel(interaction, metadata?.ownerId as string | undefined);
       if (!channelId || !interaction.guild) {
         await interaction.editReply({ content: "❌ Channel information not found." });
         return;
@@ -575,11 +641,15 @@ export class TempVCInteractionHandler {
         return;
       }
 
+      if (!(await this.ensureCanManageChannel(interaction, channel, ownerId))) {
+        return;
+      }
+
       const everyoneRole = interaction.guild.roles.everyone;
       const perms = channel.permissionOverwrites.cache.get(everyoneRole.id);
       const isLocked = perms?.deny.has(PermissionFlagsBits.Connect) ?? false;
 
-      await this.service.lockTempChannel(channel, !isLocked);
+      await this.service.lockTempChannel(channel, !isLocked, ownerId);
 
       const statusText = !isLocked ? "🔒 locked" : "🔓 unlocked";
       await interaction.editReply({ content: `✅ Channel is now **${statusText}**!` });
@@ -604,5 +674,51 @@ export class TempVCInteractionHandler {
     } catch {
       log.error("Failed to send error message");
     }
+  }
+
+  /**
+   * Temp VC control actions are restricted to either:
+   * - The original channel owner, OR
+   * - Anyone with ManageChannels in that specific channel
+   */
+  private async ensureCanManageChannel(interaction: ButtonInteraction | ModalSubmitInteraction | UserSelectMenuInteraction, channel: VoiceChannel, ownerId?: string): Promise<boolean> {
+    const actorId = interaction.user.id;
+    const isOwner = ownerId === actorId;
+
+    let hasManageChannels = false;
+    if (!isOwner) {
+      const member = channel.guild.members.cache.get(actorId) ?? (await channel.guild.members.fetch(actorId).catch(() => null));
+      hasManageChannels = member ? (channel.permissionsFor(member)?.has(PermissionFlagsBits.ManageChannels) ?? false) : false;
+    }
+
+    if (isOwner || hasManageChannels) {
+      return true;
+    }
+
+    const content = "❌ Only the channel owner or members with Manage Channels permission can use Temp VC controls.";
+    if (interaction.replied || interaction.deferred) {
+      await interaction.editReply({ content });
+    } else {
+      await interaction.reply({ content, ephemeral: true });
+    }
+    return false;
+  }
+
+  /**
+   * Resolve channel owner for control panel interactions.
+   * Primary source is persistent component metadata; fallback is the panel message mention.
+   */
+  private resolveOwnerIdForControlPanel(interaction: ButtonInteraction, metadataOwnerId?: string): string | undefined {
+    if (metadataOwnerId) {
+      return metadataOwnerId;
+    }
+
+    const content = interaction.message?.content ?? "";
+    const mention = content.match(/<@!?(\d+)>/);
+    if (mention?.[1]) {
+      return mention[1];
+    }
+
+    return undefined;
   }
 }

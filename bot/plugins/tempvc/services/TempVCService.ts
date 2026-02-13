@@ -46,6 +46,17 @@ export class TempVCService {
   private lib: LibAPI;
   private interactionHandler?: { buildControlPanel(channelId: string, ownerId: string): Promise<MessageCreateOptions> };
 
+  private static readonly OWNER_BASELINE_PERMISSIONS = {
+    ViewChannel: true,
+    Connect: true,
+    Speak: true,
+    SendMessages: true,
+    ReadMessageHistory: true,
+    UseApplicationCommands: true,
+    ManageChannels: true,
+    ManageRoles: true,
+  } as const;
+
   constructor(client: HeimdallClient, redis: RedisClientType, lib: LibAPI) {
     this.client = client;
     this.redis = redis;
@@ -154,6 +165,8 @@ export class TempVCService {
       bitrate: sourceChannel.bitrate,
     });
 
+    await this.ensureOwnerPermissions(newChannel, member.id);
+
     // Move user to new channel
     try {
       await member.voice.setChannel(newChannel);
@@ -215,11 +228,16 @@ export class TempVCService {
   /**
    * Lock or unlock a temporary voice channel
    */
-  async lockTempChannel(channel: VoiceChannel, lock: boolean): Promise<void> {
+  async lockTempChannel(channel: VoiceChannel, lock: boolean, ownerId?: string): Promise<void> {
     const everyoneRole = channel.guild.roles.everyone;
     await channel.permissionOverwrites.edit(everyoneRole, {
       Connect: lock ? false : null,
     });
+
+    if (ownerId) {
+      await this.ensureOwnerPermissions(channel, ownerId);
+    }
+
     log.info(`${lock ? "Locked" : "Unlocked"} channel ${channel.id}`);
   }
 
@@ -268,13 +286,7 @@ export class TempVCService {
    * Build permission overwrites for a new temp VC based on the opener's permission mode.
    */
   private async buildPermissionOverwrites(member: GuildMember, config: ChannelConfig, sourceChannel: VoiceChannel): Promise<OverwriteResolvable[]> {
-    const overwrites: OverwriteResolvable[] = [
-      // Owner always gets manage perms
-      {
-        id: member.id,
-        allow: [PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles],
-      },
-    ];
+    const overwrites: OverwriteResolvable[] = [this.createOwnerBaselineOverwrite(member.id)];
 
     const mode = config.permissionMode ?? "none";
 
@@ -324,6 +336,26 @@ export class TempVCService {
     }
 
     return overwrites;
+  }
+
+  private createOwnerBaselineOverwrite(ownerId: string): OverwriteResolvable {
+    return {
+      id: ownerId,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.UseApplicationCommands,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.ManageRoles,
+      ],
+    };
+  }
+
+  private async ensureOwnerPermissions(channel: VoiceChannel, ownerId: string): Promise<void> {
+    await channel.permissionOverwrites.edit(ownerId, TempVCService.OWNER_BASELINE_PERMISSIONS);
   }
 
   /**
