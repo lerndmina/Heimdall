@@ -8,7 +8,6 @@ import type { CommandContext } from "../../../src/core/CommandManager.js";
 export const data = new SlashCommandBuilder()
   .setName("purge")
   .setDescription("Bulk delete messages with optional filters")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
   .addSubcommand((sub) =>
     sub
       .setName("count")

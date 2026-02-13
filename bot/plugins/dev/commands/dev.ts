@@ -10,7 +10,6 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 export const data = new SlashCommandBuilder()
   .setName("dev")
   .setDescription("Developer utilities (owner-only)")
-  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addSubcommand((sub) =>
     sub
       .setName("mongo-import")

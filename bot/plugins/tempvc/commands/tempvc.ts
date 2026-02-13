@@ -12,7 +12,6 @@ import { SlashCommandBuilder, PermissionFlagsBits, ChannelType } from "discord.j
 export const data = new SlashCommandBuilder()
   .setName("tempvc")
   .setDescription("Setup and manage temporary voice channels")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .setDMPermission(false)
   .addSubcommand((sub) =>
     sub

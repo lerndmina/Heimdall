@@ -11,7 +11,6 @@ import type { CommandContext } from "../../../src/core/CommandManager.js";
 export const data = new SlashCommandBuilder()
   .setName("automod")
   .setDescription("Manage automod settings")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand((sub) => sub.setName("enable").setDescription("Enable automod for this server"))
   .addSubcommand((sub) => sub.setName("disable").setDescription("Disable automod for this server"))
   .addSubcommand((sub) => sub.setName("view").setDescription("View current automod configuration"))

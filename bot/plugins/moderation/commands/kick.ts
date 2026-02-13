@@ -10,7 +10,6 @@ import type { ModerationPluginAPI } from "../index.js";
 export const data = new SlashCommandBuilder()
   .setName("kick")
   .setDescription("Kick a member from the server")
-  .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
   .addUserOption((opt) => opt.setName("user").setDescription("The member to kick").setRequired(true))
   .addStringOption((opt) => opt.setName("reason").setDescription("Reason for the kick").setRequired(false));
 

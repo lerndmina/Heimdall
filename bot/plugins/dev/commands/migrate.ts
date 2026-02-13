@@ -13,7 +13,6 @@ import { runFullMigration, type MigrationStats, type FullMigrationOptions } from
 export const data = new SlashCommandBuilder()
   .setName("migrate")
   .setDescription("Import data from the old bot database")
-  .setDefaultMemberPermissions("0") // Owner only
   .addSubcommand((sub) =>
     sub
       .setName("run")

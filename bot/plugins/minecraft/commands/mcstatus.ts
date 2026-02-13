@@ -46,8 +46,7 @@ export const data = new SlashCommandBuilder()
       .addStringOption((opt) => opt.setName("server-name").setDescription("The name of the server").setRequired(true))
       .addChannelOption((opt) => opt.setName("channel").setDescription("The channel to send the status to").setRequired(true))
       .addBooleanOption((opt) => opt.setName("persistent").setDescription("Keep the message automatically updated").setRequired(false)),
-  )
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages);
+  );
 
 export const config = { allowInDMs: false };
 

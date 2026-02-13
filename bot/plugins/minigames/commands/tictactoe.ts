@@ -10,8 +10,7 @@ import TicTacToe from "../models/TicTacToe.js";
 export const data = new SlashCommandBuilder()
   .setName("tictactoe")
   .setDescription("Start a Tic-Tac-Toe game")
-  .addUserOption((opt) => opt.setName("opponent").setDescription("The user you want to play against").setRequired(true))
-  .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages);
+  .addUserOption((opt) => opt.setName("opponent").setDescription("The user you want to play against").setRequired(true));
 
 export const config = {
   allowInDMs: false,

@@ -10,7 +10,6 @@ import type { ModerationPluginAPI } from "../index.js";
 export const data = new SlashCommandBuilder()
   .setName("unban")
   .setDescription("Unban a member from the server")
-  .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
   .addUserOption((opt) => opt.setName("user").setDescription("The user to unban").setRequired(true))
   .addStringOption((opt) => opt.setName("reason").setDescription("Reason for the unban").setRequired(false));
 

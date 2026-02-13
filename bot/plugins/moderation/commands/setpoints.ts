@@ -10,7 +10,6 @@ import type { ModerationPluginAPI } from "../index.js";
 export const data = new SlashCommandBuilder()
   .setName("setpoints")
   .setDescription("Set a user's infraction points to a specific value")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
   .addUserOption((opt) => opt.setName("user").setDescription("The user whose points to set").setRequired(true))
   .addIntegerOption((opt) => opt.setName("points").setDescription("The point value to set").setRequired(true).setMinValue(0).setMaxValue(1000))
   .addStringOption((opt) => opt.setName("reason").setDescription("Reason for setting points").setRequired(false));

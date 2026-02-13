@@ -7,7 +7,6 @@ import { SlashCommandBuilder, ChannelType, PermissionFlagsBits } from "discord.j
 export const data = new SlashCommandBuilder()
   .setName("welcome")
   .setDescription("Setup and manage welcome messages for new members")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand((sub) =>
     sub
       .setName("setup")

@@ -18,7 +18,6 @@ const log = createLogger("vc-transcription");
 export const data = new SlashCommandBuilder()
   .setName("voice-transcription")
   .setDescription("Configure voice message transcription settings")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand((sub) => sub.setName("status").setDescription("View current transcription configuration"))
   .addSubcommand((sub) =>
     sub

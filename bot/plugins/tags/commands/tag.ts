@@ -7,7 +7,6 @@ import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 export const data = new SlashCommandBuilder()
   .setName("tag")
   .setDescription("Create and use custom text tags")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
   .addSubcommand((sub) =>
     sub
       .setName("use")

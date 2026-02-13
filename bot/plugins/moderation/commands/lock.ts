@@ -10,7 +10,6 @@ import type { ModerationPluginAPI } from "../index.js";
 export const data = new SlashCommandBuilder()
   .setName("lock")
   .setDescription("Lock a channel, preventing members from sending messages")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
   .addChannelOption((opt) =>
     opt.setName("channel").setDescription("The channel to lock (defaults to current channel)").setRequired(false).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
   )

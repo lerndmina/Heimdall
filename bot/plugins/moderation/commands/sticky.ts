@@ -14,7 +14,6 @@ import type { TagsPluginAPI } from "../../tags/index.js";
 export const data = new SlashCommandBuilder()
   .setName("sticky")
   .setDescription("Manage sticky messages that stay at the bottom of a channel")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
   .addSubcommand((sub) =>
     sub
       .setName("set")

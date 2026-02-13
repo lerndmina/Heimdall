@@ -12,12 +12,11 @@
  * - migrate - Import modmail data from old Heimdall database
  */
 
-import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 
 export const data = new SlashCommandBuilder()
   .setName("modmail")
   .setDescription("Modmail system management")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   // Config subcommand (launches interactive panel — also handles first-time setup)
   .addSubcommand((sub) => sub.setName("config").setDescription("Open the interactive configuration panel"))
   // Staff actions

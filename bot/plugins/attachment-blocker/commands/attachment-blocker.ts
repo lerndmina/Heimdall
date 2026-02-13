@@ -7,7 +7,6 @@ import { SlashCommandBuilder, PermissionFlagsBits, ChannelType } from "discord.j
 export const data = new SlashCommandBuilder()
   .setName("attachment-blocker")
   .setDescription("Manage attachment blocking rules for channels")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
   .addSubcommand((sub) =>
     sub
       .setName("setup")

@@ -507,7 +507,6 @@ export class PluginLoader {
 
   private buildCommandPermissionKeys(pluginName: string, commandName: string | undefined, commandData: any, permissions?: CommandPermissionDefinition): CommandPermissionKeys | undefined {
     if (!commandName) return undefined;
-    if (pluginName === "dev") return undefined;
 
     const subcommands = this.getSubcommandPaths(commandData);
     const keys: CommandPermissionKeys = { base: undefined, subcommands: {} };
@@ -549,7 +548,6 @@ export class PluginLoader {
 
   private buildContextMenuPermissionKey(pluginName: string, commandName: string | undefined, permissions?: CommandPermissionDefinition): string | undefined {
     if (!commandName) return undefined;
-    if (pluginName === "dev") return undefined;
 
     const actionKey = `commands.${commandName}`;
     const fullKey = `${pluginName}.${actionKey}`;

@@ -10,7 +10,6 @@ import type { ModerationPluginAPI } from "../index.js";
 export const data = new SlashCommandBuilder()
   .setName("warn")
   .setDescription("Warn a member and assign infraction points")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
   .addUserOption((opt) => opt.setName("user").setDescription("The member to warn").setRequired(true))
   .addIntegerOption((opt) => opt.setName("points").setDescription("Points to assign (default: 1)").setRequired(false).setMinValue(1).setMaxValue(100))
   .addStringOption((opt) => opt.setName("reason").setDescription("Reason for the warning").setRequired(false));

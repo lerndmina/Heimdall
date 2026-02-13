@@ -10,7 +10,6 @@ import type { ModerationPluginAPI } from "../index.js";
 export const data = new SlashCommandBuilder()
   .setName("unlock")
   .setDescription("Unlock a locked channel, restoring its previous permissions")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
   .addChannelOption((opt) =>
     opt.setName("channel").setDescription("The channel to unlock (defaults to current channel)").setRequired(false).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
   );

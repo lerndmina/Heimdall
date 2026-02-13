@@ -29,8 +29,7 @@ export const data = new SlashCommandBuilder()
       .setRequired(false)
       .addChoices({ name: "Skip duplicates", value: "skip" }, { name: "Overwrite duplicates", value: "overwrite" }),
   )
-  .addBooleanOption((opt) => opt.setName("dry-run").setDescription("Preview what would be imported without making changes").setRequired(false))
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
+  .addBooleanOption((opt) => opt.setName("dry-run").setDescription("Preview what would be imported without making changes").setRequired(false));
 
 export const config = { allowInDMs: false };
 

@@ -15,7 +15,7 @@ import { createLogger } from "../../../src/core/Logger.js";
 
 const log = createLogger("minecraft:relink-mcstatus");
 
-export const data = new ContextMenuCommandBuilder().setName("Relink MC Status").setType(ApplicationCommandType.Message).setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages);
+export const data = new ContextMenuCommandBuilder().setName("Relink MC Status").setType(ApplicationCommandType.Message);
 
 export const config = { allowInDMs: false };
 

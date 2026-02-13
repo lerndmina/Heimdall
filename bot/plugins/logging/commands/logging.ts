@@ -7,7 +7,6 @@ import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 export const data = new SlashCommandBuilder()
   .setName("logging")
   .setDescription("Configure logging for your server")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand((sub) =>
     sub
       .setName("setup")

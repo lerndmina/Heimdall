@@ -3,7 +3,6 @@ import { SlashCommandBuilder, PermissionFlagsBits, ChannelType } from "discord.j
 export const data = new SlashCommandBuilder()
   .setName("suggestion-config")
   .setDescription("Configure the suggestion system")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand((sub) =>
     sub
       .setName("add-channel")

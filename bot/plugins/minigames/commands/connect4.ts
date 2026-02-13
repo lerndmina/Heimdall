@@ -10,8 +10,7 @@ import Connect4 from "../models/Connect4.js";
 export const data = new SlashCommandBuilder()
   .setName("connect4")
   .setDescription("Start a Connect4 game")
-  .addUserOption((opt) => opt.setName("opponent").setDescription("The user you want to play against").setRequired(true))
-  .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages);
+  .addUserOption((opt) => opt.setName("opponent").setDescription("The user you want to play against").setRequired(true));
 
 export const config = {
   allowInDMs: false,

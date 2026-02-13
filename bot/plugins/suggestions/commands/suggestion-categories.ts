@@ -3,7 +3,6 @@ import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 export const data = new SlashCommandBuilder()
   .setName("suggestion-categories")
   .setDescription("Manage suggestion categories")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand((sub) => sub.setName("list").setDescription("List all suggestion categories"))
   .addSubcommand((sub) =>
     sub

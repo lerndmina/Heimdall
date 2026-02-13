@@ -10,7 +10,6 @@ import type { ModerationPluginAPI } from "../index.js";
 export const data = new SlashCommandBuilder()
   .setName("infractions")
   .setDescription("View a user's infraction history")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
   .addUserOption((opt) => opt.setName("user").setDescription("The user to view infractions for").setRequired(true))
   .addIntegerOption((opt) => opt.setName("page").setDescription("Page number").setRequired(false).setMinValue(1));
 

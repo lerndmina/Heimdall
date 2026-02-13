@@ -7,7 +7,6 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 export const data = new SlashCommandBuilder()
   .setName("ticket-admin")
   .setDescription("Manage ticket system configuration")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommandGroup((group) =>
     group
       .setName("category")

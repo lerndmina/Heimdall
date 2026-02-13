@@ -46,8 +46,7 @@ export const data = new SlashCommandBuilder()
           ),
       )
       .addStringOption((opt) => opt.setName("message").setDescription("The message text (use {code} for auth code, {player} for username). Leave empty to reset.").setRequired(false)),
-  )
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
+  );
 
 export const config = { allowInDMs: false };
 

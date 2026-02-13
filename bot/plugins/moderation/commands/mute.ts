@@ -11,7 +11,6 @@ import { formatDuration } from "../utils/dm-templates.js";
 export const data = new SlashCommandBuilder()
   .setName("mute")
   .setDescription("Timeout a member for a specified duration")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
   .addUserOption((opt) => opt.setName("user").setDescription("The member to timeout").setRequired(true))
   .addStringOption((opt) => opt.setName("duration").setDescription("Duration (e.g. 1h, 30m, 2d)").setRequired(true))
   .addStringOption((opt) => opt.setName("reason").setDescription("Reason for the timeout").setRequired(false));
