@@ -142,8 +142,20 @@ export class ApiManager {
    * Setup base middleware
    */
   private setupMiddleware(): void {
-    // Trust first upstream proxy (e.g. nginx / container ingress) for correct client IP detection
-    this.app.set("trust proxy", 1);
+    // Trust proxy configuration for accurate client IPs behind reverse proxies.
+    // Defaults to 1 (first upstream proxy) to support common Docker/nginx setups.
+    const trustProxyRaw = (process.env.TRUST_PROXY ?? "1").trim().toLowerCase();
+    let trustProxySetting: boolean | number | string;
+    if (trustProxyRaw === "true") {
+      trustProxySetting = true;
+    } else if (trustProxyRaw === "false") {
+      trustProxySetting = false;
+    } else if (/^\d+$/.test(trustProxyRaw)) {
+      trustProxySetting = Number(trustProxyRaw);
+    } else {
+      trustProxySetting = trustProxyRaw;
+    }
+    this.app.set("trust proxy", trustProxySetting);
 
     // Request parsing — default 1MB limit for most routes
     this.app.use(express.json({ limit: "1mb" }));
