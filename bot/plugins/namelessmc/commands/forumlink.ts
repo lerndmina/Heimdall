@@ -31,8 +31,66 @@ export async function execute(context: CommandContext): Promise<void> {
   const siteBaseUrl = resolveSiteBaseUrl();
   const apiKey = resolveApiKey();
   const isConfigured = Boolean(siteBaseUrl) && Boolean(apiKey);
+  const service = isConfigured ? new NamelessMcService({ siteBaseUrl, apiKey }) : null;
 
-  const sitePath = siteBaseUrl ? `${siteBaseUrl.replace(/\/+$/, "")}/user/connections/` : "sitebaseurl_ENV/user/connections/";
+  if (service) {
+    const lookup = await service.lookupDiscordLink(interaction.user.id);
+
+    if (!lookup.success) {
+      const statusEmbed = pluginAPI.lib
+        .createEmbedBuilder()
+        .setColor(0xffa500)
+        .setTitle("⚠️ Could Not Verify Link Status")
+        .setDescription("I could not confirm whether your Discord is already linked, so linking is temporarily blocked to avoid duplicate connections.")
+        .addFields({
+          name: "Reason",
+          value: lookup.message ?? "Unknown API error",
+          inline: false,
+        });
+
+      await interaction.editReply({ embeds: [statusEmbed], components: [] });
+      return;
+    }
+
+    if (lookup.linked) {
+      const linkedUser = lookup.user;
+      const linkedEmbed = pluginAPI.lib
+        .createEmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle("✅ Already Connected")
+        .setDescription("Your Discord account is already linked to NamelessMC.")
+        .addFields(
+          {
+            name: "Nameless User",
+            value: linkedUser?.displayname ?? linkedUser?.username ?? "Unknown",
+            inline: true,
+          },
+          {
+            name: "Nameless User ID",
+            value: linkedUser?.id !== undefined ? String(linkedUser.id) : "Unknown",
+            inline: true,
+          },
+          {
+            name: "Discord Integration",
+            value: lookup.integration?.verified ? "Verified" : "Linked",
+            inline: true,
+          },
+        );
+
+      if (linkedUser?.profile) {
+        linkedEmbed.addFields({
+          name: "Profile",
+          value: linkedUser.profile,
+          inline: false,
+        });
+      }
+
+      await interaction.editReply({ embeds: [linkedEmbed], components: [] });
+      return;
+    }
+  }
+
+  const sitePath = siteBaseUrl ? `${siteBaseUrl.replace(/\/+$/, "")}` : "sitebaseurl_ENV";
 
   const embed = pluginAPI.lib
     .createEmbedBuilder()
@@ -40,11 +98,13 @@ export async function execute(context: CommandContext): Promise<void> {
     .setTitle("🔗 Connect Discord to NamelessMC")
     .setDescription(
       "Follow these steps:\n" +
-        `1. Navigate to **${sitePath}**\n` +
-        "2. Click **Discord**\n" +
-        "3. Click **Connect**\n" +
-        "4. Copy the verification code shown on the site\n" +
-        "5. Click the button below and paste the code into the modal",
+        `1. Navigate to **${sitePath}** and login.\n` +
+        "2. Hover over the profile icon on the left and click **Account**\n" +
+        "3. Click the **Connections** tab\n" +
+        "4. Click **Discord**\n" +
+        "5. Click **Connect**\n" +
+        "6. Copy the **verification code** shown on the site\n" +
+        "7. Click the **button below** and paste the code into the modal",
     );
 
   if (!isConfigured) {
@@ -96,9 +156,8 @@ export async function execute(context: CommandContext): Promise<void> {
       await submit.deferUpdate();
 
       const code = submit.fields.getTextInputValue("verification_code").trim();
-      const service = new NamelessMcService({ siteBaseUrl, apiKey });
-
-      const result = await service.verifyDiscordCode({
+      const verificationService = new NamelessMcService({ siteBaseUrl, apiKey });
+      const result = await verificationService.verifyDiscordCode({
         code,
         identifier: interaction.user.id,
         username: interaction.user.username,

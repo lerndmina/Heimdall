@@ -14,6 +14,29 @@ export interface VerifyDiscordResult {
   message?: string;
 }
 
+export interface NamelessIntegrationInfo {
+  integration?: string;
+  identifier?: string;
+  verified?: boolean;
+  username?: string;
+}
+
+export interface NamelessLinkedUser {
+  id?: number | string;
+  username?: string;
+  displayname?: string;
+  profile?: string;
+  integrations?: NamelessIntegrationInfo[];
+}
+
+export interface LookupDiscordLinkResult {
+  success: boolean;
+  linked: boolean;
+  message?: string;
+  user?: NamelessLinkedUser;
+  integration?: NamelessIntegrationInfo;
+}
+
 function getMessageFromUnknown(payload: unknown): string | undefined {
   if (!payload || typeof payload !== "object") return undefined;
 
@@ -37,6 +60,61 @@ function getMessageFromUnknown(payload: unknown): string | undefined {
 
 export class NamelessMcService {
   constructor(private config: NamelessMcConfig) {}
+
+  async lookupDiscordLink(discordUserId: string): Promise<LookupDiscordLinkResult> {
+    const base = this.config.siteBaseUrl.trim().replace(/\/+$/, "");
+    const lookup = encodeURIComponent(`integration_id:Discord:${discordUserId}`);
+    const endpoint = `${base}/api/v2/users/${lookup}`;
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+        },
+      });
+    } catch {
+      return {
+        success: false,
+        linked: false,
+        message: "Failed to reach NamelessMC while checking current Discord link status.",
+      };
+    }
+
+    let parsed: unknown = undefined;
+    try {
+      parsed = await response.json();
+    } catch {
+      parsed = undefined;
+    }
+
+    if (!response.ok) {
+      const apiMessage = getMessageFromUnknown(parsed);
+      if (apiMessage === "nameless:cannot_find_user") {
+        return {
+          success: true,
+          linked: false,
+        };
+      }
+
+      return {
+        success: false,
+        linked: false,
+        message: apiMessage ?? `NamelessMC link lookup failed (${response.status}).`,
+      };
+    }
+
+    const user = (parsed && typeof parsed === "object" ? (parsed as NamelessLinkedUser) : undefined) ?? undefined;
+    const integrations = Array.isArray(user?.integrations) ? user.integrations : [];
+    const discordIntegration = integrations.find((integration) => integration?.integration === "Discord" && Boolean(integration?.verified));
+
+    return {
+      success: true,
+      linked: Boolean(discordIntegration),
+      user,
+      integration: discordIntegration,
+    };
+  }
 
   async verifyDiscordCode(payload: VerifyDiscordPayload): Promise<VerifyDiscordResult> {
     const base = this.config.siteBaseUrl.trim().replace(/\/+$/, "");
