@@ -771,7 +771,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search players..."
+            placeholder="Search by Minecraft username, Discord username, or Discord ID..."
             className="w-full rounded-lg border border-zinc-700/30 bg-white/5 py-2 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
           />
         </div>
