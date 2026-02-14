@@ -11,6 +11,15 @@ on:
       - "bot/**"
       - ".github/workflows/docker-ghcr.yml"
   workflow_dispatch:
+    inputs:
+      whisper_prebuilt_amd64_url:
+        description: "Optional URL to prebuilt Linux amd64 whisper-cli binary/archive"
+        required: false
+        type: string
+      whisper_prebuilt_arm64_url:
+        description: "Optional URL to prebuilt Linux arm64 whisper-cli binary/archive"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -23,6 +32,9 @@ concurrency:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout
@@ -38,7 +50,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker metadata
@@ -59,6 +71,9 @@ jobs:
           file: ./bot/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            WHISPER_PREBUILT_AMD64_URL=${{ github.event_name == 'workflow_dispatch' && inputs.whisper_prebuilt_amd64_url || '' }}
+            WHISPER_PREBUILT_ARM64_URL=${{ github.event_name == 'workflow_dispatch' && inputs.whisper_prebuilt_arm64_url || '' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
