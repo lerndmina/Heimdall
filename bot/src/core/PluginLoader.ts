@@ -212,6 +212,24 @@ export class PluginLoader {
   private validatePlugins(): void {
     const errors: string[] = [];
 
+    const hasEnvKey = (envKey: string): boolean => {
+      const value = process.env[envKey];
+      if (value !== undefined && value !== "") return true;
+
+      // NextAuth v5 uses AUTH_SECRET while some manifests still require NEXTAUTH_SECRET
+      if (envKey === "NEXTAUTH_SECRET") {
+        const authSecret = process.env.AUTH_SECRET;
+        return authSecret !== undefined && authSecret !== "";
+      }
+
+      if (envKey === "AUTH_SECRET") {
+        const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+        return nextAuthSecret !== undefined && nextAuthSecret !== "";
+      }
+
+      return false;
+    };
+
     for (const [name, manifest] of this.manifests) {
       // Check required dependencies exist
       for (const dep of manifest.dependencies) {
@@ -222,7 +240,7 @@ export class PluginLoader {
 
       // Check required env vars exist
       for (const envKey of manifest.requiredEnv) {
-        if (!process.env[envKey]) {
+        if (!hasEnvKey(envKey)) {
           errors.push(`Plugin "${name}" requires env var "${envKey}" which is not set`);
         }
       }
