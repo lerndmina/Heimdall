@@ -1,11 +1,6 @@
 name: Sync to Forgejo
 
 on:
-  push:
-    branches:
-      - "**"
-    tags:
-      - "**"
   workflow_dispatch:
 
 permissions:
