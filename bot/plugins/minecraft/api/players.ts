@@ -52,7 +52,12 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
 
       if (search && typeof search === "string") {
         const escaped = escapeRegex(search);
-        query.$or = [{ minecraftUsername: { $regex: escaped, $options: "i" } }, { discordUsername: { $regex: escaped, $options: "i" } }, { discordDisplayName: { $regex: escaped, $options: "i" } }];
+        query.$or = [
+          { minecraftUsername: { $regex: escaped, $options: "i" } },
+          { discordUsername: { $regex: escaped, $options: "i" } },
+          { discordDisplayName: { $regex: escaped, $options: "i" } },
+          { discordId: { $regex: escaped, $options: "i" } },
+        ];
       }
 
       const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
