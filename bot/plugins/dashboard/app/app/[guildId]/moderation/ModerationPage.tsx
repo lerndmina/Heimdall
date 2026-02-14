@@ -46,6 +46,8 @@ interface ModerationConfig {
   logChannelId?: string;
   pointDecayEnabled: boolean;
   pointDecayDays: number;
+  muteMode?: "native" | "role";
+  muteRoleId?: string;
   dmOnInfraction: boolean;
   defaultDmTemplate?: string;
   defaultDmEmbed: boolean;
@@ -1579,6 +1581,8 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
   const [logChannelId, setLogChannelId] = useState("");
   const [pointDecayEnabled, setPointDecayEnabled] = useState(false);
   const [pointDecayDays, setPointDecayDays] = useState(30);
+  const [muteMode, setMuteMode] = useState<"native" | "role">("native");
+  const [muteRoleId, setMuteRoleId] = useState("");
   const [dmOnInfraction, setDmOnInfraction] = useState(true);
   const [defaultDmTemplate, setDefaultDmTemplate] = useState("");
   const [dmMode, setDmMode] = useState("text");
@@ -1592,6 +1596,8 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
       setLogChannelId(c.logChannelId ?? "");
       setPointDecayEnabled(c.pointDecayEnabled);
       setPointDecayDays(c.pointDecayDays);
+      setMuteMode(c.muteMode === "role" ? "role" : "native");
+      setMuteRoleId(c.muteRoleId ?? "");
       setDmOnInfraction(c.dmOnInfraction);
       setDefaultDmTemplate(c.defaultDmTemplate ?? "");
       setDmMode(c.dmMode);
@@ -1608,6 +1614,11 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
   });
 
   async function handleSave() {
+    if (muteMode === "role" && !muteRoleId) {
+      toast.error("Select a mute role before saving role-based mute mode");
+      return;
+    }
+
     setSaving(true);
     const res = await fetchApi<ModerationConfig>(guildId, "moderation/config", {
       method: "PUT",
@@ -1616,6 +1627,8 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
         logChannelId: logChannelId || undefined,
         pointDecayEnabled,
         pointDecayDays,
+        muteMode,
+        muteRoleId: muteMode === "role" ? muteRoleId || undefined : null,
         dmOnInfraction,
         defaultDmTemplate: defaultDmTemplate || undefined,
         dmMode,
@@ -1646,6 +1659,31 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
             <Toggle label="Point Decay" description="Automatically expire infraction points after a set period" checked={pointDecayEnabled} onChange={setPointDecayEnabled} disabled={!canManage} />
 
             {pointDecayEnabled && <TextInput label="Decay Period (days)" value={String(pointDecayDays)} onChange={(v) => setPointDecayDays(parseInt(v) || 30)} type="number" disabled={!canManage} />}
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Mute Method</label>
+              <select
+                value={muteMode}
+                onChange={(e) => setMuteMode(e.target.value as "native" | "role")}
+                disabled={!canManage}
+                className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm disabled:opacity-50">
+                <option value="native">Discord Native Timeout</option>
+                <option value="role">Specific Mute Role</option>
+              </select>
+            </div>
+
+            {muteMode === "role" && (
+              <RoleCombobox
+                guildId={guildId}
+                value={muteRoleId}
+                onChange={setMuteRoleId}
+                includeEveryone={false}
+                label="Mute Role"
+                description="This role will be added when /mute is used."
+                placeholder="Select mute role…"
+                disabled={!canManage}
+              />
+            )}
           </div>
         </CardContent>
       </Card>

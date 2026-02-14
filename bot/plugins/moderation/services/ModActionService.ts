@@ -170,18 +170,56 @@ export class ModActionService {
 
   // ── Mute (Timeout) ─────────────────────────────────────
 
-  async mute(guild: Guild, member: GuildMember, moderatorId: string, duration: number, reason: string, points: number = 0): Promise<{ success: boolean; error?: string; activePoints?: number }> {
-    if (duration > MAX_TIMEOUT_MS) {
-      return { success: false, error: `Duration exceeds Discord's maximum of 28 days (${formatDuration(MAX_TIMEOUT_MS)})` };
-    }
-
+  async mute(
+    guild: Guild,
+    member: GuildMember,
+    moderatorId: string,
+    duration: number,
+    reason: string,
+    points: number = 0,
+  ): Promise<{ success: boolean; error?: string; activePoints?: number; mode?: "timeout" | "role" }> {
     try {
       const config = await this.getConfig(guild.id);
+      const muteMode = config?.muteMode === "role" ? "role" : "native";
+      let actionMode: "timeout" | "role" = "timeout";
+      let infractionDuration: number | null = duration;
 
-      const vars = this.buildVars(member, guild, "Timeout", reason, points, duration, moderatorId);
+      if (muteMode === "role") {
+        const muteRoleId = config?.muteRoleId;
+        if (!muteRoleId) {
+          return { success: false, error: "Mute mode is set to role, but no mute role is configured in the dashboard." };
+        }
+
+        const botMember = guild.members.me;
+        if (!botMember?.permissions.has("ManageRoles")) {
+          return { success: false, error: "I need the Manage Roles permission to apply the configured mute role." };
+        }
+
+        const muteRole = guild.roles.cache.get(muteRoleId) ?? (await guild.roles.fetch(muteRoleId).catch(() => null));
+        if (!muteRole) {
+          return { success: false, error: "Configured mute role was not found. Update the moderation settings in the dashboard." };
+        }
+
+        if (muteRole.position >= botMember.roles.highest.position) {
+          return { success: false, error: "Configured mute role is above or equal to my highest role." };
+        }
+
+        if (member.roles.highest.position >= botMember.roles.highest.position) {
+          return { success: false, error: "I cannot mute this user because their highest role is above or equal to mine." };
+        }
+
+        await member.roles.add(muteRole.id, reason);
+        actionMode = "role";
+        infractionDuration = null;
+      } else {
+        if (duration > MAX_TIMEOUT_MS) {
+          return { success: false, error: `Duration exceeds Discord's maximum of 28 days (${formatDuration(MAX_TIMEOUT_MS)})` };
+        }
+        await member.timeout(duration, reason);
+      }
+
+      const vars = this.buildVars(member, guild, actionMode === "role" ? "Mute Role" : "Timeout", reason, points, duration, moderatorId);
       if (config) await sendInfractionDm(member.user, config, vars);
-
-      await member.timeout(duration, reason);
 
       const { activePoints } = await this.infractionService.recordInfraction({
         guildId: guild.id,
@@ -191,7 +229,7 @@ export class ModActionService {
         type: InfractionType.MUTE,
         reason,
         pointsAssigned: points,
-        duration,
+        duration: infractionDuration,
       });
 
       broadcastDashboardChange(guild.id, "moderation", "infraction_created", { requiredAction: "moderation.manage_infractions" });
@@ -202,18 +240,19 @@ export class ModActionService {
         this.lib
           .createEmbedBuilder()
           .setColor(ACTION_COLORS.mute)
-          .setTitle("🔇 Member Timed Out")
+          .setTitle(actionMode === "role" ? "🔇 Member Muted (Role)" : "🔇 Member Timed Out")
           .setThumbnail(member.user.displayAvatarURL({ size: 64 }))
           .addFields(
             { name: "User", value: `${member.user.tag} (${member.user})`, inline: true },
             { name: "Moderator", value: `<@${moderatorId}>`, inline: true },
-            { name: "Duration", value: formatDuration(duration), inline: true },
+            { name: "Method", value: actionMode === "role" ? "Configured Mute Role" : "Discord Timeout", inline: true },
+            ...(actionMode === "timeout" ? [{ name: "Duration", value: formatDuration(duration), inline: true }] : []),
             { name: "Reason", value: reason || "No reason provided" },
           )
           .setFooter({ text: `User ID: ${member.user.id}` }),
       );
 
-      return { success: true, activePoints };
+      return { success: true, activePoints, mode: actionMode };
     } catch (error) {
       log.error("Mute failed:", error);
       return { success: false, error: (error as Error).message };

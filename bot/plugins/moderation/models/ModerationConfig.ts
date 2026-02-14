@@ -96,6 +96,17 @@ const ModerationConfigSchema = new Schema(
       type: [String],
       default: [],
     },
+    /** How manual mute actions are applied */
+    muteMode: {
+      type: String,
+      enum: ["native", "role"],
+      default: "native",
+    },
+    /** Role ID used when muteMode is set to role */
+    muteRoleId: {
+      type: String,
+      default: null,
+    },
     /** Escalation tier configuration */
     escalationTiers: {
       type: [EscalationTierSchema],

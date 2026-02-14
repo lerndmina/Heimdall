@@ -53,7 +53,8 @@ export function createConfigRoutes(deps: ModerationApiDeps): Router {
   router.put("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const { automodEnabled, logChannelId, pointDecayEnabled, pointDecayDays, dmOnInfraction, defaultDmTemplate, defaultDmEmbed, dmMode, immuneRoles, escalationTiers } = req.body;
+      const { automodEnabled, logChannelId, pointDecayEnabled, pointDecayDays, dmOnInfraction, defaultDmTemplate, defaultDmEmbed, dmMode, immuneRoles, muteMode, muteRoleId, escalationTiers } =
+        req.body;
 
       const updates: Record<string, any> = {};
       if (automodEnabled !== undefined) updates.automodEnabled = automodEnabled;
@@ -65,6 +66,32 @@ export function createConfigRoutes(deps: ModerationApiDeps): Router {
       if (defaultDmEmbed !== undefined) updates.defaultDmEmbed = defaultDmEmbed;
       if (dmMode !== undefined) updates.dmMode = dmMode;
       if (immuneRoles !== undefined) updates.immuneRoles = immuneRoles;
+      if (muteMode !== undefined) {
+        if (!["native", "role"].includes(muteMode)) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: "muteMode must be 'native' or 'role'" },
+          });
+          return;
+        }
+        updates.muteMode = muteMode;
+      }
+      if (muteRoleId !== undefined) updates.muteRoleId = muteRoleId || null;
+
+      if (muteMode !== undefined || muteRoleId !== undefined) {
+        const current = await deps.moderationService.getOrCreateConfig(guildId);
+        const effectiveMuteMode = (updates.muteMode ?? current.muteMode ?? "native") as "native" | "role";
+        const effectiveMuteRoleId = updates.muteRoleId !== undefined ? updates.muteRoleId : current.muteRoleId;
+
+        if (effectiveMuteMode === "role" && !effectiveMuteRoleId) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: "muteRoleId is required when muteMode is 'role'" },
+          });
+          return;
+        }
+      }
+
       if (escalationTiers !== undefined) {
         // Validate escalation tiers
         if (!Array.isArray(escalationTiers)) {

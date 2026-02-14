@@ -1,5 +1,5 @@
 /**
- * /mute <user> <duration> [reason] — Timeout a member.
+ * /mute <user> <duration> [reason] — Mute a member.
  */
 
 import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
@@ -10,8 +10,8 @@ import { formatDuration } from "../utils/dm-templates.js";
 
 export const data = new SlashCommandBuilder()
   .setName("mute")
-  .setDescription("Timeout a member for a specified duration")
-  .addUserOption((opt) => opt.setName("user").setDescription("The member to timeout").setRequired(true))
+  .setDescription("Mute a member for a specified duration")
+  .addUserOption((opt) => opt.setName("user").setDescription("The member to mute").setRequired(true))
   .addStringOption((opt) => opt.setName("duration").setDescription("Duration (e.g. 1h, 30m, 2d)").setRequired(true))
   .addStringOption((opt) => opt.setName("reason").setDescription("Reason for the timeout").setRequired(false));
 
@@ -30,6 +30,8 @@ export async function execute(context: CommandContext): Promise<void> {
   const durationStr = interaction.options.getString("duration", true);
   const reason = interaction.options.getString("reason") ?? "No reason provided";
   const guild = interaction.guild!;
+  const config = await mod.moderationService.getConfig(guild.id);
+  const muteMode = config?.muteMode === "role" ? "role" : "native";
 
   // Parse duration
   const durationMs = mod.lib.parseDuration(durationStr);
@@ -60,7 +62,7 @@ export async function execute(context: CommandContext): Promise<void> {
     return;
   }
 
-  if (!member.moderatable) {
+  if (muteMode === "native" && !member.moderatable) {
     await interaction.editReply({ embeds: [mod.lib.builders.HeimdallEmbedBuilder.error("I cannot timeout this user.")] });
     return;
   }
@@ -68,9 +70,9 @@ export async function execute(context: CommandContext): Promise<void> {
   const result = await mod.modActionService.mute(guild, member, interaction.user.id, durationMs, reason);
 
   if (result.success) {
-    await interaction.editReply({
-      embeds: [mod.lib.builders.HeimdallEmbedBuilder.success(`Timed out **${user.tag}** for **${formatDuration(durationMs)}** — ${reason}`)],
-    });
+    const successMessage = result.mode === "role" ? `Muted **${user.tag}** with the configured mute role — ${reason}` : `Timed out **${user.tag}** for **${formatDuration(durationMs)}** — ${reason}`;
+
+    await interaction.editReply({ embeds: [mod.lib.builders.HeimdallEmbedBuilder.success(successMessage)] });
     broadcastDashboardChange(guild.id, "moderation", "mod_action", { requiredAction: "moderation.manage_infractions" });
   } else {
     await interaction.editReply({
