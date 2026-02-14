@@ -39,43 +39,11 @@ services:
     depends_on:
       - mongodb
       - redis
+    env_file:
+      - .env
     environment:
-      # Bot Configuration
-      BOT_TOKEN: ${BOT_TOKEN}
-      OWNER_IDS: ${OWNER_IDS}
-      PREFIX: ${PREFIX:-.}
-
-      # Database
       MONGODB_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-changeme}@mongodb:27017/?authSource=admin
-      MONGODB_DATABASE: ${MONGODB_DATABASE:-heimdall}
       REDIS_URL: redis://default:${REDIS_PASSWORD:-changeme}@redis:6379
-
-      # Security
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-
-      # Dashboard
-      DASHBOARD_PORT: 3000
-      API_PORT: 3001
-      WS_PORT: 3002
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
-      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:3002}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
-      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
-
-      # Optional
-      DEBUG_LOG: ${DEBUG_LOG:-false}
-      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-UTC}
-
-      # Cloudflare R2 (if using transcripts)
-      R2_ENDPOINT: ${R2_ENDPOINT}
-      R2_ACCESS_KEY: ${R2_ACCESS_KEY}
-      R2_SECRET_KEY: ${R2_SECRET_KEY}
-      R2_BUCKET: ${R2_BUCKET}
-      R2_CUSTOM_DOMAIN: ${R2_CUSTOM_DOMAIN}
-
-      NODE_ENV: production
     networks:
       - heimdall-network
     ports:

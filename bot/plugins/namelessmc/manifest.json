@@ -1,0 +1,9 @@
+{
+  "name": "namelessmc",
+  "version": "0.1.0",
+  "description": "NamelessMC Discord connection flow (v0)",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": ["NAMELESS_SITE_BASE_URL", "NAMELESS_API_KEY"],
+  "optionalEnv": []
+}
