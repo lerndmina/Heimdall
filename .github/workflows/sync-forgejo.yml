@@ -1,0 +1,60 @@
+name: Sync to Forgejo
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-forgejo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add Forgejo remote
+        env:
+          FORGEJO_HOST: ${{ secrets.FORGEJO_HOST }}
+          FORGEJO_OWNER: ${{ secrets.FORGEJO_OWNER }}
+          FORGEJO_REPO: ${{ secrets.FORGEJO_REPO }}
+          FORGEJO_USERNAME: ${{ secrets.FORGEJO_USERNAME }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+        run: |
+          if [ -z "$FORGEJO_HOST" ] || [ -z "$FORGEJO_OWNER" ] || [ -z "$FORGEJO_REPO" ] || [ -z "$FORGEJO_USERNAME" ] || [ -z "$FORGEJO_TOKEN" ]; then
+            echo "Missing required Forgejo sync secrets."
+            exit 1
+          fi
+
+          git remote add forgejo "https://${FORGEJO_USERNAME}:${FORGEJO_TOKEN}@${FORGEJO_HOST}/${FORGEJO_OWNER}/${FORGEJO_REPO}.git"
+
+      - name: Push branch or tag to Forgejo
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$REF_TYPE" = "branch" ]; then
+            git push forgejo "HEAD:${REF_NAME}"
+          elif [ "$REF_TYPE" = "tag" ]; then
+            git push forgejo "refs/tags/${REF_NAME}:refs/tags/${REF_NAME}"
+          else
+            echo "Unsupported ref type: $REF_TYPE"
+            exit 1
+          fi
