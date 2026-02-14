@@ -47,9 +47,9 @@ services:
     networks:
       - heimdall-network
     ports:
-      - "${DASHBOARD_PORT:-3000}:3000"
-      - "${API_PORT:-3001}:3001"
-      - "${WS_PORT:-3002}:3002"
+      - "127.0.0.1:${DASHBOARD_PORT:-3000}:3000"
+      - "127.0.0.1:${API_PORT:-3001}:3001"
+      - "127.0.0.1:${WS_PORT:-3002}:3002"
     volumes:
       # Mount logs directory (optional)
       - ./logs:/app/logs

@@ -228,36 +228,20 @@ docker run -d \
 
 ## Nginx Reverse Proxy Config
 
-Create `/etc/nginx/sites-available/heimdall`:
+Template config is provided at `nginx/heimdall-host-proxy.conf` and includes:
 
-```nginx
-server {
-    listen 80;
-    server_name dashboard.yourdomain.com;
+- `dashboard.example.com` -> `127.0.0.1:3000`
+- `api.example.com` -> `127.0.0.1:3001`
+- `ws.example.com` -> `127.0.0.1:3002` (WebSocket/WSS upgrade headers)
 
-    # Dashboard
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+Install it on your host:
 
-    # Bot API (optional - can be kept internal)
-    location /api/ {
-        proxy_pass http://localhost:3001/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
+```bash
+sudo cp nginx/heimdall-host-proxy.conf /etc/nginx/sites-available/heimdall
+sudo nano /etc/nginx/sites-available/heimdall
 ```
+
+Update the three domain names and certificate paths in that file, then enable and test:
 
 Enable and test:
 
