@@ -144,41 +144,66 @@ export class PluginLoader {
   private async applyConfigOverrides(): Promise<void> {
     const configPath = path.join(path.dirname(this.pluginsDir), "plugins.json");
 
-    if (!fs.existsSync(configPath)) {
-      return; // No override config
+    // Read plugins.json if present (optional)
+    let config: PluginsConfig | null = null;
+    if (fs.existsSync(configPath)) {
+      try {
+        const configRaw = fs.readFileSync(configPath, "utf-8");
+        config = JSON.parse(configRaw) as PluginsConfig;
+      } catch (error) {
+        log.error("Failed to parse plugins.json:", error);
+      }
     }
 
-    try {
-      const configRaw = fs.readFileSync(configPath, "utf-8");
-      const config: PluginsConfig = JSON.parse(configRaw);
-
-      // Apply disabled list
-      if (config.disabled) {
-        for (const name of config.disabled) {
-          if (this.manifests.has(name)) {
-            log.debug(`Plugin ${name} disabled via plugins.json`);
-            this.manifests.delete(name);
-            this.pluginPaths.delete(name);
-          }
+    // Apply disabled list from plugins.json
+    if (config?.disabled) {
+      for (const name of config.disabled) {
+        if (this.manifests.has(name)) {
+          log.debug(`Plugin ${name} disabled via plugins.json`);
+          this.manifests.delete(name);
+          this.pluginPaths.delete(name);
         }
       }
-
-      // If explicit plugins list, filter to only those
-      if (config.plugins) {
-        const allowed = new Set(config.plugins);
-        for (const name of this.manifests.keys()) {
-          if (!allowed.has(name)) {
-            log.debug(`Plugin ${name} not in plugins.json whitelist, skipping`);
-            this.manifests.delete(name);
-            this.pluginPaths.delete(name);
-          }
-        }
-      }
-
-      log.debug(`Applied config overrides, ${this.manifests.size} plugin(s) remaining`);
-    } catch (error) {
-      log.error("Failed to parse plugins.json:", error);
     }
+
+    // Apply disabled list from env var DISABLED_PLUGINS=name1,name2
+    const disabledPluginsEnv = (process.env.DISABLED_PLUGINS ?? "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
+
+    if (disabledPluginsEnv.length > 0) {
+      const manifestNameByLower = new Map<string, string>();
+      for (const name of this.manifests.keys()) {
+        manifestNameByLower.set(name.toLowerCase(), name);
+      }
+
+      for (const rawName of disabledPluginsEnv) {
+        const actualName = manifestNameByLower.get(rawName.toLowerCase());
+        if (!actualName) {
+          log.warn(`Plugin "${rawName}" from DISABLED_PLUGINS not found, skipping`);
+          continue;
+        }
+
+        log.debug(`Plugin ${actualName} disabled via DISABLED_PLUGINS`);
+        this.manifests.delete(actualName);
+        this.pluginPaths.delete(actualName);
+      }
+    }
+
+    // If explicit plugins list, filter to only those
+    if (config?.plugins) {
+      const allowed = new Set(config.plugins);
+      for (const name of this.manifests.keys()) {
+        if (!allowed.has(name)) {
+          log.debug(`Plugin ${name} not in plugins.json whitelist, skipping`);
+          this.manifests.delete(name);
+          this.pluginPaths.delete(name);
+        }
+      }
+    }
+
+    log.debug(`Applied config overrides, ${this.manifests.size} plugin(s) remaining`);
   }
 
   /**

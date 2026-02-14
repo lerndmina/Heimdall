@@ -94,6 +94,19 @@ Each plugin is a folder in `plugins/` with at minimum:
 - `apiRoutePrefix` — required if the plugin exposes API routes (sets the URL prefix)
 - `disabled` — set `true` to skip loading
 
+### Disabling Plugins via Environment
+
+You can disable plugins at runtime using:
+
+- `DISABLED_PLUGINS=pluginA,pluginB`
+
+Notes:
+
+- Comma-separated plugin names
+- Case-insensitive matching
+- Applied before dependency resolution and command/event registration
+- Defaults to empty (no plugins disabled)
+
 ### Plugin Entry Point (`index.ts`)
 
 ```ts
