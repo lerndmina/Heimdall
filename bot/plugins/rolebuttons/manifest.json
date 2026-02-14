@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Reusable role assignment panels with persistent buttons",
   "dependencies": ["lib"],
-  "optionalDependencies": ["dashboard"],
+  "optionalDependencies": [],
   "requiredEnv": [],
   "optionalEnv": [],
   "apiRoutePrefix": "/rolebuttons"

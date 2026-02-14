@@ -142,6 +142,9 @@ export class ApiManager {
    * Setup base middleware
    */
   private setupMiddleware(): void {
+    // Trust first upstream proxy (e.g. nginx / container ingress) for correct client IP detection
+    this.app.set("trust proxy", 1);
+
     // Request parsing — default 1MB limit for most routes
     this.app.use(express.json({ limit: "1mb" }));
     this.app.use(express.urlencoded({ extended: true, limit: "1mb" }));
