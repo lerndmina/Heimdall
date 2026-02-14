@@ -12,7 +12,7 @@ function resolveApiKey(): string {
   return (process.env.NAMELESS_API_KEY || "").trim();
 }
 
-export const data = new SlashCommandBuilder().setName("namelessmc").setDescription("Connect your Discord account to NamelessMC");
+export const data = new SlashCommandBuilder().setName("forumlink").setDescription("Connect your Discord account to NamelessMC");
 
 export const config = {
   allowInDMs: false,
