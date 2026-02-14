@@ -96,7 +96,7 @@ export async function handleEdit(context: CommandContext, api: RoleButtonsPlugin
 
   const previewBtn = api.lib
     .createButtonBuilder(async (i) => {
-      const preview = api.roleButtonService.buildPanelMessage(panel as any, api.lib);
+      const preview = await api.roleButtonService.buildPanelMessage(panel as any, api.lib);
       await i.reply({ content: "Preview:", embeds: preview.embeds as any, components: preview.components as any, ephemeral: true });
     }, COMPONENT_TTL)
     .setLabel("Preview")

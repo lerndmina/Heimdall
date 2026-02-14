@@ -63,7 +63,7 @@ export class RoleButtonService {
     return (await RoleButtonPanel.findOneAndDelete({ guildId, id: panelId })) as PanelDoc | null;
   }
 
-  buildPanelMessage(panel: PanelDoc, lib: LibAPI): { embeds: any[]; components: ActionRowBuilder<MessageActionRowComponentBuilder>[] } {
+  async buildPanelMessage(panel: PanelDoc, lib: LibAPI): Promise<{ embeds: any[]; components: ActionRowBuilder<MessageActionRowComponentBuilder>[] }> {
     const embed = lib.createEmbedBuilder();
 
     if (panel.embed?.title) embed.setTitle(panel.embed.title);
@@ -98,6 +98,8 @@ export class RoleButtonService {
 
       if (button.emoji) builder.setEmoji(button.emoji);
 
+      await builder.ready();
+
       const rowNum = Math.max(0, Math.min(4, button.row ?? 0));
       const row = rows.get(rowNum) ?? new ActionRowBuilder<MessageActionRowComponentBuilder>();
       if (row.components.length < 5) {
@@ -116,7 +118,7 @@ export class RoleButtonService {
     if (!channel.isTextBased()) throw new Error("Target channel is not text-based");
     if (!panel.buttons?.length) throw new Error("Panel has no buttons configured");
 
-    const payload = this.buildPanelMessage(panel, lib);
+    const payload = await this.buildPanelMessage(panel, lib);
     const message = await channel.send(payload as any);
 
     panel.posts.push({
@@ -131,7 +133,7 @@ export class RoleButtonService {
   }
 
   async updatePostedPanels(panel: PanelDoc, client: HeimdallClient, lib: LibAPI): Promise<{ updated: number; removed: number }> {
-    const payload = this.buildPanelMessage(panel, lib);
+    const payload = await this.buildPanelMessage(panel, lib);
     let updated = 0;
     let removed = 0;
     const nextPosts: typeof panel.posts = [] as any;
