@@ -51,13 +51,22 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       }
 
       if (search && typeof search === "string") {
-        const escaped = escapeRegex(search);
-        query.$or = [
-          { minecraftUsername: { $regex: escaped, $options: "i" } },
-          { discordUsername: { $regex: escaped, $options: "i" } },
-          { discordDisplayName: { $regex: escaped, $options: "i" } },
-          { discordId: { $regex: escaped, $options: "i" } },
-        ];
+        const trimmedSearch = search.trim();
+        if (trimmedSearch) {
+          const isDiscordSnowflake = /^\d{17,20}$/.test(trimmedSearch);
+
+          if (isDiscordSnowflake) {
+            query.discordId = trimmedSearch;
+          } else {
+            const escaped = escapeRegex(trimmedSearch);
+            query.$or = [
+              { minecraftUsername: { $regex: escaped, $options: "i" } },
+              { discordUsername: { $regex: escaped, $options: "i" } },
+              { discordDisplayName: { $regex: escaped, $options: "i" } },
+              { discordId: { $regex: escaped, $options: "i" } },
+            ];
+          }
+        }
       }
 
       const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
