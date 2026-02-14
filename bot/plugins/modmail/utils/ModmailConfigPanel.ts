@@ -1310,8 +1310,9 @@ export class ModmailConfigPanel {
       new ActionRowBuilder<TextInputBuilder>().addComponents(
         new TextInputBuilder()
           .setCustomId("autoCloseHours")
-          .setLabel("Auto-close hours override (blank = use global)")
+          .setLabel("Auto-close hours (blank = global)")
           .setStyle(TextInputStyle.Short)
+          .setPlaceholder("Enter 1-8760 hours, or leave blank to use global")
           .setValue(category.autoCloseHours ? String(category.autoCloseHours) : "")
           .setRequired(false),
       ),
