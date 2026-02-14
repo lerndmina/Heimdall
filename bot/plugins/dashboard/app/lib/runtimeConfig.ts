@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const RuntimeConfigSchema = z.object({
   wsUrl: z.string().url(),
+  enabledPlugins: z.array(z.string()),
 });
 
 export type RuntimeConfig = z.infer<typeof RuntimeConfigSchema>;

@@ -34,8 +34,10 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
   const port = parseInt(getEnv("DASHBOARD_PORT") || "3000", 10);
   const isDev = process.env.NODE_ENV !== "production";
 
+  const manifest = JSON.parse(fs.readFileSync(path.join(pluginPath, "manifest.json"), "utf-8"));
+
   // Determine which optional plugin features are available
-  const optionalPlugins = ["minecraft", "modmail", "tickets", "suggestions", "tags", "logging", "welcome", "tempvc", "reminders", "vc-transcription", "rolebuttons"];
+  const optionalPlugins: string[] = manifest.optionalDependencies ?? [];
   const features = optionalPlugins.filter((p) => dependencies.has(p));
   logger.info(`Available dashboard features: ${features.length > 0 ? features.join(", ") : "none"}`);
 
@@ -44,7 +46,6 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
   // hardcoding var names in next.config.mjs we read the manifest's
   // requiredEnv + optionalEnv and forward every defined value.
   const appDir = path.join(pluginPath, "app");
-  const manifest = JSON.parse(fs.readFileSync(path.join(pluginPath, "manifest.json"), "utf-8"));
   const envKeys: string[] = [...(manifest.requiredEnv ?? []), ...(manifest.optionalEnv ?? [])];
 
   // Also forward vars that Next.js / NextAuth look for implicitly
@@ -66,6 +67,8 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
 
     if (value !== undefined) lines.push(`${key}=${value}`);
   }
+
+  lines.push(`DASHBOARD_ENABLED_PLUGINS=${features.join(",")}`);
 
   const envLocalPath = path.join(appDir, ".env.local");
   fs.writeFileSync(envLocalPath, lines.join("\n") + "\n", { encoding: "utf-8", mode: 0o600 });

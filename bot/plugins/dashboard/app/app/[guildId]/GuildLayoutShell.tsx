@@ -8,10 +8,13 @@
  */
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import GuildProvider, { type GuildInfo } from "@/components/providers/GuildProvider";
 import PermissionsProvider, { usePermissions } from "@/components/providers/PermissionsProvider";
 import UnsavedChangesProvider from "@/components/providers/UnsavedChangesProvider";
 import Sidebar, { type NavItem } from "@/components/layout/Sidebar";
+import { fetchRuntimeConfig } from "@/lib/runtimeConfig";
+import { isPluginEnabled, parseEnabledPlugins } from "@/lib/integrations";
 import {
   OverviewIcon,
   MinecraftIcon,
@@ -40,29 +43,45 @@ interface NavItemDef {
   icon: React.ReactNode;
   /** Permission category key — if set, item visibility is based on permissions */
   category?: string;
+  plugin?: string;
 }
 
 const NAV_ITEMS: NavItemDef[] = [
   { label: "Overview", href: (id) => `/${id}`, icon: <OverviewIcon /> },
-  { label: "Minecraft", href: (id) => `/${id}/minecraft`, icon: <MinecraftIcon />, category: "minecraft" },
-  { label: "Modmail", href: (id) => `/${id}/modmail`, icon: <ModmailIcon />, category: "modmail" },
-  { label: "Tickets", href: (id) => `/${id}/tickets`, icon: <TicketsIcon />, category: "tickets" },
-  { label: "Suggestions", href: (id) => `/${id}/suggestions`, icon: <SuggestionsIcon />, category: "suggestions" },
-  { label: "Tags", href: (id) => `/${id}/tags`, icon: <TagsIcon />, category: "tags" },
-  { label: "Role Buttons", href: (id) => `/${id}/rolebuttons`, icon: <RoleButtonsIcon />, category: "rolebuttons" },
-  { label: "Logging", href: (id) => `/${id}/logging`, icon: <LoggingIcon />, category: "logging" },
-  { label: "Welcome", href: (id) => `/${id}/welcome`, icon: <WelcomeIcon />, category: "welcome" },
-  { label: "Temp VC", href: (id) => `/${id}/tempvc`, icon: <TempVCIcon />, category: "tempvc" },
-  { label: "Reminders", href: (id) => `/${id}/reminders`, icon: <RemindersIcon />, category: "reminders" },
-  { label: "VC Transcription", href: (id) => `/${id}/vc-transcription`, icon: <VCTranscriptionIcon />, category: "vc-transcription" },
-  { label: "Attachment Blocker", href: (id) => `/${id}/attachment-blocker`, icon: <AttachmentBlockerIcon />, category: "attachment-blocker" },
-  { label: "Moderation", href: (id) => `/${id}/moderation`, icon: <ModerationIcon />, category: "moderation" },
+  { label: "Minecraft", href: (id) => `/${id}/minecraft`, icon: <MinecraftIcon />, category: "minecraft", plugin: "minecraft" },
+  { label: "Modmail", href: (id) => `/${id}/modmail`, icon: <ModmailIcon />, category: "modmail", plugin: "modmail" },
+  { label: "Tickets", href: (id) => `/${id}/tickets`, icon: <TicketsIcon />, category: "tickets", plugin: "tickets" },
+  { label: "Suggestions", href: (id) => `/${id}/suggestions`, icon: <SuggestionsIcon />, category: "suggestions", plugin: "suggestions" },
+  { label: "Tags", href: (id) => `/${id}/tags`, icon: <TagsIcon />, category: "tags", plugin: "tags" },
+  { label: "Role Buttons", href: (id) => `/${id}/rolebuttons`, icon: <RoleButtonsIcon />, category: "rolebuttons", plugin: "rolebuttons" },
+  { label: "Logging", href: (id) => `/${id}/logging`, icon: <LoggingIcon />, category: "logging", plugin: "logging" },
+  { label: "Welcome", href: (id) => `/${id}/welcome`, icon: <WelcomeIcon />, category: "welcome", plugin: "welcome" },
+  { label: "Temp VC", href: (id) => `/${id}/tempvc`, icon: <TempVCIcon />, category: "tempvc", plugin: "tempvc" },
+  { label: "Reminders", href: (id) => `/${id}/reminders`, icon: <RemindersIcon />, category: "reminders", plugin: "reminders" },
+  { label: "VC Transcription", href: (id) => `/${id}/vc-transcription`, icon: <VCTranscriptionIcon />, category: "vc-transcription", plugin: "vc-transcription" },
+  { label: "Attachment Blocker", href: (id) => `/${id}/attachment-blocker`, icon: <AttachmentBlockerIcon />, category: "attachment-blocker", plugin: "attachment-blocker" },
+  { label: "Moderation", href: (id) => `/${id}/moderation`, icon: <ModerationIcon />, category: "moderation", plugin: "moderation" },
   { label: "Settings", href: (id) => `/${id}/settings`, icon: <SettingsIcon />, category: "dashboard" },
 ];
 
 function GuildLayoutInner({ guild, children }: { guild: GuildInfo; children: React.ReactNode }) {
-  const { permissions, hideDeniedFeatures, isOwner, isBotOwner, denyAccess, loaded } = usePermissions();
-  const hasFullAccess = isOwner || isBotOwner;
+  const { permissions, hideDeniedFeatures, isOwner, isBotOwner, isAdministrator, denyAccess, loaded } = usePermissions();
+  const hasFullAccess = isOwner || isBotOwner || (isAdministrator && !denyAccess);
+  const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(new Set());
+  const [runtimeLoaded, setRuntimeLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const runtime = await fetchRuntimeConfig();
+      if (!alive) return;
+      setEnabledPlugins(runtime ? new Set(runtime.enabledPlugins.map((p) => p.toLowerCase())) : parseEnabledPlugins(undefined));
+      setRuntimeLoaded(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function hasAnyCategoryAccess(categoryKey: string): boolean {
     if (hasFullAccess) return true;
@@ -92,25 +111,33 @@ function GuildLayoutInner({ guild, children }: { guild: GuildInfo; children: Rea
     );
   }
 
-  const navItems: NavItem[] = NAV_ITEMS.map((def) => {
-    const href = def.href(guild.id);
-    const hasAccess = !def.category || hasFullAccess || hasAnyCategoryAccess(def.category);
+  const navItems: NavItem[] = useMemo(
+    () =>
+      NAV_ITEMS.map((def) => {
+        if (runtimeLoaded && !isPluginEnabled(enabledPlugins, def.plugin ?? null)) {
+          return null;
+        }
 
-    // If permissions haven't loaded yet, show all items
-    if (!loaded) return { label: def.label, href, icon: def.icon };
+        const href = def.href(guild.id);
+        const hasAccess = !def.category || hasFullAccess || hasAnyCategoryAccess(def.category);
 
-    if (!hasAccess) {
-      if (hideDeniedFeatures) return null; // hide entirely
-      return {
-        label: def.label,
-        href: `/${guild.id}/no-access`,
-        icon: def.icon,
-        locked: true,
-      };
-    }
+        // If permissions haven't loaded yet, show all items
+        if (!loaded) return { label: def.label, href, icon: def.icon };
 
-    return { label: def.label, href, icon: def.icon };
-  }).filter((item): item is NavItem => item !== null);
+        if (!hasAccess) {
+          if (hideDeniedFeatures) return null; // hide entirely
+          return {
+            label: def.label,
+            href: `/${guild.id}/no-access`,
+            icon: def.icon,
+            locked: true,
+          };
+        }
+
+        return { label: def.label, href, icon: def.icon };
+      }).filter((item): item is NavItem => item !== null),
+    [enabledPlugins, guild.id, hasFullAccess, hideDeniedFeatures, loaded, runtimeLoaded, permissions],
+  );
 
   return (
     <div className="flex h-screen flex-col lg:flex-row">

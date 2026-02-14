@@ -4,8 +4,20 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getIntegrationPluginFromSegment, isPluginEnabled, parseEnabledPlugins } from "@/lib/integrations";
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length >= 2) {
+    const guildId = segments[0];
+    const integrationPlugin = getIntegrationPluginFromSegment(segments[1]);
+    const enabledPlugins = parseEnabledPlugins(process.env.DASHBOARD_ENABLED_PLUGINS);
+    if (!isPluginEnabled(enabledPlugins, integrationPlugin)) {
+      return NextResponse.redirect(new URL(`/${guildId}`, request.url));
+    }
+  }
+
   // Apply auth middleware
   const authResult = await auth(request as any);
 

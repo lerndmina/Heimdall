@@ -11,6 +11,7 @@ import { resolveRouteAction } from "@/lib/routePermissions";
 import { resolvePermissions, type RoleOverrides, type MemberInfo } from "@/lib/permissions";
 import { checkBotOwner } from "@/lib/botOwner";
 import { permissionCategories } from "@/lib/permissionDefs";
+import { getIntegrationPluginFromSegment, isPluginEnabled, parseEnabledPlugins } from "@/lib/integrations";
 
 const API_PORT = process.env.API_PORT || "3001";
 const API_BASE = `http://localhost:${API_PORT}`;
@@ -69,6 +70,12 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
   }
 
   const { guildId, path: pathSegments } = await params;
+
+  const enabledPlugins = parseEnabledPlugins(process.env.DASHBOARD_ENABLED_PLUGINS);
+  const integrationPlugin = getIntegrationPluginFromSegment(pathSegments[0]);
+  if (!isPluginEnabled(enabledPlugins, integrationPlugin)) {
+    return NextResponse.json({ error: "Integration unavailable" }, { status: 404 });
+  }
 
   // Verify user has access to this guild via the guild cache
   const guilds = await getUserGuilds(session.accessToken, session.user.id);
