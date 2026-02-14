@@ -74,6 +74,15 @@ export function TagsIcon() {
   );
 }
 
+/** Role buttons / list-check icon */
+export function RoleButtonsIcon() {
+  return (
+    <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+    </svg>
+  );
+}
+
 /** Logging / document icon */
 export function LoggingIcon() {
   return (

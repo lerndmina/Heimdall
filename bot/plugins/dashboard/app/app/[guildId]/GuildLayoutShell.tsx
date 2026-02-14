@@ -12,7 +12,23 @@ import GuildProvider, { type GuildInfo } from "@/components/providers/GuildProvi
 import PermissionsProvider, { usePermissions } from "@/components/providers/PermissionsProvider";
 import UnsavedChangesProvider from "@/components/providers/UnsavedChangesProvider";
 import Sidebar, { type NavItem } from "@/components/layout/Sidebar";
-import { OverviewIcon, MinecraftIcon, ModmailIcon, TicketsIcon, SuggestionsIcon, TagsIcon, LoggingIcon, WelcomeIcon, TempVCIcon, RemindersIcon, VCTranscriptionIcon, AttachmentBlockerIcon, ModerationIcon, SettingsIcon } from "@/components/icons";
+import {
+  OverviewIcon,
+  MinecraftIcon,
+  ModmailIcon,
+  TicketsIcon,
+  SuggestionsIcon,
+  TagsIcon,
+  RoleButtonsIcon,
+  LoggingIcon,
+  WelcomeIcon,
+  TempVCIcon,
+  RemindersIcon,
+  VCTranscriptionIcon,
+  AttachmentBlockerIcon,
+  ModerationIcon,
+  SettingsIcon,
+} from "@/components/icons";
 
 /**
  * Nav item with its associated permission category key.
@@ -33,6 +49,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: "Tickets", href: (id) => `/${id}/tickets`, icon: <TicketsIcon />, category: "tickets" },
   { label: "Suggestions", href: (id) => `/${id}/suggestions`, icon: <SuggestionsIcon />, category: "suggestions" },
   { label: "Tags", href: (id) => `/${id}/tags`, icon: <TagsIcon />, category: "tags" },
+  { label: "Role Buttons", href: (id) => `/${id}/rolebuttons`, icon: <RoleButtonsIcon />, category: "rolebuttons" },
   { label: "Logging", href: (id) => `/${id}/logging`, icon: <LoggingIcon />, category: "logging" },
   { label: "Welcome", href: (id) => `/${id}/welcome`, icon: <WelcomeIcon />, category: "welcome" },
   { label: "Temp VC", href: (id) => `/${id}/tempvc`, icon: <TempVCIcon />, category: "tempvc" },

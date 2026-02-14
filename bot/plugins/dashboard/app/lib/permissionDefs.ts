@@ -98,6 +98,15 @@ export const permissionCategories: PermissionCategory[] = [
     ],
   },
   {
+    key: "rolebuttons",
+    label: "Role Buttons",
+    description: "Manage self-assignable role button panels.",
+    actions: [
+      { key: "view", label: "View Panels", description: "View role button panel configs." },
+      { key: "manage", label: "Manage Panels", description: "Create, edit, delete, and post role button panels." },
+    ],
+  },
+  {
     key: "logging",
     label: "Logging",
     description: "Configure event logging channels and categories.",

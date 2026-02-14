@@ -3,7 +3,21 @@
   "version": "1.0.0",
   "description": "Next.js web dashboard for managing Heimdall bot settings",
   "dependencies": ["lib"],
-  "optionalDependencies": ["minecraft", "modmail", "tickets", "suggestions", "tags", "logging", "welcome", "tempvc", "reminders", "vc-transcription", "attachment-blocker", "moderation"],
+  "optionalDependencies": [
+    "minecraft",
+    "modmail",
+    "tickets",
+    "suggestions",
+    "tags",
+    "logging",
+    "welcome",
+    "tempvc",
+    "reminders",
+    "vc-transcription",
+    "attachment-blocker",
+    "moderation",
+    "rolebuttons"
+  ],
   "requiredEnv": ["INTERNAL_API_KEY", "NEXTAUTH_SECRET", "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "OWNER_IDS"],
   "optionalEnv": ["DASHBOARD_PORT", "NEXT_PUBLIC_WS_URL", "WS_PUBLIC_URL"]
 }

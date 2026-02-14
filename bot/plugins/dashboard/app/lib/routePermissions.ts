@@ -111,6 +111,16 @@ const routeMap: Record<string, string> = {
   "POST /tags/*/use": "tags.manage_tags",
   "PATCH /tags/*/slash-command": "tags.manage_tags",
 
+  // ── Role Buttons ──
+  "GET /rolebuttons": "rolebuttons.view",
+  "GET /rolebuttons/*": "rolebuttons.view",
+  "POST /rolebuttons": "rolebuttons.manage",
+  "PUT /rolebuttons/*": "rolebuttons.manage",
+  "DELETE /rolebuttons/*": "rolebuttons.manage",
+  "POST /rolebuttons/*/post": "rolebuttons.manage",
+  "POST /rolebuttons/*/update-posts": "rolebuttons.manage",
+  "DELETE /rolebuttons/*/posts/*": "rolebuttons.manage",
+
   // ── Logging ──
   "GET /logging": "logging.view_config",
   "GET /logging/config": "logging.view_config",
