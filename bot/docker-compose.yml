@@ -31,6 +31,12 @@ services:
 
   # Heimdall bot + dashboard
   bot:
+    # Prebuilt image mode (recommended for low-resource servers):
+    # 1) Comment out/remove the `build:` block below.
+    # 2) Uncomment `image:` and set the registry/tag you publish from CI.
+    # Example GHCR: ghcr.io/<owner>/<repo>:latest
+    # Example Forgejo: forgejo.example.com/<owner>/<repo>:latest
+    # image: ghcr.io/<owner>/<repo>:latest
     build:
       context: .
       dockerfile: Dockerfile
