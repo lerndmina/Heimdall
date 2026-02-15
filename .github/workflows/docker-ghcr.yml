@@ -1,15 +1,15 @@
 name: Build and Publish Docker (GHCR)
 
 on:
-  push:
-    branches:
-      - main
-      - master
-    tags:
-      - "v*"
-    paths:
-      - "bot/**"
-      - ".github/workflows/docker-ghcr.yml"
+  # push:
+  #   branches:
+  #     - main
+  #     - master
+  #   tags:
+  #     - "v*"
+  #   paths:
+  #     - "bot/**"
+  #     - ".github/workflows/docker-ghcr.yml"
   workflow_dispatch:
     inputs:
       whisper_prebuilt_amd64_url:

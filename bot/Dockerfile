@@ -1,15 +1,50 @@
 # Heimdall Discord Bot - Production Dockerfile
 # Multi-stage build for optimized production image using Bun
+# Supports multi-platform (amd64 + arm64) via native cross-compilation
 
 # ──────────────────────────────────────────────────────────────────────
-# Stage 1: Dependencies
+# Stage 0: Cross-compilation toolkit (tiny, cached)
+# ──────────────────────────────────────────────────────────────────────
+FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
+
+# ──────────────────────────────────────────────────────────────────────
+# Stage 1: Cross-compile whisper.cpp (runs NATIVELY on build host)
+# This avoids painfully slow QEMU emulation when targeting arm64.
+# ──────────────────────────────────────────────────────────────────────
+FROM --platform=$BUILDPLATFORM oven/bun:1-alpine AS whisper-cross
+COPY --from=xx / /
+ARG TARGETPLATFORM
+
+WORKDIR /build
+
+# Native build tools + cross-compilation support for the target arch
+RUN apk add --no-cache clang lld cmake make git wget
+RUN xx-apk add --no-cache gcc g++ musl-dev
+
+# Get whisper.cpp source via bun install (runs natively — fast)
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+
+# Cross-compile whisper.cpp for the TARGET platform
+RUN cd node_modules/nodejs-whisper/cpp/whisper.cpp && \
+  cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+  -DCMAKE_C_COMPILER=$(which xx-cc) \
+  -DCMAKE_CXX_COMPILER=$(which xx-c++) && \
+  cmake --build build --config Release -j$(nproc)
+
+# Download default whisper model
+RUN wget -q -O node_modules/nodejs-whisper/cpp/whisper.cpp/models/ggml-base.en.bin \
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
+
+# ──────────────────────────────────────────────────────────────────────
+# Stage 2: Dependencies (runs on target platform)
 # ──────────────────────────────────────────────────────────────────────
 FROM oven/bun:1-alpine AS deps
 
 WORKDIR /app
 
 # Install dependencies for native modules
-RUN apk add --no-cache libc6-compat python3 make g++ cmake git wget
+RUN apk add --no-cache libc6-compat python3 make g++ cmake git
 
 # Copy package files
 COPY package.json bun.lock ./
@@ -21,18 +56,15 @@ RUN bun install --frozen-lockfile --production && \
   # Install all deps (including dev) for build stage
   bun install --frozen-lockfile
 
-# Pre-build whisper.cpp and download default model so runtime doesn't need build tools
-RUN cd /tmp/node_modules/nodejs-whisper/cpp/whisper.cpp && \
-  cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF && \
-  cmake --build build --config Release -j$(nproc) && \
-  cd /app && \
-  wget -q -O /tmp/node_modules/nodejs-whisper/cpp/whisper.cpp/models/ggml-base.en.bin \
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
+# Overlay cross-compiled whisper.cpp binary + pre-downloaded model
+# (replaces the slow QEMU-emulated build that used to happen here)
+COPY --from=whisper-cross /build/node_modules/nodejs-whisper/cpp/whisper.cpp/ /tmp/node_modules/nodejs-whisper/cpp/whisper.cpp/
 
 # ──────────────────────────────────────────────────────────────────────
-# Stage 2: Build Dashboard
+# Stage 3: Build Dashboard (runs NATIVELY on build host)
+# Next.js outputs platform-independent JS, no need for QEMU.
 # ──────────────────────────────────────────────────────────────────────
-FROM oven/bun:1-alpine AS dashboard-builder
+FROM --platform=$BUILDPLATFORM oven/bun:1-alpine AS dashboard-builder
 
 WORKDIR /app
 
@@ -49,7 +81,7 @@ RUN bun install --frozen-lockfile && \
   NODE_ENV=production bun run next build
 
 # ──────────────────────────────────────────────────────────────────────
-# Stage 3: Build Bot (Optional - TypeScript compilation)
+# Stage 4: Build Bot (Optional - TypeScript compilation)
 # ──────────────────────────────────────────────────────────────────────
 FROM oven/bun:1-alpine AS bot-builder
 
@@ -68,7 +100,7 @@ COPY plugins ./plugins
 # RUN bun run build
 
 # ──────────────────────────────────────────────────────────────────────
-# Stage 4: Production Runtime
+# Stage 5: Production Runtime
 # ──────────────────────────────────────────────────────────────────────
 FROM oven/bun:1-alpine AS runner
 

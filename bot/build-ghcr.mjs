@@ -95,6 +95,25 @@ function checkDocker() {
   return v;
 }
 
+function isDockerRunning() {
+  // "docker info" succeeds only when the daemon is reachable
+  return execQuiet("docker info") !== null;
+}
+
+function requireDockerRunning() {
+  if (!isDockerRunning()) {
+    err("Docker engine is not running!");
+    const isWindows = process.platform === "win32";
+    if (isWindows) {
+      info("Start Docker Desktop and wait for the engine to be ready, then try again.");
+    } else {
+      info('Start the Docker daemon (e.g. "sudo systemctl start docker") and try again.');
+    }
+    return false;
+  }
+  return true;
+}
+
 function checkBuildx() {
   const v = execQuiet("docker buildx version");
   return v !== null;
@@ -223,8 +242,8 @@ async function actionBuild(cfg) {
   const platforms = cfg.platforms || "linux/amd64";
   const isMultiPlatform = platforms.includes(",");
 
-  // Determine tags
-  const defaultTags = `latest,v${version}`;
+  // Determine tags (remembers last-used tags)
+  const defaultTags = cfg.lastTags || `latest,v${version}`;
   const rawTags = await ask("Tags (comma-separated)", defaultTags);
   const tags = rawTags
     .split(",")
@@ -251,6 +270,11 @@ async function actionBuild(cfg) {
     return { tags: [] };
   }
 
+  // Verify Docker engine is running before we start
+  if (!requireDockerRunning()) {
+    return { tags: [], error: true };
+  }
+
   console.log();
   const startTime = Date.now();
 
@@ -260,16 +284,25 @@ async function actionBuild(cfg) {
       info("Using docker buildx for multi-platform build...");
 
       // Ensure a builder exists
-      try {
-        execQuiet("docker buildx inspect heimdall-builder");
-      } catch {
-        info("Creating buildx builder instance...");
-        exec("docker buildx create --name heimdall-builder --use");
+      const builderExists = execQuiet("docker buildx inspect heimdall-builder");
+      if (!builderExists) {
+        info("Creating buildx builder instance (first build will pull buildkit)...");
+        exec("docker buildx create --name heimdall-builder --driver docker-container --use");
+      } else {
+        exec("docker buildx use heimdall-builder");
       }
-      exec("docker buildx use heimdall-builder");
 
       await streamCmd("docker", ["buildx", "build", "--platform", platforms, ...tags.flatMap((t) => ["-t", imageRef(cfg, t)]), "--push", "."]);
       ok("Multi-platform build & push complete!");
+
+      // Stop the builder container (it persists otherwise)
+      execQuiet("docker buildx stop heimdall-builder");
+      info("Builder container stopped.");
+
+      // Save tags as default for next run
+      cfg.lastTags = tags.join(",");
+      saveConfig(cfg);
+
       return { tags, pushed: true };
     } else {
       // Standard build
@@ -278,8 +311,15 @@ async function actionBuild(cfg) {
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     ok(`Build completed in ${elapsed}s`);
+
+    // Save tags as default for next run
+    cfg.lastTags = tags.join(",");
+    saveConfig(cfg);
+
     return { tags, pushed: false };
   } catch (e) {
+    // Stop the builder container on failure too
+    execQuiet("docker buildx stop heimdall-builder");
     err(`Build failed: ${e.message}`);
     return { tags: [], error: true };
   }
@@ -327,6 +367,9 @@ async function actionPush(cfg, tags) {
     return;
   }
 
+  // Verify Docker engine is running before we push
+  if (!requireDockerRunning()) return;
+
   for (const tag of tags) {
     const ref = imageRef(cfg, tag);
     try {
@@ -364,6 +407,7 @@ async function actionShowConfig(cfg) {
     ["Full Image", cfg.owner && cfg.repo ? `ghcr.io/${cfg.owner}/${cfg.repo}` : c.dim + "(configure first)" + c.reset],
     ["GHCR Login", isLoggedIntoGhcr() ? c.green + "authenticated" + c.reset : c.yellow + "not logged in" + c.reset],
     ["Docker", execQuiet("docker --version") || c.red + "not found" + c.reset],
+    ["Engine", isDockerRunning() ? c.green + "running" + c.reset : c.red + "not running" + c.reset],
     ["Buildx", checkBuildx() ? c.green + "available" + c.reset : c.dim + "not available" + c.reset],
     ["Config File", CONFIG_PATH],
   ];
@@ -418,6 +462,20 @@ async function main() {
 
   // Banner
   console.clear();
+
+  // Check if Docker daemon is actually running
+  if (!isDockerRunning()) {
+    console.log();
+    warn("Docker engine is not running.");
+    const isWindows = process.platform === "win32";
+    if (isWindows) {
+      info("Start Docker Desktop and wait for the engine to be ready.");
+    } else {
+      info('Start the Docker daemon (e.g. "sudo systemctl start docker").');
+    }
+    info("You can still configure settings — build/push will re-check.");
+    console.log();
+  }
   console.log();
   console.log(`${c.bold}${c.magenta}  ╔══════════════════════════════════════════════════════╗${c.reset}`);
   console.log(`${c.bold}${c.magenta}  ║${c.reset}${c.bold}${c.white}     Heimdall — Docker Build & Publish (GHCR)         ${c.reset}${c.bold}${c.magenta}║${c.reset}`);
