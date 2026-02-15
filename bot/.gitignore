@@ -34,3 +34,6 @@ yarn-error.log*
 coverage/
 
 .next
+
+# Build config (contains PAT)
+.build-config.json
