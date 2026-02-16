@@ -17,6 +17,7 @@ import type { LibAPI } from "../../lib/index.js";
 import type { Document } from "mongoose";
 import { nanoid } from "nanoid";
 import { ModmailWebSocketService } from "../websocket/ModmailWebSocketService.js";
+import { formatStaffReply as buildStaffReply } from "../utils/formatStaffReply.js";
 import { broadcast } from "../../../src/core/broadcast.js";
 
 /** Discord DM file size limit for bots (8 MB) */
@@ -375,7 +376,7 @@ export class ModmailFlowService {
    * Format a staff reply for the user's DM
    */
   formatStaffReply(content: string, staffName: string, guildName: string): string {
-    return `**${staffName}:**\n${content}\n\n-# This message was sent by the staff of ${guildName} in response to your modmail.\n-# To reply, simply send a message in this DM.\n-# If you want to close this thread, just click the close button above.`;
+    return buildStaffReply(content, staffName, guildName);
   }
 
   /**

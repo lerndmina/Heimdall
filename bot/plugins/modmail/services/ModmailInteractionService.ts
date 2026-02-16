@@ -19,6 +19,7 @@ import type { IModmail } from "../models/Modmail.js";
 import { ModmailStatus } from "../models/Modmail.js";
 import type { LibAPI } from "../../lib/index.js";
 import { ModmailEmbeds } from "../utils/ModmailEmbeds.js";
+import { formatStaffReply } from "../utils/formatStaffReply.js";
 import { createCloseTicketRow, createResolveButtonRow } from "../utils/modmailButtons.js";
 import type { ComponentCallbackService } from "../../../src/core/services/ComponentCallbackService.js";
 import type { PluginLogger } from "../../../src/types/Plugin.js";
@@ -134,7 +135,7 @@ export class ModmailInteractionService {
 
       try {
         await user.send({
-          content: `**${closedByDisplayName}** (${guildName}):\n${finalMessage}`,
+          content: formatStaffReply(finalMessage, closedByDisplayName, guildName),
         });
       } catch {
         dmFailed = true;
