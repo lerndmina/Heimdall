@@ -287,14 +287,21 @@ async function actionBuild(cfg) {
 
   // Determine tags (remembers last-used tags)
   const rememberedTags = cfg.lastTags
-    ? stripShaTags(cfg.lastTags.split(",").map((t) => t.trim()).filter(Boolean)).join(",")
+    ? stripShaTags(
+        cfg.lastTags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+      ).join(",")
     : "";
   const defaultTags = rememberedTags || `latest,v${version}`;
   const rawTags = await ask("Tags (comma-separated)", defaultTags);
-  const baseTags = stripShaTags(rawTags
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean));
+  const baseTags = stripShaTags(
+    rawTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean),
+  );
   const tags = [...new Set(baseTags)];
   const shaTag = getShaTag();
 
@@ -400,10 +407,12 @@ async function actionPush(cfg, tags) {
   if (!tags || tags.length === 0) {
     const version = getPackageVersion();
     const raw = await ask("Tags to push (comma-separated)", `latest,v${version}`);
-    tags = stripShaTags(raw
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean));
+    tags = stripShaTags(
+      raw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+    );
   }
 
   tags = [...new Set(tags)];

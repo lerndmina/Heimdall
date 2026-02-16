@@ -22,6 +22,7 @@ const WebSocketContext = createContext<WebSocketContextValue>({
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
+  const accessToken = session?.accessToken;
   const [connected, setConnected] = useState(false);
   const [wsUrl, setWsUrl] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -30,6 +31,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const subscribedGuildsRef = useRef<Map<string, number>>(new Map());
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  const shouldReconnectRef = useRef(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,14 +51,21 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const connect = useCallback(() => {
-    if (!session?.accessToken || !wsUrl) return;
+    if (!accessToken || !wsUrl) return;
+
+    const currentSocket = wsRef.current;
+    if (currentSocket && (currentSocket.readyState === WebSocket.OPEN || currentSocket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    shouldReconnectRef.current = true;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
       reconnectAttemptsRef.current = 0;
-      ws.send(JSON.stringify({ type: "auth", token: session.accessToken }));
+      ws.send(JSON.stringify({ type: "auth", token: accessToken }));
     };
 
     ws.onmessage = (event) => {
@@ -75,6 +84,16 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           }
         }
         return;
+      }
+
+      if (msg.event === "error") {
+        const code = msg?.data?.code as string | undefined;
+        if (code === "INVALID_TOKEN" || code === "MISSING_TOKEN" || code === "NOT_AUTHENTICATED" || code === "TOO_MANY_CONNECTIONS") {
+          shouldReconnectRef.current = false;
+          setConnected(false);
+          ws.close(4001, code);
+          return;
+        }
       }
 
       // Handle global (non-guild-scoped) events — e.g., owner-only migration progress
@@ -107,15 +126,22 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       setConnected(false);
+
+      if (!shouldReconnectRef.current) return;
+
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[dashboard] ws closed", { code: event.code, reason: event.reason, wasClean: event.wasClean });
+      }
+
       scheduleReconnect();
     };
 
     ws.onerror = () => {
       ws.close();
     };
-  }, [session, wsUrl]);
+  }, [accessToken, wsUrl]);
 
   const scheduleReconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) return;
@@ -132,6 +158,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!wsUrl) return;
+    if (!accessToken) return;
 
     connect();
 
@@ -142,7 +169,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         reconnectTimeoutRef.current = null;
       }
     };
-  }, [connect, wsUrl]);
+  }, [connect, wsUrl, accessToken]);
+
+  useEffect(() => {
+    shouldReconnectRef.current = true;
+  }, [accessToken]);
 
   const subscribe = useCallback((guildId: string, event: string, handler: (data: any) => void) => {
     const key = `${guildId}:${event}`;
