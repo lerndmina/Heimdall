@@ -142,13 +142,17 @@ function getShaTag() {
   return sha ? `sha-${sha}` : null;
 }
 
+function stripShaTags(tags) {
+  return tags.filter((tag) => !/^sha-[a-f0-9]{7,40}$/i.test(tag));
+}
+
 function withShaTag(tags) {
   const shaTag = getShaTag();
   if (!shaTag) {
     warn("Could not determine git SHA; continuing without SHA tag.");
-    return [...new Set(tags)];
+    return [...new Set(stripShaTags(tags))];
   }
-  return [...new Set([...tags, shaTag])];
+  return [...new Set([...stripShaTags(tags), shaTag])];
 }
 
 function localImageExists(ref) {
@@ -282,13 +286,17 @@ async function actionBuild(cfg) {
   const isMultiPlatform = platforms.includes(",");
 
   // Determine tags (remembers last-used tags)
-  const defaultTags = cfg.lastTags || `latest,v${version}`;
+  const rememberedTags = cfg.lastTags
+    ? stripShaTags(cfg.lastTags.split(",").map((t) => t.trim()).filter(Boolean)).join(",")
+    : "";
+  const defaultTags = rememberedTags || `latest,v${version}`;
   const rawTags = await ask("Tags (comma-separated)", defaultTags);
-  const baseTags = rawTags
+  const baseTags = stripShaTags(rawTags
     .split(",")
     .map((t) => t.trim())
-    .filter(Boolean);
-  const tags = withShaTag(baseTags);
+    .filter(Boolean));
+  const tags = [...new Set(baseTags)];
+  const shaTag = getShaTag();
 
   if (!cfg.owner || !cfg.repo) {
     warn("Owner or repo not configured. Run Configure first.");
@@ -300,6 +308,7 @@ async function actionBuild(cfg) {
   console.log();
   info(`Image:      ghcr.io/${cfg.owner}/${cfg.repo}`);
   info(`Tags:       ${tags.join(", ")}`);
+  if (shaTag) info(`SHA Tag:    ${shaTag} ${c.dim}(applied on push)${c.reset}`);
   info(`Platforms:  ${platforms}`);
   info(`Buildx:     ${hasBuildx ? "yes" : "no (falling back to docker build)"}`);
   console.log();
@@ -322,6 +331,7 @@ async function actionBuild(cfg) {
     if (hasBuildx && isMultiPlatform) {
       // Multi-platform build with buildx
       info("Using docker buildx for multi-platform build...");
+      const pushTags = withShaTag(tags);
 
       // Ensure a builder exists
       const builderExists = execQuiet("docker buildx inspect heimdall-builder");
@@ -332,7 +342,7 @@ async function actionBuild(cfg) {
         exec("docker buildx use heimdall-builder");
       }
 
-      await streamCmd("docker", ["buildx", "build", "--platform", platforms, ...tags.flatMap((t) => ["-t", imageRef(cfg, t)]), "--push", "."]);
+      await streamCmd("docker", ["buildx", "build", "--platform", platforms, ...pushTags.flatMap((t) => ["-t", imageRef(cfg, t)]), "--push", "."]);
       ok("Multi-platform build & push complete!");
 
       // Stop the builder container (it persists otherwise)
@@ -343,7 +353,7 @@ async function actionBuild(cfg) {
       cfg.lastTags = baseTags.join(",");
       saveConfig(cfg);
 
-      return { tags, pushed: true };
+      return { tags: pushTags, pushed: true };
     } else {
       // Standard build
       await streamCmd("docker", ["build", ...tags.flatMap((t) => ["-t", imageRef(cfg, t)]), "."]);
@@ -390,10 +400,10 @@ async function actionPush(cfg, tags) {
   if (!tags || tags.length === 0) {
     const version = getPackageVersion();
     const raw = await ask("Tags to push (comma-separated)", `latest,v${version}`);
-    tags = raw
+    tags = stripShaTags(raw
       .split(",")
       .map((t) => t.trim())
-      .filter(Boolean);
+      .filter(Boolean));
   }
 
   tags = [...new Set(tags)];

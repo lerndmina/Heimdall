@@ -261,6 +261,7 @@ export class ApiManager {
     // Higher body size limit for bulk import and migration routes
     this.app.use("/api/guilds/:guildId/minecraft/import-whitelist", express.json({ limit: "10mb" }));
     this.app.use("/api/dev/migrate", express.json({ limit: "10mb" }));
+    this.app.use("/api/dev/clone", express.json({ limit: "10mb" }));
 
     // API key auth middleware — applied to all guild-scoped routes
     this.app.use("/api/guilds", (req: Request, res: Response, next: NextFunction) => {
@@ -597,6 +598,71 @@ export class ApiManager {
             },
           });
         }
+      }
+    });
+
+    // Dev clone endpoint — clone data from another Heimdall instance (owner only)
+    this.app.post("/api/dev/clone", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || !this.verifyApiKey(key)) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const userId = req.header("X-User-Id");
+      const ownerIds = (process.env.OWNER_IDS || "").trim().split(",").filter(Boolean);
+
+      if (!userId || !ownerIds.includes(userId)) {
+        res.status(401).json({
+          success: false,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Only the bot owner can execute clone migrations",
+          },
+        });
+        return;
+      }
+
+      const { sourceDbUri, guildId } = req.body;
+
+      if (!sourceDbUri || typeof sourceDbUri !== "string") {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "INVALID_REQUEST",
+            message: "sourceDbUri is required",
+          },
+        });
+        return;
+      }
+
+      try {
+        const { runCloneMigration } = await import("../../plugins/dev/utils/cloneMigration.js");
+        const { broadcastToOwners } = await import("./broadcast.js");
+
+        const stats = await runCloneMigration({
+          sourceDbUri,
+          guildId,
+          onProgress: (event: any) => {
+            broadcastToOwners(`migration:${event.step === "complete" ? "complete" : event.result ? "step_complete" : "step_start"}`, {
+              mode: "clone",
+              ...event,
+            });
+          },
+        });
+
+        res.json({ success: true, data: stats });
+      } catch (error: any) {
+        log.error("[API] Clone migration failed:", error);
+        const isProduction = process.env.NODE_ENV === "production";
+        const safeMessage = isProduction ? "Clone migration failed" : error.message || "Clone migration failed";
+        res.status(500).json({
+          success: false,
+          error: {
+            code: "CLONE_FAILED",
+            message: safeMessage,
+          },
+        });
       }
     });
 

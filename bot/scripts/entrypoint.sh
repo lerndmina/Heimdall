@@ -11,8 +11,19 @@
 
 set -e
 
-if [ "$SINGLE_PORT_PROXY" = "true" ]; then
-  PORT="${PORT:-8080}"
+normalize_env_value() {
+  echo "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
+}
+
+is_truthy() {
+  case "$(normalize_env_value "$1" | tr '[:upper:]' '[:lower:]')" in
+    true|1|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if is_truthy "${SINGLE_PORT_PROXY:-}"; then
+  PORT="$(normalize_env_value "${PORT:-8080}")"
   export PORT
 
   # Prepare writable directories for non-root nginx
