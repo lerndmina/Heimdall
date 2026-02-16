@@ -386,6 +386,14 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
     setRoleFilterRoles(roleFilterRoles.filter((r) => r !== roleId));
   };
 
+  const modelOptions = useMemo(() => {
+    if (provider === "openai") return OPENAI_MODEL_OPTIONS;
+    return LOCAL_MODEL_OPTIONS.map((opt) => ({
+      ...opt,
+      suffix: <ModelBadge status={modelStatus[opt.value]} />,
+    }));
+  }, [provider, modelStatus]);
+
   // ── Loading ──
   if (loading && originalConfig === "") {
     return (
@@ -408,14 +416,6 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
       </Card>
     );
   }
-
-  const modelOptions = useMemo(() => {
-    if (provider === "openai") return OPENAI_MODEL_OPTIONS;
-    return LOCAL_MODEL_OPTIONS.map((opt) => ({
-      ...opt,
-      suffix: <ModelBadge status={modelStatus[opt.value]} />,
-    }));
-  }, [provider, modelStatus]);
 
   return (
     <div className="space-y-6">
