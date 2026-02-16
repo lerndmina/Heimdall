@@ -252,9 +252,14 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
                     </span>
                     <span>{new Date(s.createdAt).toLocaleDateString()}</span>
                     {s.messageLink && (
-                      <a href={s.messageLink} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300">
-                        View in Discord
-                      </a>
+                      <>
+                        <a href={s.messageLink.replace("https://", "discord://")} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300">
+                          Open in Discord
+                        </a>
+                        <a href={s.messageLink.replace("https://", "discord://")} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300">
+                          View in Browser
+                        </a>
+                      </>
                     )}
                   </div>
                 </div>
