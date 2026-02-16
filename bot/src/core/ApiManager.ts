@@ -262,6 +262,7 @@ export class ApiManager {
     this.app.use("/api/guilds/:guildId/minecraft/import-whitelist", express.json({ limit: "10mb" }));
     this.app.use("/api/dev/migrate", express.json({ limit: "10mb" }));
     this.app.use("/api/dev/clone", express.json({ limit: "10mb" }));
+    this.app.use("/api/dev/drop", express.json());
 
     // API key auth middleware — applied to all guild-scoped routes
     this.app.use("/api/guilds", (req: Request, res: Response, next: NextFunction) => {
@@ -660,6 +661,68 @@ export class ApiManager {
           success: false,
           error: {
             code: "CLONE_FAILED",
+            message: safeMessage,
+          },
+        });
+      }
+    });
+
+    // Dev drop endpoint — wipe all Heimdall-managed collections (owner only)
+    this.app.delete("/api/dev/drop", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      if (!key || !this.verifyApiKey(key)) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      const userId = req.header("X-User-Id");
+      const ownerIds = (process.env.OWNER_IDS || "").trim().split(",").filter(Boolean);
+
+      if (!userId || !ownerIds.includes(userId)) {
+        res.status(401).json({
+          success: false,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Only the bot owner can drop all data",
+          },
+        });
+        return;
+      }
+
+      // Require explicit confirmation header
+      const confirm = req.header("X-Confirm-Drop");
+      if (confirm !== "DROP ALL DATA") {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "CONFIRMATION_REQUIRED",
+            message: "Missing X-Confirm-Drop header with value 'DROP ALL DATA'",
+          },
+        });
+        return;
+      }
+
+      try {
+        const { dropAllCollections } = await import("../../plugins/dev/utils/dropCollections.js");
+        const { broadcastToOwners } = await import("./broadcast.js");
+
+        const results = await dropAllCollections({
+          onProgress: (event: any) => {
+            broadcastToOwners(`drop:${event.result ? "step_complete" : "step_start"}`, event);
+          },
+        });
+
+        const totalDeleted = Object.values(results).reduce((sum, r) => sum + r.deleted, 0);
+
+        res.json({ success: true, data: { results, totalDeleted } });
+      } catch (error: any) {
+        log.error("[API] Drop all data failed:", error);
+        const isProduction = process.env.NODE_ENV === "production";
+        const safeMessage = isProduction ? "Drop all data failed" : error.message || "Drop all data failed";
+        res.status(500).json({
+          success: false,
+          error: {
+            code: "DROP_FAILED",
             message: safeMessage,
           },
         });
