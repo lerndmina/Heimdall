@@ -112,6 +112,7 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
           }
         : undefined,
     });
+    const pendingClientFrames: Array<{ data: WebSocket.RawData; isBinary: boolean }> = [];
 
     const closeBoth = () => {
       if (clientSocket.readyState === WebSocket.OPEN || clientSocket.readyState === WebSocket.CONNECTING) {
@@ -124,11 +125,25 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
 
     upstream.on("open", () => {
       logger.debug(`[dashboard] WS bridge connected (${req.url ?? "/ws"} -> ws://127.0.0.1:${wsPort})`);
+
+      for (const frame of pendingClientFrames) {
+        if (upstream.readyState !== WebSocket.OPEN) break;
+        upstream.send(frame.data, { binary: frame.isBinary });
+      }
+      pendingClientFrames.length = 0;
     });
 
     clientSocket.on("message", (data, isBinary) => {
       if (upstream.readyState === WebSocket.OPEN) {
         upstream.send(data, { binary: isBinary });
+        return;
+      }
+
+      if (upstream.readyState === WebSocket.CONNECTING) {
+        pendingClientFrames.push({ data, isBinary });
+        if (pendingClientFrames.length > 64) {
+          pendingClientFrames.shift();
+        }
       }
     });
 
