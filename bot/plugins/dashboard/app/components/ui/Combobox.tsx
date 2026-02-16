@@ -15,6 +15,10 @@ import { createPortal } from "react-dom";
 export interface ComboboxOption {
   value: string;
   label: string;
+  /** Small badge rendered before the label text. */
+  prefix?: React.ReactNode;
+  /** Small badge rendered after the label text. */
+  suffix?: React.ReactNode;
 }
 
 interface ComboboxProps {
@@ -56,7 +60,7 @@ export default function Combobox({
   // Position state for portal-based popover
   const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
 
-  const selectedLabel = useMemo(() => options.find((o) => o.value === value)?.label, [options, value]);
+  const selectedOption = useMemo(() => options.find((o) => o.value === value), [options, value]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return options;
@@ -143,7 +147,19 @@ export default function Combobox({
         className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm outline-none transition ${
           error ? "border-red-500 ring-1 ring-red-500/30" : open ? "border-primary-500 ring-1 ring-primary-500" : "border-zinc-700 hover:border-zinc-600"
         } bg-white/5 backdrop-blur-sm ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
-        <span className={selectedLabel ? "text-zinc-100" : "text-zinc-500"}>{loading ? "Loading…" : selectedLabel || placeholder}</span>
+        <span className={`flex items-center gap-1.5 ${selectedOption ? "text-zinc-100" : "text-zinc-500"}`}>
+          {loading ? (
+            "Loading…"
+          ) : selectedOption ? (
+            <>
+              {selectedOption.prefix}
+              {selectedOption.label}
+              {selectedOption.suffix}
+            </>
+          ) : (
+            placeholder
+          )}
+        </span>
         {/* Chevron */}
         <svg className={`ml-2 h-4 w-4 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -202,7 +218,11 @@ export default function Combobox({
                     <svg className={`h-4 w-4 shrink-0 ${isSelected ? "text-primary-400" : "text-transparent"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span className="truncate">{opt.label}</span>
+                    <span className="flex items-center gap-1.5 truncate">
+                      {opt.prefix}
+                      <span className="truncate">{opt.label}</span>
+                      {opt.suffix}
+                    </span>
                   </button>
                 );
               })}

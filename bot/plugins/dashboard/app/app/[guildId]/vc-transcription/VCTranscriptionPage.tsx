@@ -10,7 +10,7 @@
  */
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -68,6 +68,18 @@ const LOCAL_MODEL_OPTIONS = [
   { value: "medium.en", label: "medium.en (769 MB — high quality)" },
   { value: "large", label: "large (1.5 GB — best quality, multilingual)" },
 ];
+
+function ModelBadge({ status }: { status?: { downloaded: boolean; downloading: boolean; percent?: number } }) {
+  if (!status) return <span className="ml-auto shrink-0 rounded-full border border-zinc-500/20 bg-zinc-500/15 px-1.5 py-px text-[10px] font-medium text-zinc-400">Not Downloaded</span>;
+  if (status.downloading)
+    return (
+      <span className="ml-auto shrink-0 rounded-full border border-blue-500/20 bg-blue-500/15 px-1.5 py-px text-[10px] font-medium text-blue-400">
+        Downloading{status.percent != null ? ` ${status.percent}%` : "…"}
+      </span>
+    );
+  if (status.downloaded) return <span className="ml-auto shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/15 px-1.5 py-px text-[10px] font-medium text-emerald-400">Downloaded</span>;
+  return <span className="ml-auto shrink-0 rounded-full border border-zinc-500/20 bg-zinc-500/15 px-1.5 py-px text-[10px] font-medium text-zinc-400">Not Downloaded</span>;
+}
 
 const OPENAI_MODEL_OPTIONS = [{ value: "whisper-1", label: "whisper-1" }];
 
@@ -397,7 +409,13 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
     );
   }
 
-  const modelOptions = provider === "openai" ? OPENAI_MODEL_OPTIONS : LOCAL_MODEL_OPTIONS;
+  const modelOptions = useMemo(() => {
+    if (provider === "openai") return OPENAI_MODEL_OPTIONS;
+    return LOCAL_MODEL_OPTIONS.map((opt) => ({
+      ...opt,
+      suffix: <ModelBadge status={modelStatus[opt.value]} />,
+    }));
+  }, [provider, modelStatus]);
 
   return (
     <div className="space-y-6">
