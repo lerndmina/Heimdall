@@ -32,6 +32,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const shouldReconnectRef = useRef(true);
+  const hasAuthenticatedRef = useRef(false);
+  const preAuthCloseCountRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +61,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     }
 
     shouldReconnectRef.current = true;
+    hasAuthenticatedRef.current = false;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -77,6 +80,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       }
 
       if (msg.event === "authenticated") {
+        hasAuthenticatedRef.current = true;
+        preAuthCloseCountRef.current = 0;
         setConnected(true);
         for (const [guildId, count] of subscribedGuildsRef.current.entries()) {
           if (count > 0) {
@@ -130,6 +135,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       setConnected(false);
 
       if (!shouldReconnectRef.current) return;
+
+      if (!hasAuthenticatedRef.current) {
+        preAuthCloseCountRef.current += 1;
+        if (preAuthCloseCountRef.current >= 3) {
+          shouldReconnectRef.current = false;
+          return;
+        }
+      }
 
       if (process.env.NODE_ENV !== "production") {
         console.debug("[dashboard] ws closed", { code: event.code, reason: event.reason, wasClean: event.wasClean });
