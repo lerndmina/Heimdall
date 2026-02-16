@@ -135,18 +135,22 @@ export function createStatusEmbed(
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const nextUpdate = data.nextPingInSeconds + nowSeconds;
+  // Clamp nextPingInSeconds to a reasonable range for display (30s – 300s)
+  const clampedNext = Math.min(Math.max(data.nextPingInSeconds || 61, 30), 300);
+  const nextUpdate = clampedNext + nowSeconds;
 
   if (dbData.persistData) {
     fields.push({ name: "Next Update", value: `<t:${Math.floor(nextUpdate)}:R>`, inline: false });
   }
+
+  const updateInterval = dbData.persistData ? Math.round((dbData.persistData.updateInterval || 61000) / 1000) : null;
 
   const embed = new EmbedBuilder()
     .setTitle(`Server Status for ${dbData.serverName}`)
     .setColor(data.online ? (isMaintenance ? 0xff8c00 : 0x00ff00) : 0xff0000)
     .setDescription(data.online ? data.motd.clean : "Server is offline")
     .setURL(`https://mcstatus.io/status/java/${dbData.serverIp}:${dbData.serverPort}`)
-    .setFooter({ text: "Last updated", iconURL: client.user?.displayAvatarURL() })
+    .setFooter({ text: updateInterval ? `Auto-updating embed every ${updateInterval}s` : "Last updated", iconURL: client.user?.displayAvatarURL() })
     .addFields(fields)
     .setTimestamp();
 

@@ -9,10 +9,12 @@ import { createConfigRoutes } from "./config.js";
 import { createApiKeyRoutes } from "./apikey.js";
 import type { VCTranscriptionPluginAPI } from "../index.js";
 import type { GuildEnvService } from "../../../src/core/services/GuildEnvService.js";
+import type { TranscriptionQueueService } from "../services/TranscriptionQueueService.js";
 
 /** Narrowed dependencies for API sub-route files */
 export interface VCTranscriptionApiDependencies {
   guildEnvService: GuildEnvService;
+  queueService: TranscriptionQueueService;
 }
 
 export function createRouter(api: VCTranscriptionPluginAPI): Router {
@@ -20,6 +22,7 @@ export function createRouter(api: VCTranscriptionPluginAPI): Router {
 
   const deps: VCTranscriptionApiDependencies = {
     guildEnvService: api.guildEnvService,
+    queueService: api.queueService,
   };
 
   // GET/PUT/DELETE /api/guilds/:guildId/vc-transcription/config

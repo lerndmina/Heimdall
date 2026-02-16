@@ -9,7 +9,6 @@ import { Events, type Message, MessageFlags, ThreadChannel, ChannelType } from "
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import VoiceTranscriptionConfig from "../models/VoiceTranscriptionConfig.js";
 import { TranscriptionMode, WhisperProvider } from "../types/index.js";
-import { transcribeMessage } from "../utils/TranscribeMessage.js";
 import { passesFilters } from "../utils/FilterUtils.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import type { VCTranscriptionPluginAPI } from "../index.js";
@@ -23,10 +22,7 @@ export const pluginName = "vc-transcription";
  * Check if a message is a Discord voice message.
  */
 function isVoiceMessage(message: Message): boolean {
-  return (
-    message.flags.has(MessageFlags.IsVoiceMessage) &&
-    message.attachments.size === 1
-  );
+  return message.flags.has(MessageFlags.IsVoiceMessage) && message.attachments.size === 1;
 }
 
 export async function execute(client: HeimdallClient, message: Message): Promise<void> {
@@ -66,12 +62,12 @@ export async function execute(client: HeimdallClient, message: Message): Promise
       log.debug(`Auto-transcribing voice message from ${message.author.username}`);
 
       const pluginApi = client.plugins.get("vc-transcription") as VCTranscriptionPluginAPI | undefined;
-      if (!pluginApi?.guildEnvService) {
+      if (!pluginApi?.guildEnvService || !pluginApi?.queueService) {
         log.error("VC Transcription plugin API not available");
         return;
       }
 
-      await transcribeMessage(client, message, {
+      await pluginApi.queueService.enqueue(message, {
         provider: (config?.whisperProvider as WhisperProvider) || WhisperProvider.LOCAL,
         model: config?.whisperModel || "base.en",
         guildId: message.guildId,

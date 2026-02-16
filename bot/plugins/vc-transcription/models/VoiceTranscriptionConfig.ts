@@ -6,13 +6,7 @@
  */
 
 import mongoose, { Schema, model, type Model, type InferSchemaType } from "mongoose";
-import {
-  TranscriptionMode,
-  WhisperProvider,
-  FilterMode,
-  LOCAL_WHISPER_MODELS,
-  OPENAI_WHISPER_MODELS,
-} from "../types/index.js";
+import { TranscriptionMode, WhisperProvider, FilterMode, LOCAL_WHISPER_MODELS, OPENAI_WHISPER_MODELS } from "../types/index.js";
 
 const VoiceTranscriptionConfigSchema = new Schema(
   {
@@ -57,6 +51,17 @@ const VoiceTranscriptionConfigSchema = new Schema(
         type: [String],
         default: [],
       },
+    },
+    maxConcurrentTranscriptions: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 10,
+    },
+    maxQueueSize: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   {

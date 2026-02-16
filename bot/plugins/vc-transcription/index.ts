@@ -12,6 +12,8 @@
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 import type { GuildEnvService } from "../../src/core/services/GuildEnvService.js";
+import type { HeimdallClient } from "../../src/types/Client.js";
+import { TranscriptionQueueService } from "./services/TranscriptionQueueService.js";
 
 // Register model with Mongoose
 import "./models/VoiceTranscriptionConfig.js";
@@ -21,25 +23,42 @@ export interface VCTranscriptionPluginAPI extends PluginAPI {
   version: string;
   lib: LibAPI;
   guildEnvService: GuildEnvService;
+  queueService: TranscriptionQueueService;
+}
+
+/** Module-level reference for internal access */
+let pluginAPI: VCTranscriptionPluginAPI | null = null;
+export function getVCTranscriptionAPI(): VCTranscriptionPluginAPI | null {
+  return pluginAPI;
 }
 
 export async function onLoad(context: PluginContext): Promise<VCTranscriptionPluginAPI> {
-  const { logger, dependencies, guildEnvService } = context;
+  const { logger, dependencies, guildEnvService, client } = context;
 
   // Get lib dependency
   const lib = dependencies.get("lib") as LibAPI | undefined;
   if (!lib) throw new Error("vc-transcription requires lib plugin");
 
+  // Instantiate queue service
+  const queueService = new TranscriptionQueueService(client as HeimdallClient);
+
   logger.info("✅ VC Transcription plugin loaded");
 
-  return {
+  pluginAPI = {
     version: "1.0.0",
     lib,
     guildEnvService,
+    queueService,
   };
+
+  return pluginAPI;
 }
 
 export async function onDisable(logger: PluginLogger): Promise<void> {
+  if (pluginAPI?.queueService) {
+    pluginAPI.queueService.stop();
+  }
+  pluginAPI = null;
   logger.info("🛑 VC Transcription plugin unloaded");
 }
 

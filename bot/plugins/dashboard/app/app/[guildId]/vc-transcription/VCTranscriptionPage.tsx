@@ -15,6 +15,7 @@ import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/C
 import Spinner from "@/components/ui/Spinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Combobox from "@/components/ui/Combobox";
+import NumberInput from "@/components/ui/NumberInput";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
 import Modal from "@/components/ui/Modal";
@@ -32,7 +33,21 @@ interface VCTranscriptionConfig {
   whisperModel: string;
   roleFilter: { mode: "disabled" | "whitelist" | "blacklist"; roles: string[] };
   channelFilter: { mode: "disabled" | "whitelist" | "blacklist"; channels: string[] };
+  maxConcurrentTranscriptions: number;
+  maxQueueSize: number;
   hasApiKey: boolean;
+}
+
+interface ModelStatusMap {
+  [model: string]: { downloaded: boolean; downloading: boolean; percent?: number; totalMB?: number; downloadedMB?: number };
+}
+
+interface DownloadProgress {
+  model: string;
+  percent: number;
+  totalMB: number;
+  downloadedMB: number;
+  status: string;
 }
 
 const MODE_OPTIONS = [
@@ -89,12 +104,20 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Queue settings
+  const [maxConcurrent, setMaxConcurrent] = useState(1);
+  const [maxQueueSize, setMaxQueueSize] = useState(0);
+
+  // Model download status
+  const [modelStatus, setModelStatus] = useState<ModelStatusMap>({});
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+
   // Dirty tracking
   const [originalConfig, setOriginalConfig] = useState<string>("");
 
   const getCurrentConfigHash = useCallback(() => {
-    return JSON.stringify({ mode, provider, model, roleFilterMode, roleFilterRoles, channelFilterMode, channelFilterChannels });
-  }, [mode, provider, model, roleFilterMode, roleFilterRoles, channelFilterMode, channelFilterChannels]);
+    return JSON.stringify({ mode, provider, model, roleFilterMode, roleFilterRoles, channelFilterMode, channelFilterChannels, maxConcurrent, maxQueueSize });
+  }, [mode, provider, model, roleFilterMode, roleFilterRoles, channelFilterMode, channelFilterChannels, maxConcurrent, maxQueueSize]);
 
   const isDirty = originalConfig !== getCurrentConfigHash();
 
@@ -114,6 +137,8 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
         setRoleFilterRoles(c.roleFilter.roles);
         setChannelFilterMode(c.channelFilter.mode);
         setChannelFilterChannels(c.channelFilter.channels);
+        setMaxConcurrent(c.maxConcurrentTranscriptions ?? 1);
+        setMaxQueueSize(c.maxQueueSize ?? 0);
 
         const hash = JSON.stringify({
           mode: c.mode,
@@ -123,6 +148,8 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
           roleFilterRoles: c.roleFilter.roles,
           channelFilterMode: c.channelFilter.mode,
           channelFilterChannels: c.channelFilter.channels,
+          maxConcurrent: c.maxConcurrentTranscriptions ?? 1,
+          maxQueueSize: c.maxQueueSize ?? 0,
         });
         setOriginalConfig(hash);
       } else {
@@ -139,9 +166,62 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
     fetchConfig();
   }, [fetchConfig]);
 
+  // Fetch model status on load
+  const fetchModelStatus = useCallback(async () => {
+    try {
+      const res = await fetchApi<{ models: ModelStatusMap }>(guildId, "vc-transcription/model-status", { skipCache: true });
+      if (res.success && res.data) {
+        setModelStatus(res.data.models);
+      }
+    } catch {
+      // Non-critical — model status is supplementary
+    }
+  }, [guildId]);
+
+  useEffect(() => {
+    fetchModelStatus();
+  }, [fetchModelStatus]);
+
   useRealtimeEvent("vc-transcription:updated", () => {
     fetchConfig();
+    fetchModelStatus();
   });
+
+  // Model download progress via WebSocket
+  useRealtimeEvent(
+    "vc-transcription:model_download_progress",
+    useCallback((data: DownloadProgress) => {
+      setDownloadProgress(data);
+      setModelStatus((prev) => ({
+        ...prev,
+        [data.model]: { downloaded: false, downloading: true, percent: data.percent, totalMB: data.totalMB, downloadedMB: data.downloadedMB },
+      }));
+    }, []),
+  );
+
+  useRealtimeEvent(
+    "vc-transcription:model_download_complete",
+    useCallback((data: { model: string }) => {
+      setDownloadProgress(null);
+      setModelStatus((prev) => ({
+        ...prev,
+        [data.model]: { downloaded: true, downloading: false },
+      }));
+      toast.success(`Model ${data.model} downloaded successfully`);
+    }, []),
+  );
+
+  useRealtimeEvent(
+    "vc-transcription:model_download_error",
+    useCallback((data: { model: string; error: string }) => {
+      setDownloadProgress(null);
+      setModelStatus((prev) => ({
+        ...prev,
+        [data.model]: { ...prev[data.model], downloading: false },
+      }));
+      toast.error(`Model download failed: ${data.error}`);
+    }, []),
+  );
 
   // When provider changes, reset model to sensible default
   useEffect(() => {
@@ -164,12 +244,16 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
           whisperModel: model,
           roleFilter: { mode: roleFilterMode, roles: roleFilterRoles },
           channelFilter: { mode: channelFilterMode, channels: channelFilterChannels },
+          maxConcurrentTranscriptions: maxConcurrent,
+          maxQueueSize,
         }),
       });
 
       if (res.success) {
         setOriginalConfig(getCurrentConfigHash());
         toast.success("Transcription settings saved");
+        // Refresh model status since save may trigger a download
+        fetchModelStatus();
       } else {
         toast.error(res.error?.message ?? "Failed to save");
       }
@@ -242,6 +326,8 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
         setRoleFilterRoles([]);
         setChannelFilterMode("disabled");
         setChannelFilterChannels([]);
+        setMaxConcurrent(1);
+        setMaxQueueSize(0);
         setOriginalConfig(
           JSON.stringify({
             mode: "disabled",
@@ -251,6 +337,8 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
             roleFilterRoles: [],
             channelFilterMode: "disabled",
             channelFilterChannels: [],
+            maxConcurrent: 1,
+            maxQueueSize: 0,
           }),
         );
         toast.success("Configuration reset to defaults");
@@ -350,6 +438,45 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
             <p className="text-xs text-zinc-500">{provider === "local" ? "Larger models are more accurate but slower and use more memory." : "OpenAI currently offers the whisper-1 model."}</p>
             <Combobox options={modelOptions} value={model} onChange={setModel} placeholder="Select model…" disabled={!canManage} />
           </div>
+
+          {/* Model download status indicator (local provider only) */}
+          {provider === "local" &&
+            (() => {
+              const status = modelStatus[model];
+              const isActiveDownload = downloadProgress?.model === model;
+              if (isActiveDownload && downloadProgress) {
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-zinc-400">
+                      <span>
+                        Downloading {model}... {downloadProgress.downloadedMB} / {downloadProgress.totalMB} MB
+                      </span>
+                      <span>{downloadProgress.percent}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+                      <div className="h-full rounded-full bg-primary-500 transition-all duration-300 ease-out" style={{ width: `${downloadProgress.percent}%` }} />
+                    </div>
+                  </div>
+                );
+              }
+              if (status?.downloading) {
+                return (
+                  <div className="flex items-center gap-2 text-xs text-zinc-400">
+                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                      <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span>
+                      Downloading {model}... {status.percent ?? 0}%
+                    </span>
+                  </div>
+                );
+              }
+              if (status?.downloaded) {
+                return <StatusBadge variant="success">Downloaded</StatusBadge>;
+              }
+              return <StatusBadge variant="warning">Not downloaded — will download on save</StatusBadge>;
+            })()}
         </CardContent>
       </Card>
 
@@ -424,6 +551,31 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
           </CardContent>
         </Card>
       )}
+
+      {/* ── Queue Settings Section ── */}
+      <Card>
+        <CardTitle>Queue Settings</CardTitle>
+        <CardDescription className="mt-1">Control how voice message transcription requests are queued and processed.</CardDescription>
+        <CardContent className="mt-4 space-y-5">
+          <NumberInput
+            label="Max Concurrent Transcriptions"
+            description="How many voice messages can be transcribed at the same time."
+            value={maxConcurrent}
+            onChange={(v) => setMaxConcurrent(v ?? 1)}
+            min={1}
+            max={10}
+            disabled={!canManage}
+          />
+          <NumberInput
+            label="Max Queue Size"
+            description="Maximum number of voice messages waiting to be transcribed. Set to 0 for unlimited."
+            value={maxQueueSize}
+            onChange={(v) => setMaxQueueSize(v ?? 0)}
+            min={0}
+            disabled={!canManage}
+          />
+        </CardContent>
+      </Card>
 
       {/* ── Channel Filter Section ── */}
       <Card>

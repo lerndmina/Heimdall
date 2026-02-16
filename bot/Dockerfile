@@ -26,15 +26,15 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
 # Cross-compile whisper.cpp for the TARGET platform
+# GGML_NATIVE=OFF: disable host-specific SIMD (AVX2/FMA/etc.) so the binary
+# runs on any CPU of the target architecture (prevents SIGILL on servers
+# whose CPU lacks instructions the build host supports).
 RUN cd node_modules/nodejs-whisper/cpp/whisper.cpp && \
   cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+  -DGGML_NATIVE=OFF \
   -DCMAKE_C_COMPILER=$(which xx-cc) \
   -DCMAKE_CXX_COMPILER=$(which xx-c++) && \
   cmake --build build --config Release -j$(nproc)
-
-# Download default whisper model
-RUN wget -q -O node_modules/nodejs-whisper/cpp/whisper.cpp/models/ggml-base.en.bin \
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
 
 # ──────────────────────────────────────────────────────────────────────
 # Stage 2: Dependencies (runs on target platform)
@@ -56,7 +56,7 @@ RUN bun install --frozen-lockfile --production && \
   # Install all deps (including dev) for build stage
   bun install --frozen-lockfile
 
-# Overlay cross-compiled whisper.cpp binary + pre-downloaded model
+# Overlay cross-compiled whisper.cpp binary
 # (replaces the slow QEMU-emulated build that used to happen here)
 COPY --from=whisper-cross /build/node_modules/nodejs-whisper/cpp/whisper.cpp/ /tmp/node_modules/nodejs-whisper/cpp/whisper.cpp/
 

@@ -49,10 +49,10 @@ interface TempVCStats {
 }
 
 interface McServer {
-  name: string;
-  host: string;
-  port: number;
-  lastPing?: { online: boolean; players?: { online: number; max: number } };
+  serverName: string;
+  serverIp: string;
+  serverPort: number;
+  lastPingData?: { online: boolean; players?: { online: number; max: number } } | null;
 }
 
 // ── Stat Card ────────────────────────────────────────────
@@ -264,8 +264,8 @@ export default function GuildOverviewPage() {
         {mcServers.length > 0 && (
           <StatCard
             title="MC Servers"
-            value={mcServers.filter((s) => s.lastPing?.online).length + "/" + mcServers.length}
-            description={`${mcServers.reduce((a, s) => a + (s.lastPing?.players?.online ?? 0), 0)} players online`}
+            value={mcServers.filter((s) => s.lastPingData?.online).length + "/" + mcServers.length}
+            description={`${mcServers.reduce((a, s) => a + (s.lastPingData?.players?.online ?? 0), 0)} players online`}
             icon={icons.mc}
             accent="text-green-400"
           />
@@ -281,18 +281,18 @@ export default function GuildOverviewPage() {
               {mcServers.map((srv, i) => (
                 <div key={i} className="flex items-center justify-between py-2">
                   <div>
-                    <p className="text-sm font-medium text-zinc-200">{srv.name}</p>
+                    <p className="text-sm font-medium text-zinc-200">{srv.serverName}</p>
                     <p className="text-xs text-zinc-500">
-                      {srv.host}:{srv.port}
+                      {srv.serverIp}:{srv.serverPort}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    {srv.lastPing?.players && (
+                    {srv.lastPingData?.players && (
                       <span className="text-sm text-zinc-400">
-                        {srv.lastPing.players.online}/{srv.lastPing.players.max}
+                        {srv.lastPingData.players.online}/{srv.lastPingData.players.max}
                       </span>
                     )}
-                    <StatusBadge variant={srv.lastPing?.online ? "success" : "error"}>{srv.lastPing?.online ? "Online" : "Offline"}</StatusBadge>
+                    <StatusBadge variant={srv.lastPingData?.online ? "success" : "error"}>{srv.lastPingData?.online ? "Online" : "Offline"}</StatusBadge>
                   </div>
                 </div>
               ))}

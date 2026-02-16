@@ -1,216 +1,90 @@
-## Plan: Role Buttons Plugin
+## Plan: Transcription Queue + On-Demand Model Downloads
 
-A new `rolebuttons` plugin that lets admins create reusable role-panel templates (custom embed + buttons → role assignments), post them to channels as persistent panels, and manage everything from the dashboard. Buttons survive restarts via the existing `PersistentComponent` infrastructure.
+**TL;DR:** Remove the pre-bundled `base.en` model from the Docker image. Models are downloaded on-demand when a user saves a non-disabled config in the dashboard, with live progress via the existing WebSocket system. Transcription requests are queued (max 1 concurrent, unlimited queue) with edit-in-place position updates every 5 seconds. Models persist across rebuilds via an optional Docker volume.
 
-**Steps**
+---
 
-### 1. Plugin scaffold
+### Steps
 
-Create bot/plugins/rolebuttons/ with the standard structure:
+**1. Remove pre-bundled model from Dockecurl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGVzdA==" http://localhost:3002/rfile**
+In Dockerfile, delete the `wget` line that downloads `ggml-base.en.bin` at build time. This shrinks the image by ~74 MB (and avoids baking in a model the user might not want).
 
-- manifest.json — `name: "rolebuttons"`, depends on `["lib"]`, optional dep on `["dashboard"]`, `apiRoutePrefix: "/rolebuttons"`
-- index.ts — imports models (side-effect), creates `RoleButtonService`, registers persistent handler `"rolebuttons.assign"`, exports `RoleButtonsPluginAPI`
-- Exported paths: `commands`, `api`, `events` (for `guildRoleDelete` cleanup)
-
-### 2. Database models
-
-Create bot/plugins/rolebuttons/models/RoleButtonPanel.ts:
+**2. Add volume mount to docker-compose.yml**
+In docker-compose.yml, add a commented volume line under the existing `./logs` mount:
 
 ```
-RoleButtonPanel {
-  id:          String (nanoid, unique)
-  guildId:     String (indexed)
-  name:        String (unique per guild, for autocomplete/display)
-
-  // Custom embed config
-  embed: {
-    title:       String (optional)
-    description: String (optional)
-    color:       String (optional, hex)
-    image:       String (optional, URL)
-    thumbnail:   String (optional, URL)
-    footer:      String (optional)
-    fields:      [{ name: String, value: String, inline: Boolean }] (optional)
-  }
-
-  // Button definitions (ordered array, max 25)
-  buttons: [{
-    id:        String (nanoid)
-    label:     String (required)
-    emoji:     String (optional)
-    style:     Number (ButtonStyle enum: Primary/Secondary/Success/Danger)
-    roleId:    String (required — one role per button)
-    mode:      String (enum: "toggle" | "add" | "remove")
-    row:       Number (0-4, which ActionRow — allows admin to control layout)
-  }]
-
-  // Panel-level settings
-  exclusive:   Boolean (default false — if true, clicking a button removes other roles from this panel)
-
-  // Tracking posted instances
-  posts: [{
-    channelId: String
-    messageId: String
-    postedAt:  Date
-    postedBy:  String
-  }]
-
-  createdBy:   String
-  timestamps:  true
-}
+# Whisper model cache (optional — avoids re-downloading models after rebuilds)
+- ./data/whisper-models:/app/models/whisper
 ```
 
-Indexes: `(guildId, name)` unique compound, `guildId` alone.
+**3. Update model path resolution in TranscribeMessage.ts**
+In TranscribeMessage.ts, change the `modelsDir` from `node_modules/nodejs-whisper/cpp/whisper.cpp/models` to a new persistent path: `/app/models/whisper` (with fallback to the `node_modules` path if the volume isn't mounted). The `WHISPER_MODELS` map and `downloadWhisperModel` function stay but now target this new directory.
 
-### 3. Service layer
+**4. Create `TranscriptionQueueService.ts`** (new file)
+In bot/plugins/vc-transcription/services/, create a queue service:
 
-Create bot/plugins/rolebuttons/services/RoleButtonService.ts:
+- **Properties:** `queue: Array<QueueEntry>`, `processing: boolean`, `maxConcurrent: 1` (from config), `modelReady: Map<string, boolean>`, `downloadProgress: Map<string, number>`
+- **`enqueue(message, options)`** — adds to queue, returns `{ position, queueMessage }` (the bot's reply). If model isn't ready, throws/returns a "model downloading" state
+- **`processNext()`** — dequeues one entry, calls `transcribeWithLocal/OpenAI`, edits the queue message in-place with the result
+- **Position updater** — every 5 seconds, iterates queued entries and edits their reply messages with updated positions: `"⏳ Queued for transcription (position 3)..."`
+- **`downloadModel(model, guildId)`** — downloads the model, emits `vc-transcription:model_download_progress` WS events with `{ model, percent, status }`. On completion emits `vc-transcription:model_ready`
+- **`isModelReady(model)`** — checks filesystem for model file existence
 
-- **CRUD**: `createPanel()`, `getPanel()`, `listPanels()`, `updatePanel()`, `deletePanel()`
-- **`buildPanelMessage(panel, lib)`** — constructs the embed from `panel.embed` using `lib.createEmbedBuilder()`, creates persistent buttons via `lib.createButtonBuilderPersistent("rolebuttons.assign", { panelId, buttonId, roleId, mode })`, groups by `button.row`, returns `{ embeds, components }`
-- **`postPanel(panel, channel, userId, lib)`** — calls `buildPanelMessage()`, sends to channel, pushes to `panel.posts[]`, saves
-- **`updatePostedPanels(panel, client, lib)`** — rebuilds message and edits all live `posts[]` (for when template is edited)
-- **`handleRoleAssignment(interaction, metadata)`** — the persistent handler logic:
-  1. Retrieve `panelId`, `buttonId`, `roleId`, `mode` from metadata
-  2. Fetch panel from DB (for `exclusive` setting)
-  3. Resolve the member
-  4. If `exclusive` and member is gaining a role: remove all other roles from this panel's buttons first
-  5. Apply `toggle`/`add`/`remove` logic
-  6. Ephemeral reply: "Added **@RoleName**" / "Removed **@RoleName**" / "You already have/don't have this role"
-  7. Handle errors (missing role, missing permissions, hierarchy issues) with user-friendly ephemeral messages
-- **`cleanupDeletedRole(guildId, roleId)`** — removes buttons referencing a deleted role from all panels, updates posted messages
+**5. Update messageCreate.ts and messageReactionAdd.ts event handlers**
+In messageCreate.ts and messageReactionAdd.ts:
 
-### 4. Persistent handler registration
+- Instead of calling `transcribeMessage()` directly, call `queueService.enqueue(message, options)`
+- The enqueue immediately replies with `"⏳ Queued for transcription (position 1)..."` or `"⏳ Transcribing..."` if no queue
+- If the model is still downloading: `"⏳ Transcription model is downloading (67%)... your message is queued"`
+- The queue service handles editing the reply in-place with the final transcription
 
-In index.ts `onLoad()`:
+**6. Trigger model download on config save**
+In api/config.ts PUT handler, after saving the config:
 
-```
-componentCallbackService.registerPersistentHandler("rolebuttons.assign", (interaction) => {
-  const metadata = await componentCallbackService.getPersistentComponentMetadata(interaction.customId);
-  await roleButtonService.handleRoleAssignment(interaction, metadata);
-});
-```
+- If `mode` is not `DISABLED` and `whisperProvider` is `LOCAL`:
+  - Check if the selected model file exists
+  - If not, kick off `queueService.downloadModel(model, guildId)` (non-blocking)
+  - This emits live WS progress events the dashboard can consume
 
-### 5. Slash commands
+**7. Add WS events for download progress**
+Using the existing broadcast() helper, emit from the queue service:
 
-Create bot/plugins/rolebuttons/commands/rolebuttons.ts with subcommands, routed via bot/plugins/rolebuttons/subcommands/rolebuttons/index.ts:
+- `vc-transcription:model_download_progress` — `{ model, percent, totalMB, downloadedMB, status: "downloading" }`
+- `vc-transcription:model_download_complete` — `{ model, status: "ready" }`
+- `vc-transcription:model_download_error` — `{ model, error }`
 
-| Subcommand | Options                           | Behavior                                                                                                                                                          |
-| ---------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `create`   | `name`                            | Creates a blank panel template, replies with instructions to use `edit` and `post`                                                                                |
-| `edit`     | `panel` (autocomplete)            | Opens a multi-step ephemeral config panel (similar to ModmailConfigPanel) with buttons to edit embed fields, add/remove/reorder buttons, set exclusivity, preview |
-| `post`     | `panel` (autocomplete), `channel` | Builds & posts the panel to the target channel                                                                                                                    |
-| `update`   | `panel` (autocomplete)            | Rebuilds and edits all live posted instances of this panel                                                                                                        |
-| `delete`   | `panel` (autocomplete)            | Deletes template + optionally deletes posted messages                                                                                                             |
-| `list`     | —                                 | Lists all panels in the guild with post counts                                                                                                                    |
+**8. Update dashboard page**
+In VCTranscriptionPage.tsx:
 
-The `edit` subcommand uses an ephemeral interactive panel (like modmail config) with views:
+- Subscribe to `vc-transcription:model_download_progress` via `useRealtimeEvent`
+- When a model is downloading, show a progress bar in the Model card (e.g., `"Downloading base.en... 45% (33 / 74 MB)"`)
+- On `model_download_complete`, show a success badge
+- On `model_download_error`, show an error toast
 
-- **Home**: Panel name, exclusivity toggle, button list, preview button
-- **Embed Editor**: Title, description, color, image URL, thumbnail URL, footer, fields (add/edit/remove)
-- **Button Editor**: For each button — label, emoji, style (dropdown), role (role select menu), mode (toggle/add/remove), row assignment
-- **Preview**: Shows the final embed + buttons as they'll appear
+**9. Add `maxConcurrent` config field**
+In VoiceTranscriptionConfig.ts, add `maxConcurrentTranscriptions: { type: Number, default: 1 }`. Expose it in the API config route and add a simple number input to the dashboard page.
 
-All interactive elements use ephemeral callbacks with TTL (like ModmailConfigPanel's `btn()` pattern).
+**10. Add model status API endpoint**
+In api/config.ts, add `GET /model-status` that returns which models are downloaded and any active download progress, so the dashboard can show the correct state on page load (not just from WS events).
 
-### 6. Event handler
+**11. Update agents.md**
+Add convention #8: "Edit-in-place replies — when the bot sends a status/progress reply, always edit that same message in place with the final result rather than sending a second message."
 
-Create bot/plugins/rolebuttons/events/guildRoleDelete/cleanup.ts:
+---
 
-- Listens for `Events.GuildRoleDelete`
-- Calls `roleButtonService.cleanupDeletedRole(guildId, roleId)`
-- Logs which panels were affected
+### Verification
 
-### 7. API routes
+- Select `large` model in dashboard, set mode to Auto → progress bar appears, WS events flow
+- Send a voice message during download → reply says "model downloading (X%)... queued"
+- Send multiple voice messages rapidly → queue positions shown, updated every 5s, processed one at a time
+- Rebuild Docker container → model persists in `./data/whisper-models/` (if volume mounted)
+- No volume mounted → model re-downloads on first use (works, just slower)
+- `base.en` no longer baked into Docker image → image is ~74 MB smaller
 
-Create bot/plugins/rolebuttons/api/ with:
+### Decisions
 
-| Method                              | Path                                              | Action                                          |
-| ----------------------------------- | ------------------------------------------------- | ----------------------------------------------- |
-| `GET /`                             | List all panels for the guild                     | `listPanels()`                                  |
-| `POST /`                            | Create a new panel                                | `createPanel()`                                 |
-| `GET /:panelId`                     | Get a single panel                                | `getPanel()`                                    |
-| `PUT /:panelId`                     | Update panel config (embed, buttons, exclusivity) | `updatePanel()`                                 |
-| `DELETE /:panelId`                  | Delete panel + clean up persistent components     | `deletePanel()`                                 |
-| `POST /:panelId/post`               | Post panel to a channel `{ channelId }`           | `postPanel()`                                   |
-| `POST /:panelId/update-posts`       | Rebuild & edit all posted instances               | `updatePostedPanels()`                          |
-| `DELETE /:panelId/posts/:messageId` | Delete a specific posted instance                 | Removes from `posts[]`, deletes Discord message |
-
-### 8. Dashboard page
-
-Create [bot/plugins/dashboard/app/app/[guildId]/rolebuttons/page.tsx](bot/plugins/dashboard/app/app/%5BguildId%5D/rolebuttons/page.tsx) and a `RoleButtonsPage.tsx` client component.
-
-**Layout**: Two-pane — panel list (left/top) + editor (right/bottom).
-
-**Panel List view**:
-
-- Table/card grid of all panels: name, button count, post count, created date
-- Create New button → opens create modal
-- Click to edit
-
-**Panel Editor view** (multi-section form):
-
-- **Embed section**: Title, description, color picker, image URL, thumbnail URL, footer text, fields editor (add/remove/reorder field rows)
-- **Buttons section**: Sortable list of button configs. Each row has: label input, emoji input, style dropdown (Primary/Secondary/Success/Danger), role selector (`RoleCombobox`), mode dropdown (Toggle/Add-only/Remove-only), row number (0-4). Add/remove button controls. Max 25 buttons.
-- **Settings section**: Exclusive toggle
-- **Live Preview**: Renders a mock of the embed + buttons as they'll appear in Discord
-- **Actions bar**: Save, Post to Channel (channel selector + post button), Update Posted Messages, Delete
-
-**Post modal**: Channel selector (`ChannelCombobox`) + confirm button → `POST /:panelId/post { channelId }`
-
-**Posted instances list**: Below the editor, shows all places this panel is posted (channel name, date, posted by) with individual delete buttons.
-
-### 9. Dashboard permission wiring
-
-Add to routePermissions.ts:
-
-```
-"GET /rolebuttons"                    → "rolebuttons.view"
-"GET /rolebuttons/*"                  → "rolebuttons.view"
-"POST /rolebuttons"                   → "rolebuttons.manage"
-"PUT /rolebuttons/*"                  → "rolebuttons.manage"
-"DELETE /rolebuttons/*"               → "rolebuttons.manage"
-"POST /rolebuttons/*/post"            → "rolebuttons.manage"
-"POST /rolebuttons/*/update-posts"    → "rolebuttons.manage"
-"DELETE /rolebuttons/*/posts/*"       → "rolebuttons.manage"
-```
-
-Add to permissionDefs.ts:
-
-```
-{ key: "rolebuttons", label: "Role Buttons", description: "Manage self-assignable role button panels.",
-  actions: [
-    { key: "view", label: "View Panels", description: "View role button panel configs." },
-    { key: "manage", label: "Manage Panels", description: "Create, edit, delete, and post role button panels." }
-  ]
-}
-```
-
-Add to `NAV_ITEMS` in GuildLayoutShell.tsx:
-
-```
-{ label: "Role Buttons", href: (id) => `/${id}/rolebuttons`, icon: <RoleButtonsIcon />, category: "rolebuttons" }
-```
-
-Add `"rolebuttons"` to the dashboard plugin's `optionalDependencies` in manifest.json, and to the features detection in dashboard/index.ts.
-
-### 10. Realtime updates
-
-- Bot API routes broadcast `broadcastDashboardChange(guildId, "rolebuttons", "updated", ...)` on mutations
-- Dashboard component subscribes via `useRealtimeEvent("rolebuttons:updated", fetchPanels)`
-
-**Verification**
-
-1. **Unit**: Create a panel with `create`, verify it's in `list`, add buttons via `edit`, `post` to a test channel, click buttons to verify role toggle/add/remove works, restart bot and verify buttons still work
-2. **Exclusivity**: Create a panel with `exclusive: true` and 3 color roles, verify clicking one removes the others
-3. **Role deletion**: Delete a role from Discord, verify the button is removed from the panel and posted messages are updated
-4. **Dashboard**: Navigate to Role Buttons page, create/edit/post/delete a panel, verify realtime updates
-5. **Permissions**: Verify `view` users can see panels but not edit, `manage` users can do everything
-6. **Edge cases**: Bot missing `ManageRoles` permission, role higher than bot's role, panel with 0 buttons (should block posting), 25 buttons (max), deleted channel for a posted instance
-
-**Decisions**
-
-- **One model, not two**: A single `RoleButtonPanel` document holds both the template and its posts (as a `posts[]` subdocument), rather than splitting into separate Template and Post models. This simplifies "update all posts" and keeps the data together.
-- **Per-button metadata**: Each persistent button stores `{ panelId, buttonId, roleId, mode }` in its `PersistentComponent` metadata, so the handler doesn't need to re-query the panel for simple operations (only for exclusivity checks).
-- **Edit command uses ephemeral panel**: Following the ModmailConfigPanel pattern — a single ephemeral message with button-driven navigation between views. This keeps the edit flow contained in Discord without requiring the dashboard.
-- **Repost strategy**: The `update` command rebuilds and edits existing messages in-place (via `message.edit()`), preserving the message link. If the message was deleted, it's removed from `posts[]`.
+- **Queue size: unlimited** — per your preference, no cap on queued transcriptions
+- **Default concurrency: 1** — configurable via dashboard
+- **Edit-in-place** — queue position reply becomes the transcription result
+- **`large` uses `large-v3-turbo`** — 806 MB, much faster than full `large-v3` (2.9 GB) with near-identical quality
+- **Volume is optional** — works without it, just re-downloads after rebuilds

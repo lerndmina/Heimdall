@@ -376,6 +376,8 @@ bun add -d <package>        # adds to devDependencies
 
 If `npm install` was used by mistake, run `bun install` afterwards to sync the lockfile.
 
+**Edit-in-place replies** — when the bot sends a status/progress reply (e.g. queue position, download progress), always edit that same message in place with the final result rather than sending a second message.
+
 **Pre-commit checklist:**
 
 - `bun.lock` is up to date (`bun install` produces no changes)

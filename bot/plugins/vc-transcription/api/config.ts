@@ -4,17 +4,13 @@
  * GET  /config        — Get guild transcription config
  * PUT  /config        — Update guild transcription config
  * DELETE /config      — Delete (reset) guild transcription config
+ * GET  /model-status  — Get download status of all whisper models
  */
 
 import { Router, type Request, type Response } from "express";
 import VoiceTranscriptionConfig from "../models/VoiceTranscriptionConfig.js";
-import {
-  TranscriptionMode,
-  WhisperProvider,
-  FilterMode,
-  LOCAL_WHISPER_MODELS,
-  OPENAI_WHISPER_MODELS,
-} from "../types/index.js";
+import { TranscriptionMode, WhisperProvider, FilterMode, LOCAL_WHISPER_MODELS, OPENAI_WHISPER_MODELS } from "../types/index.js";
+import { isModelDownloaded, WHISPER_MODELS } from "../utils/TranscribeMessage.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import type { VCTranscriptionApiDependencies } from "./index.js";
 
@@ -42,6 +38,8 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
             whisperModel: "base.en",
             roleFilter: { mode: FilterMode.DISABLED, roles: [] },
             channelFilter: { mode: FilterMode.DISABLED, channels: [] },
+            maxConcurrentTranscriptions: 1,
+            maxQueueSize: 0,
             hasApiKey: false,
           },
         });
@@ -64,6 +62,8 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
           whisperModel: config.whisperModel,
           roleFilter: config.roleFilter,
           channelFilter: config.channelFilter,
+          maxConcurrentTranscriptions: config.maxConcurrentTranscriptions ?? 1,
+          maxQueueSize: config.maxQueueSize ?? 0,
           hasApiKey,
         },
       });
@@ -78,7 +78,7 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
    */
   router.put("/config", async (req: Request, res: Response) => {
     const guildId = req.params.guildId as string;
-    const { mode, whisperProvider, whisperModel, roleFilter, channelFilter } = req.body;
+    const { mode, whisperProvider, whisperModel, roleFilter, channelFilter, maxConcurrentTranscriptions, maxQueueSize } = req.body;
 
     try {
       const update: Record<string, unknown> = {};
@@ -115,10 +115,7 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
           providerToCheck = existing?.whisperProvider || WhisperProvider.LOCAL;
         }
 
-        const validModels =
-          providerToCheck === WhisperProvider.OPENAI
-            ? OPENAI_WHISPER_MODELS
-            : LOCAL_WHISPER_MODELS;
+        const validModels = providerToCheck === WhisperProvider.OPENAI ? OPENAI_WHISPER_MODELS : LOCAL_WHISPER_MODELS;
 
         if (!(validModels as readonly string[]).includes(whisperModel)) {
           return res.status(400).json({
@@ -176,11 +173,31 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
         });
       }
 
-      const config = await VoiceTranscriptionConfig.findOneAndUpdate(
-        { guildId },
-        update,
-        { upsert: true, new: true, runValidators: true },
-      );
+      // Validate maxConcurrentTranscriptions
+      if (maxConcurrentTranscriptions !== undefined) {
+        const val = Number(maxConcurrentTranscriptions);
+        if (!Number.isInteger(val) || val < 1 || val > 10) {
+          return res.status(400).json({
+            success: false,
+            error: { message: "maxConcurrentTranscriptions must be an integer between 1 and 10" },
+          });
+        }
+        update.maxConcurrentTranscriptions = val;
+      }
+
+      // Validate maxQueueSize
+      if (maxQueueSize !== undefined) {
+        const val = Number(maxQueueSize);
+        if (!Number.isInteger(val) || val < 0) {
+          return res.status(400).json({
+            success: false,
+            error: { message: "maxQueueSize must be a non-negative integer (0 = unlimited)" },
+          });
+        }
+        update.maxQueueSize = val;
+      }
+
+      const config = await VoiceTranscriptionConfig.findOneAndUpdate({ guildId }, update, { upsert: true, new: true, runValidators: true });
 
       // Check API key status
       let hasApiKey = false;
@@ -192,6 +209,19 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
 
       log.info(`VC transcription config updated for guild ${guildId}`);
 
+      // Trigger model download if mode is active and provider is local
+      const savedMode = config.mode as TranscriptionMode;
+      const savedProvider = config.whisperProvider as WhisperProvider;
+      const savedModel = config.whisperModel as string;
+      if (savedMode !== TranscriptionMode.DISABLED && savedProvider === WhisperProvider.LOCAL) {
+        if (!isModelDownloaded(savedModel)) {
+          // Fire-and-forget — download happens in background with WS progress events
+          deps.queueService.downloadModel(savedModel, guildId).catch((err) => {
+            log.error(`Background model download failed for "${savedModel}":`, err);
+          });
+        }
+      }
+
       return res.json({
         success: true,
         data: {
@@ -201,6 +231,8 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
           whisperModel: config.whisperModel,
           roleFilter: config.roleFilter,
           channelFilter: config.channelFilter,
+          maxConcurrentTranscriptions: config.maxConcurrentTranscriptions ?? 1,
+          maxQueueSize: config.maxQueueSize ?? 0,
           hasApiKey,
         },
       });
@@ -232,6 +264,36 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
     } catch (error) {
       log.error("Failed to delete transcription config:", error);
       return res.status(500).json({ success: false, error: { message: "Failed to delete config" } });
+    }
+  });
+
+  /**
+   * GET /model-status — Get download status of all local whisper models
+   */
+  router.get("/model-status", async (_req: Request, res: Response) => {
+    try {
+      const models: Record<string, { downloaded: boolean; downloading: boolean; percent?: number; totalMB?: number; downloadedMB?: number }> = {};
+
+      for (const modelName of Object.keys(WHISPER_MODELS)) {
+        const downloaded = isModelDownloaded(modelName);
+        const progress = deps.queueService.getDownloadProgress(modelName);
+        models[modelName] = {
+          downloaded,
+          downloading: progress?.status === "downloading",
+          ...(progress?.status === "downloading"
+            ? {
+                percent: progress.percent,
+                totalMB: progress.totalMB,
+                downloadedMB: progress.downloadedMB,
+              }
+            : {}),
+        };
+      }
+
+      return res.json({ success: true, data: { models } });
+    } catch (error) {
+      log.error("Failed to get model status:", error);
+      return res.status(500).json({ success: false, error: { message: "Failed to get model status" } });
     }
   });
 

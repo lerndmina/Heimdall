@@ -59,6 +59,8 @@ services:
     volumes:
       # Mount logs directory (optional)
       - ./logs:/app/logs
+      # Whisper model cache (optional — avoids re-downloading models after rebuilds)
+      # - ./data/whisper-models:/app/models/whisper
     healthcheck:
       test:
         [
