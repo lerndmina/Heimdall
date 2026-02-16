@@ -25,6 +25,12 @@ interface ClientMessage {
   guildId?: string;
 }
 
+const WS_CLOSE = {
+  AUTH_FAILED: 4001,
+  RATE_LIMITED: 4008,
+  TOO_MANY_CONNECTIONS: 4009,
+} as const;
+
 interface DiscordUser {
   id: string;
   username: string;
@@ -182,7 +188,7 @@ export class WebSocketManager {
     if (message.type === "auth") {
       if (!message.token) {
         this.send(socket, "error", { code: "MISSING_TOKEN", message: "Missing auth token" });
-        socket.close();
+        socket.close(WS_CLOSE.AUTH_FAILED, "MISSING_TOKEN");
         return;
       }
 
@@ -198,7 +204,7 @@ export class WebSocketManager {
           attempts.count++;
           if (attempts.count > WebSocketManager.AUTH_RATE_LIMIT) {
             this.send(socket, "error", { code: "RATE_LIMITED", message: "Too many auth attempts" });
-            socket.close();
+            socket.close(WS_CLOSE.RATE_LIMITED, "RATE_LIMITED");
             return;
           }
         }
@@ -209,7 +215,7 @@ export class WebSocketManager {
       const user = await this.fetchDiscordUser(message.token);
       if (!user) {
         this.send(socket, "error", { code: "INVALID_TOKEN", message: "Invalid or expired token" });
-        socket.close();
+        socket.close(WS_CLOSE.AUTH_FAILED, "INVALID_TOKEN");
         return;
       }
 
@@ -217,7 +223,7 @@ export class WebSocketManager {
       const existingConns = this.connectionsByUser.get(user.id);
       if (existingConns && existingConns.size >= WebSocketManager.MAX_CONNECTIONS_PER_USER) {
         this.send(socket, "error", { code: "TOO_MANY_CONNECTIONS", message: `Maximum ${WebSocketManager.MAX_CONNECTIONS_PER_USER} concurrent connections per user` });
-        socket.close();
+        socket.close(WS_CLOSE.TOO_MANY_CONNECTIONS, "TOO_MANY_CONNECTIONS");
         return;
       }
 

@@ -8,7 +8,6 @@
 import * as http from "http";
 import * as fs from "fs";
 import * as path from "path";
-import { WebSocket, WebSocketServer } from "ws";
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
 import type { LibAPI } from "../lib/index.js";
 
@@ -25,7 +24,6 @@ export interface DashboardPluginAPI extends PluginAPI {
 }
 
 let server: http.Server | null = null;
-let wsBridgeServer: WebSocketServer | null = null;
 
 export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI> {
   const { logger, pluginPath, dependencies, getEnv } = context;
@@ -34,7 +32,6 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
   if (!lib) throw new Error("dashboard requires lib plugin");
 
   const port = parseInt(getEnv("DASHBOARD_PORT") || "3000", 10);
-  const wsPort = parseInt(getEnv("WS_PORT") || "3002", 10);
   const isDev = process.env.NODE_ENV !== "production";
 
   const manifest = JSON.parse(fs.readFileSync(path.join(pluginPath, "manifest.json"), "utf-8"));
@@ -98,89 +95,6 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
     handle(req, res);
   });
 
-  // Fallback WebSocket bridge for single-port deployments where nginx entrypoint
-  // is not in use (e.g. platform source builds). Routes /ws upgrades received on
-  // the dashboard port to the internal WS server port.
-  wsBridgeServer = new WebSocketServer({ noServer: true });
-
-  wsBridgeServer.on("connection", (clientSocket, req) => {
-    const forwardedFor = typeof req.headers["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"] : req.socket.remoteAddress;
-    const upstream = new WebSocket(`ws://127.0.0.1:${wsPort}`, {
-      headers: forwardedFor
-        ? {
-            "x-forwarded-for": forwardedFor,
-          }
-        : undefined,
-    });
-    const pendingClientFrames: Array<{ data: WebSocket.RawData; isBinary: boolean }> = [];
-
-    const closeBoth = () => {
-      if (clientSocket.readyState === WebSocket.OPEN || clientSocket.readyState === WebSocket.CONNECTING) {
-        clientSocket.close();
-      }
-      if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) {
-        upstream.close();
-      }
-    };
-
-    upstream.on("open", () => {
-      logger.debug(`[dashboard] WS bridge connected (${req.url ?? "/ws"} -> ws://127.0.0.1:${wsPort})`);
-
-      for (const frame of pendingClientFrames) {
-        if (upstream.readyState !== WebSocket.OPEN) break;
-        upstream.send(frame.data, { binary: frame.isBinary });
-      }
-      pendingClientFrames.length = 0;
-    });
-
-    clientSocket.on("message", (data, isBinary) => {
-      if (upstream.readyState === WebSocket.OPEN) {
-        upstream.send(data, { binary: isBinary });
-        return;
-      }
-
-      if (upstream.readyState === WebSocket.CONNECTING) {
-        pendingClientFrames.push({ data, isBinary });
-        if (pendingClientFrames.length > 64) {
-          pendingClientFrames.shift();
-        }
-      }
-    });
-
-    upstream.on("message", (data, isBinary) => {
-      if (clientSocket.readyState === WebSocket.OPEN) {
-        clientSocket.send(data, { binary: isBinary });
-      }
-    });
-
-    clientSocket.on("close", () => {
-      if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) {
-        upstream.close();
-      }
-    });
-
-    upstream.on("close", () => {
-      if (clientSocket.readyState === WebSocket.OPEN || clientSocket.readyState === WebSocket.CONNECTING) {
-        clientSocket.close();
-      }
-    });
-
-    clientSocket.on("error", () => closeBoth());
-    upstream.on("error", () => closeBoth());
-  });
-
-  server.on("upgrade", (req, socket, head) => {
-    const requestPath = req.url ?? "";
-    if (!requestPath.startsWith("/ws")) {
-      socket.destroy();
-      return;
-    }
-
-    wsBridgeServer!.handleUpgrade(req, socket, head, (clientSocket) => {
-      wsBridgeServer!.emit("connection", clientSocket, req);
-    });
-  });
-
   await new Promise<void>((resolve, reject) => {
     server!.on("error", reject);
     server!.listen(port, () => {
@@ -197,11 +111,6 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
 }
 
 export async function onDisable(logger: PluginLogger): Promise<void> {
-  if (wsBridgeServer) {
-    wsBridgeServer.close();
-    wsBridgeServer = null;
-  }
-
   if (server) {
     await new Promise<void>((resolve, reject) => {
       server!.close((err) => {

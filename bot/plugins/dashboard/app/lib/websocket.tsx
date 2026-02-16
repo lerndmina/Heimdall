@@ -134,6 +134,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     ws.onclose = (event) => {
       setConnected(false);
 
+      if (event.code === 4001 || event.code === 4008 || event.code === 4009) {
+        shouldReconnectRef.current = false;
+        return;
+      }
+
       if (!shouldReconnectRef.current) return;
 
       if (!hasAuthenticatedRef.current) {
