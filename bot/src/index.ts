@@ -228,6 +228,50 @@ baseClient.on(Events.GuildCreate, async (guild) => {
   }
 });
 
+// Global cleanup for persistent components when source messages/channels are deleted
+baseClient.on(Events.MessageDelete, async (message) => {
+  try {
+    const deleted = await componentCallbackService.cleanupByMessageId(message.id);
+    if (deleted > 0) {
+      log.debug(`[ComponentCleanup] Removed ${deleted} persistent component(s) for deleted message ${message.id}`);
+    }
+  } catch (error) {
+    log.error(`[ComponentCleanup] Failed message cleanup for ${message.id}:`, error);
+  }
+});
+
+baseClient.on(Events.ChannelDelete, async (channel) => {
+  try {
+    const deleted = await componentCallbackService.cleanupByChannelId(channel.id);
+    if (deleted > 0) {
+      log.debug(`[ComponentCleanup] Removed ${deleted} persistent component(s) for deleted channel ${channel.id}`);
+    }
+  } catch (error) {
+    log.error(`[ComponentCleanup] Failed channel cleanup for ${channel.id}:`, error);
+  }
+});
+
+// Auto-attach persistent component message context on bot message send/edit
+baseClient.on(Events.MessageCreate, async (message) => {
+  try {
+    if (message.author?.id !== baseClient.user?.id) return;
+    await componentCallbackService.attachContextFromMessage(message);
+  } catch (error) {
+    log.error(`[ComponentCleanup] Failed to auto-attach context for message ${message.id}:`, error);
+  }
+});
+
+baseClient.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
+  try {
+    const authorId = (newMessage as { author?: { id?: string } }).author?.id;
+    if (authorId !== baseClient.user?.id) return;
+    await componentCallbackService.attachContextFromMessage(newMessage);
+  } catch (error) {
+    const messageId = (newMessage as { id?: string }).id ?? "unknown";
+    log.error(`[ComponentCleanup] Failed to auto-attach context for updated message ${messageId}:`, error);
+  }
+});
+
 // ============================================================================
 // Phase 5: Error handling
 // ============================================================================

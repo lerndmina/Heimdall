@@ -6,7 +6,7 @@
  * - **Persistent (no TTL)**: Named handlers stored in MongoDB, survive restarts
  */
 
-import type { ButtonInteraction, AnySelectMenuInteraction } from "discord.js";
+import type { ButtonInteraction, AnySelectMenuInteraction, Message } from "discord.js";
 import { nanoid } from "nanoid";
 import type { RedisClientType } from "redis";
 import log from "../../utils/logger";
@@ -447,7 +447,10 @@ export class ComponentCallbackService {
    */
   async cleanupByMessageId(messageId: string): Promise<number> {
     try {
-      const components = await PersistentComponent.find({ messageId });
+      const query = {
+        $or: [{ messageId }, { "metadata.messageId": messageId }],
+      };
+      const components = await PersistentComponent.find(query);
 
       let removedFromCache = 0;
       for (const component of components) {
@@ -457,7 +460,7 @@ export class ComponentCallbackService {
         }
       }
 
-      const result = await PersistentComponent.deleteMany({ messageId });
+      const result = await PersistentComponent.deleteMany(query);
 
       log.debug(`[ComponentCallbackService] Cleaned up ${result.deletedCount} persistent components for message ${messageId} (${removedFromCache} from cache)`);
 
@@ -465,6 +468,95 @@ export class ComponentCallbackService {
     } catch (error) {
       log.error(`[ComponentCallbackService] Failed to cleanup components for message ${messageId}:`, error);
       return 0;
+    }
+  }
+
+  /**
+   * Clean up persistent components by channel ID
+   */
+  async cleanupByChannelId(channelId: string): Promise<number> {
+    try {
+      const query = {
+        $or: [{ channelId }, { "metadata.channelId": channelId }],
+      };
+      const components = await PersistentComponent.find(query);
+
+      let removedFromCache = 0;
+      for (const component of components) {
+        if (this.persistentComponents.has(component.customId)) {
+          this.persistentComponents.delete(component.customId);
+          removedFromCache++;
+        }
+      }
+
+      const result = await PersistentComponent.deleteMany(query);
+
+      log.debug(`[ComponentCallbackService] Cleaned up ${result.deletedCount} persistent components for channel ${channelId} (${removedFromCache} from cache)`);
+
+      return result.deletedCount;
+    } catch (error) {
+      log.error(`[ComponentCallbackService] Failed to cleanup components for channel ${channelId}:`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Auto-attach message/channel context for any persistent components present on a message
+   */
+  async attachContextFromMessage(message: Pick<Message, "id" | "channelId" | "guildId" | "components">): Promise<number> {
+    try {
+      const customIds = this.extractCustomIdsFromMessage(message);
+      if (customIds.length === 0) return 0;
+
+      let attached = 0;
+
+      for (const customId of customIds) {
+        const isPersistent = await this.isKnownPersistentComponent(customId);
+        if (!isPersistent) continue;
+
+        await this.updateComponentMessageContext(customId, message.id, message.channelId, message.guildId ?? undefined);
+        attached++;
+      }
+
+      if (attached > 0) {
+        log.debug(`[ComponentCallbackService] Auto-attached context for ${attached} persistent components on message ${message.id}`);
+      }
+
+      return attached;
+    } catch (error) {
+      log.error(`[ComponentCallbackService] Failed to auto-attach context from message ${message.id}:`, error);
+      return 0;
+    }
+  }
+
+  private extractCustomIdsFromMessage(message: Pick<Message, "components">): string[] {
+    const customIds = new Set<string>();
+
+    for (const row of message.components) {
+      if (!("components" in row)) continue;
+
+      for (const component of row.components) {
+        const customId = (component as { customId?: string }).customId;
+        if (customId) customIds.add(customId);
+      }
+    }
+
+    return [...customIds];
+  }
+
+  private async isKnownPersistentComponent(customId: string): Promise<boolean> {
+    if (this.persistentComponents.has(customId)) {
+      return true;
+    }
+
+    try {
+      const component = await PersistentComponent.findOne({ customId }).select({ customId: 1, handlerId: 1 }).lean();
+      if (!component) return false;
+
+      this.persistentComponents.set(component.customId, component.handlerId);
+      return true;
+    } catch {
+      return false;
     }
   }
 
