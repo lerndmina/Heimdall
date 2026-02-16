@@ -104,7 +104,14 @@ export async function onLoad(context: PluginContext): Promise<DashboardPluginAPI
   wsBridgeServer = new WebSocketServer({ noServer: true });
 
   wsBridgeServer.on("connection", (clientSocket, req) => {
-    const upstream = new WebSocket(`ws://127.0.0.1:${wsPort}`);
+    const forwardedFor = typeof req.headers["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"] : req.socket.remoteAddress;
+    const upstream = new WebSocket(`ws://127.0.0.1:${wsPort}`, {
+      headers: forwardedFor
+        ? {
+            "x-forwarded-for": forwardedFor,
+          }
+        : undefined,
+    });
 
     const closeBoth = () => {
       if (clientSocket.readyState === WebSocket.OPEN || clientSocket.readyState === WebSocket.CONNECTING) {

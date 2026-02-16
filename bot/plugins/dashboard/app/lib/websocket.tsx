@@ -93,7 +93,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
       if (msg.event === "error") {
         const code = msg?.data?.code as string | undefined;
-        if (code === "INVALID_TOKEN" || code === "MISSING_TOKEN" || code === "NOT_AUTHENTICATED" || code === "TOO_MANY_CONNECTIONS") {
+        if (code === "INVALID_TOKEN" || code === "MISSING_TOKEN" || code === "NOT_AUTHENTICATED" || code === "TOO_MANY_CONNECTIONS" || code === "RATE_LIMITED") {
           shouldReconnectRef.current = false;
           setConnected(false);
           ws.close(4001, code);

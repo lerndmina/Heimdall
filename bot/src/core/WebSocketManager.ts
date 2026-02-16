@@ -16,6 +16,7 @@ interface AuthenticatedSocket extends WebSocket {
   guildIds: Set<string>;
   permissionsByGuild: Map<string, ResolvedPermissions>;
   isAlive: boolean;
+  clientIp?: string;
 }
 
 interface ClientMessage {
@@ -52,6 +53,20 @@ export class WebSocketManager {
     private redis?: RedisClientType,
   ) {}
 
+  private getClientIp(req: any): string {
+    const forwardedFor = req?.headers?.["x-forwarded-for"];
+    if (typeof forwardedFor === "string" && forwardedFor.trim().length > 0) {
+      return forwardedFor.split(",")[0]!.trim();
+    }
+
+    if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
+      const first = forwardedFor[0]?.trim();
+      if (first) return first;
+    }
+
+    return req?.socket?.remoteAddress || "unknown";
+  }
+
   async start(): Promise<void> {
     this.wss = new WebSocketServer({ port: this.port });
 
@@ -60,6 +75,7 @@ export class WebSocketManager {
       socket.guildIds = new Set();
       socket.permissionsByGuild = new Map();
       socket.isAlive = true;
+      socket.clientIp = this.getClientIp(req);
 
       ws.on("pong", () => {
         socket.isAlive = true;
@@ -171,7 +187,7 @@ export class WebSocketManager {
       }
 
       // Rate limit auth attempts
-      const ip = (socket as any)._socket?.remoteAddress || "unknown";
+      const ip = socket.clientIp || (socket as any)._socket?.remoteAddress || "unknown";
       const now = Date.now();
       const attempts = this.authAttempts.get(ip);
       if (attempts) {
