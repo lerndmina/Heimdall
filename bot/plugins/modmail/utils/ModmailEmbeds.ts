@@ -275,6 +275,20 @@ export class ModmailEmbeds {
   }
 
   /**
+   * Modal preview — shows upcoming questions before opening the modal
+   * Used as a confirmation step after select menu answers to prevent re-interaction bugs
+   */
+  static formModalPreview(startQuestion: number, endQuestion: number, totalQuestions: number, fieldLabels: string[]): HeimdallEmbedBuilder {
+    const range = startQuestion === endQuestion ? `**Question ${startQuestion} of ${totalQuestions}**` : `**Questions ${startQuestion}–${endQuestion} of ${totalQuestions}**`;
+
+    const questionList = fieldLabels.map((label) => `• ${label}`).join("\n");
+
+    const description = `${range}\n\nThe following questions will be asked:\n${questionList}\n\nClick the button below to answer them.`;
+
+    return ModmailEmbeds.info("Additional Information Needed", description);
+  }
+
+  /**
    * Review panel showing all answers before submission
    */
   static reviewPanel(guildName: string, categoryName: string, initialMessage: string, answers: Array<{ label: string; value: string }>): HeimdallEmbedBuilder {

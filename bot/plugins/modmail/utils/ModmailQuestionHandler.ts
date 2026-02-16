@@ -27,6 +27,7 @@ import { ModmailEmbeds } from "./ModmailEmbeds.js";
 export class ModmailQuestionHandler {
   private readonly BUTTON_TTL = 900; // 15 minutes
   private readonly SELECT_HANDLER_ID = "modmail.question.select";
+  private readonly CANCEL_VALUE = "__cancel__";
 
   constructor(
     private client: Client,
@@ -184,9 +185,9 @@ export class ModmailQuestionHandler {
 
     selectMenu.setPlaceholder(field.placeholder || `Select ${field.label}`);
 
-    // Add options from field config (deduplicate by value as safety net)
+    // Add options from field config (deduplicate by value as safety net, max 24 to leave room for cancel)
     const seen = new Set<string>();
-    const options = (field.options || [])
+    const options: Array<{ label: string; value: string; emoji?: { name: string } }> = (field.options || [])
       .map((opt) => ({
         label: opt.label,
         value: opt.value,
@@ -195,7 +196,15 @@ export class ModmailQuestionHandler {
         if (seen.has(opt.value)) return false;
         seen.add(opt.value);
         return true;
-      });
+      })
+      .slice(0, 24);
+
+    // Add cancel option
+    options.push({
+      label: "Cancel",
+      value: this.CANCEL_VALUE,
+      emoji: { name: "❌" },
+    });
 
     selectMenu.addOptions(options);
     await selectMenu.ready();
@@ -243,6 +252,17 @@ export class ModmailQuestionHandler {
       return;
     }
 
+    // Handle cancel selection
+    if (selectedValue === this.CANCEL_VALUE) {
+      await interaction.deferUpdate();
+      await this.sessionService.deleteSession(sessionId);
+      await interaction.editReply({
+        embeds: [ModmailEmbeds.info("Cancelled", "Your modmail has been cancelled. You can start a new one anytime.")],
+        components: [],
+      });
+      return;
+    }
+
     // Record the answer
     await this.sessionService.recordAnswer(sessionId, fieldId, selectedValue);
 
@@ -260,12 +280,11 @@ export class ModmailQuestionHandler {
       currentStep: session.currentStep + 1,
     });
 
-    // Check if next step needs a modal — if so, we CANNOT defer first
-    // (Discord rejects showModal on already-acknowledged interactions)
-    const needsModal = await this.nextStepNeedsModal(sessionId);
-    if (!needsModal) {
-      await interaction.deferUpdate();
-    }
+    // Always defer — this replaces the select menu message and prevents
+    // re-interaction (which caused empty modal values when cancelling and re-selecting).
+    // If the next step needs a modal, processNextStep will show a confirmation
+    // preview with an "Answer Questions" button instead of opening the modal directly.
+    await interaction.deferUpdate();
     await this.processNextStep(interaction, sessionId);
   }
 
@@ -347,7 +366,10 @@ export class ModmailQuestionHandler {
    */
   private async showContinueButton(interaction: MessageComponentInteraction | ModalSubmitInteraction, session: ModmailSession, fields: FormField[]): Promise<void> {
     const totalFields = await this.getFieldCount(session);
-    const embed = ModmailEmbeds.formQuestion(session.currentStep + 1, totalFields, fields[0]!.label, "Click Continue to answer the next set of questions.");
+    const startQ = session.currentStep + 1;
+    const endQ = Math.min(session.currentStep + fields.length, totalFields);
+    const fieldLabels = fields.map((f) => f.label);
+    const embed = ModmailEmbeds.formModalPreview(startQ, endQ, totalFields, fieldLabels);
 
     const continueBtn = this.lib.createButtonBuilder(async (btnInteraction: ButtonInteraction) => {
       // Now we have a fresh MessageComponentInteraction — safe to show modal
@@ -366,7 +388,7 @@ export class ModmailQuestionHandler {
       }
     }, this.BUTTON_TTL);
 
-    continueBtn.setLabel("Continue").setStyle(ButtonStyle.Primary).setEmoji("📝");
+    continueBtn.setLabel("Answer Questions").setStyle(ButtonStyle.Primary).setEmoji("📝");
     await continueBtn.ready();
 
     const row = new ActionRowBuilder<HeimdallButtonBuilder>().addComponents(continueBtn);
@@ -413,11 +435,23 @@ export class ModmailQuestionHandler {
    * Show review panel with all answers and submit/edit buttons
    */
   async showReviewPanel(interaction: MessageComponentInteraction | ModalSubmitInteraction, session: ModmailSession, fields: FormField[]): Promise<void> {
-    // Build answer list for display
-    const answers = fields.map((field) => ({
-      label: field.label,
-      value: session.answers[field.id] || "(not answered)",
-    }));
+    // Build answer list for display — resolve SELECT values to human-readable labels
+    const answers = fields.map((field) => {
+      let answerValue = session.answers[field.id] || "(not answered)";
+
+      // For SELECT fields, show the option label instead of the backend value
+      if (field.type === ModmailFormFieldType.SELECT && field.options && session.answers[field.id]) {
+        const selectedOption = field.options.find((opt) => opt.value === session.answers[field.id]);
+        if (selectedOption) {
+          answerValue = selectedOption.label;
+        }
+      }
+
+      return {
+        label: field.label,
+        value: answerValue,
+      };
+    });
 
     // Get guild name
     const guild = await this.lib.thingGetter.getGuild(session.guildId);
@@ -491,12 +525,24 @@ export class ModmailQuestionHandler {
     // Convert session answers to form responses
     const config = await ModmailConfig.findOne({ guildId: session.guildId });
     const category = config?.categories?.find((cat) => cat.id === session.categoryId);
-    const formResponses = (category?.formFields || []).map((field) => ({
-      fieldId: field.id,
-      fieldLabel: field.label,
-      fieldType: field.type as "short" | "paragraph" | "select" | "number",
-      value: session.answers[field.id] || "",
-    }));
+    const formResponses = (category?.formFields || []).map((field) => {
+      let value = session.answers[field.id] || "";
+
+      // For SELECT fields, store the human-readable label instead of the backend value
+      if (field.type === ModmailFormFieldType.SELECT && field.options && value) {
+        const selectedOption = field.options.find((opt) => opt.value === value);
+        if (selectedOption) {
+          value = selectedOption.label;
+        }
+      }
+
+      return {
+        fieldId: field.id,
+        fieldLabel: field.label,
+        fieldType: field.type as "short" | "paragraph" | "select" | "number",
+        value,
+      };
+    });
 
     // Create the modmail
     const result: ModmailCreationResult = await this.creationService.createModmail({
