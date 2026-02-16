@@ -348,16 +348,7 @@ export class ModmailEmbeds {
       },
     ];
 
-    // Add form answers if present
-    if (answers && answers.length > 0) {
-      for (const answer of answers) {
-        fields.push({
-          name: answer.label,
-          value: answer.value.length > 1024 ? answer.value.substring(0, 1021) + "..." : answer.value,
-          inline: answer.value.length < 50,
-        });
-      }
-    }
+    void answers;
 
     const embed = ModmailEmbeds.generic(
       `📬 New Modmail #${ticketNumber}`,

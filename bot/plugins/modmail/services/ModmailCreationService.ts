@@ -280,13 +280,6 @@ export class ModmailCreationService {
       .setThumbnail(user?.displayAvatarURL() || null)
       .setTimestamp();
 
-    // Add form responses if present
-    const formResponses = modmail.formResponses;
-    if (formResponses && formResponses.length > 0) {
-      const formFieldsText = formResponses.map((r) => `**${r.fieldLabel}**: ${r.value}`).join("\n");
-      embed.addFields({ name: "Form Responses", value: formFieldsText.substring(0, 1024) });
-    }
-
     // Create staff action buttons on the opening message
     const claimButton = await this.lib.componentCallbackService.createPersistentComponent("modmail.staff.claim", "button", { modmailId: modmail.modmailId });
     const resolveButton = await this.lib.componentCallbackService.createPersistentComponent("modmail.staff.resolve", "button", { modmailId: modmail.modmailId });
@@ -409,6 +402,14 @@ export class ModmailCreationService {
       }
     }
 
+    const formResponses = modmail.formResponses;
+    if (formResponses && formResponses.length > 0) {
+      const formResponseMessages = this.buildFormResponseMessages(formResponses as Array<{ value?: string }>);
+      for (const formResponseMessage of formResponseMessages) {
+        await thread.send({ content: formResponseMessage });
+      }
+    }
+
     try {
       await webhook.send({
         content: content || "*No message content*",
@@ -433,6 +434,39 @@ export class ModmailCreationService {
     }
 
     // Staff role mentions are now included in the thread starter message (createForumThread)
+  }
+
+  /**
+   * Build one or more bot messages containing form responses in markdown format.
+   * Splits into multiple messages when nearing Discord's 2000-char limit.
+   */
+  private buildFormResponseMessages(formResponses: Array<{ value?: string }>): string[] {
+    const title = "# Form Responses:";
+    const maxLength = 2000;
+    const messages: string[] = [];
+
+    let current = title;
+
+    for (let i = 0; i < formResponses.length; i++) {
+      const answer = (formResponses[i]?.value || "(no response)").trim() || "(no response)";
+
+      // Keep each section bounded so we can safely chunk across messages.
+      const boundedAnswer = answer.length > 1500 ? `${answer.substring(0, 1497)}...` : answer;
+      const section = `\n## Question ${i + 1}\n${boundedAnswer}\n`;
+
+      if ((current + section).length > maxLength) {
+        messages.push(current.trimEnd());
+        current = `${title}${section}`;
+      } else {
+        current += section;
+      }
+    }
+
+    if (current.trim().length > 0) {
+      messages.push(current.trimEnd());
+    }
+
+    return messages;
   }
 
   /**
