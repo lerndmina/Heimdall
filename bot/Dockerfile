@@ -108,7 +108,9 @@ FROM oven/bun:1-alpine AS runner
 # - ffmpeg: audio format conversion for voice transcription
 # - wget: GNU wget (replaces BusyBox wget which lacks --no-config for nodejs-whisper model downloads)
 # - libstdc++: required by compiled whisper.cpp binary
-RUN apk add --no-cache ffmpeg wget libstdc++
+# - nginx: reverse proxy for single-port PaaS deployments (only used when SINGLE_PORT_PROXY=true)
+# - gettext: provides envsubst for nginx config templating
+RUN apk add --no-cache ffmpeg wget libstdc++ nginx gettext
 
 # Security: Run as non-root user
 RUN addgroup --system --gid 1001 nodejs && \
@@ -132,16 +134,25 @@ COPY --chown=heimdall:nodejs --from=bot-builder /app/tsconfig.json ./
 # Copy built dashboard AFTER plugins to overwrite with complete production build
 COPY --chown=heimdall:nodejs --from=dashboard-builder /app/plugins/dashboard/app ./plugins/dashboard/app
 
+# Copy nginx config template and entrypoint script
+COPY --chown=heimdall:nodejs nginx/single-port.conf.template ./nginx/single-port.conf.template
+COPY --chown=heimdall:nodejs scripts/entrypoint.sh ./scripts/entrypoint.sh
+RUN chmod +x ./scripts/entrypoint.sh
+
+# Prepare writable directories for non-root nginx
+RUN mkdir -p /tmp/nginx && chown -R heimdall:nodejs /tmp/nginx
+
 # Switch to non-root user
 USER heimdall
 
 # Expose ports
 # API_PORT (default 3001), DASHBOARD_PORT (default 3000), WS_PORT (default 3002)
-EXPOSE 3000 3001 3002
+# PORT (default 8080) is the single-port proxy when SINGLE_PORT_PROXY=true
+EXPOSE 3000 3001 3002 8080
 
-# Health check
+# Health check — always checks the dashboard directly on port 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
   CMD bun -e "fetch('http://localhost:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-# Start the bot (which loads the dashboard plugin)
-CMD ["bun", "run", "src/index.ts"]
+# Entrypoint: optionally starts nginx proxy, then launches the bot
+ENTRYPOINT ["./scripts/entrypoint.sh"]

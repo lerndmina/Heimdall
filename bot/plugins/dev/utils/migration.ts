@@ -37,7 +37,9 @@ export interface MigrationProgressEvent {
   label: string;
   completed: number;
   total: number;
-  result: MigrationResult;
+  result?: MigrationResult;
+  recordIndex?: number;
+  recordTotal?: number;
 }
 
 export interface MigrationStats {
@@ -718,8 +720,19 @@ export async function runFullMigration(options: FullMigrationOptions): Promise<M
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i]!;
+
+    // Emit step_start (no result yet)
+    onProgress?.({
+      step: step.key,
+      label: step.label,
+      completed: i,
+      total,
+    });
+
     const result = await step.run();
     stats[step.key] = result;
+
+    // Emit step_complete (with result)
     onProgress?.({
       step: step.key,
       label: step.label,

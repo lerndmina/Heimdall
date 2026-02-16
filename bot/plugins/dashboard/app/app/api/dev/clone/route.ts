@@ -1,7 +1,6 @@
 /**
- * Dev migration proxy — forwards migration requests to the bot API.
+ * Dev clone migration proxy — forwards clone requests to the bot API.
  * Only accessible to bot owners (checked on bot API side).
- * Progress is delivered via WebSocket, not SSE.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -21,7 +20,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
 
-    const res = await fetch(`${API_BASE}/api/dev/migrate`, {
+    const res = await fetch(`${API_BASE}/api/dev/clone`, {
       method: "POST",
       headers: {
         "X-API-Key": API_KEY,
@@ -38,6 +37,6 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: { code: "INTERNAL_ERROR", message: error.message || "Migration failed" } }, { status: 500 });
+    return NextResponse.json({ success: false, error: { code: "INTERNAL_ERROR", message: error.message || "Clone migration failed" } }, { status: 500 });
   }
 }

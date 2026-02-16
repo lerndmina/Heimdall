@@ -46,6 +46,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { DevApiDependencies } from "./index.js";
 import { runFullMigration, type FullMigrationOptions } from "../utils/migration.js";
+import { broadcastToOwners } from "../../../src/core/broadcast.js";
 
 export function createMigrateRoutes(deps: DevApiDependencies): Router {
   const router = Router({ mergeParams: true });
@@ -67,7 +68,7 @@ export function createMigrateRoutes(deps: DevApiDependencies): Router {
         return;
       }
 
-      const { oldDbUri, guildId, categoryMapping, importOpenThreads, skipModmail } = req.body;
+      const { oldDbUri, guildId, categoryMapping, importOpenThreads, skipModmail, modmailCollection } = req.body;
 
       if (!oldDbUri || typeof oldDbUri !== "string") {
         res.status(400).json({
@@ -86,10 +87,22 @@ export function createMigrateRoutes(deps: DevApiDependencies): Router {
         categoryMapping,
         importOpenThreads: importOpenThreads === true,
         skipModmail: skipModmail === true,
+        modmailCollection,
+        onProgress: (event) => {
+          if (event.result) {
+            broadcastToOwners("migration:step_complete", { mode: "legacy", ...event });
+          } else if (event.recordIndex !== undefined) {
+            broadcastToOwners("migration:step_progress", { mode: "legacy", ...event });
+          } else {
+            broadcastToOwners("migration:step_start", { mode: "legacy", ...event });
+          }
+        },
       };
 
       // Execute migration
       const stats = await runFullMigration(options);
+
+      broadcastToOwners("migration:complete", { mode: "legacy", stats });
 
       res.json({
         success: true,

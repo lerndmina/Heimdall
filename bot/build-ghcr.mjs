@@ -96,8 +96,8 @@ function checkDocker() {
 }
 
 function isDockerRunning() {
-  // "docker info" succeeds only when the daemon is reachable
-  return execQuiet("docker info") !== null;
+  // Succeeds only when daemon is reachable; avoids verbose info output
+  return execQuiet("docker version --format '{{.Server.Version}}'") !== null;
 }
 
 function requireDockerRunning() {
@@ -121,10 +121,11 @@ function checkBuildx() {
 
 function isLoggedIntoGhcr() {
   try {
-    const cfg = execQuiet("docker system info --format '{{json .}}'");
-    // Quick heuristic: check if ghcr.io appears in docker config
     const home = process.env.USERPROFILE || process.env.HOME;
-    const dockerCfg = readFileSync(resolve(home, ".docker", "config.json"), "utf-8");
+    if (!home) return false;
+    const dockerCfgPath = resolve(home, ".docker", "config.json");
+    if (!existsSync(dockerCfgPath)) return false;
+    const dockerCfg = readFileSync(dockerCfgPath, "utf-8");
     return dockerCfg.includes("ghcr.io");
   } catch {
     return false;
@@ -134,6 +135,44 @@ function isLoggedIntoGhcr() {
 // ── Build the full image tag ────────────────────────────────────────────────
 function imageRef(cfg, tag) {
   return `ghcr.io/${cfg.owner}/${cfg.repo}:${tag}`;
+}
+
+function getShaTag() {
+  const sha = execQuiet("git rev-parse --short=12 HEAD");
+  return sha ? `sha-${sha}` : null;
+}
+
+function withShaTag(tags) {
+  const shaTag = getShaTag();
+  if (!shaTag) {
+    warn("Could not determine git SHA; continuing without SHA tag.");
+    return [...new Set(tags)];
+  }
+  return [...new Set([...tags, shaTag])];
+}
+
+function localImageExists(ref) {
+  return execQuiet(`docker image inspect ${ref}`) !== null;
+}
+
+function ensureLocalTag(cfg, targetTag, sourceTags = []) {
+  const targetRef = imageRef(cfg, targetTag);
+  if (localImageExists(targetRef)) return true;
+
+  const candidates = [...new Set(sourceTags.filter((tag) => tag && tag !== targetTag))];
+  for (const sourceTag of candidates) {
+    const sourceRef = imageRef(cfg, sourceTag);
+    if (!localImageExists(sourceRef)) continue;
+    try {
+      info(`Creating missing local tag ${targetRef} from ${sourceRef}...`);
+      exec(`docker tag ${sourceRef} ${targetRef}`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 // ── Interactive readline ────────────────────────────────────────────────────
@@ -245,10 +284,11 @@ async function actionBuild(cfg) {
   // Determine tags (remembers last-used tags)
   const defaultTags = cfg.lastTags || `latest,v${version}`;
   const rawTags = await ask("Tags (comma-separated)", defaultTags);
-  const tags = rawTags
+  const baseTags = rawTags
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
+  const tags = withShaTag(baseTags);
 
   if (!cfg.owner || !cfg.repo) {
     warn("Owner or repo not configured. Run Configure first.");
@@ -300,7 +340,7 @@ async function actionBuild(cfg) {
       info("Builder container stopped.");
 
       // Save tags as default for next run
-      cfg.lastTags = tags.join(",");
+      cfg.lastTags = baseTags.join(",");
       saveConfig(cfg);
 
       return { tags, pushed: true };
@@ -313,7 +353,7 @@ async function actionBuild(cfg) {
     ok(`Build completed in ${elapsed}s`);
 
     // Save tags as default for next run
-    cfg.lastTags = tags.join(",");
+    cfg.lastTags = baseTags.join(",");
     saveConfig(cfg);
 
     return { tags, pushed: false };
@@ -356,6 +396,17 @@ async function actionPush(cfg, tags) {
       .filter(Boolean);
   }
 
+  tags = [...new Set(tags)];
+  const selectedTags = [...tags];
+  const shaTag = getShaTag();
+  if (shaTag && !tags.includes(shaTag)) {
+    if (ensureLocalTag(cfg, shaTag, selectedTags)) {
+      tags.push(shaTag);
+    } else {
+      warn(`Could not create local SHA tag ${imageRef(cfg, shaTag)}; continuing without it.`);
+    }
+  }
+
   console.log();
   info("Pushing the following tags:");
   tags.forEach((t) => info(`  → ${imageRef(cfg, t)}`));
@@ -372,6 +423,10 @@ async function actionPush(cfg, tags) {
 
   for (const tag of tags) {
     const ref = imageRef(cfg, tag);
+    if (!localImageExists(ref)) {
+      err(`Skipping ${ref} (local tag does not exist)`);
+      continue;
+    }
     try {
       info(`Pushing ${ref}...`);
       await streamCmd("docker", ["push", ref]);

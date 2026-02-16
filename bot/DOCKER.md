@@ -228,6 +228,8 @@ docker run -d \
 
 ## Nginx Reverse Proxy Config
 
+### Multi-Domain Setup (VPS / Dedicated Server)
+
 Template config is provided at `nginx/heimdall-host-proxy.conf` and includes:
 
 - `dashboard.example.com` -> `127.0.0.1:3000`
@@ -250,6 +252,32 @@ sudo ln -s /etc/nginx/sites-available/heimdall /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+
+### Single-Port Mode (Railway, Render, Fly.io)
+
+If your platform only exposes one port (or one domain), enable the built-in nginx proxy
+that runs **inside** the container. No image rebuild required — it's a runtime toggle.
+
+Set these environment variables:
+
+```dotenv
+SINGLE_PORT_PROXY=true
+WS_PUBLIC_URL=wss://yourdomain.com/ws
+# PORT is usually auto-set by the platform. Default: 8080
+```
+
+This starts an nginx reverse proxy on `$PORT` that routes:
+
+| Path        | Destination      | Notes                                   |
+| ----------- | ---------------- | --------------------------------------- |
+| `/ws`       | `localhost:3002` | WebSocket with upgrade headers          |
+| `/bot-api/` | `localhost:3001` | REST API, `/bot-api` prefix is stripped |
+| `/`         | `localhost:3000` | Next.js dashboard (default)             |
+
+The config template is at `nginx/single-port.conf.template`.
+
+> **Note:** The dashboard's API calls already go through Next.js proxy routes (`/api/guilds/...`),
+> so `/bot-api/` is only needed if you access the REST API directly from external tools.
 
 ## Volume Management
 

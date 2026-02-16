@@ -7,6 +7,7 @@ import { fetchRuntimeConfig } from "./runtimeConfig";
 interface WebSocketContextValue {
   connected: boolean;
   subscribe: (guildId: string, event: string, handler: (data: any) => void) => () => void;
+  subscribeGlobal: (event: string, handler: (data: any) => void) => () => void;
   joinGuild: (guildId: string) => void;
   leaveGuild: (guildId: string) => void;
 }
@@ -14,6 +15,7 @@ interface WebSocketContextValue {
 const WebSocketContext = createContext<WebSocketContextValue>({
   connected: false,
   subscribe: () => () => {},
+  subscribeGlobal: () => () => {},
   joinGuild: () => {},
   leaveGuild: () => {},
 });
@@ -24,6 +26,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [wsUrl, setWsUrl] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const listenersRef = useRef<Map<string, Set<(data: any) => void>>>(new Map());
+  const globalListenersRef = useRef<Map<string, Set<(data: any) => void>>>(new Map());
   const subscribedGuildsRef = useRef<Map<string, number>>(new Map());
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -69,6 +72,17 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         for (const [guildId, count] of subscribedGuildsRef.current.entries()) {
           if (count > 0) {
             ws.send(JSON.stringify({ type: "subscribe", guildId }));
+          }
+        }
+        return;
+      }
+
+      // Handle global (non-guild-scoped) events — e.g., owner-only migration progress
+      if (!msg.guildId && msg.event) {
+        const globalHandlers = globalListenersRef.current.get(msg.event);
+        if (globalHandlers) {
+          for (const handler of globalHandlers) {
+            handler(msg.data);
           }
         }
         return;
@@ -142,6 +156,17 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const subscribeGlobal = useCallback((event: string, handler: (data: any) => void) => {
+    if (!globalListenersRef.current.has(event)) {
+      globalListenersRef.current.set(event, new Set());
+    }
+    globalListenersRef.current.get(event)!.add(handler);
+
+    return () => {
+      globalListenersRef.current.get(event)?.delete(handler);
+    };
+  }, []);
+
   const joinGuild = useCallback((guildId: string) => {
     const current = subscribedGuildsRef.current.get(guildId) ?? 0;
     subscribedGuildsRef.current.set(guildId, current + 1);
@@ -162,7 +187,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     subscribedGuildsRef.current.set(guildId, current - 1);
   }, []);
 
-  return <WebSocketContext.Provider value={{ connected, subscribe, joinGuild, leaveGuild }}>{children}</WebSocketContext.Provider>;
+  return <WebSocketContext.Provider value={{ connected, subscribe, subscribeGlobal, joinGuild, leaveGuild }}>{children}</WebSocketContext.Provider>;
 }
 
 export function useWebSocket(): WebSocketContextValue {

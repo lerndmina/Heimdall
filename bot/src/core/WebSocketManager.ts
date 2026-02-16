@@ -126,6 +126,28 @@ export class WebSocketManager {
     }
   }
 
+  /**
+   * Broadcast an event to all authenticated sockets whose userId is in OWNER_IDS.
+   * No guild scoping — used for global owner-only events like migration progress.
+   */
+  broadcastToOwners(event: string, data: unknown): void {
+    if (!this.wss) return;
+    const ownerIds = (process.env.OWNER_IDS || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    if (ownerIds.length === 0) return;
+
+    const message = JSON.stringify({ event, data, timestamp: Date.now() });
+
+    for (const socket of this.wss.clients) {
+      const ws = socket as AuthenticatedSocket;
+      if (ws.readyState === WebSocket.OPEN && ws.userId && ownerIds.includes(ws.userId)) {
+        ws.send(message);
+      }
+    }
+  }
+
   private async handleMessage(socket: AuthenticatedSocket, raw: WebSocket.RawData): Promise<void> {
     let message: ClientMessage;
 

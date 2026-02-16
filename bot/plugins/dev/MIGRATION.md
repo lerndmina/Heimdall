@@ -1,4 +1,85 @@
-# Data Migration from Old Bot
+# Data Migration
+
+Heimdall supports two migration modes:
+
+1. **Legacy Import** — Import data from the old (pre-plugin) Heimdall bot into the new system
+2. **Instance Clone** — Copy all data from one Heimdall instance to another (Heimdall → Heimdall)
+
+---
+
+## Instance Clone (Heimdall → Heimdall)
+
+Clone all data from a source Heimdall instance's MongoDB database to the current instance. Both databases must use identical schemas.
+
+### What Gets Cloned
+
+All 35 data models across all plugins:
+
+| Plugin                | Models                                                                     |
+| --------------------- | -------------------------------------------------------------------------- |
+| **Core**              | PersistentComponent, GuildEnv (encrypted)                                  |
+| **AttachmentBlocker** | AttachmentBlockerConfig, AttachmentBlockerChannel, AttachmentBlockerOpener |
+| **Dashboard**         | DashboardPermission                                                        |
+| **Logging**           | LoggingConfig                                                              |
+| **Minecraft**         | MinecraftConfig (encrypted), MinecraftPlayer, McServerStatus, RoleSyncLog  |
+| **Minigames**         | HeimdallCoin                                                               |
+| **Moderation**        | ModerationConfig, AutomodRule, Infraction, ChannelLock, StickyMessage      |
+| **Modmail**           | ModmailConfig (encrypted), Modmail                                         |
+| **Reminders**         | Reminder                                                                   |
+| **RoleButtons**       | RoleButtonPanel                                                            |
+| **Suggestions**       | SuggestionConfig, Suggestion, SuggestionOpener                             |
+| **SupportCore**       | SupportBan, ScheduledAction                                                |
+| **Tags**              | Tag                                                                        |
+| **TempVC**            | TempVC, ActiveTempChannels                                                 |
+| **Tickets**           | TicketCategory, TicketOpener, TicketArchiveConfig, Ticket                  |
+| **VCTranscription**   | VoiceTranscriptionConfig                                                   |
+| **Welcome**           | WelcomeMessage                                                             |
+
+**Skipped:** TicTacToe, Connect4 (24h TTL ephemeral game state — auto-deleted)
+
+### Encryption Key Requirement
+
+Both instances **must** use the same `ENCRYPTION_KEY` environment variable. Encrypted fields are copied as raw ciphertext:
+
+- `GuildEnv.encryptedValue`
+- `MinecraftConfig.encryptedRconPassword`
+- `ModmailConfig.categories[].encryptedWebhookToken`
+
+If the keys differ, these fields will fail to decrypt on the target instance.
+
+### Clone Methods
+
+#### Dashboard UI (Recommended)
+
+1. Navigate to `/dev/migration` in the dashboard
+2. Select the **"Instance Clone"** tab
+3. Enter the source MongoDB URI
+4. Optionally specify a guild ID to filter
+5. Click "Start Clone"
+6. Watch real-time progress via WebSocket
+
+#### API Call
+
+```bash
+curl -X POST https://your-dashboard.com/api/dev/clone \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceDbUri": "mongodb://source-host:27017/heimdall",
+    "guildId": "optional_guild_id"
+  }'
+```
+
+### Clone Behavior
+
+- **Idempotent:** Existing documents (matched by `_id` or unique key) are skipped
+- **Batch processing:** Documents are copied in batches of 500 for efficiency
+- **Infraction.ruleId remapping:** AutomodRule references are automatically remapped when the target already has rules with different `_id` values
+- **Guild filtering:** When a guild ID is provided, only guild-scoped documents are copied; global models (PersistentComponent, HeimdallCoin) are skipped
+- **Progress:** Real-time per-step and per-record progress via WebSocket
+
+---
+
+## Legacy Import (Old Bot → Heimdall)
 
 This guide explains how to import configurations and data from the old Heimdall bot to the new plugin-based system.
 

@@ -15,6 +15,10 @@ export function clearWebSocketManager(): void {
   wsManager = null;
 }
 
+export function broadcastToOwners(event: string, data?: unknown): void {
+  wsManager?.broadcastToOwners(event, data ?? {});
+}
+
 export function broadcast(guildId: string, event: string, data?: unknown, options?: BroadcastOptions): void {
   wsManager?.broadcastToGuild(guildId, event, data ?? {}, options);
 

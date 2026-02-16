@@ -56,6 +56,9 @@ services:
       - "127.0.0.1:${DASHBOARD_PORT:-3000}:3000"
       - "127.0.0.1:${API_PORT:-3001}:3001"
       - "127.0.0.1:${WS_PORT:-3002}:3002"
+      # Single-port mode (PaaS): uncomment the line below and comment out the 3 ports above.
+      # Also set SINGLE_PORT_PROXY=true and WS_PUBLIC_URL=wss://yourdomain/ws in your .env.
+      # - "${PORT:-8080}:${PORT:-8080}"
     volumes:
       # Mount logs directory (optional)
       - ./logs:/app/logs

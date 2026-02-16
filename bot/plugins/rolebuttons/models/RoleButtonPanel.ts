@@ -63,7 +63,6 @@ const RoleButtonPanelSchema = new Schema(
 );
 
 RoleButtonPanelSchema.index({ guildId: 1, name: 1 }, { unique: true });
-RoleButtonPanelSchema.index({ guildId: 1 });
 
 type IRoleButtonPanel = InferSchemaType<typeof RoleButtonPanelSchema>;
 
