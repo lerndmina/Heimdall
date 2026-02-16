@@ -146,8 +146,8 @@ RUN mkdir -p /tmp/nginx && chown -R heimdall:nodejs /tmp/nginx
 # (supports Railway / Docker volume mounts at /app/models/whisper)
 RUN mkdir -p /app/models/whisper && chown -R heimdall:nodejs /app/models
 
-# Switch to non-root user
-USER heimdall
+# # Switch to non-root user
+# USER heimdall
 
 # Expose ports
 # API_PORT (default 3001), DASHBOARD_PORT (default 3000), WS_PORT (default 3002)
