@@ -34,6 +34,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const shouldReconnectRef = useRef(true);
   const hasAuthenticatedRef = useRef(false);
   const preAuthCloseCountRef = useRef(0);
+  /** Periodic fallback: if we gave up reconnecting, retry every 60s */
+  const fallbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +84,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       if (msg.event === "authenticated") {
         hasAuthenticatedRef.current = true;
         preAuthCloseCountRef.current = 0;
+        reconnectAttemptsRef.current = 0;
+        stopFallbackReconnect();
         setConnected(true);
         for (const [guildId, count] of subscribedGuildsRef.current.entries()) {
           if (count > 0) {
@@ -134,6 +138,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     ws.onclose = (event) => {
       setConnected(false);
 
+      // Permanent give-up codes (auth failures / rate limit / user error)
       if (event.code === 4001 || event.code === 4008 || event.code === 4009) {
         shouldReconnectRef.current = false;
         return;
@@ -141,10 +146,15 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
       if (!shouldReconnectRef.current) return;
 
+      // If the connection closed before authentication succeeded (server
+      // unavailable / restarting), count consecutive pre-auth failures.
+      // After 5 in a row, pause aggressive reconnection but start a slow
+      // fallback interval (every 60s) so we eventually recover once the
+      // server comes back.
       if (!hasAuthenticatedRef.current) {
         preAuthCloseCountRef.current += 1;
-        if (preAuthCloseCountRef.current >= 3) {
-          shouldReconnectRef.current = false;
+        if (preAuthCloseCountRef.current >= 5) {
+          startFallbackReconnect();
           return;
         }
       }
@@ -174,6 +184,36 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     }, delay);
   }, [connect]);
 
+  /**
+   * Slow fallback reconnect: try every 60s when we've exhausted fast retries.
+   * Once a connection succeeds, the authenticated handler resets everything.
+   */
+  const startFallbackReconnect = useCallback(() => {
+    if (fallbackIntervalRef.current) return;
+
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[dashboard] ws: entering slow reconnect (every 60s)");
+    }
+
+    fallbackIntervalRef.current = setInterval(() => {
+      const ws = wsRef.current;
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return; // already connected/connecting
+      }
+      // Reset counters and attempt a fresh connect
+      preAuthCloseCountRef.current = 0;
+      reconnectAttemptsRef.current = 0;
+      connect();
+    }, 60_000);
+  }, [connect]);
+
+  const stopFallbackReconnect = useCallback(() => {
+    if (fallbackIntervalRef.current) {
+      clearInterval(fallbackIntervalRef.current);
+      fallbackIntervalRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!wsUrl) return;
     if (!accessToken) return;
@@ -186,8 +226,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
+      stopFallbackReconnect();
     };
-  }, [connect, wsUrl, accessToken]);
+  }, [connect, wsUrl, accessToken, stopFallbackReconnect]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;

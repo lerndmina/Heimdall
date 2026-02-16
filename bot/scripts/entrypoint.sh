@@ -22,6 +22,11 @@ is_truthy() {
   esac
 }
 
+# Ensure whisper model directory is writable (handles volume mounts that
+# may reset ownership). If we can't fix perms (non-root), silently continue
+# — the bot will fall back to node_modules.
+mkdir -p /app/models/whisper 2>/dev/null || true
+
 if is_truthy "${SINGLE_PORT_PROXY:-}"; then
   PORT="$(normalize_env_value "${PORT:-8080}")"
   export PORT

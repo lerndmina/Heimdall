@@ -229,16 +229,37 @@ export async function downloadWhisperModel(model: string, modelsDir: string, onP
       // Stream to a temp file with progress reporting
       if (onProgress && response.body && totalBytes > 0) {
         const writer = fs.createWriteStream(tmpPath);
+
+        // Attach error handler IMMEDIATELY to prevent uncaught exceptions
+        // (e.g. EACCES when the file can't be opened).
+        let writerError: Error | null = null;
+        writer.on("error", (err) => {
+          writerError = err;
+        });
+
+        // Wait for the stream to be ready (file descriptor opened)
+        await new Promise<void>((resolve, reject) => {
+          writer.on("open", () => resolve());
+          writer.on("error", reject);
+        });
+
         let downloadedBytes = 0;
         let lastProgressReport = 0;
 
         const reader = response.body.getReader();
         try {
           while (true) {
+            if (writerError) throw writerError;
             const { done, value } = await reader.read();
             if (done) break;
-            writer.write(Buffer.from(value));
+            const ok = writer.write(Buffer.from(value));
             downloadedBytes += value.byteLength;
+
+            // Apply backpressure — wait for drain if the internal buffer is full
+            if (!ok) {
+              await new Promise<void>((resolve) => writer.once("drain", resolve));
+            }
+            if (writerError) throw writerError;
 
             // Report progress at most every 500ms to avoid spamming
             const now = Date.now();
@@ -252,11 +273,12 @@ export async function downloadWhisperModel(model: string, modelsDir: string, onP
         } finally {
           writer.end();
         }
-        // Wait for the write stream to finish
+        // Wait for the write stream to finish flushing
         await new Promise<void>((resolve, reject) => {
           writer.on("finish", resolve);
           writer.on("error", reject);
         });
+        if (writerError) throw writerError;
         // Final 100% progress
         onProgress(100, Math.round(totalMB * 10) / 10, Math.round(totalMB * 10) / 10);
       } else {

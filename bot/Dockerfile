@@ -142,6 +142,10 @@ RUN chmod +x ./scripts/entrypoint.sh
 # Prepare writable directories for non-root nginx
 RUN mkdir -p /tmp/nginx && chown -R heimdall:nodejs /tmp/nginx
 
+# Pre-create whisper model directory so the non-root user can write to it
+# (supports Railway / Docker volume mounts at /app/models/whisper)
+RUN mkdir -p /app/models/whisper && chown -R heimdall:nodejs /app/models
+
 # Switch to non-root user
 USER heimdall
 
