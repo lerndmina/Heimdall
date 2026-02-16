@@ -256,7 +256,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
                         <a href={s.messageLink.replace("https://", "discord://")} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300">
                           Open in Discord
                         </a>
-                        <a href={s.messageLink.replace("https://", "discord://")} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300">
+                        <a href={s.messageLink} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300">
                           View in Browser
                         </a>
                       </>
