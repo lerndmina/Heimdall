@@ -427,14 +427,7 @@ async function detectLocalLanguage(fileName: string, model: string): Promise<str
   const modelPath = path.join(getModelsDir(), modelInfo.filename);
   if (!fs.existsSync(executablePath) || !fs.existsSync(modelPath)) return null;
 
-  const args = [
-    "--no-gpu",
-    "--detect-language",
-    "-m",
-    modelPath,
-    "-f",
-    filePath,
-  ];
+  const args = ["--no-gpu", "--detect-language", "-m", modelPath, "-f", filePath];
 
   try {
     const { stdout, stderr } = await execFileAsync(executablePath, args, {

@@ -175,9 +175,7 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
       if (languageGate !== undefined) {
         const enabled = Boolean(languageGate.enabled);
         const allowedLanguagesRaw = Array.isArray(languageGate.allowedLanguages) ? languageGate.allowedLanguages : [];
-        const normalizedAllowed = allowedLanguagesRaw
-          .map((lang: unknown) => String(lang).trim().toLowerCase())
-          .filter((lang: string) => /^[a-z]{2,8}$/.test(lang));
+        const normalizedAllowed = allowedLanguagesRaw.map((lang: unknown) => String(lang).trim().toLowerCase()).filter((lang: string) => /^[a-z]{2,8}$/.test(lang));
 
         if (enabled && normalizedAllowed.length === 0) {
           return res.status(400).json({
