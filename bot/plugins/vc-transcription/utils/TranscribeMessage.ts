@@ -168,7 +168,20 @@ function shouldShowTranslation(transcription: string, translation?: string): tra
   const normalizedTranscript = normalizeForCompare(transcription);
   const normalizedTranslation = normalizeForCompare(translation);
   if (!normalizedTranscript || !normalizedTranslation) return false;
-  return normalizedTranscript !== normalizedTranslation;
+  if (normalizedTranscript === normalizedTranslation) return false;
+
+  // Word-level similarity: OpenAI's transcription and translation endpoints
+  // often return slightly different versions of the same text for English input
+  // (e.g. different punctuation, compound vs split words). Use overlap ratio
+  // to detect "essentially the same" content and suppress the useless translation.
+  const wordsA = normalizedTranscript.split(" ");
+  const wordsB = normalizedTranslation.split(" ");
+  const setB = new Set(wordsB);
+  const matchCount = wordsA.filter((w) => setB.has(w)).length;
+  const overlapRatio = matchCount / Math.max(wordsA.length, wordsB.length);
+
+  // >70% shared words → too similar, translation adds no value
+  return overlapRatio < 0.7;
 }
 
 function truncateWithEllipsis(text: string, maxLength: number): string {
@@ -531,31 +544,50 @@ async function transcribeWithOpenAI(fileName: string, model: string, guildId: st
   const filePath = getTempPath(fileName, "wav");
   const fileBuffer = fs.readFileSync(filePath);
 
-  const transcription = await callOpenAIAudioEndpoint({
+  // Step 1: Transcribe with verbose_json to get detected language in the same call
+  const verboseJson = await callOpenAIAudioEndpoint({
     endpoint: "transcriptions",
     model,
     fileName,
     fileBuffer,
     apiKey,
-    responseFormat: "text",
+    responseFormat: "verbose_json",
   });
 
-  let englishTranslation: string | undefined;
-  try {
-    const translated = await callOpenAIAudioEndpoint({
-      endpoint: "translations",
-      model: "whisper-1",
-      fileName,
-      fileBuffer,
-      apiKey,
-      responseFormat: "text",
-    });
+  let transcription: string;
+  let detectedLanguage: string | undefined;
 
-    if (translated) {
-      englishTranslation = translated;
+  try {
+    const parsed = JSON.parse(verboseJson);
+    transcription = parsed.text ?? "";
+    detectedLanguage = parsed.language?.toLowerCase();
+  } catch {
+    // Fallback: treat the raw response as plain text
+    log.warn("Failed to parse verbose_json response; using raw text");
+    transcription = verboseJson;
+  }
+
+  // Step 2: Only call translation if the detected language is NOT English.
+  // This avoids a second API call for English-only content.
+  let englishTranslation: string | undefined;
+
+  if (detectedLanguage && detectedLanguage !== "english") {
+    try {
+      const translated = await callOpenAIAudioEndpoint({
+        endpoint: "translations",
+        model: "whisper-1",
+        fileName,
+        fileBuffer,
+        apiKey,
+        responseFormat: "text",
+      });
+
+      if (translated) {
+        englishTranslation = translated;
+      }
+    } catch (error) {
+      log.warn("OpenAI translation failed; returning transcription only:", error);
     }
-  } catch (error) {
-    log.warn("OpenAI translation failed; returning transcription only:", error);
   }
 
   return {
