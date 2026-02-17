@@ -136,7 +136,7 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
     try {
       const res = await fetchApi<SuggestionConfig>(guildId, "suggestions/config", {
         method: "PUT",
-        body: JSON.stringify({ ...draft, updatedBy: "dashboard" }),
+        body: JSON.stringify(draft),
       });
       if (res.success && res.data) {
         setConfig(res.data);

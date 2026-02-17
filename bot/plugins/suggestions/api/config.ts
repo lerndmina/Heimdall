@@ -76,7 +76,8 @@ export function createConfigRoutes(deps: SuggestionsApiDependencies): Router {
   router.put("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const { maxChannels, voteCooldown, submissionCooldown, enableCategories, updatedBy } = req.body;
+      const { maxChannels, voteCooldown, submissionCooldown, enableCategories, updatedBy: updatedByBody } = req.body;
+      const updatedBy = req.header("X-User-Id") || updatedByBody;
 
       const updateData: Record<string, unknown> = {};
       if (maxChannels !== undefined) updateData.maxChannels = maxChannels;

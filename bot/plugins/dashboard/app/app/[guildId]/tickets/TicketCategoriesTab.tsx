@@ -213,7 +213,6 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
           emoji: draft.emoji.trim() || undefined,
           type: draft.type,
           ticketNameFormat: draft.ticketNameFormat,
-          createdBy: "dashboard",
           inactivityReminder: {
             enabled: draft.inactivityEnabled,
             warningDelay: draft.inactivityWarningDelay * 3_600_000,
@@ -300,7 +299,6 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
           description: wizardParent.description.trim(),
           emoji: wizardParent.emoji.trim() || undefined,
           type: "parent",
-          createdBy: "dashboard",
         }),
       });
 
@@ -318,7 +316,6 @@ export default function TicketCategoriesTab({ guildId }: { guildId: string }) {
         type: "child",
         parentId: parentRes.data.id ?? parentRes.data._id,
         ticketNameFormat: wizardChild.ticketNameFormat,
-        createdBy: "dashboard",
       };
       if (wizardChild.discordCategoryId) {
         childBody.discordCategoryId = wizardChild.discordCategoryId;

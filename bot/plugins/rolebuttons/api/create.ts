@@ -8,12 +8,21 @@ export function createRoleButtonsCreateRoutes(deps: RoleButtonsApiDependencies):
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const { name, createdBy } = req.body ?? {};
+      const createdBy = req.header("X-User-Id");
+      const { name } = req.body ?? {};
 
-      if (!name || !createdBy) {
+      if (!createdBy) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
+
+      if (!name) {
         res.status(400).json({
           success: false,
-          error: { code: "INVALID_INPUT", message: "name and createdBy are required" },
+          error: { code: "INVALID_INPUT", message: "name is required" },
         });
         return;
       }

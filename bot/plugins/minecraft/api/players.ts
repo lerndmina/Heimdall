@@ -96,6 +96,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
   router.post("/manual", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId } = req.params;
+      const actorUserId = req.header("X-User-Id") || "api";
       const { minecraftUsername, minecraftUuid, discordId, discordUsername, discordDisplayName, notes, status, rejectionReason, revocationReason } = req.body;
 
       if (!minecraftUsername) {
@@ -140,10 +141,10 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       if (resolvedStatus === "whitelisted") {
         playerData.whitelistedAt = new Date();
         if (!playerData.linkedAt) playerData.linkedAt = new Date();
-        playerData.approvedBy = "api";
+        playerData.approvedBy = actorUserId;
       } else if (resolvedStatus === "revoked") {
         playerData.revokedAt = new Date();
-        playerData.revokedBy = "api";
+        playerData.revokedBy = actorUserId;
         if (revocationReason) playerData.revocationReason = revocationReason;
       }
       // "pending" is the default — linkedAt set, no whitelistedAt
@@ -166,6 +167,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
     try {
       const { guildId, playerId } = req.params;
       const updateData = req.body;
+      const actorUserId = req.header("X-User-Id") || "api";
 
       delete updateData._id;
       delete updateData.guildId;
@@ -187,7 +189,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
         // Only set revokedAt if not already revoked
         if (!current.revokedAt) {
           updateData.revokedAt = new Date();
-          updateData.revokedBy = "api";
+          updateData.revokedBy = actorUserId;
         }
         updateData.revocationReason = updateData.revocationReason || current.revocationReason || "Revoked via dashboard";
         // Clear whitelist status
@@ -197,7 +199,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
         // Only set whitelistedAt if not already whitelisted
         if (!current.whitelistedAt) {
           updateData.whitelistedAt = new Date();
-          updateData.approvedBy = "api";
+          updateData.approvedBy = actorUserId;
         }
         // Clear revocation status
         updateData.revokedAt = null;
@@ -251,6 +253,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
     try {
       const { guildId, playerId } = req.params;
       const { reason } = req.body || {};
+      const actorUserId = req.header("X-User-Id") || "api";
 
       const player = await MinecraftPlayer.findOne({ _id: playerId, guildId });
       if (!player) {
@@ -262,7 +265,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       }
 
       player.revokedAt = new Date();
-      player.revokedBy = "api";
+      player.revokedBy = actorUserId;
       player.revocationReason = reason || "Removed via API";
       // Clear auth/linking data
       player.authCode = undefined;
@@ -302,6 +305,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
     try {
       const { guildId, playerId } = req.params;
       const { approvedBy } = req.body || {};
+      const actorUserId = req.header("X-User-Id") || approvedBy || "api";
 
       const player = await MinecraftPlayer.findOne({ _id: playerId, guildId });
       if (!player) {
@@ -313,7 +317,7 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
       }
 
       player.whitelistedAt = new Date();
-      player.approvedBy = approvedBy || "api";
+      player.approvedBy = actorUserId;
       player.revokedAt = undefined;
       player.revokedBy = undefined;
       player.revocationReason = undefined;

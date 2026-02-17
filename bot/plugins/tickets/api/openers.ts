@@ -162,7 +162,7 @@ export function createOpenersRoutes(_deps: ApiDependencies): Router {
         embedImage,
         embedThumbnail,
         categoryIds,
-        createdBy: "api",
+        createdBy: req.header("X-User-Id") || req.body?.createdBy || "api",
       });
 
       await opener.save();

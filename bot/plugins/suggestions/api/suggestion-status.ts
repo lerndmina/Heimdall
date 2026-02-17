@@ -47,12 +47,13 @@ export function createSuggestionStatusRoutes(deps: SuggestionsApiDependencies): 
   router.patch("/:suggestionId/status", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, suggestionId } = req.params;
-      const { status, managedBy } = req.body;
+      const { status, managedBy: managedByBody } = req.body;
+      const managedBy = req.header("X-User-Id") || managedByBody;
 
       if (!status || !managedBy) {
         res.status(400).json({
           success: false,
-          error: { code: "INVALID_INPUT", message: "status and managedBy are required" },
+          error: { code: "INVALID_INPUT", message: "status and actor user ID are required" },
         });
         return;
       }

@@ -137,7 +137,6 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
         method: "PATCH",
         body: JSON.stringify({
           status: manageAction,
-          managedBy: "dashboard",
         }),
       });
       if (res.success) {

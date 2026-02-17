@@ -82,7 +82,16 @@ export function createStickyRoutes(deps: StickyApiDeps): Router {
     try {
       const guildId = req.params.guildId as string;
       const channelId = req.params.channelId as string;
-      const { content, color, moderatorId, detectionBehavior, detectionDelay, conversationDuration, conversationDeleteBehavior, sendOrder } = req.body;
+      const { content, color, detectionBehavior, detectionDelay, conversationDuration, conversationDeleteBehavior, sendOrder } = req.body;
+      const modId = req.header("X-User-Id");
+
+      if (!modId) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
 
       if (!content || typeof content !== "string") {
         res.status(400).json({
@@ -99,9 +108,6 @@ export function createStickyRoutes(deps: StickyApiDeps): Router {
         });
         return;
       }
-
-      // Use moderatorId from body (dashboard user) or fall back to "dashboard"
-      const modId = moderatorId ?? "dashboard";
 
       const sticky = await deps.stickyMessageService.setSticky(guildId, channelId, content, modId, {
         color: typeof color === "number" ? color : 0,

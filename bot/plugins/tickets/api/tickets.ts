@@ -212,10 +212,10 @@ export function createTicketsRoutes(deps: ApiDependencies): Router {
   router.patch("/:ticketId/claim", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, ticketId } = req.params;
-      const { staffId } = req.body;
+      const staffId = req.header("X-User-Id");
 
       if (!staffId) {
-        res.status(400).json({ success: false, error: "staffId is required" });
+        res.status(401).json({ success: false, error: "X-User-Id header is required" });
         return;
       }
 
@@ -353,10 +353,11 @@ export function createTicketsRoutes(deps: ApiDependencies): Router {
   router.patch("/:ticketId/close", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, ticketId } = req.params;
-      const { closedBy, reason } = req.body;
+      const closedBy = req.header("X-User-Id");
+      const { reason } = req.body || {};
 
       if (!closedBy) {
-        res.status(400).json({ success: false, error: "closedBy is required" });
+        res.status(401).json({ success: false, error: "X-User-Id header is required" });
         return;
       }
 

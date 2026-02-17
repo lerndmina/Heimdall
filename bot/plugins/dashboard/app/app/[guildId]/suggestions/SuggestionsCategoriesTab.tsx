@@ -119,7 +119,6 @@ export default function SuggestionsCategoriesTab({ guildId }: { guildId: string 
             emoji: draft.emoji.trim() || undefined,
             channelId: draft.channelId || undefined,
             isActive: draft.isActive,
-            updatedBy: "dashboard",
           }),
         });
         if (res.success) {
@@ -137,7 +136,6 @@ export default function SuggestionsCategoriesTab({ guildId }: { guildId: string 
             description: draft.description.trim(),
             emoji: draft.emoji.trim() || undefined,
             channelId: draft.channelId || undefined,
-            createdBy: "dashboard",
           }),
         });
         if (res.success) {

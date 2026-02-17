@@ -11,7 +11,12 @@ export function createRoleButtonsPostRoutes(deps: RoleButtonsApiDependencies): R
       const guildId = req.params.guildId as string;
       const panelId = req.params.panelId as string;
       const channelId = String(req.body?.channelId ?? "");
-      const postedBy = String(req.body?.postedBy ?? "dashboard");
+      const postedBy = req.header("X-User-Id");
+
+      if (!postedBy) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" } });
+        return;
+      }
 
       if (!channelId) {
         res.status(400).json({ success: false, error: { code: "INVALID_INPUT", message: "channelId is required" } });

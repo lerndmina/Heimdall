@@ -116,6 +116,7 @@ export function createCategoriesRoutes(deps: ApiDependencies): Router {
     try {
       const { guildId } = req.params;
       const { name, description, emoji, type, parentId, discordCategoryId, staffRoles, ticketNameFormat, inactivityReminder } = req.body;
+      const createdBy = req.header("X-User-Id") || req.body?.createdBy || "api";
 
       // Validation
       if (!name || !description || !type) {
@@ -170,7 +171,7 @@ export function createCategoriesRoutes(deps: ApiDependencies): Router {
         // selectQuestions and modalQuestions use schema defaults
         inactivityReminder,
         isActive: true,
-        createdBy: "api",
+        createdBy,
       });
 
       if (!category) {

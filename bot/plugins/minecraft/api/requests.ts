@@ -39,6 +39,7 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
     try {
       const { guildId, authId } = req.params;
       const { approvedBy } = req.body || {};
+      const actorUserId = req.header("X-User-Id") || approvedBy || "api";
 
       const player = await MinecraftPlayer.findOne({ _id: authId, guildId });
       if (!player) {
@@ -58,7 +59,7 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
       }
 
       player.whitelistedAt = new Date();
-      player.approvedBy = approvedBy || "api";
+      player.approvedBy = actorUserId;
       player.authCode = undefined;
       player.expiresAt = undefined;
       player.confirmedAt = new Date();
@@ -75,6 +76,7 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
     try {
       const { guildId, authId } = req.params;
       const { reason, rejectedBy } = req.body || {};
+      const actorUserId = req.header("X-User-Id") || rejectedBy || "api";
 
       const player = await MinecraftPlayer.findOne({ _id: authId, guildId });
       if (!player) {
@@ -87,7 +89,7 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
 
       player.rejectionReason = reason || "Rejected by staff";
       player.revokedAt = new Date();
-      player.revokedBy = rejectedBy || "api";
+      player.revokedBy = actorUserId;
       player.authCode = undefined;
       player.expiresAt = undefined;
       await player.save();
@@ -103,6 +105,7 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
     try {
       const { guildId } = req.params;
       const { playerIds, approvedBy } = req.body;
+      const actorUserId = req.header("X-User-Id") || approvedBy || "api";
 
       if (!Array.isArray(playerIds) || playerIds.length === 0) {
         res.status(400).json({
@@ -116,7 +119,7 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
         { _id: { $in: playerIds }, guildId, whitelistedAt: null },
         {
           whitelistedAt: new Date(),
-          approvedBy: approvedBy || "api",
+          approvedBy: actorUserId,
           confirmedAt: new Date(),
           $unset: { authCode: 1, expiresAt: 1 },
         },

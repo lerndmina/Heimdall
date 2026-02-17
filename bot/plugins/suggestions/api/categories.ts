@@ -104,12 +104,13 @@ export function createCategoryRoutes(deps: SuggestionsApiDependencies): Router {
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const { name, description, emoji, channelId, createdBy } = req.body;
+      const { name, description, emoji, channelId, createdBy: createdByBody } = req.body;
+      const createdBy = req.header("X-User-Id") || createdByBody;
 
       if (!name || !description || !createdBy) {
         res.status(400).json({
           success: false,
-          error: { code: "INVALID_INPUT", message: "name, description, and createdBy are required" },
+          error: { code: "INVALID_INPUT", message: "name, description, and actor user ID are required" },
         });
         return;
       }
@@ -134,7 +135,8 @@ export function createCategoryRoutes(deps: SuggestionsApiDependencies): Router {
   router.put("/:categoryId", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, categoryId } = req.params;
-      const { name, description, emoji, channelId, isActive, updatedBy } = req.body;
+      const { name, description, emoji, channelId, isActive, updatedBy: updatedByBody } = req.body;
+      const updatedBy = req.header("X-User-Id") || updatedByBody;
 
       const result = await SuggestionConfigHelper.updateCategory(guildId as string, categoryId as string, { name, description, emoji, channelId, isActive }, updatedBy || "api");
 
@@ -177,7 +179,8 @@ export function createCategoryRoutes(deps: SuggestionsApiDependencies): Router {
   router.put("/reorder", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const { categoryIds, updatedBy } = req.body;
+      const { categoryIds, updatedBy: updatedByBody } = req.body;
+      const updatedBy = req.header("X-User-Id") || updatedByBody;
 
       if (!categoryIds || !Array.isArray(categoryIds)) {
         res.status(400).json({

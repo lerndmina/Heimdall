@@ -148,6 +148,7 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
   try {
     const headers: Record<string, string> = {
       "X-API-Key": API_KEY,
+      "X-User-Id": session.user.id,
       "Content-Type": req.headers.get("content-type") || "application/json",
     };
 
