@@ -103,6 +103,15 @@ export function createOpenersRoutes(_deps: ApiDependencies): Router {
     try {
       const { guildId } = req.params;
       const { name, uiType, embedTitle, embedDescription, embedColor, embedImage, embedThumbnail, categoryIds = [] } = req.body;
+      const createdBy = req.header("X-User-Id");
+
+      if (!createdBy) {
+        res.status(401).json({
+          success: false,
+          error: "X-User-Id header is required",
+        });
+        return;
+      }
 
       // Validation
       if (!name || !uiType || !embedTitle || !embedDescription) {
@@ -162,7 +171,7 @@ export function createOpenersRoutes(_deps: ApiDependencies): Router {
         embedImage,
         embedThumbnail,
         categoryIds,
-        createdBy: req.header("X-User-Id") || req.body?.createdBy || "api",
+        createdBy,
       });
 
       await opener.save();

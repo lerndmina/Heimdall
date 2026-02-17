@@ -96,7 +96,16 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
   router.post("/manual", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId } = req.params;
-      const actorUserId = req.header("X-User-Id") || "api";
+      const actorUserId = req.header("X-User-Id");
+
+      if (!actorUserId) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
+
       const { minecraftUsername, minecraftUuid, discordId, discordUsername, discordDisplayName, notes, status, rejectionReason, revocationReason } = req.body;
 
       if (!minecraftUsername) {
@@ -167,7 +176,15 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
     try {
       const { guildId, playerId } = req.params;
       const updateData = req.body;
-      const actorUserId = req.header("X-User-Id") || "api";
+      const actorUserId = req.header("X-User-Id");
+
+      if (!actorUserId) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
 
       delete updateData._id;
       delete updateData.guildId;
@@ -253,7 +270,15 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
     try {
       const { guildId, playerId } = req.params;
       const { reason } = req.body || {};
-      const actorUserId = req.header("X-User-Id") || "api";
+      const actorUserId = req.header("X-User-Id");
+
+      if (!actorUserId) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
 
       const player = await MinecraftPlayer.findOne({ _id: playerId, guildId });
       if (!player) {
@@ -304,8 +329,15 @@ export function createPlayersRoutes(deps: MinecraftApiDependencies): Router {
   router.post("/:playerId/whitelist", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, playerId } = req.params;
-      const { approvedBy } = req.body || {};
-      const actorUserId = req.header("X-User-Id") || approvedBy || "api";
+      const actorUserId = req.header("X-User-Id");
+
+      if (!actorUserId) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
 
       const player = await MinecraftPlayer.findOne({ _id: playerId, guildId });
       if (!player) {

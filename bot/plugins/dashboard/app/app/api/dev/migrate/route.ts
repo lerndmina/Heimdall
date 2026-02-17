@@ -9,6 +9,10 @@ import { auth } from "@/lib/auth";
 const API_PORT = process.env.API_PORT || "3001";
 const API_BASE = `http://localhost:${API_PORT}`;
 const API_KEY = process.env.INTERNAL_API_KEY!;
+const OWNER_IDS = (process.env.OWNER_IDS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +20,11 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED", message: "Not authenticated" } }, { status: 401 });
+  }
+
+  // Defense-in-depth: verify bot owner on dashboard side before proxying
+  if (!OWNER_IDS.includes(session.user.id)) {
+    return NextResponse.json({ success: false, error: { code: "FORBIDDEN", message: "Only bot owners can perform migrations" } }, { status: 403 });
   }
 
   try {
@@ -38,6 +47,7 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: { code: "INTERNAL_ERROR", message: error.message || "Migration failed" } }, { status: 500 });
+    const message = process.env.NODE_ENV === "production" ? "Migration failed" : error.message || "Migration failed";
+    return NextResponse.json({ success: false, error: { code: "INTERNAL_ERROR", message } }, { status: 500 });
   }
 }

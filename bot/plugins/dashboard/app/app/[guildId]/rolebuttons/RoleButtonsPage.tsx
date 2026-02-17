@@ -128,7 +128,6 @@ export default function RoleButtonsPage({ guildId }: { guildId: string }) {
       method: "POST",
       body: JSON.stringify({
         name: newName.trim(),
-        createdBy: session?.user?.id ?? "dashboard",
       }),
     });
 
@@ -176,7 +175,7 @@ export default function RoleButtonsPage({ guildId }: { guildId: string }) {
     if (!draft || !postChannelId) return;
     const res = await fetchApi(guildId, `rolebuttons/${draft.id}/post`, {
       method: "POST",
-      body: JSON.stringify({ channelId: postChannelId, postedBy: session?.user?.id ?? "dashboard" }),
+      body: JSON.stringify({ channelId: postChannelId }),
     });
 
     if (!res.success) {

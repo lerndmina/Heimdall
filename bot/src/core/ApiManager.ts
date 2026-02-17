@@ -161,13 +161,14 @@ export class ApiManager {
     this.app.use(express.json({ limit: "1mb" }));
     this.app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-    // Global rate limiting — 100 requests/minute per IP
+    // Global rate limiting — 100 requests/minute, keyed by X-User-Id (dashboard) or IP (external)
     this.app.use(
       rateLimit({
         windowMs: 60_000,
         max: 100,
         standardHeaders: true,
         legacyHeaders: false,
+        keyGenerator: (req: Request) => req.header("X-User-Id") || req.ip || "unknown",
         message: { error: "Too many requests, please try again later" },
       }),
     );
@@ -180,6 +181,7 @@ export class ApiManager {
         max: 20,
         standardHeaders: true,
         legacyHeaders: false,
+        keyGenerator: (req: Request) => req.header("X-User-Id") || req.ip || "unknown",
         message: { error: "Too many requests, please try again later" },
       }),
     );
@@ -192,6 +194,7 @@ export class ApiManager {
           max: 30,
           standardHeaders: true,
           legacyHeaders: false,
+          keyGenerator: (r: Request) => r.header("X-User-Id") || r.ip || "unknown",
           message: { error: "Too many write requests, please try again later" },
         })(req, _res, next);
       }
@@ -236,6 +239,9 @@ export class ApiManager {
 
     // CORS — restrict to dashboard origin only
     const dashboardUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.DASHBOARD_PORT || "3000"}`;
+    if (process.env.NODE_ENV === "production" && !process.env.DASHBOARD_URL) {
+      log.warn("DASHBOARD_URL is not set — CORS origin defaults to localhost. Set DASHBOARD_URL in production.");
+    }
     this.app.use(
       cors({
         origin: dashboardUrl,

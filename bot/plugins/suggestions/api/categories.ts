@@ -104,13 +104,21 @@ export function createCategoryRoutes(deps: SuggestionsApiDependencies): Router {
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const { name, description, emoji, channelId, createdBy: createdByBody } = req.body;
-      const createdBy = req.header("X-User-Id") || createdByBody;
+      const { name, description, emoji, channelId } = req.body;
+      const createdBy = req.header("X-User-Id");
 
-      if (!name || !description || !createdBy) {
+      if (!createdBy) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
+
+      if (!name || !description) {
         res.status(400).json({
           success: false,
-          error: { code: "INVALID_INPUT", message: "name, description, and actor user ID are required" },
+          error: { code: "INVALID_INPUT", message: "name and description are required" },
         });
         return;
       }
@@ -135,10 +143,18 @@ export function createCategoryRoutes(deps: SuggestionsApiDependencies): Router {
   router.put("/:categoryId", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, categoryId } = req.params;
-      const { name, description, emoji, channelId, isActive, updatedBy: updatedByBody } = req.body;
-      const updatedBy = req.header("X-User-Id") || updatedByBody;
+      const { name, description, emoji, channelId, isActive } = req.body;
+      const updatedBy = req.header("X-User-Id");
 
-      const result = await SuggestionConfigHelper.updateCategory(guildId as string, categoryId as string, { name, description, emoji, channelId, isActive }, updatedBy || "api");
+      if (!updatedBy) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
+
+      const result = await SuggestionConfigHelper.updateCategory(guildId as string, categoryId as string, { name, description, emoji, channelId, isActive }, updatedBy);
 
       if (!result.success) {
         res.status(400).json({
@@ -179,8 +195,16 @@ export function createCategoryRoutes(deps: SuggestionsApiDependencies): Router {
   router.put("/reorder", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const { categoryIds, updatedBy: updatedByBody } = req.body;
-      const updatedBy = req.header("X-User-Id") || updatedByBody;
+      const { categoryIds } = req.body;
+      const updatedBy = req.header("X-User-Id");
+
+      if (!updatedBy) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
 
       if (!categoryIds || !Array.isArray(categoryIds)) {
         res.status(400).json({
@@ -190,7 +214,7 @@ export function createCategoryRoutes(deps: SuggestionsApiDependencies): Router {
         return;
       }
 
-      const result = await SuggestionConfigHelper.reorderCategories(guildId, categoryIds, updatedBy || "api");
+      const result = await SuggestionConfigHelper.reorderCategories(guildId, categoryIds, updatedBy);
 
       if (!result.success) {
         res.status(400).json({

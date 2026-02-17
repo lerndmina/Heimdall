@@ -38,8 +38,15 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
   router.post("/approve/:authId", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, authId } = req.params;
-      const { approvedBy } = req.body || {};
-      const actorUserId = req.header("X-User-Id") || approvedBy || "api";
+      const actorUserId = req.header("X-User-Id");
+
+      if (!actorUserId) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
 
       const player = await MinecraftPlayer.findOne({ _id: authId, guildId });
       if (!player) {
@@ -75,8 +82,16 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
   router.post("/reject/:authId", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId, authId } = req.params;
-      const { reason, rejectedBy } = req.body || {};
-      const actorUserId = req.header("X-User-Id") || rejectedBy || "api";
+      const { reason } = req.body || {};
+      const actorUserId = req.header("X-User-Id");
+
+      if (!actorUserId) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
 
       const player = await MinecraftPlayer.findOne({ _id: authId, guildId });
       if (!player) {
@@ -104,8 +119,16 @@ export function createRequestsRoutes(deps: MinecraftApiDependencies): Router {
   router.post("/bulk-approve", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId } = req.params;
-      const { playerIds, approvedBy } = req.body;
-      const actorUserId = req.header("X-User-Id") || approvedBy || "api";
+      const { playerIds } = req.body;
+      const actorUserId = req.header("X-User-Id");
+
+      if (!actorUserId) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
 
       if (!Array.isArray(playerIds) || playerIds.length === 0) {
         res.status(400).json({

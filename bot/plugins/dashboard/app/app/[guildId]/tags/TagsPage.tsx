@@ -185,7 +185,6 @@ export default function TagsPage({ guildId }: { guildId: string }) {
           body: JSON.stringify({
             name: draftName.trim(),
             content: draftContent,
-            createdBy: session?.user?.id ?? "dashboard",
           }),
         });
         if (res.success) {

@@ -38,10 +38,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     /** Called by middleware — returns true if user is authenticated */
     authorized({ auth: session, request }) {
       const isLoggedIn = !!session?.user;
-      const isOnLogin = request.nextUrl.pathname.startsWith("/login");
+      const { pathname } = request.nextUrl;
 
-      if (isOnLogin) return true; // Always allow login page
-      return isLoggedIn; // Redirect to login if not authenticated
+      // Always allow login page and NextAuth auth endpoints
+      if (pathname.startsWith("/login") || pathname.startsWith("/api/auth/")) return true;
+
+      return isLoggedIn; // Redirect/block if not authenticated
     },
   },
 

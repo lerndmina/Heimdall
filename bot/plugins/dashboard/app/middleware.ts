@@ -68,6 +68,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Protect all dashboard routes, but exclude login, dev pages, static assets, and Next.js internals
-  matcher: ["/((?!api|_next/static|_next/image|login|dev|favicon.ico).*)"],
+  // Protect all routes including API routes, but exclude static assets, Next.js internals,
+  // login, and dev pages. API auth endpoints are allowed through by the authorized() callback.
+  matcher: ["/((?!_next/static|_next/image|login|dev|favicon.ico).*)"],
 };

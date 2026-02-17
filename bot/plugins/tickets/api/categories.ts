@@ -116,7 +116,15 @@ export function createCategoriesRoutes(deps: ApiDependencies): Router {
     try {
       const { guildId } = req.params;
       const { name, description, emoji, type, parentId, discordCategoryId, staffRoles, ticketNameFormat, inactivityReminder } = req.body;
-      const createdBy = req.header("X-User-Id") || req.body?.createdBy || "api";
+      const createdBy = req.header("X-User-Id");
+
+      if (!createdBy) {
+        res.status(401).json({
+          success: false,
+          error: "X-User-Id header is required",
+        });
+        return;
+      }
 
       // Validation
       if (!name || !description || !type) {

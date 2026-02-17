@@ -76,15 +76,23 @@ export function createConfigRoutes(deps: SuggestionsApiDependencies): Router {
   router.put("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const { maxChannels, voteCooldown, submissionCooldown, enableCategories, updatedBy: updatedByBody } = req.body;
-      const updatedBy = req.header("X-User-Id") || updatedByBody;
+      const { maxChannels, voteCooldown, submissionCooldown, enableCategories } = req.body;
+      const updatedBy = req.header("X-User-Id");
+
+      if (!updatedBy) {
+        res.status(401).json({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "X-User-Id header is required" },
+        });
+        return;
+      }
 
       const updateData: Record<string, unknown> = {};
       if (maxChannels !== undefined) updateData.maxChannels = maxChannels;
       if (voteCooldown !== undefined) updateData.voteCooldown = voteCooldown;
       if (submissionCooldown !== undefined) updateData.submissionCooldown = submissionCooldown;
       if (enableCategories !== undefined) updateData.enableCategories = enableCategories;
-      if (updatedBy) updateData.updatedBy = updatedBy;
+      updateData.updatedBy = updatedBy;
 
       const config = await SuggestionConfig.findOneAndUpdate({ guildId }, updateData, { new: true, upsert: true });
 

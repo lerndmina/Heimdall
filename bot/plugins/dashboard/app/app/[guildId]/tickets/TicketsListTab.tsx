@@ -149,7 +149,6 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
     try {
       const res = await fetchApi(guildId, `tickets/${detailTicket.id}/claim`, {
         method: "PATCH",
-        body: JSON.stringify({ staffId: session.user.id }),
       });
       if (res.success) {
         toast.success("Ticket claimed");
@@ -190,7 +189,6 @@ export default function TicketsListTab({ guildId }: { guildId: string }) {
     try {
       const res = await fetchApi(guildId, `tickets/${detailTicket.id}/close`, {
         method: "PATCH",
-        body: JSON.stringify({ closedBy: session.user.id }),
       });
       if (res.success) {
         toast.success("Ticket closed");
