@@ -34,6 +34,7 @@ interface VCTranscriptionConfig {
   roleFilter: { mode: "disabled" | "whitelist" | "blacklist"; roles: string[] };
   channelFilter: { mode: "disabled" | "whitelist" | "blacklist"; channels: string[] };
   languageGate: { enabled: boolean; allowedLanguages: string[] };
+  translationEnabled: boolean;
   maxConcurrentTranscriptions: number;
   maxQueueSize: number;
   hasApiKey: boolean;
@@ -83,9 +84,9 @@ function ModelBadge({ status }: { status?: { downloaded: boolean; downloading: b
 }
 
 const OPENAI_MODEL_OPTIONS = [
-  { value: "whisper-1", label: "whisper-1 — $0.006/min · 1 API call (2 if non-English)" },
-  { value: "gpt-4o-mini-transcribe", label: "gpt-4o-mini-transcribe — $0.003/min · always 2 API calls" },
-  { value: "gpt-4o-transcribe", label: "gpt-4o-transcribe — $0.006/min · always 2 API calls" },
+  { value: "whisper-1", label: "whisper-1 — $0.006/min · 1 API call" },
+  { value: "gpt-4o-mini-transcribe", label: "gpt-4o-mini-transcribe — $0.003/min" },
+  { value: "gpt-4o-transcribe", label: "gpt-4o-transcribe — $0.006/min" },
 ];
 
 const FILTER_MODE_OPTIONS = [
@@ -122,6 +123,9 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
   const [allowedLanguages, setAllowedLanguages] = useState<string[]>([]);
   const [languageInput, setLanguageInput] = useState("");
 
+  // Translation toggle (OpenAI only)
+  const [translationEnabled, setTranslationEnabled] = useState(false);
+
   // API Key state
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [savingApiKey, setSavingApiKey] = useState(false);
@@ -150,10 +154,11 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
       channelFilterChannels,
       languageGateEnabled,
       allowedLanguages,
+      translationEnabled,
       maxConcurrent,
       maxQueueSize,
     });
-  }, [mode, provider, model, roleFilterMode, roleFilterRoles, channelFilterMode, channelFilterChannels, languageGateEnabled, allowedLanguages, maxConcurrent, maxQueueSize]);
+  }, [mode, provider, model, roleFilterMode, roleFilterRoles, channelFilterMode, channelFilterChannels, languageGateEnabled, allowedLanguages, translationEnabled, maxConcurrent, maxQueueSize]);
 
   const isDirty = originalConfig !== getCurrentConfigHash();
   const isLanguageGateInvalid = languageGateEnabled && allowedLanguages.length === 0;
@@ -177,6 +182,7 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
         setLanguageGateEnabled(c.languageGate?.enabled ?? false);
         setAllowedLanguages(c.languageGate?.allowedLanguages ?? []);
         setLanguageInput("");
+        setTranslationEnabled(c.translationEnabled ?? false);
         setMaxConcurrent(c.maxConcurrentTranscriptions ?? 1);
         setMaxQueueSize(c.maxQueueSize ?? 0);
 
@@ -190,6 +196,7 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
           channelFilterChannels: c.channelFilter.channels,
           languageGateEnabled: c.languageGate?.enabled ?? false,
           allowedLanguages: c.languageGate?.allowedLanguages ?? [],
+          translationEnabled: c.translationEnabled ?? false,
           maxConcurrent: c.maxConcurrentTranscriptions ?? 1,
           maxQueueSize: c.maxQueueSize ?? 0,
         });
@@ -290,6 +297,7 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
             enabled: languageGateEnabled,
             allowedLanguages,
           },
+          translationEnabled,
           maxConcurrentTranscriptions: maxConcurrent,
           maxQueueSize,
         }),
@@ -375,6 +383,7 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
         setLanguageGateEnabled(false);
         setAllowedLanguages([]);
         setLanguageInput("");
+        setTranslationEnabled(false);
         setMaxConcurrent(1);
         setMaxQueueSize(0);
         setOriginalConfig(
@@ -388,6 +397,7 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
             channelFilterChannels: [],
             languageGateEnabled: false,
             allowedLanguages: [],
+            translationEnabled: false,
             maxConcurrent: 1,
             maxQueueSize: 0,
           }),
@@ -633,7 +643,36 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
         </Card>
       )}
 
-      {/* ── Queue Settings Section ── */}
+      {/* ── Translation Toggle (OpenAI only) ── */}
+      {provider === "openai" && (
+        <Card>
+          <div className="flex items-center justify-between">
+            <CardTitle>English Translation</CardTitle>
+            <StatusBadge variant={translationEnabled ? "info" : "neutral"}>{translationEnabled ? "Enabled" : "Disabled"}</StatusBadge>
+          </div>
+          <CardDescription className="mt-1">Translate non-English voice messages into English alongside the original transcription.</CardDescription>
+          <CardContent className="mt-4 space-y-3">
+            <label className="inline-flex items-center gap-3 text-sm text-zinc-200">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-zinc-700/30 bg-white/5"
+                checked={translationEnabled}
+                onChange={(e) => setTranslationEnabled(e.target.checked)}
+                disabled={!canManage}
+              />
+              Enable translation
+            </label>
+            <p className="text-xs text-zinc-500">
+              When enabled, an extra API call is made per voice message to translate non-English audio into English.
+              {model === "whisper-1"
+                ? " With whisper-1, the extra call only fires for non-English messages (+$0.006/min)."
+                : ` With ${model}, every message requires an extra whisper-1 call (+$0.006/min) since language detection is not available.`}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Language Gate Section ── */}
       <Card>
         <div className="flex items-center justify-between">
           <CardTitle>Language Gate</CardTitle>

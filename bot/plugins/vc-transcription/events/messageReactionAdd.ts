@@ -81,6 +81,7 @@ export async function execute(client: HeimdallClient, reaction: MessageReaction 
           enabled: config?.languageGate?.enabled ?? false,
           allowedLanguages: config?.languageGate?.allowedLanguages ?? [],
         },
+        translationEnabled: config?.translationEnabled ?? false,
       });
     }
 

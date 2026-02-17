@@ -39,6 +39,7 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
             roleFilter: { mode: FilterMode.DISABLED, roles: [] },
             channelFilter: { mode: FilterMode.DISABLED, channels: [] },
             languageGate: { enabled: false, allowedLanguages: [] },
+            translationEnabled: false,
             maxConcurrentTranscriptions: 1,
             maxQueueSize: 0,
             hasApiKey: false,
@@ -83,7 +84,7 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
    */
   router.put("/config", async (req: Request, res: Response) => {
     const guildId = req.params.guildId as string;
-    const { mode, whisperProvider, whisperModel, roleFilter, channelFilter, languageGate, maxConcurrentTranscriptions, maxQueueSize } = req.body;
+    const { mode, whisperProvider, whisperModel, roleFilter, channelFilter, languageGate, translationEnabled, maxConcurrentTranscriptions, maxQueueSize } = req.body;
 
     try {
       const update: Record<string, unknown> = {};
@@ -188,6 +189,11 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
           enabled,
           allowedLanguages: normalizedAllowed,
         };
+      }
+
+      // Validate translation toggle
+      if (translationEnabled !== undefined) {
+        update.translationEnabled = Boolean(translationEnabled);
       }
 
       if (Object.keys(update).length === 0) {

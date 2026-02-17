@@ -109,6 +109,7 @@ export class TranscriptionQueueService {
               enabled: Boolean(job.languageGate?.enabled),
               allowedLanguages: Array.isArray(job.languageGate?.allowedLanguages) ? job.languageGate.allowedLanguages : [],
             },
+            translationEnabled: (await VoiceTranscriptionConfig.findOne({ guildId: job.guildId }).lean())?.translationEnabled ?? false,
             replyMessage,
           },
           addedAt: Date.now(),

@@ -31,6 +31,8 @@ export interface TranscribeOptions {
   guildId: string;
   guildEnvService: GuildEnvService;
   languageGate?: LanguageGateConfig;
+  /** When true, non-English OpenAI transcriptions include an English translation section */
+  translationEnabled?: boolean;
   /** If provided, edit this message with the result instead of replying to the voice message */
   replyMessage?: Message;
 }
@@ -101,7 +103,7 @@ export async function transcribeMessage(client: Client<true>, message: Message, 
     let englishTranslation: string | undefined;
 
     if (provider === WhisperProvider.OPENAI) {
-      const openAiResult = await transcribeWithOpenAI(fileName, model, guildId, guildEnvService);
+      const openAiResult = await transcribeWithOpenAI(fileName, model, guildId, guildEnvService, options.translationEnabled ?? false);
       transcription = openAiResult.transcription;
       englishTranslation = openAiResult.englishTranslation;
     } else {
@@ -535,7 +537,7 @@ async function detectLocalLanguage(fileName: string, model: string): Promise<str
  * Transcribe using OpenAI's Whisper API.
  * Retrieves the per-guild encrypted API key via GuildEnvService.
  */
-async function transcribeWithOpenAI(fileName: string, model: string, guildId: string, guildEnvService: GuildEnvService): Promise<OpenAITranscriptionResult> {
+async function transcribeWithOpenAI(fileName: string, model: string, guildId: string, guildEnvService: GuildEnvService, translationEnabled: boolean): Promise<OpenAITranscriptionResult> {
   const apiKey = await guildEnvService.getEnv(guildId, OPENAI_API_KEY_ENV);
   if (!apiKey) {
     throw new Error("OpenAI API key not configured for this guild. Set it in the dashboard.");
@@ -591,28 +593,32 @@ async function transcribeWithOpenAI(fileName: string, model: string, guildId: st
     }
   }
 
-  // Only call translation when needed:
-  // - whisper-1: we know the language, so skip if English
+  // Translation is opt-in via the dashboard toggle.
+  // When enabled:
+  // - whisper-1: we know the language, so skip if English (1 call)
   // - gpt-4o-*: no language info, always try (similarity check filters later)
   let englishTranslation: string | undefined;
-  const needsTranslation = detectedLanguage ? detectedLanguage !== "english" : true;
 
-  if (needsTranslation) {
-    try {
-      const translated = await callOpenAIAudioEndpoint({
-        endpoint: "translations",
-        model: "whisper-1",
-        fileName,
-        fileBuffer,
-        apiKey,
-        responseFormat: "text",
-      });
+  if (translationEnabled) {
+    const needsTranslation = detectedLanguage ? detectedLanguage !== "english" : true;
 
-      if (translated) {
-        englishTranslation = translated;
+    if (needsTranslation) {
+      try {
+        const translated = await callOpenAIAudioEndpoint({
+          endpoint: "translations",
+          model: "whisper-1",
+          fileName,
+          fileBuffer,
+          apiKey,
+          responseFormat: "text",
+        });
+
+        if (translated) {
+          englishTranslation = translated;
+        }
+      } catch (error) {
+        log.warn("OpenAI translation failed; returning transcription only:", error);
       }
-    } catch (error) {
-      log.warn("OpenAI translation failed; returning transcription only:", error);
     }
   }
 
