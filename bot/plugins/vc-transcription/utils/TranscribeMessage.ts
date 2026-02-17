@@ -544,34 +544,60 @@ async function transcribeWithOpenAI(fileName: string, model: string, guildId: st
   const filePath = getTempPath(fileName, "wav");
   const fileBuffer = fs.readFileSync(filePath);
 
-  // Step 1: Transcribe with verbose_json to get detected language in the same call
-  const verboseJson = await callOpenAIAudioEndpoint({
-    endpoint: "transcriptions",
-    model,
-    fileName,
-    fileBuffer,
-    apiKey,
-    responseFormat: "verbose_json",
-  });
+  // whisper-1 supports verbose_json which includes detected language in the
+  // same call.  gpt-4o-* models only support json/text, so we can't detect
+  // language from the transcription response — fall back to always attempting
+  // translation and let the similarity check suppress it for English content.
+  const supportsVerboseJson = model === "whisper-1";
 
   let transcription: string;
   let detectedLanguage: string | undefined;
 
-  try {
-    const parsed = JSON.parse(verboseJson);
-    transcription = parsed.text ?? "";
-    detectedLanguage = parsed.language?.toLowerCase();
-  } catch {
-    // Fallback: treat the raw response as plain text
-    log.warn("Failed to parse verbose_json response; using raw text");
-    transcription = verboseJson;
+  if (supportsVerboseJson) {
+    const verboseJson = await callOpenAIAudioEndpoint({
+      endpoint: "transcriptions",
+      model,
+      fileName,
+      fileBuffer,
+      apiKey,
+      responseFormat: "verbose_json",
+    });
+
+    try {
+      const parsed = JSON.parse(verboseJson);
+      transcription = parsed.text ?? "";
+      detectedLanguage = parsed.language?.toLowerCase();
+    } catch {
+      log.warn("Failed to parse verbose_json response; using raw text");
+      transcription = verboseJson;
+    }
+  } else {
+    // gpt-4o-transcribe / gpt-4o-mini-transcribe — use json format
+    const jsonResponse = await callOpenAIAudioEndpoint({
+      endpoint: "transcriptions",
+      model,
+      fileName,
+      fileBuffer,
+      apiKey,
+      responseFormat: "json",
+    });
+
+    try {
+      const parsed = JSON.parse(jsonResponse);
+      transcription = parsed.text ?? "";
+    } catch {
+      log.warn("Failed to parse json response; using raw text");
+      transcription = jsonResponse;
+    }
   }
 
-  // Step 2: Only call translation if the detected language is NOT English.
-  // This avoids a second API call for English-only content.
+  // Only call translation when needed:
+  // - whisper-1: we know the language, so skip if English
+  // - gpt-4o-*: no language info, always try (similarity check filters later)
   let englishTranslation: string | undefined;
+  const needsTranslation = detectedLanguage ? detectedLanguage !== "english" : true;
 
-  if (detectedLanguage && detectedLanguage !== "english") {
+  if (needsTranslation) {
     try {
       const translated = await callOpenAIAudioEndpoint({
         endpoint: "translations",

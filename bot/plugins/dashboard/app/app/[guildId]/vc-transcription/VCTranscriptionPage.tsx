@@ -83,9 +83,9 @@ function ModelBadge({ status }: { status?: { downloaded: boolean; downloading: b
 }
 
 const OPENAI_MODEL_OPTIONS = [
-  { value: "gpt-4o-mini-transcribe", label: "gpt-4o-mini-transcribe (fast, cost-effective)" },
-  { value: "gpt-4o-transcribe", label: "gpt-4o-transcribe (best quality)" },
-  { value: "whisper-1", label: "whisper-1 (legacy Whisper model)" },
+  { value: "whisper-1", label: "whisper-1 — $0.006/min · 1 API call (2 if non-English)" },
+  { value: "gpt-4o-mini-transcribe", label: "gpt-4o-mini-transcribe — $0.003/min · always 2 API calls" },
+  { value: "gpt-4o-transcribe", label: "gpt-4o-transcribe — $0.006/min · always 2 API calls" },
 ];
 
 const FILTER_MODE_OPTIONS = [
