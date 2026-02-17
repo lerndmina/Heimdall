@@ -536,6 +536,54 @@ export class ModmailService {
   }
 
   /**
+   * Resolve a human-readable claimer label from user ID.
+   * Prefers guild display name, then global display name/username, then mention fallback.
+   */
+  private async resolveClaimerLabel(guildId: string, userId: string): Promise<string> {
+    try {
+      const guild = await this.client.guilds.fetch(guildId);
+      const member = await guild.members.fetch(userId);
+      if (member?.displayName) return member.displayName;
+    } catch {
+      // Fall through to user/global fallback
+    }
+
+    try {
+      const user = await this.client.users.fetch(userId);
+      return user.displayName || user.username;
+    } catch {
+      return `<@${userId}>`;
+    }
+  }
+
+  /**
+   * High-level starter panel status sync for a modmail.
+   * Derives status context (like claimer label) from modmail state so callers
+   * don't need to pass presentation extras manually.
+   */
+  async syncStarterMessageStatus(modmailOrId: IModmail | string, statusOverride?: ModmailStatus, extra?: { banned?: boolean }): Promise<void> {
+    try {
+      const modmail = typeof modmailOrId === "string" ? await Modmail.findOne({ modmailId: modmailOrId }) : modmailOrId;
+
+      if (!modmail?.forumThreadId) return;
+
+      const status = statusOverride ?? modmail.status;
+      let claimedBy: string | undefined;
+
+      if (status === ModmailStatus.OPEN && modmail.claimedBy) {
+        claimedBy = await this.resolveClaimerLabel(modmail.guildId as string, modmail.claimedBy as string);
+      }
+
+      await this.updateStarterMessageStatus(modmail.forumThreadId as string, status, {
+        ...(claimedBy ? { claimedBy } : {}),
+        ...(extra?.banned ? { banned: true } : {}),
+      });
+    } catch (error) {
+      this.logger.debug(`Failed to sync starter message status: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Lock and archive a modmail thread
    * Used after close, ban, or other terminal actions
    * Locks first (prevents further messages), then archives

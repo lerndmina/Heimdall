@@ -92,7 +92,7 @@ export async function handleResolve(context: CommandContext, pluginAPI: ModmailP
     }
 
     // Update starter message status to Resolved
-    await pluginAPI.modmailService.updateStarterMessageStatus(modmail.forumThreadId, ModmailStatus.RESOLVED);
+    await pluginAPI.modmailService.syncStarterMessageStatus(modmail.modmailId, ModmailStatus.RESOLVED);
 
     await interaction.editReply({
       embeds: [ModmailEmbeds.threadResolved(staffDisplayName, autoCloseHours)],

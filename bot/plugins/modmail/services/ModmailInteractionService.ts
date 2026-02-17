@@ -718,10 +718,8 @@ export class ModmailInteractionService {
         }
       }
 
-      // Update starter message status to Claimed
-      await this.modmailService.updateStarterMessageStatus(modmail.forumThreadId as string, ModmailStatus.OPEN, {
-        claimedBy: staffDisplayName,
-      });
+      // Update starter message status to Claimed (derived from persisted modmail state)
+      await this.modmailService.syncStarterMessageStatus(modmail.modmailId as string, ModmailStatus.OPEN);
 
       // Send thread-side notification (mirrored embed, visible to all staff)
       await interaction.reply({
@@ -787,7 +785,7 @@ export class ModmailInteractionService {
       }
 
       // Update starter message status to Resolved
-      await this.modmailService.updateStarterMessageStatus(modmail.forumThreadId as string, ModmailStatus.RESOLVED);
+      await this.modmailService.syncStarterMessageStatus(modmail.modmailId as string, ModmailStatus.RESOLVED);
 
       // Send thread-side notification (mirrored embed, visible to all staff)
       await interaction.reply({
@@ -1061,7 +1059,7 @@ export class ModmailInteractionService {
       const userDisplayName = interaction.user.displayName || interaction.user.username;
 
       // Update starter message status back to Open
-      await this.modmailService.updateStarterMessageStatus(modmail.forumThreadId as string, ModmailStatus.OPEN);
+      await this.modmailService.syncStarterMessageStatus(modmail.modmailId as string, ModmailStatus.OPEN);
 
       // Send SOS embed to staff thread
       const sosEmbed = ModmailEmbeds.additionalHelpRequested(userDisplayName);
