@@ -9,11 +9,13 @@
  * - Model download progress relayed to queued message replies
  */
 
-import type { Client, Message } from "discord.js";
+import type { GuildTextBasedChannel, Message } from "discord.js";
 import type { HeimdallClient } from "../../../src/types/Client.js";
+import type { GuildEnvService } from "../../../src/core/services/GuildEnvService.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import { broadcast } from "../../../src/core/broadcast.js";
 import VoiceTranscriptionConfig from "../models/VoiceTranscriptionConfig.js";
+import TranscriptionJob, { TranscriptionJobStatus } from "../models/TranscriptionJob.js";
 import { transcribeMessage, downloadWhisperModel, isModelDownloaded, getModelsDir, WHISPER_MODELS, type TranscribeOptions, type DownloadProgressCallback } from "../utils/TranscribeMessage.js";
 
 const log = createLogger("vc-transcription");
@@ -39,9 +41,88 @@ export class TranscriptionQueueService {
   private isUpdatingPositions = false;
   private downloadProgress = new Map<string, DownloadProgressInfo>();
   private client: HeimdallClient;
+  private guildEnvService: GuildEnvService;
 
-  constructor(client: HeimdallClient) {
+  constructor(client: HeimdallClient, guildEnvService: GuildEnvService) {
     this.client = client;
+    this.guildEnvService = guildEnvService;
+  }
+
+  /**
+   * Restore persisted queued/in-progress jobs after bot restart.
+   */
+  async resumePendingJobs(): Promise<void> {
+    const pendingJobs = await TranscriptionJob.find({
+      status: { $in: [TranscriptionJobStatus.QUEUED, TranscriptionJobStatus.PROCESSING] },
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    if (pendingJobs.length === 0) return;
+
+    log.info(`Resuming ${pendingJobs.length} persisted transcription job(s) after restart`);
+
+    for (const job of pendingJobs) {
+      try {
+        const channel = await this.client.channels.fetch(job.channelId);
+        if (!channel || !channel.isTextBased() || !("messages" in channel)) {
+          await TranscriptionJob.deleteOne({ messageId: job.messageId });
+          continue;
+        }
+
+        const textChannel = channel as GuildTextBasedChannel;
+
+        const originalMessage = await textChannel.messages.fetch(job.messageId).catch(() => null);
+        if (!originalMessage) {
+          await TranscriptionJob.deleteOne({ messageId: job.messageId });
+          continue;
+        }
+
+        let replyMessage = await textChannel.messages.fetch(job.replyMessageId).catch(() => null);
+        if (!replyMessage) {
+          replyMessage = await originalMessage.reply("⏳ Resuming transcription after bot restart...").catch(() => null);
+          if (!replyMessage) {
+            await TranscriptionJob.deleteOne({ messageId: job.messageId });
+            continue;
+          }
+
+          await TranscriptionJob.updateOne(
+            { messageId: job.messageId },
+            {
+              $set: {
+                replyMessageId: replyMessage.id,
+                status: TranscriptionJobStatus.QUEUED,
+              },
+            },
+          );
+        }
+
+        this.queue.push({
+          message: originalMessage,
+          replyMessage,
+          options: {
+            provider: job.provider,
+            model: job.model,
+            guildId: job.guildId,
+            guildEnvService: this.guildEnvService,
+            languageGate: {
+              enabled: Boolean(job.languageGate?.enabled),
+              allowedLanguages: Array.isArray(job.languageGate?.allowedLanguages) ? job.languageGate.allowedLanguages : [],
+            },
+            replyMessage,
+          },
+          addedAt: Date.now(),
+        });
+      } catch (error) {
+        log.error(`Failed to restore transcription job for message ${job.messageId}:`, error);
+        await TranscriptionJob.deleteOne({ messageId: job.messageId });
+      }
+    }
+
+    if (this.queue.length > 0) {
+      this.startPositionUpdater();
+      await this.processNext();
+    }
   }
 
   /**
@@ -87,6 +168,31 @@ export class TranscriptionQueueService {
       addedAt: Date.now(),
     };
 
+    // Persist queued work so it can be resumed after restart.
+    try {
+      await TranscriptionJob.updateOne(
+        { messageId: message.id },
+        {
+          $set: {
+            guildId: options.guildId,
+            channelId: message.channelId,
+            messageId: message.id,
+            replyMessageId: replyMessage.id,
+            provider: options.provider,
+            model: options.model,
+            languageGate: {
+              enabled: Boolean(options.languageGate?.enabled),
+              allowedLanguages: options.languageGate?.allowedLanguages ?? [],
+            },
+            status: TranscriptionJobStatus.QUEUED,
+          },
+        },
+        { upsert: true },
+      );
+    } catch (error) {
+      log.error(`Failed to persist queued transcription job for message ${message.id}:`, error);
+    }
+
     // Always enqueue first so queue order is preserved and draining logic is centralized.
     this.queue.push(entry);
     this.startPositionUpdater();
@@ -105,6 +211,19 @@ export class TranscriptionQueueService {
     this.activeCount++;
 
     try {
+      try {
+        await TranscriptionJob.updateOne(
+          { messageId: entry.message.id },
+          {
+            $set: {
+              status: TranscriptionJobStatus.PROCESSING,
+            },
+          },
+        );
+      } catch (error) {
+        log.error(`Failed to mark transcription job as processing for message ${entry.message.id}:`, error);
+      }
+
       // Update status to "transcribing"
       try {
         await entry.replyMessage.edit("⏳ Transcribing...");
@@ -122,6 +241,12 @@ export class TranscriptionQueueService {
         // Message may have been deleted
       }
     } finally {
+      try {
+        await TranscriptionJob.deleteOne({ messageId: entry.message.id });
+      } catch (error) {
+        log.error(`Failed to clear transcription job for message ${entry.message.id}:`, error);
+      }
+
       this.activeCount--;
       this.processNext();
     }
@@ -213,6 +338,11 @@ export class TranscriptionQueueService {
           await entry.replyMessage.edit(statusText);
         } catch {
           // Message may have been deleted — remove from queue
+          try {
+            await TranscriptionJob.deleteOne({ messageId: entry.message.id });
+          } catch (error) {
+            log.error(`Failed to clear transcription job after message deletion for ${entry.message.id}:`, error);
+          }
           this.queue.splice(i, 1);
           i--;
         }

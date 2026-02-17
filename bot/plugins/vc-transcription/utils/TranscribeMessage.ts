@@ -15,6 +15,7 @@ import { createLogger } from "../../../src/core/Logger.js";
 import { WhisperProvider } from "../types/index.js";
 import { downloadFile, convertFile, deleteFile, checkFfmpeg, getTempPath } from "./FileHelpers.js";
 import type { GuildEnvService } from "../../../src/core/services/GuildEnvService.js";
+import type { LanguageGateConfig } from "../types/index.js";
 
 const log = createLogger("vc-transcription");
 
@@ -29,6 +30,7 @@ export interface TranscribeOptions {
   model: string;
   guildId: string;
   guildEnvService: GuildEnvService;
+  languageGate?: LanguageGateConfig;
   /** If provided, edit this message with the result instead of replying to the voice message */
   replyMessage?: Message;
 }
@@ -38,7 +40,7 @@ export interface TranscribeOptions {
  * Returns true on success, false on failure.
  */
 export async function transcribeMessage(client: Client<true>, message: Message, options: TranscribeOptions): Promise<boolean> {
-  const { provider, model, guildId, guildEnvService, replyMessage } = options;
+  const { provider, model, guildId, guildEnvService, languageGate, replyMessage } = options;
 
   /** Helper: send result via edit-in-place or reply */
   const sendResult = async (content: string) => {
@@ -95,6 +97,24 @@ export async function transcribeMessage(client: Client<true>, message: Message, 
     if (provider === WhisperProvider.OPENAI) {
       transcription = await transcribeWithOpenAI(fileName, model, guildId, guildEnvService);
     } else {
+      if (languageGate?.enabled) {
+        const allowedLanguages = new Set((languageGate.allowedLanguages ?? []).map((lang) => lang.trim().toLowerCase()).filter(Boolean));
+
+        if (allowedLanguages.size > 0) {
+          const detectedLanguage = await detectLocalLanguage(fileName, model);
+
+          if (!detectedLanguage) {
+            await sendResult("I couldn't reliably detect the language in this voice message. Please use a multilingual Whisper model or disable the language gate.");
+            return false;
+          }
+
+          if (!allowedLanguages.has(detectedLanguage)) {
+            await sendResult(`🚫 This voice message appears to be in \`${detectedLanguage}\`, which is blocked by this server's language gate.`);
+            return false;
+          }
+        }
+      }
+
       transcription = await transcribeWithLocal(fileName, model);
     }
 
@@ -386,6 +406,56 @@ async function transcribeWithLocal(fileName: string, model: string): Promise<str
     }
     const stderr = execError.stderr?.substring(0, 500) || "";
     throw new Error(`whisper-cli failed (exit ${execError.code}, signal ${execError.signal ?? "none"}): ${stderr}`);
+  }
+}
+
+/**
+ * Detect language using local whisper-cli.
+ * Returns ISO-like code (e.g. "en", "es") or null if detection is unavailable.
+ */
+async function detectLocalLanguage(fileName: string, model: string): Promise<string | null> {
+  const { execFile } = await import("child_process");
+  const { promisify } = await import("util");
+  const execFileAsync = promisify(execFile);
+
+  const filePath = getTempPath(fileName, "wav");
+  const whisperCppDir = path.join(process.cwd(), "node_modules/nodejs-whisper/cpp/whisper.cpp");
+  const executablePath = path.join(whisperCppDir, "build/bin/whisper-cli");
+  const modelInfo = WHISPER_MODELS[model];
+  if (!modelInfo) return null;
+
+  const modelPath = path.join(getModelsDir(), modelInfo.filename);
+  if (!fs.existsSync(executablePath) || !fs.existsSync(modelPath)) return null;
+
+  const args = [
+    "--no-gpu",
+    "--detect-language",
+    "-m",
+    modelPath,
+    "-f",
+    filePath,
+  ];
+
+  try {
+    const { stdout, stderr } = await execFileAsync(executablePath, args, {
+      cwd: whisperCppDir,
+      timeout: 120_000,
+      maxBuffer: 5 * 1024 * 1024,
+    });
+
+    const output = `${stdout ?? ""}\n${stderr ?? ""}`;
+    const patterns = [/language\s*[:=]\s*([a-z]{2,8})\b/i, /auto[-\s]?detected\s+language\s*[:=]?\s*([a-z]{2,8})\b/i, /\blang\s*=\s*([a-z]{2,8})\b/i];
+
+    for (const pattern of patterns) {
+      const match = output.match(pattern);
+      if (match?.[1]) {
+        return match[1].toLowerCase();
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
   }
 }
 

@@ -33,6 +33,7 @@ interface VCTranscriptionConfig {
   whisperModel: string;
   roleFilter: { mode: "disabled" | "whitelist" | "blacklist"; roles: string[] };
   channelFilter: { mode: "disabled" | "whitelist" | "blacklist"; channels: string[] };
+  languageGate: { enabled: boolean; allowedLanguages: string[] };
   maxConcurrentTranscriptions: number;
   maxQueueSize: number;
   hasApiKey: boolean;
@@ -89,6 +90,8 @@ const FILTER_MODE_OPTIONS = [
   { value: "blacklist", label: "Blacklist (block listed)" },
 ];
 
+const COMMON_LANGUAGE_CODES = ["en", "es", "fr", "de", "it", "pt", "nl", "pl", "ru", "uk", "tr", "ar", "hi", "ja", "ko", "zh"];
+
 // ── Component ────────────────────────────────────────────
 
 export default function VCTranscriptionConfigPage({ guildId }: { guildId: string }) {
@@ -110,6 +113,11 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
   const [channelFilterMode, setChannelFilterMode] = useState<string>("disabled");
   const [channelFilterChannels, setChannelFilterChannels] = useState<string[]>([]);
 
+  // Language gate state
+  const [languageGateEnabled, setLanguageGateEnabled] = useState(false);
+  const [allowedLanguages, setAllowedLanguages] = useState<string[]>([]);
+  const [languageInput, setLanguageInput] = useState("");
+
   // API Key state
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [savingApiKey, setSavingApiKey] = useState(false);
@@ -128,10 +136,23 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
   const [originalConfig, setOriginalConfig] = useState<string>("");
 
   const getCurrentConfigHash = useCallback(() => {
-    return JSON.stringify({ mode, provider, model, roleFilterMode, roleFilterRoles, channelFilterMode, channelFilterChannels, maxConcurrent, maxQueueSize });
-  }, [mode, provider, model, roleFilterMode, roleFilterRoles, channelFilterMode, channelFilterChannels, maxConcurrent, maxQueueSize]);
+    return JSON.stringify({
+      mode,
+      provider,
+      model,
+      roleFilterMode,
+      roleFilterRoles,
+      channelFilterMode,
+      channelFilterChannels,
+      languageGateEnabled,
+      allowedLanguages,
+      maxConcurrent,
+      maxQueueSize,
+    });
+  }, [mode, provider, model, roleFilterMode, roleFilterRoles, channelFilterMode, channelFilterChannels, languageGateEnabled, allowedLanguages, maxConcurrent, maxQueueSize]);
 
   const isDirty = originalConfig !== getCurrentConfigHash();
+  const isLanguageGateInvalid = languageGateEnabled && allowedLanguages.length === 0;
 
   // ── Fetch config ──
   const fetchConfig = useCallback(async () => {
@@ -149,6 +170,9 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
         setRoleFilterRoles(c.roleFilter.roles);
         setChannelFilterMode(c.channelFilter.mode);
         setChannelFilterChannels(c.channelFilter.channels);
+        setLanguageGateEnabled(c.languageGate?.enabled ?? false);
+        setAllowedLanguages(c.languageGate?.allowedLanguages ?? []);
+        setLanguageInput("");
         setMaxConcurrent(c.maxConcurrentTranscriptions ?? 1);
         setMaxQueueSize(c.maxQueueSize ?? 0);
 
@@ -160,6 +184,8 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
           roleFilterRoles: c.roleFilter.roles,
           channelFilterMode: c.channelFilter.mode,
           channelFilterChannels: c.channelFilter.channels,
+          languageGateEnabled: c.languageGate?.enabled ?? false,
+          allowedLanguages: c.languageGate?.allowedLanguages ?? [],
           maxConcurrent: c.maxConcurrentTranscriptions ?? 1,
           maxQueueSize: c.maxQueueSize ?? 0,
         });
@@ -256,6 +282,10 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
           whisperModel: model,
           roleFilter: { mode: roleFilterMode, roles: roleFilterRoles },
           channelFilter: { mode: channelFilterMode, channels: channelFilterChannels },
+          languageGate: {
+            enabled: languageGateEnabled,
+            allowedLanguages,
+          },
           maxConcurrentTranscriptions: maxConcurrent,
           maxQueueSize,
         }),
@@ -338,6 +368,9 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
         setRoleFilterRoles([]);
         setChannelFilterMode("disabled");
         setChannelFilterChannels([]);
+        setLanguageGateEnabled(false);
+        setAllowedLanguages([]);
+        setLanguageInput("");
         setMaxConcurrent(1);
         setMaxQueueSize(0);
         setOriginalConfig(
@@ -349,6 +382,8 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
             roleFilterRoles: [],
             channelFilterMode: "disabled",
             channelFilterChannels: [],
+            languageGateEnabled: false,
+            allowedLanguages: [],
             maxConcurrent: 1,
             maxQueueSize: 0,
           }),
@@ -384,6 +419,23 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
 
   const removeRole = (roleId: string) => {
     setRoleFilterRoles(roleFilterRoles.filter((r) => r !== roleId));
+  };
+
+  const normalizeLanguageCode = (value: string): string => value.trim().toLowerCase();
+
+  const addLanguage = (value: string) => {
+    const code = normalizeLanguageCode(value);
+    if (!/^[a-z]{2,8}$/.test(code)) {
+      toast.error("Language code must be 2-8 lowercase letters (e.g. en, es, zh)");
+      return;
+    }
+    if (!allowedLanguages.includes(code)) {
+      setAllowedLanguages([...allowedLanguages, code]);
+    }
+  };
+
+  const removeLanguage = (code: string) => {
+    setAllowedLanguages(allowedLanguages.filter((lang) => lang !== code));
   };
 
   const modelOptions = useMemo(() => {
@@ -455,6 +507,9 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
             <p className="text-sm font-medium text-zinc-200">Model</p>
             <p className="text-xs text-zinc-500">{provider === "local" ? "Larger models are more accurate but slower and use more memory." : "OpenAI currently offers the whisper-1 model."}</p>
             <Combobox options={modelOptions} value={model} onChange={setModel} placeholder="Select model…" disabled={!canManage} />
+            {provider === "local" && model.endsWith(".en") && !languageGateEnabled && (
+              <p className="text-xs text-amber-400">This is an English-only model. If users may speak other languages, enable Language Gate or switch to a multilingual model.</p>
+            )}
           </div>
 
           {/* Model download status indicator (local provider only) */}
@@ -569,6 +624,96 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
           </CardContent>
         </Card>
       )}
+
+      {/* ── Queue Settings Section ── */}
+      <Card>
+        <div className="flex items-center justify-between">
+          <CardTitle>Language Gate</CardTitle>
+          <StatusBadge variant={languageGateEnabled ? "info" : "neutral"}>{languageGateEnabled ? "Enabled" : "Disabled"}</StatusBadge>
+        </div>
+        <CardDescription className="mt-1">Detect language before transcription and allow only selected language codes.</CardDescription>
+        <CardContent className="mt-4 space-y-4">
+          <div className="space-y-2">
+            <label className="inline-flex items-center gap-3 text-sm text-zinc-200">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-zinc-700/30 bg-white/5"
+                checked={languageGateEnabled}
+                onChange={(e) => setLanguageGateEnabled(e.target.checked)}
+                disabled={!canManage}
+              />
+              Enable language gate
+            </label>
+            <p className="text-xs text-zinc-500">Useful for `.en` local Whisper models. Messages in non-allowed languages are blocked before transcription.</p>
+            {provider === "openai" && <p className="text-xs text-amber-400">Language gate is currently enforced for local provider transcriptions.</p>}
+          </div>
+
+          {languageGateEnabled && (
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-zinc-200">Allowed language codes</p>
+              <p className="text-xs text-zinc-500">Add ISO-like codes such as `en`, `es`, `fr`, `de`, `ja`, `zh`.</p>
+
+              {allowedLanguages.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {allowedLanguages.map((code) => (
+                    <span key={code} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700/30 bg-white/5 px-3 py-1 text-xs text-zinc-300">
+                      {code}
+                      {canManage && (
+                        <button onClick={() => removeLanguage(code)} className="ml-0.5 rounded-full p-0.5 transition hover:bg-white/10 hover:text-red-400">
+                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {canManage && (
+                <div className="flex gap-2">
+                  <input
+                    value={languageInput}
+                    onChange={(e) => setLanguageInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addLanguage(languageInput);
+                        setLanguageInput("");
+                      }
+                    }}
+                    placeholder="Add language code (e.g. en)"
+                    className="flex-1 rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 backdrop-blur-sm transition focus:border-primary-500/50 focus:outline-none focus:ring-1 focus:ring-primary-500/30"
+                  />
+                  <button
+                    onClick={() => {
+                      addLanguage(languageInput);
+                      setLanguageInput("");
+                    }}
+                    disabled={!languageInput.trim()}
+                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50">
+                    Add
+                  </button>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {COMMON_LANGUAGE_CODES.filter((code) => !allowedLanguages.includes(code)).map((code) => (
+                  <button
+                    key={code}
+                    onClick={() => addLanguage(code)}
+                    disabled={!canManage}
+                    className="rounded-full border border-zinc-700/30 bg-white/5 px-2.5 py-1 text-xs text-zinc-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">
+                    + {code}
+                  </button>
+                ))}
+              </div>
+
+              {isLanguageGateInvalid && <p className="text-xs text-red-400">Add at least one language code before saving while language gate is enabled.</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Queue Settings Section ── */}
       <Card>
@@ -730,7 +875,7 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
 
           <button
             onClick={handleSave}
-            disabled={saving || !isDirty}
+            disabled={saving || !isDirty || isLanguageGateInvalid}
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed">
             {saving && (
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">

@@ -52,6 +52,16 @@ const VoiceTranscriptionConfigSchema = new Schema(
         default: [],
       },
     },
+    languageGate: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      allowedLanguages: {
+        type: [String],
+        default: [],
+      },
+    },
     maxConcurrentTranscriptions: {
       type: Number,
       default: 1,

@@ -37,3 +37,8 @@ export interface ChannelFilter {
   mode: FilterMode;
   channels: string[];
 }
+
+export interface LanguageGateConfig {
+  enabled: boolean;
+  allowedLanguages: string[];
+}

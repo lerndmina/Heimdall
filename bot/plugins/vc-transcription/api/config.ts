@@ -38,6 +38,7 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
             whisperModel: "base.en",
             roleFilter: { mode: FilterMode.DISABLED, roles: [] },
             channelFilter: { mode: FilterMode.DISABLED, channels: [] },
+            languageGate: { enabled: false, allowedLanguages: [] },
             maxConcurrentTranscriptions: 1,
             maxQueueSize: 0,
             hasApiKey: false,
@@ -62,6 +63,10 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
           whisperModel: config.whisperModel,
           roleFilter: config.roleFilter,
           channelFilter: config.channelFilter,
+          languageGate: {
+            enabled: config.languageGate?.enabled ?? false,
+            allowedLanguages: config.languageGate?.allowedLanguages ?? [],
+          },
           maxConcurrentTranscriptions: config.maxConcurrentTranscriptions ?? 1,
           maxQueueSize: config.maxQueueSize ?? 0,
           hasApiKey,
@@ -78,7 +83,7 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
    */
   router.put("/config", async (req: Request, res: Response) => {
     const guildId = req.params.guildId as string;
-    const { mode, whisperProvider, whisperModel, roleFilter, channelFilter, maxConcurrentTranscriptions, maxQueueSize } = req.body;
+    const { mode, whisperProvider, whisperModel, roleFilter, channelFilter, languageGate, maxConcurrentTranscriptions, maxQueueSize } = req.body;
 
     try {
       const update: Record<string, unknown> = {};
@@ -166,6 +171,27 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
         };
       }
 
+      // Validate language gate
+      if (languageGate !== undefined) {
+        const enabled = Boolean(languageGate.enabled);
+        const allowedLanguagesRaw = Array.isArray(languageGate.allowedLanguages) ? languageGate.allowedLanguages : [];
+        const normalizedAllowed = allowedLanguagesRaw
+          .map((lang: unknown) => String(lang).trim().toLowerCase())
+          .filter((lang: string) => /^[a-z]{2,8}$/.test(lang));
+
+        if (enabled && normalizedAllowed.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: { message: "languageGate.allowedLanguages must include at least one language code when enabled" },
+          });
+        }
+
+        update.languageGate = {
+          enabled,
+          allowedLanguages: normalizedAllowed,
+        };
+      }
+
       if (Object.keys(update).length === 0) {
         return res.status(400).json({
           success: false,
@@ -231,6 +257,10 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
           whisperModel: config.whisperModel,
           roleFilter: config.roleFilter,
           channelFilter: config.channelFilter,
+          languageGate: {
+            enabled: config.languageGate?.enabled ?? false,
+            allowedLanguages: config.languageGate?.allowedLanguages ?? [],
+          },
           maxConcurrentTranscriptions: config.maxConcurrentTranscriptions ?? 1,
           maxQueueSize: config.maxQueueSize ?? 0,
           hasApiKey,

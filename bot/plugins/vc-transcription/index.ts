@@ -17,6 +17,7 @@ import { TranscriptionQueueService } from "./services/TranscriptionQueueService.
 
 // Register model with Mongoose
 import "./models/VoiceTranscriptionConfig.js";
+import "./models/TranscriptionJob.js";
 
 /** Public API exposed to other plugins and dashboard */
 export interface VCTranscriptionPluginAPI extends PluginAPI {
@@ -40,7 +41,7 @@ export async function onLoad(context: PluginContext): Promise<VCTranscriptionPlu
   if (!lib) throw new Error("vc-transcription requires lib plugin");
 
   // Instantiate queue service
-  const queueService = new TranscriptionQueueService(client as HeimdallClient);
+  const queueService = new TranscriptionQueueService(client as HeimdallClient, guildEnvService);
 
   logger.info("✅ VC Transcription plugin loaded");
 
@@ -50,6 +51,11 @@ export async function onLoad(context: PluginContext): Promise<VCTranscriptionPlu
     guildEnvService,
     queueService,
   };
+
+  // Resume any queued/in-progress transcriptions left from a prior restart/crash.
+  void queueService.resumePendingJobs().catch((error) => {
+    logger.error("Failed to resume pending transcription jobs:", error);
+  });
 
   return pluginAPI;
 }

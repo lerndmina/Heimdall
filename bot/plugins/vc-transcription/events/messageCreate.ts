@@ -72,6 +72,10 @@ export async function execute(client: HeimdallClient, message: Message): Promise
         model: config?.whisperModel || "base.en",
         guildId: message.guildId,
         guildEnvService: pluginApi.guildEnvService,
+        languageGate: {
+          enabled: config?.languageGate?.enabled ?? false,
+          allowedLanguages: config?.languageGate?.allowedLanguages ?? [],
+        },
       });
     }
   } catch (error) {
