@@ -37,6 +37,11 @@ const AttachmentBlockerConfigSchema = new Schema(
       default: 0,
       min: 0,
     },
+    /** Roles that bypass all attachment-blocker checks guild-wide */
+    bypassRoleIds: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true },
 );

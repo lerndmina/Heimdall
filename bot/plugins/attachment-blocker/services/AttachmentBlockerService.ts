@@ -29,6 +29,7 @@ export interface EffectiveConfig {
   enabled: boolean;
   allowedTypes: AttachmentType[];
   timeoutDuration: number;
+  bypassRoleIds: string[];
   isChannelOverride: boolean;
 }
 
@@ -69,7 +70,7 @@ export class AttachmentBlockerService {
     return config;
   }
 
-  async updateGuildConfig(guildId: string, updates: Partial<Pick<IAttachmentBlockerConfig, "enabled" | "defaultAllowedTypes" | "defaultTimeoutDuration">>): Promise<GuildConfigDoc> {
+  async updateGuildConfig(guildId: string, updates: Partial<Pick<IAttachmentBlockerConfig, "enabled" | "defaultAllowedTypes" | "defaultTimeoutDuration" | "bypassRoleIds">>): Promise<GuildConfigDoc> {
     const config = (await AttachmentBlockerConfig.findOneAndUpdate({ guildId }, { $set: { ...updates, guildId } }, { upsert: true, new: true }).lean()) as GuildConfigDoc;
 
     // Invalidate cache
@@ -114,6 +115,7 @@ export class AttachmentBlockerService {
     data: {
       allowedTypes?: AttachmentType[];
       timeoutDuration?: number | null;
+      bypassRoleIds?: string[];
       enabled?: boolean;
       createdBy: string;
     },
@@ -126,6 +128,7 @@ export class AttachmentBlockerService {
 
     if (data.allowedTypes !== undefined) updateData.allowedTypes = data.allowedTypes;
     if (data.timeoutDuration !== undefined) updateData.timeoutDuration = data.timeoutDuration ?? undefined;
+    if (data.bypassRoleIds !== undefined) updateData.bypassRoleIds = data.bypassRoleIds;
     if (data.enabled !== undefined) updateData.enabled = data.enabled;
 
     const config = (await AttachmentBlockerChannel.findOneAndUpdate({ channelId }, { $set: updateData }, { upsert: true, new: true }).lean()) as ChannelConfigDoc;
@@ -228,16 +231,19 @@ export class AttachmentBlockerService {
         enabled: false,
         allowedTypes: [],
         timeoutDuration: 0,
+        bypassRoleIds: [],
         isChannelOverride: false,
       };
     }
 
     // Explicit per-channel override takes highest priority
     if (channelConfig) {
+      const bypassRoleIds = [...new Set([...(guildConfig.bypassRoleIds ?? []), ...(channelConfig.bypassRoleIds ?? [])])];
       return {
         enabled: channelConfig.enabled && guildConfig.enabled,
         allowedTypes: (channelConfig.allowedTypes && channelConfig.allowedTypes.length > 0 ? channelConfig.allowedTypes : guildConfig.defaultAllowedTypes) as AttachmentType[],
         timeoutDuration: channelConfig.timeoutDuration ?? guildConfig.defaultTimeoutDuration,
+        bypassRoleIds,
         isChannelOverride: true,
       };
     }
@@ -251,6 +257,7 @@ export class AttachmentBlockerService {
       enabled: guildConfig.enabled,
       allowedTypes: guildConfig.defaultAllowedTypes as AttachmentType[],
       timeoutDuration: guildConfig.defaultTimeoutDuration,
+      bypassRoleIds: guildConfig.bypassRoleIds ?? [],
       isChannelOverride: false,
     };
   }
@@ -288,6 +295,7 @@ export class AttachmentBlockerService {
         enabled: openerConfig.enabled && guildConfig.enabled,
         allowedTypes: (openerConfig.allowedTypes && openerConfig.allowedTypes.length > 0 ? openerConfig.allowedTypes : guildConfig.defaultAllowedTypes) as AttachmentType[],
         timeoutDuration: openerConfig.timeoutDuration ?? guildConfig.defaultTimeoutDuration,
+        bypassRoleIds: guildConfig.bypassRoleIds ?? [],
         isChannelOverride: true,
       };
     } catch (error) {
@@ -310,6 +318,12 @@ export class AttachmentBlockerService {
     if (message.flags.has(MessageFlags.IsVoiceMessage)) return false;
 
     const effectiveConfig = await this.resolveEffectiveConfig(message.guildId, message.channel.id);
+
+    // Role bypass (global + channel additive)
+    const member = message.member || (await this.lib.thingGetter.getMember(message.guild, message.author.id));
+    if (member && this.hasBypassRole(member as GuildMember, effectiveConfig.bypassRoleIds)) {
+      return false;
+    }
 
     // Not enabled or ALL allowed → pass through
     if (!effectiveConfig.enabled) return false;
@@ -411,6 +425,11 @@ export class AttachmentBlockerService {
     }
 
     return false;
+  }
+
+  private hasBypassRole(member: GuildMember, bypassRoleIds: string[]): boolean {
+    if (!bypassRoleIds || bypassRoleIds.length === 0) return false;
+    return bypassRoleIds.some((roleId) => member.roles.cache.has(roleId));
   }
 
   // ── Cache Helpers ──────────────────────────────────────

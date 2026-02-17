@@ -23,7 +23,13 @@ export function createConfigGetRoutes(deps: AttachmentBlockerApiDependencies): R
         return;
       }
 
-      res.json({ success: true, data: config });
+      res.json({
+        success: true,
+        data: {
+          ...config,
+          bypassRoleIds: config.bypassRoleIds ?? [],
+        },
+      });
     } catch (error) {
       next(error);
     }

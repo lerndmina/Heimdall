@@ -15,7 +15,13 @@ export function createChannelsGetRoutes(deps: AttachmentBlockerApiDependencies):
       const guildId = req.params.guildId as string;
 
       const channels = await deps.service.getChannelConfigs(guildId);
-      res.json({ success: true, data: channels });
+      res.json({
+        success: true,
+        data: channels.map((channel) => ({
+          ...channel,
+          bypassRoleIds: channel.bypassRoleIds ?? [],
+        })),
+      });
     } catch (error) {
       next(error);
     }

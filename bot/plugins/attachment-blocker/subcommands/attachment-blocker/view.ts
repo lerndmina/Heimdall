@@ -22,6 +22,7 @@ export async function handleView(context: CommandContext, pluginAPI: AttachmentB
   const typesDisplay = (guildConfig.defaultAllowedTypes as AttachmentType[]).map((t) => AttachmentTypeLabels[t] ?? t).join(", ") || "None";
 
   const timeoutDisplay = guildConfig.defaultTimeoutDuration > 0 ? `${guildConfig.defaultTimeoutDuration / 1000}s` : "Disabled";
+  const globalBypassDisplay = (guildConfig.bypassRoleIds ?? []).length > 0 ? (guildConfig.bypassRoleIds ?? []).map((id) => `<@&${id}>`).join(", ") : "None";
 
   const embed = pluginAPI.lib
     .createEmbedBuilder()
@@ -31,6 +32,7 @@ export async function handleView(context: CommandContext, pluginAPI: AttachmentB
       { name: "Status", value: guildConfig.enabled ? "✅ Enabled" : "❌ Disabled", inline: true },
       { name: "Default Whitelist", value: typesDisplay, inline: true },
       { name: "Default Timeout", value: timeoutDisplay, inline: true },
+      { name: "Global Bypass Roles", value: globalBypassDisplay },
     );
 
   // Show channel overrides
@@ -39,8 +41,9 @@ export async function handleView(context: CommandContext, pluginAPI: AttachmentB
     const channelLines = channels.map((ch: IAttachmentBlockerChannel & { channelId: string }) => {
       const types = (ch.allowedTypes as AttachmentType[] | undefined)?.map((t) => AttachmentTypeLabels[t] ?? t).join(", ") || "Inherits default";
       const timeout = ch.timeoutDuration !== undefined && ch.timeoutDuration !== null ? `${(ch.timeoutDuration as number) / 1000}s` : "Inherits default";
+      const bypassRoles = (ch.bypassRoleIds ?? []).length > 0 ? `${(ch.bypassRoleIds ?? []).map((id) => `<@&${id}>`).join(", ")}` : "None";
       const status = ch.enabled ? "" : " (disabled)";
-      return `<#${ch.channelId}>${status}\n  Types: ${types} • Timeout: ${timeout}`;
+      return `<#${ch.channelId}>${status}\n  Types: ${types} • Timeout: ${timeout} • Bypass: ${bypassRoles}`;
     });
 
     // Split into chunks if too long

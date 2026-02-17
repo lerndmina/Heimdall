@@ -38,6 +38,11 @@ const AttachmentBlockerChannelSchema = new Schema(
       default: undefined,
       min: 0,
     },
+    /** Roles that bypass attachment checks in this channel (additive with guild bypass) */
+    bypassRoleIds: {
+      type: [String],
+      default: [],
+    },
     /** Per-channel enabled toggle (can disable blocking for a specific channel) */
     enabled: {
       type: Boolean,

@@ -63,6 +63,50 @@ export const data = new SlashCommandBuilder()
           ),
       ),
   )
+  .addSubcommandGroup((group) =>
+    group
+      .setName("bypass")
+      .setDescription("Manage role-based bypasses")
+      .addSubcommand((sub) =>
+        sub
+          .setName("add")
+          .setDescription("Add a global bypass role")
+          .addRoleOption((opt) => opt.setName("role").setDescription("Role to bypass all attachment checks").setRequired(true)),
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("remove")
+          .setDescription("Remove a global bypass role")
+          .addRoleOption((opt) => opt.setName("role").setDescription("Role to remove from global bypass").setRequired(true)),
+      )
+      .addSubcommand((sub) => sub.setName("list").setDescription("List global bypass roles"))
+      .addSubcommand((sub) =>
+        sub
+          .setName("channel-add")
+          .setDescription("Add a bypass role for a specific channel")
+          .addChannelOption((opt) =>
+            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+          )
+          .addRoleOption((opt) => opt.setName("role").setDescription("Role to bypass checks in this channel").setRequired(true)),
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("channel-remove")
+          .setDescription("Remove a bypass role from a specific channel")
+          .addChannelOption((opt) =>
+            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+          )
+          .addRoleOption((opt) => opt.setName("role").setDescription("Role to remove from this channel bypass").setRequired(true)),
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("channel-list")
+          .setDescription("List bypass roles for a specific channel")
+          .addChannelOption((opt) =>
+            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+          ),
+      ),
+  )
   .addSubcommand((sub) => sub.setName("view").setDescription("View current attachment blocking configuration"))
   .addSubcommand((sub) => sub.setName("disable").setDescription("Disable attachment blocking guild-wide"));
 

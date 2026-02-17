@@ -1,101 +1,57 @@
-## Plan: Full Migration System Overhaul — Two Modes + WebSocket Progress
+## Plan: Attachment Blocker Role Bypasses (DRAFT)
 
-**TL;DR**: Restructure the migration system into two modes: **Legacy Import** (existing old-bot→new-bot with improved step coverage) and **Instance Clone** (new-bot→new-bot, all 40 Mongoose models). Replace SSE streaming with WebSocket progress broadcasts (owner-only). Add per-record progress for large collections. Dashboard gets two tabs — one for each mode.
+Add role-based bypasses to attachment-blocker with two scopes: global (guild-wide) and per-channel, using additive union semantics and full-check bypass behavior. The implementation extends existing models/API/UI without changing core blocking rule semantics. Enforcement will short-circuit early when a member has any configured bypass role for the active channel context. Dashboard and slash commands will both expose bypass configuration, reusing existing role-picker and role-validation patterns already used in moderation. Backward compatibility is preserved by defaulting new fields to empty arrays and treating missing fields as no bypass. This follows your decisions: no automatic admin bypass, global+channel additive merge, surface in dashboard+API+commands, and “skip all attachment checks.”
 
 **Steps**
 
-### Backend — Migration Engine
+1. Extend data models and runtime types for bypass roles:
+   - Add `bypassRoleIds: string[]` to guild config model in AttachmentBlockerConfig.ts.
+   - Add `bypassRoleIds: string[]` to channel override model in AttachmentBlockerChannel.ts.
+   - Update `EffectiveConfig` and related shaping in AttachmentBlockerService.ts (`resolveEffectiveConfig`, cache payload builders).
 
-1. **Create plugins/dev/utils/cloneMigration.ts** — New "Instance Clone" engine
-   - `runCloneMigration(options)` orchestrator — connects to source Heimdall DB, iterates every collection, copies documents to local DB
-   - Group collections by plugin (config models first, then data models) for logical step ordering
-   - For each collection: count source docs → stream-copy with per-record progress via `onProgress` callback → skip existing by unique key (idempotent)
-   - Handle the `Infraction.ruleId` ObjectId ref: build an `oldId→newId` map for `AutomodRule` docs, then remap `ruleId` in `Infraction` docs
-   - Handle encrypted fields (`GuildEnv.encryptedValue`, `ModmailConfig.categories[].encryptedWebhookToken`, `MinecraftConfig.encryptedRconPassword`): copy raw ciphertext as-is (both instances must share the same `ENCRYPTION_KEY`, warn user in UI)
-   - Skip TTL-indexed ephemeral models (`TicTacToe`, `Connect4`) — they auto-delete in 24h anyway
-   - Support optional `guildId` filter — if provided, only copy docs matching that guild
-   - ~22 logical steps grouped by plugin (AttachmentBlocker, Dashboard, Logging, Minecraft, Minigames, Moderation, Modmail, Reminders, RoleButtons, Suggestions, SupportCore, Tags, TempVC, Tickets, VCTranscription, Welcome, Core)
+2. Implement enforcement bypass resolution in service layer:
+   - Add helper in AttachmentBlockerService.ts to compute effective bypass set = guild `bypassRoleIds` ∪ channel `bypassRoleIds`.
+   - In `checkAndEnforce`, short-circuit before block checks when member has any effective bypass role; keep existing bot/DM/voice-message short-circuits unchanged.
+   - Ensure cache invalidation already triggered by config/channel updates also covers bypass changes.
 
-2. **Refactor plugins/dev/utils/migration.ts** — Improve existing "Legacy Import"
-   - Add `onRecordProgress` callback alongside existing `onProgress` for per-record updates within large steps (modmail, suggestions, tags)
-   - Update `MigrationProgressEvent` to include `recordIndex` and `recordTotal` optional fields
-   - No schema changes needed — same 7 steps, just finer-grained progress
+3. Update backend API contracts and validation:
+   - Extend config endpoints to read/write guild `bypassRoleIds` in config-get.ts and config-update.ts.
+   - Extend channel endpoints to read/write channel `bypassRoleIds` in channels-get.ts and channels-update.ts.
+   - Add payload validation/sanitization (array of role IDs, dedupe, max length guard) following moderation API style from locks.ts.
 
-3. **Shared progress types in plugins/dev/utils/migrationTypes.ts**
-   - `MigrationMode`: `"legacy"` | `"clone"`
-   - `MigrationProgressEvent`: `{ mode, step, label, plugin, completed, total, recordIndex?, recordTotal?, result? }`
-   - `MigrationResult`: existing shape `{ success, imported, skipped, errors[], details? }`
-   - Used by both engines and the WS broadcast
+4. Add dashboard controls for bypass role management:
+   - In [bot/plugins/dashboard/app/app/[guildId]/attachment-blocker/AttachmentBlockerPage.tsx](bot/plugins/dashboard/app/app/[guildId]/attachment-blocker/AttachmentBlockerPage.tsx), add:
+     - Global bypass role selector bound to guild config.
+     - Per-channel bypass role selector in channel override editor.
+   - Reuse existing role picker patterns (same approach as moderation page role scoping in [bot/plugins/dashboard/app/app/[guildId]/moderation/ModerationPage.tsx](bot/plugins/dashboard/app/app/[guildId]/moderation/ModerationPage.tsx)).
+   - Update TypeScript interfaces and API mapping to include `bypassRoleIds`.
 
-### Backend — WebSocket Broadcasting
+5. Add slash command support for bypass role configuration:
+   - Extend command surface under commands and/or subcommands with minimal operations:
+     - Global: add/remove/list bypass roles.
+     - Channel: add/remove/list bypass roles for a specific blocked channel.
+   - Reuse existing command permission and response style from current attachment-blocker subcommands.
 
-4. **Add owner-only WS broadcast to plugins/dev/api/migrate.ts**
-   - Import `broadcast` from core; wrap the `onProgress` callback to call `wsManager.broadcastToOwners(event, data)` (new method)
-   - Events: `migration:step_start`, `migration:step_progress` (per-record), `migration:step_complete`, `migration:complete`, `migration:error`
-   - Remove SSE streaming entirely — WS replaces it
-
-5. **Add `broadcastToOwners` method to src/core/WebSocketManager.ts**
-   - New method that sends to all authenticated sockets whose `userId` is in `OWNER_IDS`
-   - No guild scoping — owner-only global broadcast
-   - Event format: `{ event: "migration:*", data: MigrationProgressEvent }`
-
-6. **Add new API route `POST /api/dev/clone`** in plugins/dev/api/migrate.ts (or a new `clone.ts`)
-   - Owner-only guard (same as existing `/migrate`)
-   - Accepts `{ sourceDbUri, guildId? }`
-   - Validates connection, fires `runCloneMigration()` with WS progress callback
-   - Returns final stats as JSON (progress is via WS, not SSE)
-
-7. **Update plugins/dev/api/migrate.ts** — existing `/migrate` endpoint
-   - Keep JSON response but add WS progress callback
-   - Remove SSE response format (WS replaces it)
-   - Add `modmailCollection` to accepted body params (already in slash command but missing from API)
-
-### Dashboard — UI
-
-8. **Restructure app/dev/migration/page.tsx** — Add tabs
-   - Two tabs: **"Legacy Import"** (old bot) and **"Instance Clone"** (Heimdall→Heimdall)
-   - Extract existing form into `LegacyMigrationTab` component
-   - Create `CloneMigrationTab` component with: Source DB URI input, optional Guild ID, encryption key warning banner, Start button
-   - Both tabs share a common `MigrationProgress` component for WS-driven live updates
-
-9. **Create shared `MigrationProgress` component** — reusable progress UI
-   - Subscribes to WS events `migration:step_start`, `migration:step_progress`, `migration:step_complete`, `migration:complete`, `migration:error`
-   - Uses `useRealtimeEvent` or a custom hook (since this is owner-only, not guild-scoped — may need a new `useOwnerEvent` hook or use the raw WS context)
-   - Per-step cards with spinner/checkmark (existing UI pattern)
-   - Per-record progress bar within each step card for large collections
-   - Overall progress bar showing `step X/Y` and `record M/N` within the current step
-   - Auto-scrolls to active step
-
-10. **Update app/api/dev/migrate/route.ts** — Simplify
-    - Remove SSE streaming logic — just forward POST and return JSON
-    - Add new `POST /api/dev/clone` proxy route (same auth pattern)
-
-### WebSocket — Owner Events Support
-
-11. **Add owner-event subscription support to WebSocket client**
-    - The current websocket.tsx only supports guild-scoped subscriptions (`subscribe(guildId, event, handler)`)
-    - Add a new `subscribeGlobal(event, handler)` method for events not scoped to a guild
-    - Or: use a sentinel guild ID like `"__global__"` to piggyback on existing infrastructure
-    - Create `useOwnerEvent(event, handler)` hook for the migration page to consume
-
-### Documentation
-
-12. **Update plugins/dev/MIGRATION.md** — Add Instance Clone section
-    - Document the two modes, what each clones, the encryption key requirement
-    - Update the "What Gets Migrated" list to include all 40 models for clone mode
+6. Update docs and migration notes:
+   - Document new bypass behavior and precedence in bot/plugins/attachment-blocker/README.md (or plugin docs location if existing).
+   - Add concise migration note: existing guilds/channels default to empty bypass arrays (no behavior change).
 
 **Verification**
 
-- Build passes (`npm run build`)
-- Legacy migration still works (same 7 steps, now with WS progress)
-- Clone migration: connect to a test Heimdall DB → all collections copy → idempotent re-run skips existing
-- Dashboard: both tabs render, WS progress updates appear live, per-record progress animates smoothly
-- Owner-only: non-owners cannot see migration page or receive WS events
+- Backend compile: run task `Build Bot (tsc)`.
+- Dashboard compile: run task `Build Dashboard`.
+- API checks:
+  - Global bypass persists/returns in config GET/UPDATE.
+  - Channel bypass persists/returns in channels GET/UPDATE.
+- Runtime behavior checks:
+  - User with bypass role posting blocked attachment in blocked channel: no delete, no DM, no timeout.
+  - User without bypass role: existing enforcement unchanged.
+  - Additive merge: global-only role bypasses everywhere; channel-only role bypasses only configured channel.
+  - Missing legacy fields in DB do not throw and act as empty arrays.
 
 **Decisions**
 
-- **WS over SSE**: SSE requires a proxy passthrough in Next.js that's fragile (especially with the new single-port nginx setup). WS is already established infrastructure with auth.
-- **Raw collection copy for clone mode**: Since both DBs have identical schemas, we use `collection.find().lean()` + `Model.insertMany()` rather than per-field transformation. Simpler, faster, less error-prone.
-- **Skip TicTacToe/Connect4**: 24h TTL means these are ephemeral game state — not worth cloning.
-- **Encrypted fields copied as-is**: Both instances need the same `ENCRYPTION_KEY`. The UI shows a warning about this requirement. Re-encrypting would require having both keys simultaneously which is impractical.
-- **`broadcastToOwners` over guild-scoped**: Migration is a global operation (can span multiple guilds). Owner-only broadcast avoids needing a guild context.
+- Bypass behavior: full attachment-check bypass.
+- Admin handling: no implicit admin bypass.
+- Merge semantics: global + channel additive union.
+- Delivery scope: dashboard + backend API + slash commands.

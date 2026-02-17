@@ -14,6 +14,7 @@ import Toggle from "@/components/ui/Toggle";
 import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
+import RoleCombobox from "@/components/ui/RoleCombobox";
 import NumberInput from "@/components/ui/NumberInput";
 import Tabs from "@/components/ui/Tabs";
 import SetupWizard, { NotConfigured, ReviewSection, ReviewRow } from "@/components/ui/SetupWizard";
@@ -41,6 +42,7 @@ interface GuildConfig {
   enabled: boolean;
   defaultAllowedTypes: string[];
   defaultTimeoutDuration: number;
+  bypassRoleIds: string[];
 }
 
 interface ChannelOverride {
@@ -49,6 +51,7 @@ interface ChannelOverride {
   channelId: string;
   allowedTypes?: string[];
   timeoutDuration?: number | null;
+  bypassRoleIds?: string[];
   enabled: boolean;
   createdBy: string;
 }
@@ -91,6 +94,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
   const [guildEnabled, setGuildEnabled] = useState(false);
   const [guildAllowedTypes, setGuildAllowedTypes] = useState<string[]>([]);
   const [guildTimeoutSeconds, setGuildTimeoutSeconds] = useState(0);
+  const [guildBypassRoleIds, setGuildBypassRoleIds] = useState<string[]>([]);
   const [savingGuild, setSavingGuild] = useState(false);
 
   // Channel override modal
@@ -99,11 +103,13 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
   const [channelFormId, setChannelFormId] = useState("");
   const [channelFormTypes, setChannelFormTypes] = useState<string[]>([]);
   const [channelFormTimeout, setChannelFormTimeout] = useState<number | undefined>(undefined);
+  const [channelFormBypassRoleIds, setChannelFormBypassRoleIds] = useState<string[]>([]);
   const [channelFormEnabled, setChannelFormEnabled] = useState(true);
   const [savingChannel, setSavingChannel] = useState(false);
 
   // Channel name lookup
   const [channelNames, setChannelNames] = useState<Record<string, string>>({});
+  const [roleNames, setRoleNames] = useState<Record<string, string>>({});
 
   // Delete modal
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
@@ -130,11 +136,15 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
     setLoading(true);
     setError(null);
     try {
-      const [configRes, channelsRes, discordChannelsRes, tempvcConfigRes, openersRes, voiceChannelsRes] = await Promise.all([
+      const [configRes, channelsRes, discordChannelsRes, rolesRes, tempvcConfigRes, openersRes, voiceChannelsRes] = await Promise.all([
         fetchApi<GuildConfig>(guildId, "attachment-blocker/config", { skipCache: true }),
         fetchApi<ChannelOverride[]>(guildId, "attachment-blocker/channels", { skipCache: true }),
         fetchApi<{ channels: { id: string; name: string }[] }>(guildId, "channels?type=text", {
           cacheKey: `channels-${guildId}-text`,
+          cacheTtl: 60_000,
+        }),
+        fetchApi<{ roles: { id: string; name: string }[] }>(guildId, "roles", {
+          cacheKey: `roles-${guildId}`,
           cacheTtl: 60_000,
         }),
         fetchApi<{ channels: TempVCOpener[] }>(guildId, "tempvc/config", {
@@ -154,6 +164,14 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
           map[ch.id] = ch.name;
         }
         setChannelNames(map);
+      }
+
+      if (rolesRes.success && rolesRes.data) {
+        const map: Record<string, string> = {};
+        for (const role of rolesRes.data.roles) {
+          map[role.id] = role.name;
+        }
+        setRoleNames(map);
       }
 
       if (voiceChannelsRes.success && voiceChannelsRes.data) {
@@ -177,11 +195,13 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
         setGuildEnabled(configRes.data.enabled);
         setGuildAllowedTypes(configRes.data.defaultAllowedTypes);
         setGuildTimeoutSeconds(Math.round(configRes.data.defaultTimeoutDuration / 1000));
+        setGuildBypassRoleIds(configRes.data.bypassRoleIds ?? []);
       } else {
         setConfig(null);
         setGuildEnabled(false);
         setGuildAllowedTypes([]);
         setGuildTimeoutSeconds(0);
+        setGuildBypassRoleIds([]);
       }
 
       if (channelsRes.success && channelsRes.data) {
@@ -210,7 +230,8 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
   const isGuildDirty =
     guildEnabled !== (config?.enabled ?? false) ||
     JSON.stringify(guildAllowedTypes.slice().sort()) !== JSON.stringify((config?.defaultAllowedTypes ?? []).slice().sort()) ||
-    guildTimeoutSeconds !== Math.round((config?.defaultTimeoutDuration ?? 0) / 1000);
+    guildTimeoutSeconds !== Math.round((config?.defaultTimeoutDuration ?? 0) / 1000) ||
+    JSON.stringify(guildBypassRoleIds.slice().sort()) !== JSON.stringify((config?.bypassRoleIds ?? []).slice().sort());
 
   // ── Save guild config ──
   const saveGuildConfig = async () => {
@@ -222,10 +243,12 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
           enabled: guildEnabled,
           defaultAllowedTypes: guildAllowedTypes,
           defaultTimeoutDuration: guildTimeoutSeconds * 1000,
+          bypassRoleIds: guildBypassRoleIds,
         }),
       });
       if (res.success && res.data) {
         setConfig(res.data);
+        setGuildBypassRoleIds(res.data.bypassRoleIds ?? []);
         toast.success("Guild defaults updated");
       } else {
         toast.error(res.error?.message ?? "Failed to save");
@@ -257,6 +280,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
     setChannelFormId("");
     setChannelFormTypes([]);
     setChannelFormTimeout(undefined);
+    setChannelFormBypassRoleIds([]);
     setChannelFormEnabled(true);
     setShowAddChannel(true);
   };
@@ -266,6 +290,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
     setChannelFormId(ch.channelId);
     setChannelFormTypes(ch.allowedTypes ?? []);
     setChannelFormTimeout(ch.timeoutDuration != null ? Math.round(ch.timeoutDuration / 1000) : undefined);
+    setChannelFormBypassRoleIds(ch.bypassRoleIds ?? []);
     setChannelFormEnabled(ch.enabled);
     setShowAddChannel(true);
   };
@@ -285,6 +310,7 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
         body: JSON.stringify({
           allowedTypes: channelFormTypes.length > 0 ? channelFormTypes : undefined,
           timeoutDuration: channelFormTimeout !== undefined ? channelFormTimeout * 1000 : null,
+          bypassRoleIds: channelFormBypassRoleIds,
           enabled: channelFormEnabled,
         }),
       });
@@ -344,6 +370,24 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
 
   // ── Helper: is special type ──
   const isSpecialType = (types: string[]) => types.includes("all") || types.includes("none");
+
+  const addGuildBypassRole = (roleId: string) => {
+    if (!roleId || guildBypassRoleIds.includes(roleId)) return;
+    setGuildBypassRoleIds((prev) => [...prev, roleId]);
+  };
+
+  const removeGuildBypassRole = (roleId: string) => {
+    setGuildBypassRoleIds((prev) => prev.filter((id) => id !== roleId));
+  };
+
+  const addChannelBypassRole = (roleId: string) => {
+    if (!roleId || channelFormBypassRoleIds.includes(roleId)) return;
+    setChannelFormBypassRoleIds((prev) => [...prev, roleId]);
+  };
+
+  const removeChannelBypassRole = (roleId: string) => {
+    setChannelFormBypassRoleIds((prev) => prev.filter((id) => id !== roleId));
+  };
 
   // ── Open add/edit opener modal ──
   const openAddOpenerModal = () => {
@@ -735,6 +779,34 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
                       </div>
                     </div>
 
+                    <div>
+                      <RoleCombobox
+                        guildId={guildId}
+                        value=""
+                        onChange={addGuildBypassRole}
+                        excludeIds={guildBypassRoleIds}
+                        includeEveryone={false}
+                        label="Global Bypass Roles"
+                        description="Users with these roles bypass attachment-blocker checks across all channels"
+                        disabled={!canManage || savingGuild}
+                      />
+                      {guildBypassRoleIds.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {guildBypassRoleIds.map((roleId) => (
+                            <span key={roleId} className="inline-flex items-center gap-1 rounded bg-zinc-700 px-2 py-0.5 text-xs text-zinc-300">
+                              <span className="text-zinc-400">@</span>
+                              {roleNames[roleId] ?? roleId}
+                              {canManage && !savingGuild && (
+                                <button onClick={() => removeGuildBypassRole(roleId)} className="text-zinc-500 hover:text-red-400">
+                                  ×
+                                </button>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {/* Save button */}
                     {canManage && isGuildDirty && (
                       <div className="flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
@@ -826,6 +898,9 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
                                   <span className="text-xs text-zinc-500 italic">Inherits guild defaults</span>
                                 )}
                                 {ch.timeoutDuration != null && <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">Timeout: {Math.round(ch.timeoutDuration / 1000)}s</span>}
+                                {ch.bypassRoleIds && ch.bypassRoleIds.length > 0 && (
+                                  <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">Bypass Roles: {ch.bypassRoleIds.length}</span>
+                                )}
                               </div>
                             </div>
                             {canManage && (
@@ -1073,6 +1148,34 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
             <p className="mb-1 text-sm font-medium text-zinc-200">Timeout Override</p>
             <p className="mb-2 text-xs text-zinc-500">Leave empty to inherit guild default</p>
             <NumberInput label="Seconds" value={channelFormTimeout ?? 0} onChange={(v) => setChannelFormTimeout(v || undefined)} min={0} max={604800} disabled={savingChannel} />
+          </div>
+
+          <div>
+            <RoleCombobox
+              guildId={guildId}
+              value=""
+              onChange={addChannelBypassRole}
+              excludeIds={channelFormBypassRoleIds}
+              includeEveryone={false}
+              label="Channel Bypass Roles"
+              description="These roles bypass attachment-blocker checks in this channel (additive with global bypass)"
+              disabled={savingChannel}
+            />
+            {channelFormBypassRoleIds.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {channelFormBypassRoleIds.map((roleId) => (
+                  <span key={roleId} className="inline-flex items-center gap-1 rounded bg-zinc-700 px-2 py-0.5 text-xs text-zinc-300">
+                    <span className="text-zinc-400">@</span>
+                    {roleNames[roleId] ?? roleId}
+                    {!savingChannel && (
+                      <button onClick={() => removeChannelBypassRole(roleId)} className="text-zinc-500 hover:text-red-400">
+                        ×
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </Modal>
