@@ -35,6 +35,11 @@ export interface TranscribeOptions {
   replyMessage?: Message;
 }
 
+interface OpenAITranscriptionResult {
+  transcription: string;
+  englishTranslation?: string;
+}
+
 /**
  * Transcribe a Discord voice message and reply with the result.
  * Returns true on success, false on failure.
@@ -93,9 +98,12 @@ export async function transcribeMessage(client: Client<true>, message: Message, 
     deleteFile(fileName, "ogg");
 
     let transcription: string;
+    let englishTranslation: string | undefined;
 
     if (provider === WhisperProvider.OPENAI) {
-      transcription = await transcribeWithOpenAI(fileName, model, guildId, guildEnvService);
+      const openAiResult = await transcribeWithOpenAI(fileName, model, guildId, guildEnvService);
+      transcription = openAiResult.transcription;
+      englishTranslation = openAiResult.englishTranslation;
     } else {
       if (languageGate?.enabled) {
         const allowedLanguages = new Set((languageGate.allowedLanguages ?? []).map((lang) => lang.trim().toLowerCase()).filter(Boolean));
@@ -128,18 +136,14 @@ export async function transcribeMessage(client: Client<true>, message: Message, 
 
     // Clean up timestamps from whisper output
     transcription = transcription.replace(/\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]\s*/g, "").trim();
+    if (englishTranslation) {
+      englishTranslation = englishTranslation.replace(/\[\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}\]\s*/g, "").trim();
+    }
 
     const channelName = !message.channel.isDMBased() ? message.channel.name : "Direct Messages";
     log.info(`Transcribed voice message from ${message.author.username} in ${channelName}`);
 
-    // Truncate if needed (Discord message limit)
-    const prefix = "✨ **Voice Transcription:**\n\n";
-    const maxContentLen = 2000 - prefix.length - 8; // 8 for ``` markers
-    if (transcription.length > maxContentLen) {
-      transcription = transcription.slice(0, maxContentLen - 3) + "...";
-    }
-
-    await sendResult(`${prefix}\`\`\`${transcription}\`\`\``);
+    await sendResult(formatTranscriptionReply(transcription, englishTranslation));
     return true;
   } catch (error) {
     log.error("Failed to transcribe voice message:", error);
@@ -149,6 +153,68 @@ export async function transcribeMessage(client: Client<true>, message: Message, 
     await sendResult("Sorry, I encountered an error while transcribing this voice message.");
     return false;
   }
+}
+
+function normalizeForCompare(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function shouldShowTranslation(transcription: string, translation?: string): translation is string {
+  if (!translation) return false;
+  const normalizedTranscript = normalizeForCompare(transcription);
+  const normalizedTranslation = normalizeForCompare(translation);
+  if (!normalizedTranscript || !normalizedTranslation) return false;
+  return normalizedTranscript !== normalizedTranslation;
+}
+
+function truncateWithEllipsis(text: string, maxLength: number): string {
+  if (maxLength <= 0) return "";
+  if (text.length <= maxLength) return text;
+  if (maxLength <= 3) return ".".repeat(maxLength);
+  return `${text.slice(0, maxLength - 3)}...`;
+}
+
+function formatTranscriptionReply(transcription: string, englishTranslation?: string): string {
+  const prefix = "✨ **Voice Transcription:**\n\n";
+
+  if (!shouldShowTranslation(transcription, englishTranslation)) {
+    const maxContentLen = 2000 - prefix.length - 8; // 8 for ``` markers
+    const safeTranscription = truncateWithEllipsis(transcription, maxContentLen);
+    return `${prefix}\`\`\`${safeTranscription}\`\`\``;
+  }
+
+  const sectionHeader = "**Transcription**\n";
+  const translationHeader = "\n\n**Translation**\n";
+  const codeFenceLen = 6; // two sets of ``` around each section
+  const fixedLen = prefix.length + sectionHeader.length + translationHeader.length + codeFenceLen * 2;
+  const budget = Math.max(0, 2000 - fixedLen);
+
+  const translated = englishTranslation;
+  const totalLen = transcription.length + translated.length;
+
+  let transcriptionBudget = Math.floor((transcription.length / Math.max(1, totalLen)) * budget);
+  let translationBudget = budget - transcriptionBudget;
+
+  const minPerSection = Math.min(120, Math.floor(budget / 2));
+  if (transcriptionBudget < minPerSection) {
+    const deficit = minPerSection - transcriptionBudget;
+    transcriptionBudget += deficit;
+    translationBudget = Math.max(0, translationBudget - deficit);
+  }
+  if (translationBudget < minPerSection) {
+    const deficit = minPerSection - translationBudget;
+    translationBudget += deficit;
+    transcriptionBudget = Math.max(0, transcriptionBudget - deficit);
+  }
+
+  const safeTranscription = truncateWithEllipsis(transcription, transcriptionBudget);
+  const safeTranslation = truncateWithEllipsis(translated, translationBudget);
+
+  return `${prefix}**Transcription**\n\`\`\`${safeTranscription}\`\`\`${translationHeader}\`\`\`${safeTranslation}\`\`\``;
 }
 
 /**
@@ -456,7 +522,7 @@ async function detectLocalLanguage(fileName: string, model: string): Promise<str
  * Transcribe using OpenAI's Whisper API.
  * Retrieves the per-guild encrypted API key via GuildEnvService.
  */
-async function transcribeWithOpenAI(fileName: string, model: string, guildId: string, guildEnvService: GuildEnvService): Promise<string> {
+async function transcribeWithOpenAI(fileName: string, model: string, guildId: string, guildEnvService: GuildEnvService): Promise<OpenAITranscriptionResult> {
   const apiKey = await guildEnvService.getEnv(guildId, OPENAI_API_KEY_ENV);
   if (!apiKey) {
     throw new Error("OpenAI API key not configured for this guild. Set it in the dashboard.");
@@ -465,27 +531,77 @@ async function transcribeWithOpenAI(fileName: string, model: string, guildId: st
   const filePath = getTempPath(fileName, "wav");
   const fileBuffer = fs.readFileSync(filePath);
 
-  // Build multipart form data
-  const boundary = `----FormBoundary${Date.now()}`;
+  const transcription = await callOpenAIAudioEndpoint({
+    endpoint: "transcriptions",
+    model,
+    fileName,
+    fileBuffer,
+    apiKey,
+    responseFormat: "text",
+  });
+
+  let englishTranslation: string | undefined;
+  try {
+    const translated = await callOpenAIAudioEndpoint({
+      endpoint: "translations",
+      model: "whisper-1",
+      fileName,
+      fileBuffer,
+      apiKey,
+      responseFormat: "text",
+    });
+
+    if (translated) {
+      englishTranslation = translated;
+    }
+  } catch (error) {
+    log.warn("OpenAI translation failed; returning transcription only:", error);
+  }
+
+  return {
+    transcription: transcription.trim(),
+    englishTranslation: englishTranslation?.trim() || undefined,
+  };
+}
+
+interface OpenAIAudioRequestOptions {
+  endpoint: "transcriptions" | "translations";
+  model: string;
+  fileName: string;
+  fileBuffer: Buffer;
+  apiKey: string;
+  responseFormat: "text" | "json" | "verbose_json" | "srt" | "vtt" | "diarized_json";
+}
+
+function buildMultipartBody(fileName: string, fileBuffer: Buffer, fields: Array<[string, string]>): { body: Buffer; boundary: string } {
+  const boundary = `----FormBoundary${Date.now()}${Math.random().toString(16).slice(2)}`;
   const parts: Buffer[] = [];
 
-  // File part
   parts.push(Buffer.from(`--${boundary}\r\n` + `Content-Disposition: form-data; name="file"; filename="${fileName}.wav"\r\n` + `Content-Type: audio/wav\r\n\r\n`));
   parts.push(fileBuffer);
   parts.push(Buffer.from("\r\n"));
 
-  // Model part
-  parts.push(Buffer.from(`--${boundary}\r\n` + `Content-Disposition: form-data; name="model"\r\n\r\n` + `${model}\r\n`));
+  for (const [fieldName, value] of fields) {
+    parts.push(Buffer.from(`--${boundary}\r\n` + `Content-Disposition: form-data; name="${fieldName}"\r\n\r\n` + `${value}\r\n`));
+  }
 
-  // Response format part
-  parts.push(Buffer.from(`--${boundary}\r\n` + `Content-Disposition: form-data; name="response_format"\r\n\r\n` + `text\r\n`));
-
-  // Closing boundary
   parts.push(Buffer.from(`--${boundary}--\r\n`));
 
-  const body = Buffer.concat(parts);
+  return {
+    body: Buffer.concat(parts),
+    boundary,
+  };
+}
 
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+async function callOpenAIAudioEndpoint(options: OpenAIAudioRequestOptions): Promise<string> {
+  const { endpoint, model, fileName, fileBuffer, apiKey, responseFormat } = options;
+
+  const { body, boundary } = buildMultipartBody(fileName, fileBuffer, [
+    ["model", model],
+    ["response_format", responseFormat],
+  ]);
+
+  const response = await fetch(`https://api.openai.com/v1/audio/${endpoint}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -496,8 +612,8 @@ async function transcribeWithOpenAI(fileName: string, model: string, guildId: st
 
   if (!response.ok) {
     const errorText = await response.text();
-    log.error(`OpenAI API error (${response.status}):`, errorText);
-    throw new Error(`OpenAI API returned ${response.status}: ${errorText}`);
+    log.error(`OpenAI audio ${endpoint} API error (${response.status}):`, errorText);
+    throw new Error(`OpenAI ${endpoint} API returned ${response.status}: ${errorText}`);
   }
 
   const text = await response.text();

@@ -82,7 +82,11 @@ function ModelBadge({ status }: { status?: { downloaded: boolean; downloading: b
   return <span className="ml-auto shrink-0 rounded-full border border-zinc-500/20 bg-zinc-500/15 px-1.5 py-px text-[10px] font-medium text-zinc-400">Not Downloaded</span>;
 }
 
-const OPENAI_MODEL_OPTIONS = [{ value: "whisper-1", label: "whisper-1" }];
+const OPENAI_MODEL_OPTIONS = [
+  { value: "gpt-4o-mini-transcribe", label: "gpt-4o-mini-transcribe (fast, cost-effective)" },
+  { value: "gpt-4o-transcribe", label: "gpt-4o-transcribe (best quality)" },
+  { value: "whisper-1", label: "whisper-1 (legacy Whisper model)" },
+];
 
 const FILTER_MODE_OPTIONS = [
   { value: "disabled", label: "Disabled (no filtering)" },
@@ -505,7 +509,11 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
 
           <div className="space-y-1.5">
             <p className="text-sm font-medium text-zinc-200">Model</p>
-            <p className="text-xs text-zinc-500">{provider === "local" ? "Larger models are more accurate but slower and use more memory." : "OpenAI currently offers the whisper-1 model."}</p>
+            <p className="text-xs text-zinc-500">
+              {provider === "local"
+                ? "Larger models are more accurate but slower and use more memory."
+                : "Choose an OpenAI speech-to-text model. 4o models are newer and generally preferred over whisper-1."}
+            </p>
             <Combobox options={modelOptions} value={model} onChange={setModel} placeholder="Select model…" disabled={!canManage} />
             {provider === "local" && model.endsWith(".en") && !languageGateEnabled && (
               <p className="text-xs text-amber-400">This is an English-only model. If users may speak other languages, enable Language Gate or switch to a multilingual model.</p>
