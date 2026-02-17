@@ -1,0 +1,10 @@
+{
+  "files.associations": {
+    "*.conf.template": "nginx"
+  },
+  "[nginx]": {
+    "editor.formatOnSave": false
+  },
+  "files.exclude": {},
+  "editor.formatOnSave": true
+}
