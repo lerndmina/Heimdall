@@ -87,13 +87,15 @@ export class TranscriptionQueueService {
       addedAt: Date.now(),
     };
 
-    // Process immediately if we have capacity and the model is ready
-    if (this.activeCount < maxConcurrent && !isDownloading) {
-      this.processEntry(entry);
-    } else {
-      this.queue.push(entry);
-      this.startPositionUpdater();
-    }
+    // Always enqueue first so queue order is preserved and draining logic is centralized.
+    this.queue.push(entry);
+    this.startPositionUpdater();
+
+    // Try to drain immediately if capacity is available and model is ready.
+    // Using processNext() here also recovers from any previously missed wake-up.
+    void this.processNext().catch((error) => {
+      log.error("Failed to process transcription queue after enqueue:", error);
+    });
   }
 
   /**
@@ -156,7 +158,7 @@ export class TranscriptionQueueService {
       }
 
       const entry = this.queue.shift()!;
-      this.processEntry(entry);
+      void this.processEntry(entry);
     }
 
     if (this.queue.length === 0 && this.activeCount === 0) {
@@ -218,6 +220,14 @@ export class TranscriptionQueueService {
     } finally {
       this.isUpdatingPositions = false;
     }
+
+    // Self-heal: if entries are waiting and no workers are active, try draining again.
+    // This guards against rare missed wake-ups after model download completion.
+    if (this.queue.length > 0 && this.activeCount === 0) {
+      void this.processNext().catch((error) => {
+        log.error("Failed to process transcription queue after position update:", error);
+      });
+    }
   }
 
   /**
@@ -260,7 +270,7 @@ export class TranscriptionQueueService {
       });
 
       // Drain any queued entries waiting for this model
-      this.processNext();
+      await this.processNext();
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       log.error(`Model download failed for "${model}":`, error);
