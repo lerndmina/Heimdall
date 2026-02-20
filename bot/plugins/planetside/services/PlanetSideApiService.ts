@@ -301,7 +301,7 @@ export class PlanetSideApiService {
 
   /** Test Census API connectivity */
   async testCensusConnection(serviceId?: string): Promise<boolean> {
-    const result = await this.censusFetch<{ character_list: unknown[] }>(`/character/?name.first_lower=wrel&c:limit=1`, serviceId);
+    const result = await this.censusFetch<{ character_list: unknown[] }>(`/character/?c:limit=1`, serviceId);
     return result !== null && Array.isArray(result.character_list) && result.character_list.length > 0;
   }
 

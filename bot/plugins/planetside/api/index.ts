@@ -10,6 +10,7 @@ import { createPlayersRoutes } from "./players.js";
 import { createCensusStatusRoutes } from "./census-status.js";
 import { createPopulationRoutes } from "./population.js";
 import { createOutfitLookupRoutes } from "./outfit-lookup.js";
+import { createSendPanelRoutes } from "./send-panel.js";
 import type { PlanetSidePluginAPI } from "../index.js";
 
 export type PlanetSideApiDependencies = Pick<PlanetSidePluginAPI, "apiService" | "lib" | "censusMonitorService">;
@@ -32,6 +33,9 @@ export function createRouter(api: PlanetSidePluginAPI): Router {
 
   // GET     /api/guilds/:guildId/planetside/outfit-lookup?tag=...
   router.use("/outfit-lookup", createOutfitLookupRoutes(deps));
+
+  // POST    /api/guilds/:guildId/planetside/send-panel
+  router.use("/send-panel", createSendPanelRoutes(api.panelService));
 
   return router;
 }

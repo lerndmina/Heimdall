@@ -167,6 +167,7 @@ const routeMap: Record<string, string> = {
   "GET /planetside/population": "planetside.view_population",
   "GET /planetside/population/*": "planetside.view_population",
   "GET /planetside/outfit-lookup": "planetside.manage_config",
+  "POST /planetside/send-panel": "planetside.manage_config",
 
   // Sticky Messages
   "GET /moderation/stickies": "moderation.view_config",

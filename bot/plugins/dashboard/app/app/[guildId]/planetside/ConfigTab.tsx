@@ -19,6 +19,7 @@ import Combobox from "@/components/ui/Combobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import SetupWizard, { NotConfigured, EditButton, FieldDisplay, ReviewSection, ReviewRow, type WizardStep } from "@/components/ui/SetupWizard";
+import DiscordMention from "@/components/ui/DiscordMention";
 import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 
@@ -100,6 +101,10 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Post Panel state
+  const [sendingPanel, setSendingPanel] = useState(false);
+  const [panelResult, setPanelResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
   const fetchConfig = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -153,6 +158,25 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
       setSaveError("Failed to connect to API");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ── Post Panel handler ────────────────────────────────────
+
+  const handleSendPanel = async () => {
+    setSendingPanel(true);
+    setPanelResult(null);
+    try {
+      const res = await fetchApi(guildId, "planetside/send-panel", { method: "POST", body: JSON.stringify({}) });
+      if (res.success) {
+        setPanelResult({ ok: true, msg: "Panel posted successfully!" });
+      } else {
+        setPanelResult({ ok: false, msg: res.error?.message ?? "Failed to send panel." });
+      }
+    } catch {
+      setPanelResult({ ok: false, msg: "Failed to connect to API." });
+    } finally {
+      setSendingPanel(false);
     }
   };
 
@@ -318,9 +342,15 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
         <CardTitle>Roles</CardTitle>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <FieldDisplay label="Member Role" value={config.roles.member ? `<@&${config.roles.member}>` : "Not set"} />
-            <FieldDisplay label="Guest Role" value={config.roles.guest ? `<@&${config.roles.guest}>` : "Not set"} />
-            <FieldDisplay label="Promotion Role" value={config.roles.promotion ? `<@&${config.roles.promotion}>` : "Not set"} />
+            <FieldDisplay label="Member Role">
+              {config.roles.member ? <DiscordMention type="role" id={config.roles.member} guildId={guildId} /> : <span className="text-sm text-zinc-500">Not set</span>}
+            </FieldDisplay>
+            <FieldDisplay label="Guest Role">
+              {config.roles.guest ? <DiscordMention type="role" id={config.roles.guest} guildId={guildId} /> : <span className="text-sm text-zinc-500">Not set</span>}
+            </FieldDisplay>
+            <FieldDisplay label="Promotion Role">
+              {config.roles.promotion ? <DiscordMention type="role" id={config.roles.promotion} guildId={guildId} /> : <span className="text-sm text-zinc-500">Not set</span>}
+            </FieldDisplay>
           </div>
         </CardContent>
       </Card>
@@ -330,10 +360,35 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
         <CardTitle>Channels</CardTitle>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <FieldDisplay label="Log Channel" value={config.channels.log ? `<#${config.channels.log}>` : "Not set"} />
-            <FieldDisplay label="Census Status" value={config.channels.censusStatus ? `<#${config.channels.censusStatus}>` : "Not set"} />
-            <FieldDisplay label="Panel Channel" value={config.channels.panel ? `<#${config.channels.panel}>` : "Not set"} />
+            <FieldDisplay label="Log Channel">
+              {config.channels.log ? <DiscordMention type="channel" id={config.channels.log} guildId={guildId} /> : <span className="text-sm text-zinc-500">Not set</span>}
+            </FieldDisplay>
+            <FieldDisplay label="Census Status">
+              {config.channels.censusStatus ? <DiscordMention type="channel" id={config.channels.censusStatus} guildId={guildId} /> : <span className="text-sm text-zinc-500">Not set</span>}
+            </FieldDisplay>
+            <FieldDisplay label="Panel Channel">
+              {config.channels.panel ? <DiscordMention type="channel" id={config.channels.panel} guildId={guildId} /> : <span className="text-sm text-zinc-500">Not set</span>}
+            </FieldDisplay>
           </div>
+
+          {/* Post Panel action */}
+          {config.channels.panel && (
+            <div className="mt-4 flex items-center gap-3 border-t border-zinc-700 pt-4">
+              <button
+                onClick={() => {
+                  setPanelResult(null);
+                  handleSendPanel();
+                }}
+                disabled={sendingPanel}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                {sendingPanel ? "Posting…" : "Post Panel"}
+              </button>
+              <span className="text-xs text-zinc-400">
+                (Re-)sends the linking panel to <DiscordMention type="channel" id={config.channels.panel} guildId={guildId} />
+              </span>
+              {panelResult && <span className={`ml-auto text-xs font-medium ${panelResult.ok ? "text-green-400" : "text-red-400"}`}>{panelResult.msg}</span>}
+            </div>
+          )}
         </CardContent>
       </Card>
 
