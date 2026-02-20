@@ -9,7 +9,7 @@
  * Mirrors the Minecraft panel pattern.
  */
 
-import { ActionRowBuilder, ButtonStyle, ChannelType, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, type ButtonInteraction, type TextChannel } from "discord.js";
+import { ActionRowBuilder, ButtonStyle, ChannelType, MessageFlags, type ButtonInteraction, type TextChannel } from "discord.js";
 import type { LibAPI } from "../../lib/index.js";
 import type { ComponentCallbackService } from "../../../src/core/services/ComponentCallbackService.js";
 import type { PluginLogger } from "../../../src/types/Plugin.js";
@@ -17,7 +17,7 @@ import PlanetSideConfig from "../models/PlanetSideConfig.js";
 import PlanetSidePlayer from "../models/PlanetSidePlayer.js";
 import { PlanetSideApiService } from "./PlanetSideApiService.js";
 import { getFactionEmoji, getServerName, formatBattleRank } from "../utils/census-helpers.js";
-import { nanoid } from "nanoid";
+import { showAccountPanel } from "../utils/accountPanel.js";
 import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 export class PlanetSidePanelService {
@@ -153,180 +153,8 @@ export class PlanetSidePanelService {
     const guildId = interaction.guildId;
     if (!guildId) return;
 
-    const discordId = interaction.user.id;
-
-    const config = await PlanetSideConfig.findOne({ guildId }).lean();
-    if (!config?.enabled) {
-      await interaction.reply({ content: "❌ PlanetSide linking is not currently enabled.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-
-    // Check if already linked
-    const existingLink = await PlanetSidePlayer.findOne({ guildId, discordId, linkedAt: { $ne: null } }).lean();
-    if (existingLink) {
-      const embed = this.lib
-        .createEmbedBuilder()
-        .setColor(0xffa500)
-        .setTitle("⚠️ Already Linked")
-        .setDescription(`You're already linked to **${existingLink.characterName}**.\n\n` + `Use **Unlink Account** to unlink first, then try again.`);
-      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-      return;
-    }
-
-    // Check for pending verification
-    const pendingLink = await PlanetSidePlayer.findOne({
-      guildId,
-      discordId,
-      linkedAt: null,
-      verificationStartedAt: { $ne: null },
-    }).lean();
-
-    if (pendingLink) {
-      const embed = this.lib
-        .createEmbedBuilder()
-        .setColor(0xffff00)
-        .setTitle("⏳ Pending Verification")
-        .setDescription(
-          `You have a pending link for **${pendingLink.characterName}**.\n\n` +
-            (config.verificationMethod === "online_now" ? "Log in to PlanetSide 2 on that character, then click **My Status** to verify." : "Click **My Status** to check your verification status."),
-        );
-      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-      return;
-    }
-
-    // Show modal
-    const modalId = nanoid();
-    const modal = new ModalBuilder().setCustomId(modalId).setTitle("Link PlanetSide 2 Account");
-
-    const nameInput = new TextInputBuilder()
-      .setCustomId("characterName")
-      .setLabel("Your PlanetSide 2 Character Name")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setPlaceholder("e.g. Wrel")
-      .setMinLength(2)
-      .setMaxLength(32);
-
-    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput));
-    await interaction.showModal(modal);
-
-    try {
-      const submit = await interaction.awaitModalSubmit({
-        filter: (i) => i.user.id === discordId && i.customId === modalId,
-        time: 300_000,
-      });
-
-      await submit.deferReply({ flags: MessageFlags.Ephemeral });
-
-      const characterName = submit.fields.getTextInputValue("characterName").trim();
-
-      // Look up character
-      const character = await this.apiService.findCharacterByName(characterName, {
-        honuBaseUrl: config.honuBaseUrl ?? undefined,
-        censusServiceId: config.censusServiceId ?? undefined,
-      });
-
-      if (!character) {
-        const embed = this.lib
-          .createEmbedBuilder()
-          .setColor(0xff0000)
-          .setTitle("❌ Character Not Found")
-          .setDescription(`Could not find a PlanetSide 2 character named **${characterName}**.\n\nMake sure you typed the name correctly.`);
-        await submit.editReply({ embeds: [embed] });
-        return;
-      }
-
-      // Check if character is already linked by someone else
-      const takenBy = await PlanetSidePlayer.findOne({
-        guildId,
-        characterId: character.characterId,
-        discordId: { $ne: discordId },
-        linkedAt: { $ne: null },
-      }).lean();
-
-      if (takenBy) {
-        const embed = this.lib
-          .createEmbedBuilder()
-          .setColor(0xff0000)
-          .setTitle("❌ Character Already Linked")
-          .setDescription(`**${character.characterName}** is already linked to another Discord account.`);
-        await submit.editReply({ embeds: [embed] });
-        return;
-      }
-
-      // Check outfit membership if configured — but allow guests when a guest role exists
-      if (config.outfitId && character.outfitId !== config.outfitId) {
-        // Check by tag fallback
-        const outfitMatch = config.outfitTag && character.outfitTag?.toLowerCase() === config.outfitTag.toLowerCase();
-        if (!outfitMatch && !config.roles?.guest) {
-          // No guest role configured — block non-outfit members
-          const embed = this.lib
-            .createEmbedBuilder()
-            .setColor(0xff0000)
-            .setTitle("❌ Not in Outfit")
-            .setDescription(
-              `**${character.characterName}** is not a member of ${config.outfitTag ? `[${config.outfitTag}]` : "the configured outfit"}.\n\n` +
-                `You must be a member of the outfit to link your account.`,
-            );
-          await submit.editReply({ embeds: [embed] });
-          return;
-        }
-      }
-
-      // Create pending link record
-      const member = await interaction.guild?.members.fetch(discordId).catch(() => null);
-
-      await PlanetSidePlayer.findOneAndUpdate(
-        { guildId, characterId: character.characterId },
-        {
-          $set: {
-            guildId,
-            discordId,
-            characterId: character.characterId,
-            characterName: character.characterName,
-            factionId: character.factionId,
-            serverId: character.serverId,
-            battleRank: character.battleRank,
-            prestige: character.prestige,
-            outfitId: character.outfitId,
-            outfitTag: character.outfitTag,
-            discordUsername: interaction.user.username,
-            discordDisplayName: member?.displayName || interaction.user.globalName || interaction.user.username,
-            verificationStartedAt: new Date(),
-            verificationMethod: config.verificationMethod || "online_now",
-            source: "linked",
-          },
-        },
-        { upsert: true, new: true },
-      );
-
-      broadcastDashboardChange(guildId, "planetside", "link_requested", { requiredAction: "planetside.view_players" });
-
-      if (config.verificationMethod === "manual") {
-        const embed = this.lib
-          .createEmbedBuilder()
-          .setColor(0x00ff00)
-          .setTitle("📋 Link Request Submitted")
-          .setDescription(`Your link request for **${character.characterName}** has been submitted.\n\n` + `A staff member will review and approve your request.`);
-        await submit.editReply({ embeds: [embed] });
-        return;
-      }
-
-      const embed = this.lib
-        .createEmbedBuilder()
-        .setColor(0x5865f2)
-        .setTitle("🔗 Verification Required")
-        .setDescription(
-          `Character found: ${getFactionEmoji(character.factionId)} **${character.characterName}** — ${formatBattleRank(character.battleRank, character.prestige)}\n` +
-            `Server: **${getServerName(character.serverId)}**\n\n` +
-            (config.verificationMethod === "online_now"
-              ? "**Log in to PlanetSide 2** on this character, then click **My Status** on the panel to verify."
-              : `**Log in to PlanetSide 2** briefly, then click **My Status** within ${config.verificationWindowMinutes || 60} minutes.`),
-        );
-      await submit.editReply({ embeds: [embed] });
-    } catch {
-      // Modal timed out
-    }
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await showAccountPanel(interaction, this.lib, this.apiService);
   }
 
   // ═══════════════════════════════════════════════════════════════

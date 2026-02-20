@@ -17,11 +17,13 @@ import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 const log = createLogger("planetside:panel-cmd");
 
+type DeferrableInteraction = ChatInputCommandInteraction | ButtonInteraction;
+
 /**
  * Show the unified PS2 account management panel.
  * The interaction MUST be deferred (ephemeral) before calling this.
  */
-export async function showAccountPanel(interaction: ChatInputCommandInteraction, lib: LibAPI, apiService: PlanetSideApiService): Promise<void> {
+export async function showAccountPanel(interaction: DeferrableInteraction, lib: LibAPI, apiService: PlanetSideApiService): Promise<void> {
   const guildId = interaction.guildId!;
   const discordId = interaction.user.id;
 
@@ -46,7 +48,7 @@ async function buildPanel(
   lib: LibAPI,
   apiService: PlanetSideApiService,
   config: any,
-  commandInteraction: ChatInputCommandInteraction,
+  commandInteraction: DeferrableInteraction,
 ): Promise<{ embeds: any[]; components: ActionRowBuilder<any>[] }> {
   const [linkedPlayer, pendingPlayer] = await Promise.all([
     PlanetSidePlayer.findOne({ guildId, discordId, linkedAt: { $ne: null } }).lean(),
@@ -183,7 +185,7 @@ async function handleLinkAction(
   lib: LibAPI,
   apiService: PlanetSideApiService,
   config: any,
-  commandInteraction: ChatInputCommandInteraction,
+  commandInteraction: DeferrableInteraction,
 ): Promise<void> {
   const modalId = nanoid();
   const modal = new ModalBuilder().setCustomId(modalId).setTitle("Link PlanetSide 2 Account");
@@ -287,7 +289,7 @@ async function handleVerifyAction(
   lib: LibAPI,
   apiService: PlanetSideApiService,
   config: any,
-  commandInteraction: ChatInputCommandInteraction,
+  commandInteraction: DeferrableInteraction,
 ): Promise<void> {
   await btnInteraction.deferUpdate();
 
@@ -356,7 +358,7 @@ async function handleUnlinkAction(
   discordId: string,
   lib: LibAPI,
   config: any,
-  commandInteraction: ChatInputCommandInteraction,
+  commandInteraction: DeferrableInteraction,
   apiService: PlanetSideApiService,
 ): Promise<void> {
   const confirmEmbed = lib
