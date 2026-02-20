@@ -393,6 +393,7 @@ After making code changes, **always commit using the git tools** — don't leave
 
 - Group related changes into logical commits (one feature/fix per commit) rather than one giant commit per session
 - Use [Conventional Commits](https://www.conventionalcommits.org/) format: `feat(scope):`, `fix(scope):`, `chore(scope):`, `perf(scope):`, `refactor(scope):`
+- **`fix:` vs `feat:`** — if the motivation was to correct a bug, a performance problem, or unexpected behaviour, use `fix:` even if the solution involved adding new code (a new cache, a new helper, a new config option). `feat:` is for deliberate new user-facing capabilities. When in doubt: ask "was something broken?" — if yes, it's `fix:`.
 - Stage and commit each group before moving on to the next area of work
 
 ### Using the git tools
