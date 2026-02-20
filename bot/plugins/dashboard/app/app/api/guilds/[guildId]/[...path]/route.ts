@@ -12,48 +12,7 @@ import { resolvePermissions, type RoleOverrides, type MemberInfo } from "@/lib/p
 import { checkBotOwner } from "@/lib/botOwner";
 import { permissionCategories } from "@/lib/permissionDefs";
 import { getIntegrationPluginFromSegment, isPluginEnabled, parseEnabledPlugins } from "@/lib/integrations";
-
-const API_PORT = process.env.API_PORT || "3001";
-const API_BASE = `http://localhost:${API_PORT}`;
-const API_KEY = process.env.INTERNAL_API_KEY!;
-
-/** Simple in-memory cache with TTL */
-const cache = new Map<string, { data: unknown; expiresAt: number }>();
-const CACHE_TTL = 10_000; // 10 seconds
-
-function getCached<T>(key: string): T | null {
-  const entry = cache.get(key);
-  if (!entry || Date.now() > entry.expiresAt) {
-    if (entry) cache.delete(key);
-    return null;
-  }
-  return entry.data as T;
-}
-
-function setCache(key: string, data: unknown): void {
-  cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL });
-}
-
-/** Fetch from bot API with caching */
-async function fetchBotApi<T>(path: string, cacheKey?: string): Promise<T | null> {
-  if (cacheKey) {
-    const cached = getCached<T>(cacheKey);
-    if (cached) return cached;
-  }
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      headers: { "X-API-Key": API_KEY },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    if (!json.success) return null;
-    if (cacheKey) setCache(cacheKey, json.data);
-    return json.data as T;
-  } catch {
-    return null;
-  }
-}
+import { fetchBotApi, TTL_MEMBER, TTL_PERMISSIONS, TTL_PERMISSION_DEFS, API_BASE, API_KEY } from "@/lib/botApiClient";
 
 interface RouteParams {
   params: Promise<{
@@ -89,7 +48,11 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
 
   if (requiredAction) {
     // Fetch member info (roles, isOwner, isAdmin)
-    const memberData = await fetchBotApi<MemberInfo>(`/api/guilds/${guildId}/members/${session.user.id}`, `member:${guildId}:${session.user.id}`);
+    const memberData = await fetchBotApi<MemberInfo>(
+      `/api/guilds/${guildId}/members/${session.user.id}`,
+      `member:${guildId}:${session.user.id}`,
+      TTL_MEMBER,
+    );
 
     if (!memberData) {
       return NextResponse.json({ error: "Could not verify member permissions" }, { status: 403 });
@@ -105,10 +68,12 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
         fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(
           `/api/guilds/${guildId}/dashboard-permissions`,
           `perms:${guildId}`,
+          TTL_PERMISSIONS,
         ),
         fetchBotApi<{ categories: Array<{ key: string; label: string; description: string; actions: Array<{ key: string; label: string; description: string }> }> }>(
           `/api/guilds/${guildId}/permission-defs`,
           `permdefs:${guildId}`,
+          TTL_PERMISSION_DEFS,
         ),
       ]);
 

@@ -10,27 +10,10 @@ import { getUserGuilds } from "@/lib/guildCache";
 import { resolvePermissions, type RoleOverrides, type MemberInfo } from "@/lib/permissions";
 import { permissionCategories, type PermissionCategory } from "@/lib/permissionDefs";
 import { checkBotOwner } from "@/lib/botOwner";
-
-const API_PORT = process.env.API_PORT || "3001";
-const API_BASE = `http://localhost:${API_PORT}`;
-const API_KEY = process.env.INTERNAL_API_KEY!;
+import { fetchBotApi, TTL_MEMBER, TTL_PERMISSIONS, TTL_PERMISSION_DEFS, TTL_SETTINGS } from "@/lib/botApiClient";
 
 interface RouteParams {
   params: Promise<{ guildId: string }>;
-}
-
-async function fetchBotApi<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      headers: { "X-API-Key": API_KEY },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.success ? (json.data as T) : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
@@ -48,10 +31,10 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
   // Fetch member info + permission overrides + settings + bot owner in parallel
   const [memberData, permData, settingsData, permissionDefs, isBotOwner] = await Promise.all([
-    fetchBotApi<MemberInfo>(`/api/guilds/${guildId}/members/${session.user.id}`),
-    fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(`/api/guilds/${guildId}/dashboard-permissions`),
-    fetchBotApi<{ settings: { hideDeniedFeatures: boolean } }>(`/api/guilds/${guildId}/dashboard-settings`),
-    fetchBotApi<{ categories: PermissionCategory[] }>(`/api/guilds/${guildId}/permission-defs`),
+    fetchBotApi<MemberInfo>(`/api/guilds/${guildId}/members/${session.user.id}`, `member:${guildId}:${session.user.id}`, TTL_MEMBER),
+    fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(`/api/guilds/${guildId}/dashboard-permissions`, `perms:${guildId}`, TTL_PERMISSIONS),
+    fetchBotApi<{ settings: { hideDeniedFeatures: boolean } }>(`/api/guilds/${guildId}/dashboard-settings`, `settings:${guildId}`, TTL_SETTINGS),
+    fetchBotApi<{ categories: PermissionCategory[] }>(`/api/guilds/${guildId}/permission-defs`, `permdefs:${guildId}`, TTL_PERMISSION_DEFS),
     checkBotOwner(session.user.id),
   ]);
 

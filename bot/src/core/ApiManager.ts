@@ -209,9 +209,18 @@ export class ApiManager {
       next();
     });
 
-    // Request logging
-    this.app.use((req: Request, _res: Response, next: NextFunction) => {
+    // Request logging + slow-request timing
+    // Logs all requests at DEBUG level; warns on anything over SLOW_REQUEST_THRESHOLD.
+    const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_THRESHOLD_MS ?? 500);
+    this.app.use((req: Request, res: Response, next: NextFunction) => {
+      const start = Date.now();
       log.debug(`[API] ${req.method} ${req.path}`);
+      res.on("finish", () => {
+        const ms = Date.now() - start;
+        if (ms >= SLOW_REQUEST_MS) {
+          log.warn(`[API] SLOW ${req.method} ${req.path} — ${ms}ms (status ${res.statusCode})`);
+        }
+      });
       next();
     });
 
