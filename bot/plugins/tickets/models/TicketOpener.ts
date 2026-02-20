@@ -27,6 +27,7 @@ const TicketOpenerSchema = new Schema(
     embedColor: { type: Number },
     embedImage: { type: String },
     embedThumbnail: { type: String },
+    embedFooter: { type: String, maxlength: 2048 },
 
     // Component Configuration
     uiType: { type: String, enum: Object.values(OpenerUIType), required: true },
@@ -34,16 +35,13 @@ const TicketOpenerSchema = new Schema(
       type: [String],
       required: true,
       default: [],
-      validate: [
-        (v: string[]) => v.length <= MAX_OPENER_CATEGORIES,
-        `Maximum ${MAX_OPENER_CATEGORIES} categories`,
-      ],
+      validate: [(v: string[]) => v.length <= MAX_OPENER_CATEGORIES, `Maximum ${MAX_OPENER_CATEGORIES} categories`],
     },
 
     // Metadata
     createdBy: { type: String, required: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Indexes
@@ -69,8 +67,7 @@ interface ITicketOpenerModel extends Model<ITicketOpener> {
 }
 
 // Hot-reload safe export
-const TicketOpener = (mongoose.models.TicketOpener ||
-  model<ITicketOpener, ITicketOpenerModel>("TicketOpener", TicketOpenerSchema)) as ITicketOpenerModel;
+const TicketOpener = (mongoose.models.TicketOpener || model<ITicketOpener, ITicketOpenerModel>("TicketOpener", TicketOpenerSchema)) as ITicketOpenerModel;
 
 export default TicketOpener;
 export type { ITicketOpener, ITicketOpenerModel };

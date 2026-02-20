@@ -102,7 +102,7 @@ export function createOpenersRoutes(_deps: ApiDependencies): Router {
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { guildId } = req.params;
-      const { name, uiType, embedTitle, embedDescription, embedColor, embedImage, embedThumbnail, categoryIds = [] } = req.body;
+      const { name, uiType, embedTitle, embedDescription, embedColor, embedImage, embedThumbnail, embedFooter, categoryIds = [] } = req.body;
       const createdBy = req.header("X-User-Id");
 
       if (!createdBy) {
@@ -170,6 +170,7 @@ export function createOpenersRoutes(_deps: ApiDependencies): Router {
         embedColor: embedColor || 0x5865f2,
         embedImage,
         embedThumbnail,
+        embedFooter,
         categoryIds,
         createdBy,
       });
@@ -280,7 +281,7 @@ export function createOpenersRoutes(_deps: ApiDependencies): Router {
       }
 
       // Apply allowed updates
-      const allowedFields = ["name", "embedTitle", "embedDescription", "embedColor", "embedImage", "embedThumbnail"];
+      const allowedFields = ["name", "embedTitle", "embedDescription", "embedColor", "embedImage", "embedThumbnail", "embedFooter"];
 
       for (const field of allowedFields) {
         if (updates[field] !== undefined) {

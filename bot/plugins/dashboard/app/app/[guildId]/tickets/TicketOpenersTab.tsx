@@ -38,6 +38,7 @@ interface TicketOpener {
   embedColor?: number;
   embedImage?: string;
   embedThumbnail?: string;
+  embedFooter?: string;
   uiType: "buttons" | "dropdown";
   categoryIds: string[];
   createdBy: string;
@@ -82,6 +83,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
     embedColor: "",
     embedImage: "",
     embedThumbnail: "",
+    embedFooter: "",
     uiType: "buttons" as "buttons" | "dropdown",
     categoryIds: [] as string[],
   });
@@ -142,6 +144,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
       embedColor: "#5865f2",
       embedImage: "",
       embedThumbnail: "",
+      embedFooter: "",
       uiType: "buttons",
       categoryIds: [],
     });
@@ -157,6 +160,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
       embedColor: op.embedColor ? `#${op.embedColor.toString(16).padStart(6, "0")}` : "#5865f2",
       embedImage: op.embedImage ?? "",
       embedThumbnail: op.embedThumbnail ?? "",
+      embedFooter: op.embedFooter ?? "",
       uiType: op.uiType,
       categoryIds: [...op.categoryIds],
     });
@@ -197,6 +201,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
           embedColor: colorNum,
           embedImage: draft.embedImage.trim() || undefined,
           embedThumbnail: draft.embedThumbnail.trim() || undefined,
+          embedFooter: draft.embedFooter.trim() || undefined,
           uiType: draft.uiType,
         };
         const res = await fetchApi(guildId, `tickets/openers/${editOpener.id}`, {
@@ -234,6 +239,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
           embedColor: colorNum,
           embedImage: draft.embedImage.trim() || undefined,
           embedThumbnail: draft.embedThumbnail.trim() || undefined,
+          embedFooter: draft.embedFooter.trim() || undefined,
           uiType: draft.uiType,
           categoryIds: draft.categoryIds,
         };
@@ -542,6 +548,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
             onChange={(v) => setDraft((d) => ({ ...d, embedThumbnail: v }))}
             placeholder="https://…"
           />
+          <TextInput label="Footer" value={draft.embedFooter} onChange={(v) => setDraft((d) => ({ ...d, embedFooter: v }))} placeholder="Footer text" />
 
           <hr className="border-zinc-700/30" />
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Categories</p>

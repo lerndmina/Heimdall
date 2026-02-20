@@ -41,6 +41,7 @@ export async function buildOpenerMessage(
 
   if (opener.embedImage) embed.setImage(opener.embedImage);
   if (opener.embedThumbnail) embed.setThumbnail(opener.embedThumbnail);
+  if ((opener as any).embedFooter) embed.setFooter({ text: (opener as any).embedFooter });
 
   const components: ActionRowBuilder<any>[] = [];
 
