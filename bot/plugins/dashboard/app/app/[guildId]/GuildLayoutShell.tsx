@@ -64,7 +64,14 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: "Moderation", href: (id) => `/${id}/moderation`, icon: <ModerationIcon />, category: "moderation", plugin: "moderation" },
   { label: "PlanetSide", href: (id) => `/${id}/planetside`, icon: <PlanetSideIcon />, category: "planetside", plugin: "planetside" },
   { label: "Settings", href: (id) => `/${id}/settings`, icon: <SettingsIcon />, category: "dashboard" },
-];
+].sort((a, b) => {
+  // Pin Overview first and Settings last; sort everything else alphabetically
+  if (a.label === "Overview") return -1;
+  if (b.label === "Overview") return 1;
+  if (a.label === "Settings") return 1;
+  if (b.label === "Settings") return -1;
+  return a.label.localeCompare(b.label);
+});
 
 function GuildLayoutInner({ guild, children }: { guild: GuildInfo; children: React.ReactNode }) {
   const { permissions, hideDeniedFeatures, isOwner, isBotOwner, isAdministrator, denyAccess, loaded } = usePermissions();
