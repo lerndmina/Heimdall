@@ -92,10 +92,7 @@ export function RowActionMenu({ open, anchorEl, onClose, children, width = 176 }
         width,
         zIndex: 9999,
       }}
-      className={`rounded-lg border border-zinc-700/30 bg-zinc-900/95 py-1 shadow-xl backdrop-blur-sm transition-opacity duration-75 ${
-        visible ? "opacity-100" : "pointer-events-none opacity-0"
-      }`}
-    >
+      className={`rounded-lg border border-zinc-700/30 bg-zinc-900/95 py-1 shadow-xl backdrop-blur-sm transition-opacity duration-75 ${visible ? "opacity-100" : "pointer-events-none opacity-0"}`}>
       {children}
     </div>,
     document.body,
@@ -122,8 +119,7 @@ export function RowActionItem({ onClick, variant = "default", children, disabled
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40 ${ITEM_COLORS[variant]}`}
-    >
+      className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40 ${ITEM_COLORS[variant]}`}>
       {children}
     </button>
   );
