@@ -111,6 +111,10 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
   const [deleteTarget, setDeleteTarget] = useState<PS2Player | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Edit modal
+  const [editTarget, setEditTarget] = useState<PS2Player | null>(null);
+  const [editForm, setEditForm] = useState({ characterName: "", characterId: "", discordId: "", factionId: 0, serverId: 0 });
+
   // Manual link
   const [showManualLink, setShowManualLink] = useState(false);
   const [manualForm, setManualForm] = useState({ characterName: "", characterId: "", discordId: "", factionId: 0, serverId: 0 });
@@ -243,6 +247,40 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
         fetchPlayers();
       } else {
         toast.error(res.error?.message ?? "Failed to delete");
+      }
+    } catch {
+      toast.error("Failed to connect to API");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openEditModal = (player: PS2Player) => {
+    setEditTarget(player);
+    setEditForm({
+      characterName: player.characterName,
+      characterId: player.characterId,
+      discordId: player.discordId ?? "",
+      factionId: player.factionId ?? 0,
+      serverId: player.serverId ?? 0,
+    });
+    setOpenMenu(null);
+  };
+
+  const handleEdit = async () => {
+    if (!editTarget) return;
+    setActionLoading(true);
+    try {
+      const res = await fetchApi(guildId, `planetside/players/${editTarget._id}`, {
+        method: "PUT",
+        body: JSON.stringify(editForm),
+      });
+      if (res.success) {
+        toast.success(`Updated ${editForm.characterName}`);
+        setEditTarget(null);
+        fetchPlayers();
+      } else {
+        toast.error(res.error?.message ?? "Failed to update");
       }
     } catch {
       toast.error("Failed to connect to API");
@@ -428,6 +466,12 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   ref={menuRef}
                   style={{ position: "fixed", top: menuPosition.top, left: menuPosition.left, zIndex: 60 }}
                   className={`w-44 rounded-lg border border-zinc-700/30 bg-zinc-900/40 backdrop-blur-xl py-1 shadow-xl ${menuVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                  <button
+                    onClick={() => openEditModal(activePlayer)}
+                    className="w-full px-3 py-1.5 text-left text-sm text-blue-400 transition-colors hover:bg-white/5 hover:text-blue-300">
+                    ✎ Edit
+                  </button>
+                  <div className="my-1 border-t border-zinc-700/30" />
                   {!activePlayer.revokedAt && activePlayer.linkedAt && (
                     <button
                       onClick={() => {
@@ -469,6 +513,80 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
           )}
         </>
       )}
+
+      {/* Edit Modal */}
+      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title={`Edit ${editTarget?.characterName ?? ""}`}>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">Character Name</label>
+              <input
+                type="text"
+                value={editForm.characterName}
+                onChange={(e) => setEditForm((f) => ({ ...f, characterName: e.target.value }))}
+                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">Character ID</label>
+              <input
+                type="text"
+                value={editForm.characterId}
+                onChange={(e) => setEditForm((f) => ({ ...f, characterId: e.target.value }))}
+                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">Discord User ID</label>
+              <input
+                type="text"
+                value={editForm.discordId}
+                onChange={(e) => setEditForm((f) => ({ ...f, discordId: e.target.value }))}
+                placeholder="e.g. 234439833802637312"
+                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-400">Faction</label>
+              <select
+                value={editForm.factionId}
+                onChange={(e) => setEditForm((f) => ({ ...f, factionId: Number(e.target.value) }))}
+                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-indigo-500">
+                {Object.entries(FACTION_NAMES).map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-medium text-zinc-400">Server</label>
+              <select
+                value={editForm.serverId}
+                onChange={(e) => setEditForm((f) => ({ ...f, serverId: Number(e.target.value) }))}
+                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-indigo-500">
+                <option value={0}>Select server…</option>
+                {Object.entries(SERVER_NAMES).map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setEditTarget(null)} className="rounded-md px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
+              Cancel
+            </button>
+            <button
+              onClick={handleEdit}
+              disabled={actionLoading || !editForm.characterName.trim()}
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
+              {actionLoading ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Revoke Modal */}
       <Modal
