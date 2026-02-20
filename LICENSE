@@ -1,64 +1,26 @@
-Heimdall Noncommercial Single-Server License (NC-1S) v1.0
+Heimdall License Notice
 
 Copyright (c) 2026 lerndmina
 
-1) Grant of Rights
+Base License
 
-Subject to the conditions in this License, you are granted a non-exclusive,
-worldwide, non-transferable, revocable license to:
+This project is licensed under the PolyForm Noncommercial License 1.0.0,
+available at:
+https://polyformproject.org/licenses/noncommercial/1.0.0/
 
-- use, copy, modify, and share this source code;
-- self-host and run this software;
+Additional Project Term (Single-Server Addendum)
 
-provided that all usage is strictly noncommercial and limited to one active
-hosted server at a time per person or organization.
+In addition to the terms of PolyForm Noncommercial 1.0.0, the following term
+applies to this project:
 
-2) Noncommercial Use Only
+1. Single Active Hosted Server Limit
+	You may operate this software for only one active hosted server at a time
+	per person or organization.
 
-You may not use this software, or any derivative of it, for Commercial Use.
-"Commercial Use" means any use intended for, directed toward, or resulting in
-monetary compensation, business advantage, paid access, paid support, paid
-hosting, subscriptions, donations tied to access/features, sponsorship-based
-operation, or any other revenue-generating activity.
+	Running multiple active hosted servers simultaneously is not permitted
+	without explicit prior written permission from the copyright holder.
 
-3) Single-Server Hosting Limit
-
-You may operate this software for only one active hosted server at a time per
-person or organization. Running multiple active hosted servers simultaneously
-is not permitted without explicit written permission from the copyright holder.
-
-4) Distribution Requirements
-
-If you distribute this software or derivatives, you must:
-
-- include this License in full;
-- preserve copyright and attribution notices;
-- clearly indicate material modifications.
-
-5) No Trademark or Branding Rights
-
-This License does not grant rights to use project names, logos, or branding
-except as required for accurate attribution.
-
-6) Termination
-
-Any violation of this License automatically terminates your rights under it.
-Upon termination, you must stop using and distributing the software.
-
-7) Disclaimer of Warranty
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
-
-8) Limitation of Liability
-
-IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
-CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT,
-OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE
-USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-9) Contact for Commercial or Multi-Server Licensing
+Commercial and Multi-Server Licensing
 
 For commercial usage rights or permission to run multiple active hosted
 servers, contact the copyright holder.

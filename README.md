@@ -706,11 +706,11 @@ Contributions are welcome! Please follow these guidelines:
 
 ## License
 
-This project is licensed under the **Heimdall Noncommercial Single-Server License (NC-1S) v1.0**.
+This project is licensed under **PolyForm Noncommercial 1.0.0** with a project-specific **Single-Server Addendum**.
 
 - ✅ Public source code, modification, and self-hosting are allowed
-- ✅ Noncommercial use is allowed
-- ⚠️ Hosting is limited to **one active server at a time** per person/organization
+- ✅ Noncommercial use is allowed (per PolyForm Noncommercial 1.0.0)
+- ⚠️ Hosting is limited to **one active server at a time** per person/organization (addendum)
 - ❌ Commercial use is not allowed
 
 See [LICENSE](./LICENSE) for full terms.
