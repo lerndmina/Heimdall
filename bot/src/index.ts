@@ -37,6 +37,7 @@ import { OwnerCommands } from "./core/OwnerCommands";
 import { WebSocketManager } from "./core/WebSocketManager";
 import { setWebSocketManager, clearWebSocketManager } from "./core/broadcast";
 import { PermissionService } from "./core/PermissionService";
+import { buildHelpCommandData, createHelpExecute } from "./core/HelpCommand";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -188,6 +189,13 @@ async function onReady(readyClient: Client<true>): Promise<void> {
 
   // Set exported client reference
   client = heimdallClient;
+
+  // Register core help command (after plugins so it can list all commands)
+  commandManager.registerCommand({
+    data: buildHelpCommandData(),
+    config: { pluginName: "core" },
+    execute: createHelpExecute(commandManager),
+  });
 
   // Register commands now that plugins are loaded
   try {

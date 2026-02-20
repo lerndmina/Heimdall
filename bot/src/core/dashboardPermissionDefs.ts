@@ -163,6 +163,19 @@ export const permissionCategories: PermissionCategory[] = [
       { key: "manage_presets", label: "Manage Presets", description: "Install and uninstall preset automod rules." },
     ],
   },
+  {
+    key: "planetside",
+    label: "PlanetSide 2",
+    description: "Manage PlanetSide 2 account linking, Census monitoring, and population data.",
+    actions: [
+      { key: "view_config", label: "View Configuration", description: "View the PlanetSide plugin configuration." },
+      { key: "manage_config", label: "Manage Configuration", description: "Edit PlanetSide plugin settings, outfit, roles, and channels." },
+      { key: "view_players", label: "View Players", description: "View linked PlanetSide characters." },
+      { key: "manage_players", label: "Manage Players", description: "Link, unlink, or revoke PlanetSide characters." },
+      { key: "view_census_status", label: "View Census Status", description: "View Census and Honu API health status." },
+      { key: "view_population", label: "View Population", description: "View live server population data." },
+    ],
+  },
 ];
 
 export function getAllActionKeys(): Set<string> {

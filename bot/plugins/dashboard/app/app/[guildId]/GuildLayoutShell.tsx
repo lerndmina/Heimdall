@@ -30,6 +30,7 @@ import {
   VCTranscriptionIcon,
   AttachmentBlockerIcon,
   ModerationIcon,
+  PlanetSideIcon,
   SettingsIcon,
 } from "@/components/icons";
 
@@ -61,6 +62,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: "VC Transcription", href: (id) => `/${id}/vc-transcription`, icon: <VCTranscriptionIcon />, category: "vc-transcription", plugin: "vc-transcription" },
   { label: "Attachment Blocker", href: (id) => `/${id}/attachment-blocker`, icon: <AttachmentBlockerIcon />, category: "attachment-blocker", plugin: "attachment-blocker" },
   { label: "Moderation", href: (id) => `/${id}/moderation`, icon: <ModerationIcon />, category: "moderation", plugin: "moderation" },
+  { label: "PlanetSide", href: (id) => `/${id}/planetside`, icon: <PlanetSideIcon />, category: "planetside", plugin: "planetside" },
   { label: "Settings", href: (id) => `/${id}/settings`, icon: <SettingsIcon />, category: "dashboard" },
 ];
 

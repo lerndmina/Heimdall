@@ -12,6 +12,7 @@ const INTEGRATION_SEGMENT_TO_PLUGIN: Record<string, string> = {
   "vc-transcription": "vc-transcription",
   "attachment-blocker": "attachment-blocker",
   moderation: "moderation",
+  planetside: "planetside",
 };
 
 export function getIntegrationPluginFromSegment(segment: string | undefined): string | null {

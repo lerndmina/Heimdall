@@ -12,7 +12,7 @@ import express, { Router, type Application, type Request, type Response, type Ne
 import type { Server } from "http";
 import crypto from "crypto";
 import cors from "cors";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import { ChannelType, PermissionFlagsBits, EmbedBuilder, TextChannel, type Client } from "discord.js";
@@ -161,6 +161,13 @@ export class ApiManager {
     this.app.use(express.json({ limit: "1mb" }));
     this.app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
+    // Shared key generator: prefer X-User-Id (dashboard), fall back to IP (with IPv6 subnet normalization)
+    const dashboardOrIpKey = (req: Request) => {
+      const userId = req.header("X-User-Id");
+      if (userId) return userId;
+      return ipKeyGenerator(req.ip ?? "unknown");
+    };
+
     // Global rate limiting — 100 requests/minute, keyed by X-User-Id (dashboard) or IP (external)
     this.app.use(
       rateLimit({
@@ -168,7 +175,7 @@ export class ApiManager {
         max: 100,
         standardHeaders: true,
         legacyHeaders: false,
-        keyGenerator: (req: Request) => req.header("X-User-Id") || req.ip || "unknown",
+        keyGenerator: dashboardOrIpKey,
         message: { error: "Too many requests, please try again later" },
       }),
     );
@@ -181,22 +188,23 @@ export class ApiManager {
         max: 20,
         standardHeaders: true,
         legacyHeaders: false,
-        keyGenerator: (req: Request) => req.header("X-User-Id") || req.ip || "unknown",
+        keyGenerator: dashboardOrIpKey,
         message: { error: "Too many requests, please try again later" },
       }),
     );
 
-    // Stricter rate limit for mutation routes — 30 requests/minute
+    // Stricter rate limit for mutation routes — 30 requests/minute (hoisted to avoid per-request instantiation)
+    const mutationLimiter = rateLimit({
+      windowMs: 60_000,
+      max: 30,
+      standardHeaders: true,
+      legacyHeaders: false,
+      keyGenerator: dashboardOrIpKey,
+      message: { error: "Too many write requests, please try again later" },
+    });
     this.app.use((req: Request, _res: Response, next: NextFunction) => {
       if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
-        return rateLimit({
-          windowMs: 60_000,
-          max: 30,
-          standardHeaders: true,
-          legacyHeaders: false,
-          keyGenerator: (r: Request) => r.header("X-User-Id") || r.ip || "unknown",
-          message: { error: "Too many write requests, please try again later" },
-        })(req, _res, next);
+        return mutationLimiter(req, _res, next);
       }
       next();
     });

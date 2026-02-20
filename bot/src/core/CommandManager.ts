@@ -87,6 +87,13 @@ export class CommandManager {
   private dynamicCommandResolvers: DynamicCommandResolver[] = [];
   private dynamicPermissionResolvers: DynamicPermissionResolver[] = [];
 
+  /**
+   * Discord-assigned command IDs per guild.
+   * Outer key = guildId, inner key = command name, value = command snowflake ID.
+   * Populated after registerCommandsToGuild() completes.
+   */
+  private guildCommandIds: Map<string, Map<string, string>> = new Map();
+
   constructor(client: HeimdallClient, botToken: string) {
     this.client = client;
     this.rest = new REST({ version: "10" }).setToken(botToken);
@@ -255,9 +262,20 @@ export class CommandManager {
     }
 
     try {
-      await this.rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+      const result = (await this.rest.put(Routes.applicationGuildCommands(clientId, guildId), {
         body: commandData,
-      });
+      })) as Array<{ id: string; name: string }>;
+
+      // Store returned command IDs for </command:id> mention format
+      const idMap = new Map<string, string>();
+      if (Array.isArray(result)) {
+        for (const cmd of result) {
+          if (cmd.id && cmd.name) {
+            idMap.set(cmd.name, cmd.id);
+          }
+        }
+      }
+      this.guildCommandIds.set(guildId, idMap);
 
       log.debug(`✅ Registered ${commandData.length} command(s) for guild ${guildId}`);
     } catch (error) {
@@ -311,6 +329,27 @@ export class CommandManager {
   async refreshGuildCommands(guildId: string): Promise<void> {
     log.info(`Refreshing commands for guild ${guildId}...`);
     await this.registerCommandsToGuild(guildId);
+  }
+
+  /**
+   * Get the Discord-assigned command IDs for a guild.
+   * Returns a Map of command name → command snowflake ID.
+   */
+  getGuildCommandIds(guildId: string): Map<string, string> {
+    return this.guildCommandIds.get(guildId) ?? new Map();
+  }
+
+  /**
+   * Get a clickable command mention string like </help:123456>.
+   * Returns the plain /command name if no ID is found.
+   */
+  getCommandMention(commandName: string, guildId: string, subcommand?: string): string {
+    const ids = this.guildCommandIds.get(guildId);
+    const id = ids?.get(commandName);
+    if (id) {
+      return subcommand ? `</${commandName} ${subcommand}:${id}>` : `</${commandName}:${id}>`;
+    }
+    return subcommand ? `\`/${commandName} ${subcommand}\`` : `\`/${commandName}\``;
   }
 
   /**
