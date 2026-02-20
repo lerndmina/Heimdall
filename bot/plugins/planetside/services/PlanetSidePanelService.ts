@@ -62,29 +62,45 @@ export class PlanetSidePanelService {
       }
 
       const targetChannel = channel as TextChannel;
+      const guild = targetChannel.guild;
+      const botMember = guild.members.me;
+
       const displayTag = config.outfitTag ? `[${config.outfitTag}]` : "";
       const displayName = config.outfitName || "PlanetSide 2";
 
-      const verifyDesc =
-        config.verificationMethod === "online_now"
-          ? "2. **Log in to PlanetSide 2** on the character you entered\n3. Click **My Status** to verify — your character must be online"
-          : config.verificationMethod === "recent_login"
-            ? `2. **Log in to PlanetSide 2** briefly on the character\n3. Click **My Status** within ${config.verificationWindowMinutes || 60} minutes to verify`
-            : "2. A staff member will manually verify your account";
+      // Build description — mention configured roles when available
+      const memberRoleMention = config.roles?.member ? `<@&${config.roles.member}>` : "the **Member** role";
+      const guestRoleMention = config.roles?.guest ? `<@&${config.roles.guest}>` : "the **Guest** role";
+
+      let description: string;
+      if (config.outfitTag) {
+        description =
+          `Hello recruit! Click the button below and link your PlanetSide 2 account.\n\n` +
+          `If you are in ${displayTag}, you will be given the ${memberRoleMention} role.\n\n` +
+          `Guests are welcome too! If you are a guest, link your account and you will be given the ${guestRoleMention} role.`;
+      } else {
+        description =
+          `Hello! Click the button below and link your PlanetSide 2 account.\n\n` +
+          `Once verified, you will be given your role automatically.`;
+      }
 
       const embed = this.lib
         .createEmbedBuilder()
-        .setTitle(`🎮 ${displayTag} PlanetSide 2 Account Linking`)
-        .setDescription(
-          `Link your Discord account to your PlanetSide 2 character!\n\n` +
-            `**How it works:**\n` +
-            `1. Click **Link Account** and enter your PS2 character name\n` +
-            `${verifyDesc}\n\n` +
-            (config.outfitTag ? `**Outfit:** ${displayTag} ${displayName}\n` : "") +
-            `Use **My Status** to check your linking status at any time.`,
-        )
-        .setColor(0x5865f2)
+        .setTitle("Get your role!")
+        .setDescription(description)
+        .setColor(0xde3b79)
+        .setTimestamp(new Date())
         .setFooter({ text: `${displayName} • PlanetSide 2 Account Linking` });
+
+      // Set author to the bot's user info
+      if (botMember) {
+        embed.setAuthor({
+          name: botMember.displayName || guild.client.user.username,
+          iconURL: guild.client.user.displayAvatarURL(),
+        });
+      }
+
+      // ── Buttons ──────────────────────────────────────────────
 
       const linkBtn = this.lib.createButtonBuilderPersistent("planetside.link", { guildId });
       linkBtn.setLabel("Link Account").setEmoji("🔗").setStyle(ButtonStyle.Primary);
@@ -219,11 +235,12 @@ export class PlanetSidePanelService {
         return;
       }
 
-      // Check outfit membership if configured
+      // Check outfit membership if configured — but allow guests when a guest role exists
       if (config.outfitId && character.outfitId !== config.outfitId) {
         // Check by tag fallback
         const outfitMatch = config.outfitTag && character.outfitTag?.toLowerCase() === config.outfitTag.toLowerCase();
-        if (!outfitMatch) {
+        if (!outfitMatch && !config.roles?.guest) {
+          // No guest role configured — block non-outfit members
           const embed = this.lib
             .createEmbedBuilder()
             .setColor(0xff0000)
