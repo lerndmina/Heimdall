@@ -12,6 +12,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { PlanetSideApiDependencies } from "./index.js";
 import PlanetSidePlayer from "../models/PlanetSidePlayer.js";
+import PlanetSideConfig from "../models/PlanetSideConfig.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import { escapeRegex } from "../../lib/utils/escapeRegex.js";
 
@@ -261,6 +262,30 @@ export function createPlayersRoutes(deps: PlanetSideApiDependencies): Router {
         details: reason || "Revoked via dashboard",
       });
       await player.save();
+
+      // Remove configured Discord roles from the member
+      const discordId = typeof player.discordId === "string" ? player.discordId : null;
+      if (discordId) {
+        try {
+          const config = await PlanetSideConfig.findOne({ guildId }).lean();
+          const guild = await deps.lib.thingGetter.getGuild(guildId as string);
+          if (guild && config) {
+            const member = await deps.lib.thingGetter.getMember(guild, discordId);
+            if (member) {
+              const rolesToRemove = [config.roles?.member, config.roles?.guest].filter(Boolean) as string[];
+              for (const roleId of rolesToRemove) {
+                if (member.roles.cache.has(roleId)) {
+                  await member.roles.remove(roleId).catch((err: Error) => {
+                    log.warn(`Failed to remove role ${roleId} from ${discordId}:`, err);
+                  });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          log.warn(`Role removal failed for ${discordId} after revoke:`, err);
+        }
+      }
 
       log.info(`Staff ${actorUserId} revoked link for ${player.characterName} in guild ${guildId}`);
       res.json({ success: true, data: player.toObject() });
