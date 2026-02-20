@@ -68,32 +68,51 @@ export class PlanetSidePanelService {
       const displayTag = config.outfitTag ? `[${config.outfitTag}]` : "";
       const displayName = config.outfitName || "PlanetSide 2";
 
-      // Build description — mention configured roles when available
+      // Template placeholders for description substitution
       const memberRoleMention = config.roles?.member ? `<@&${config.roles.member}>` : "the **Member** role";
       const guestRoleMention = config.roles?.guest ? `<@&${config.roles.guest}>` : "the **Guest** role";
 
+      const placeholders: Record<string, string> = {
+        memberRole: memberRoleMention,
+        guestRole: guestRoleMention,
+        outfitTag: displayTag,
+        outfitName: displayName,
+      };
+
+      // ── Resolve panel embed values from config or defaults ──
+
+      const panelTitle = config.panel?.title || "Get your role!";
+      const panelColor = config.panel?.color ? parseInt(config.panel.color.replace("#", ""), 16) : 0xde3b79;
+      const panelFooter = config.panel?.footerText || `${displayName} • PlanetSide 2 Account Linking`;
+      const panelShowAuthor = config.panel?.showAuthor !== false;
+      const panelShowTimestamp = config.panel?.showTimestamp !== false;
+
       let description: string;
-      if (config.outfitTag) {
+      if (config.panel?.description) {
+        // Custom description — substitute placeholders
+        description = this.substitutePlaceholders(config.panel.description, placeholders);
+      } else if (config.outfitTag) {
+        // Default description for outfit-configured servers
         description =
           `Hello recruit! Click the button below and link your PlanetSide 2 account.\n\n` +
           `If you are in ${displayTag}, you will be given the ${memberRoleMention} role.\n\n` +
           `Guests are welcome too! If you are a guest, link your account and you will be given the ${guestRoleMention} role.`;
       } else {
-        description =
-          `Hello! Click the button below and link your PlanetSide 2 account.\n\n` +
-          `Once verified, you will be given your role automatically.`;
+        description = `Hello! Click the button below and link your PlanetSide 2 account.\n\n` + `Once verified, you will be given your role automatically.`;
       }
 
       const embed = this.lib
         .createEmbedBuilder()
-        .setTitle("Get your role!")
+        .setTitle(panelTitle)
         .setDescription(description)
-        .setColor(0xde3b79)
-        .setTimestamp(new Date())
-        .setFooter({ text: `${displayName} • PlanetSide 2 Account Linking` });
+        .setColor(panelColor)
+        .setFooter({ text: panelFooter });
 
-      // Set author to the bot's user info
-      if (botMember) {
+      if (panelShowTimestamp) {
+        embed.setTimestamp(new Date());
+      }
+
+      if (panelShowAuthor && botMember) {
         embed.setAuthor({
           name: botMember.displayName || guild.client.user.username,
           iconURL: guild.client.user.displayAvatarURL(),
@@ -124,6 +143,11 @@ export class PlanetSidePanelService {
       this.logger.error("Failed to send PlanetSide panel:", error);
       return { success: false, error: "Failed to send panel. Check bot permissions." };
     }
+  }
+
+  /** Replace `{key}` placeholders in a template string. */
+  private substitutePlaceholders(template: string, placeholders: Record<string, string>): string {
+    return template.replace(/\{(\w+)\}/g, (match, key) => placeholders[key] ?? match);
   }
 
   // ═══════════════════════════════════════════════════════════════

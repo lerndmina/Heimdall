@@ -27,7 +27,13 @@ export const data = new SlashCommandBuilder()
     sub
       .setName("panel")
       .setDescription("Send the PS2 linking panel to a channel")
-      .addChannelOption((opt) => opt.setName("channel").setDescription("Channel to post the linking panel in").setRequired(true)),
+      .addChannelOption((opt) => opt.setName("channel").setDescription("Channel to post the linking panel in").setRequired(true))
+      .addStringOption((opt) => opt.setName("title").setDescription("Custom embed title (default: 'Get your role!')").setRequired(false))
+      .addStringOption((opt) => opt.setName("description").setDescription("Custom description — use {memberRole}, {guestRole}, {outfitTag}, {outfitName}").setRequired(false))
+      .addStringOption((opt) => opt.setName("color").setDescription("Embed color as hex (e.g. #de3b79)").setRequired(false))
+      .addStringOption((opt) => opt.setName("footer").setDescription("Custom footer text").setRequired(false))
+      .addBooleanOption((opt) => opt.setName("show-author").setDescription("Show bot as embed author (default: true)").setRequired(false))
+      .addBooleanOption((opt) => opt.setName("show-timestamp").setDescription("Show timestamp on embed (default: true)").setRequired(false)),
   )
   .addSubcommand((sub) =>
     sub
@@ -160,6 +166,25 @@ export async function execute(context: CommandContext): Promise<void> {
 
   if (subcommand === "panel") {
     const channel = interaction.options.getChannel("channel", true);
+    const title = interaction.options.getString("title");
+    const description = interaction.options.getString("description");
+    const color = interaction.options.getString("color");
+    const footer = interaction.options.getString("footer");
+    const showAuthor = interaction.options.getBoolean("show-author");
+    const showTimestamp = interaction.options.getBoolean("show-timestamp");
+
+    // Save any provided panel customization to config
+    const panelUpdate: Record<string, any> = {};
+    if (title !== null) panelUpdate["panel.title"] = title;
+    if (description !== null) panelUpdate["panel.description"] = description;
+    if (color !== null) panelUpdate["panel.color"] = color.startsWith("#") ? color : `#${color}`;
+    if (footer !== null) panelUpdate["panel.footerText"] = footer;
+    if (showAuthor !== null) panelUpdate["panel.showAuthor"] = showAuthor;
+    if (showTimestamp !== null) panelUpdate["panel.showTimestamp"] = showTimestamp;
+
+    if (Object.keys(panelUpdate).length > 0) {
+      await PlanetSideConfig.findOneAndUpdate({ guildId }, { $set: panelUpdate }, { upsert: true });
+    }
 
     const result = await pluginAPI.panelService.sendPanel(channel.id, guildId);
 

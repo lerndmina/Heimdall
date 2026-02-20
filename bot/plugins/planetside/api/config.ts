@@ -36,6 +36,14 @@ function modelToDashboard(config: Record<string, any>): Record<string, any> {
     populationSource: config.populationSource ?? "honu",
     allowSelfUnlink: config.allowSelfUnlink ?? true,
     defaultDashboardTab: config.defaultDashboardTab ?? "players",
+    panel: {
+      title: config.panel?.title ?? "",
+      description: config.panel?.description ?? "",
+      color: config.panel?.color ?? "",
+      footerText: config.panel?.footerText ?? "",
+      showAuthor: config.panel?.showAuthor ?? true,
+      showTimestamp: config.panel?.showTimestamp ?? true,
+    },
   };
 }
 

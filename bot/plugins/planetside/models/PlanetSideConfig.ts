@@ -61,6 +61,16 @@ const PlanetSideConfigSchema = new Schema(
     // Self-unlink
     allowSelfUnlink: { type: Boolean, default: true },
 
+    // Panel embed customization
+    panel: {
+      title: { type: String },
+      description: { type: String },
+      color: { type: String },
+      footerText: { type: String },
+      showAuthor: { type: Boolean, default: true },
+      showTimestamp: { type: Boolean, default: true },
+    },
+
     // Dashboard preferences
     defaultDashboardTab: {
       type: String,

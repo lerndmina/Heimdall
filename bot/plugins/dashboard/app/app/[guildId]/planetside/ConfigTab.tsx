@@ -12,6 +12,7 @@ import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/C
 import StatusBadge from "@/components/ui/StatusBadge";
 import Spinner from "@/components/ui/Spinner";
 import TextInput from "@/components/ui/TextInput";
+import Textarea from "@/components/ui/Textarea";
 import NumberInput from "@/components/ui/NumberInput";
 import Toggle from "@/components/ui/Toggle";
 import Combobox from "@/components/ui/Combobox";
@@ -48,6 +49,14 @@ interface PlanetSideConfig {
   populationSource: string;
   allowSelfUnlink: boolean;
   defaultDashboardTab: string;
+  panel: {
+    title: string;
+    description: string;
+    color: string;
+    footerText: string;
+    showAuthor: boolean;
+    showTimestamp: boolean;
+  };
 }
 
 const DEFAULT_CONFIG: Omit<PlanetSideConfig, "guildId"> = {
@@ -66,6 +75,14 @@ const DEFAULT_CONFIG: Omit<PlanetSideConfig, "guildId"> = {
   populationSource: "honu",
   allowSelfUnlink: true,
   defaultDashboardTab: "players",
+  panel: {
+    title: "",
+    description: "",
+    color: "",
+    footerText: "",
+    showAuthor: true,
+    showTimestamp: true,
+  },
 };
 
 // ── Component ──────────────────────────────────────────────────
@@ -186,6 +203,8 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
 
     const updateChannels = (key: keyof typeof draft.channels, value: string | null) => setDraft((d) => ({ ...d, channels: { ...d.channels, [key]: value } }));
 
+    const updatePanel = <K extends keyof typeof draft.panel>(key: K, value: (typeof draft.panel)[K]) => setDraft((d) => ({ ...d, panel: { ...d.panel, [key]: value } }));
+
     const wizardSteps: WizardStep[] = [
       {
         id: "outfit",
@@ -207,6 +226,11 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
         id: "channels",
         label: "Channels",
         content: <StepChannels draft={draft} updateChannels={updateChannels} guildId={guildId} />,
+      },
+      {
+        id: "panel",
+        label: "Panel Appearance",
+        content: <StepPanel draft={draft} updatePanel={updatePanel} />,
       },
       {
         id: "advanced",
@@ -310,6 +334,25 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
             <FieldDisplay label="Census Status" value={config.channels.censusStatus ? `<#${config.channels.censusStatus}>` : "Not set"} />
             <FieldDisplay label="Panel Channel" value={config.channels.panel ? `<#${config.channels.panel}>` : "Not set"} />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Panel Appearance */}
+      <Card>
+        <CardTitle>Panel Appearance</CardTitle>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FieldDisplay label="Title" value={config.panel?.title || "Get your role! (default)"} />
+            <FieldDisplay label="Color" value={config.panel?.color || "#de3b79 (default)"} />
+            <FieldDisplay label="Footer" value={config.panel?.footerText || "Auto-generated (default)"} />
+            <FieldDisplay label="Show Author" value={config.panel?.showAuthor !== false ? "Yes" : "No"} />
+            <FieldDisplay label="Show Timestamp" value={config.panel?.showTimestamp !== false ? "Yes" : "No"} />
+          </div>
+          {config.panel?.description && (
+            <div className="mt-4">
+              <FieldDisplay label="Custom Description" value={config.panel.description} />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -467,6 +510,52 @@ function StepChannels({
   );
 }
 
+function StepPanel({
+  draft,
+  updatePanel,
+}: {
+  draft: Omit<PlanetSideConfig, "guildId">;
+  updatePanel: <K extends keyof PlanetSideConfig["panel"]>(key: K, value: PlanetSideConfig["panel"][K]) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-zinc-400">Customize how the linking panel embed looks in your server. Leave fields blank to use smart defaults.</p>
+      <TextInput
+        label="Panel Title"
+        value={draft.panel.title}
+        onChange={(v) => updatePanel("title", v)}
+        placeholder="Get your role!"
+        description='Title of the panel embed. Default: "Get your role!"'
+      />
+      <Textarea
+        label="Custom Description"
+        value={draft.panel.description}
+        onChange={(v) => updatePanel("description", v)}
+        placeholder="Hello recruit! Link your PlanetSide 2 account..."
+        description="Supports placeholders: {memberRole}, {guestRole}, {outfitTag}, {outfitName}. Leave blank for auto-generated description."
+        rows={4}
+        maxLength={2000}
+      />
+      <TextInput
+        label="Embed Color"
+        value={draft.panel.color}
+        onChange={(v) => updatePanel("color", v)}
+        placeholder="#de3b79"
+        description="Hex color for the embed accent. Default: #de3b79 (pink)."
+      />
+      <TextInput
+        label="Footer Text"
+        value={draft.panel.footerText}
+        onChange={(v) => updatePanel("footerText", v)}
+        placeholder="PlanetSide 2 • Account Linking"
+        description="Custom footer text. Default: auto-generated from outfit info."
+      />
+      <Toggle label="Show Author" description="Display the bot's name and avatar as the embed author." checked={draft.panel.showAuthor} onChange={(v) => updatePanel("showAuthor", v)} />
+      <Toggle label="Show Timestamp" description="Include a timestamp on the panel embed." checked={draft.panel.showTimestamp} onChange={(v) => updatePanel("showTimestamp", v)} />
+    </div>
+  );
+}
+
 function StepAdvanced({
   draft,
   update,
@@ -551,6 +640,15 @@ function StepReview({ draft }: { draft: Omit<PlanetSideConfig, "guildId"> }) {
         <ReviewRow label="Auto Revoke" value={draft.enableAutoRevoke ? "Yes" : "No"} />
         <ReviewRow label="Restore on Rejoin" value={draft.enableAutoRestore ? "Yes" : "No"} />
         <ReviewRow label="Self-Unlink" value={draft.allowSelfUnlink ? "Yes" : "No"} />
+      </ReviewSection>
+
+      <ReviewSection title="Panel Appearance">
+        <ReviewRow label="Title" value={draft.panel.title || "Get your role! (default)"} />
+        <ReviewRow label="Color" value={draft.panel.color || "#de3b79 (default)"} />
+        <ReviewRow label="Footer" value={draft.panel.footerText || "Auto-generated (default)"} />
+        <ReviewRow label="Show Author" value={draft.panel.showAuthor ? "Yes" : "No"} />
+        <ReviewRow label="Show Timestamp" value={draft.panel.showTimestamp ? "Yes" : "No"} />
+        {draft.panel.description && <ReviewRow label="Custom Description" value="Set" />}
       </ReviewSection>
     </div>
   );
