@@ -358,7 +358,10 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                       <td className="px-4 py-3 text-zinc-400 text-xs">{formatDate(player.linkedAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <button
-                          onClick={(e) => { const el = e.currentTarget; setMenuState((prev) => (prev?.id === player._id ? null : { id: player._id, el })); }}
+                          onClick={(e) => {
+                            const el = e.currentTarget;
+                            setMenuState((prev) => (prev?.id === player._id ? null : { id: player._id, el }));
+                          }}
                           className="rounded p-1 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors">
                           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
