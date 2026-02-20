@@ -39,18 +39,16 @@ export const FACTION_EMOJI: Record<number, string> = {
 // ── Server data ────────────────────────────────────────────────
 
 export const SERVER_NAMES: Record<number, string> = {
-  1: "Connery",
-  10: "Miller",
-  13: "Cobalt",
-  17: "Emerald",
+  1: "Osprey",
+  10: "Wainwright",
+  19: "Jaeger",
   40: "SolTech",
 };
 
 export const SERVER_REGIONS: Record<number, string> = {
-  1: "US West",
+  1: "US",
   10: "EU",
-  13: "EU",
-  17: "US East",
+  19: "US (Comp)",
   40: "Asia",
 };
 

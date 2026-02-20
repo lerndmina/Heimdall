@@ -46,10 +46,9 @@ interface WorldPopulation {
 }
 
 const SERVER_NAMES: Record<number, string> = {
-  1: "Connery",
-  10: "Miller",
-  13: "Cobalt",
-  17: "Emerald",
+  1: "Osprey",
+  10: "Wainwright",
+  19: "Jaeger",
   40: "SolTech",
 };
 

@@ -20,7 +20,7 @@ export const data = new SlashCommandBuilder()
       .setName("server")
       .setDescription("Specific server to show (defaults to all)")
       .setRequired(false)
-      .addChoices({ name: "Connery", value: "1" }, { name: "Miller", value: "10" }, { name: "Cobalt", value: "13" }, { name: "Emerald", value: "17" }, { name: "SolTech", value: "40" }),
+      .addChoices({ name: "Osprey (US)", value: "1" }, { name: "Wainwright (EU)", value: "10" }, { name: "Jaeger", value: "19" }, { name: "SolTech", value: "40" }),
   )
   .addBooleanOption((opt) => opt.setName("zones").setDescription("Show per-zone breakdown (single server only)").setRequired(false));
 

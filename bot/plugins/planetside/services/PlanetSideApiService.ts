@@ -104,18 +104,25 @@ export interface FisuPopulation {
 // ── World names ────────────────────────────────────────────────
 
 const WORLD_NAMES: Record<number, string> = {
-  1: "Connery",
-  10: "Miller",
-  13: "Cobalt",
-  17: "Emerald",
+  1: "Osprey",
+  10: "Wainwright",
+  19: "Jaeger",
   40: "SolTech",
 };
 
-const ALL_WORLD_IDS = [1, 10, 13, 17, 40];
+const ALL_WORLD_IDS = [1, 10, 19, 40];
 
 export { WORLD_NAMES, ALL_WORLD_IDS };
 
 // ── Service ────────────────────────────────────────────────────
+
+/** In-memory population cache shared by all callers (60 s TTL). */
+interface PopCache {
+  data: HonuWorldPopulation[];
+  expiresAt: number;
+}
+const POP_CACHE_TTL = 60_000;
+let popCache: PopCache | null = null;
 
 export class PlanetSideApiService {
   private defaultHonuBaseUrl: string;
@@ -451,28 +458,40 @@ export class PlanetSideApiService {
   }
 
   /**
-   * Get population data — tries Honu first, falls back to Fisu.
+   * Get population data — cached 60 s. Tries Honu first, falls back to Fisu.
    */
   async getPopulation(source: "honu" | "fisu" = "honu", honuBaseUrl?: string): Promise<HonuWorldPopulation[] | null> {
-    if (source === "honu") {
-      const result = await this.getMultipleWorldPopulation(ALL_WORLD_IDS, honuBaseUrl);
-      if (result) return result;
-
-      // Fallback to fisu
-      log.warn("Honu population failed, falling back to Fisu");
+    // Return cached if still fresh
+    if (popCache && Date.now() < popCache.expiresAt) {
+      return popCache.data;
     }
 
-    const fisuData = await this.fisuGetPopulation();
-    if (!fisuData) return null;
+    let result: HonuWorldPopulation[] | null = null;
 
-    return fisuData.map((entry) => ({
-      worldID: entry.worldId,
-      worldName: WORLD_NAMES[entry.worldId],
-      total: entry.vs + entry.nc + entry.tr + entry.ns,
-      vs: entry.vs,
-      nc: entry.nc,
-      tr: entry.tr,
-      ns: entry.ns,
-    }));
+    if (source === "honu") {
+      result = await this.getMultipleWorldPopulation(ALL_WORLD_IDS, honuBaseUrl);
+      if (!result) {
+        log.warn("Honu population failed, falling back to Fisu");
+      }
+    }
+
+    if (!result) {
+      const fisuData = await this.fisuGetPopulation();
+      if (!fisuData) return null;
+
+      result = fisuData.map((entry) => ({
+        worldID: entry.worldId,
+        worldName: WORLD_NAMES[entry.worldId],
+        total: entry.vs + entry.nc + entry.tr + entry.ns,
+        vs: entry.vs,
+        nc: entry.nc,
+        tr: entry.tr,
+        ns: entry.ns,
+      }));
+    }
+
+    // Cache the result
+    popCache = { data: result, expiresAt: Date.now() + POP_CACHE_TTL };
+    return result;
   }
 }

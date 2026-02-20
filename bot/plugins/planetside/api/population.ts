@@ -7,11 +7,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import type { PlanetSideApiDependencies } from "./index.js";
 import { WORLD_NAMES, type HonuWorldPopulation } from "../services/PlanetSideApiService.js";
 
-// ── In-memory cache (60 s TTL) ──────────────────────────────
-interface PopulationCache {
-  data: NormalizedPopulation[];
-  expiresAt: number;
-}
+// ── Normalization (worldID → worldId for dashboard) ──────────
 
 interface NormalizedPopulation {
   worldId: number;
@@ -22,9 +18,6 @@ interface NormalizedPopulation {
   ns: number;
   total: number;
 }
-
-const CACHE_TTL_MS = 60_000;
-let populationCache: PopulationCache | null = null;
 
 function normalizePopulation(raw: HonuWorldPopulation[]): NormalizedPopulation[] {
   return raw.map((w) => ({
@@ -41,25 +34,16 @@ function normalizePopulation(raw: HonuWorldPopulation[]): NormalizedPopulation[]
 export function createPopulationRoutes(deps: PlanetSideApiDependencies): Router {
   const router = Router({ mergeParams: true });
 
-  // GET / — All worlds population overview (cached 60 s)
+  // GET / — All worlds population (service-level cache handles TTL)
   router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Serve from cache if fresh
-      if (populationCache && Date.now() < populationCache.expiresAt) {
-        res.json({ success: true, data: populationCache.data });
-        return;
-      }
-
       const raw = await deps.apiService.getPopulation();
       if (!raw) {
         res.json({ success: true, data: null });
         return;
       }
 
-      const normalized = normalizePopulation(raw);
-      populationCache = { data: normalized, expiresAt: Date.now() + CACHE_TTL_MS };
-
-      res.json({ success: true, data: normalized });
+      res.json({ success: true, data: normalizePopulation(raw) });
     } catch (error) {
       next(error);
     }
@@ -77,15 +61,30 @@ export function createPopulationRoutes(deps: PlanetSideApiDependencies): Router 
         return;
       }
 
-      // Try cached data first
-      if (populationCache && Date.now() < populationCache.expiresAt) {
-        const cached = populationCache.data.find((w) => w.worldId === worldId);
-        if (cached) {
-          res.json({ success: true, data: { world: cached } });
+      // Try the cached all-worlds data first (avoids a separate API call)
+      const allPop = await deps.apiService.getPopulation();
+      if (allPop) {
+        const match = allPop.find((w) => w.worldID === worldId);
+        if (match) {
+          res.json({
+            success: true,
+            data: {
+              world: {
+                worldId: match.worldID,
+                worldName: match.worldName || WORLD_NAMES[match.worldID] || `World ${match.worldID}`,
+                vs: match.vs,
+                nc: match.nc,
+                tr: match.tr,
+                ns: match.ns,
+                total: match.total || match.vs + match.nc + match.tr + (match.ns || 0),
+              },
+            },
+          });
           return;
         }
       }
 
+      // Fallback: fetch single world directly
       const worldPop = await deps.apiService.getWorldPopulation(worldId);
       const normalized = worldPop
         ? {
