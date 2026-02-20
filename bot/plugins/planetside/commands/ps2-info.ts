@@ -6,7 +6,7 @@
  * With a user argument: shows that user's linked character.
  */
 
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import type { CommandContext } from "../../../src/core/CommandManager.js";
 import type { PlanetSidePluginAPI } from "../index.js";
 import PlanetSideConfig from "../models/PlanetSideConfig.js";
@@ -28,7 +28,10 @@ export const permissions = {
 
 export async function execute(context: CommandContext): Promise<void> {
   const { interaction, getPluginAPI } = context;
-  await interaction.deferReply();
+
+  const targetUser = interaction.options.getUser("user") || interaction.user;
+  const isSelf = targetUser.id === interaction.user.id;
+  await interaction.deferReply(isSelf ? { flags: MessageFlags.Ephemeral } : {});
 
   const pluginAPI = getPluginAPI<PlanetSidePluginAPI>("planetside");
   if (!pluginAPI) {
@@ -37,7 +40,6 @@ export async function execute(context: CommandContext): Promise<void> {
   }
 
   const guildId = interaction.guildId!;
-  const targetUser = interaction.options.getUser("user") || interaction.user;
 
   const ps2Config = await PlanetSideConfig.findOne({ guildId }).lean();
   if (!ps2Config?.enabled) {
@@ -53,7 +55,6 @@ export async function execute(context: CommandContext): Promise<void> {
   }).lean();
 
   if (!linkedPlayer) {
-    const isSelf = targetUser.id === interaction.user.id;
     const embed = pluginAPI.lib
       .createEmbedBuilder()
       .setColor(0xff0000)

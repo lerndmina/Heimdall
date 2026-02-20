@@ -492,6 +492,7 @@ export class PlanetSidePanelService {
       const pending = await PlanetSidePlayer.findOne({ guildId, discordId, linkedAt: null });
       if (pending) {
         await PlanetSidePlayer.findByIdAndDelete(pending._id);
+        broadcastDashboardChange(guildId, "planetside", "player_unlinked", { requiredAction: "planetside.view_players" });
         const embed = this.lib.createEmbedBuilder().setColor(0x00ff00).setTitle("✅ Pending Link Cancelled").setDescription("Your pending link request has been removed.");
         await interaction.editReply({ embeds: [embed] });
         return;

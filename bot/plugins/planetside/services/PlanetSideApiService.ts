@@ -434,6 +434,16 @@ export class PlanetSideApiService {
         return this.verifyCharacter(charId, "recent_login", windowMinutes, options);
       }
 
+      // Fallback: check dateLastLogin from Honu — covers brief Honu tracking lag
+      const honuChar = await this.getCharacterById(charId, options?.honuBaseUrl);
+      if (honuChar?.dateLastLogin) {
+        const lastLogin = new Date(honuChar.dateLastLogin).getTime();
+        if (Date.now() - lastLogin < 15 * 60 * 1000) {
+          log.warn(`Honu reports ${charId} offline but dateLastLogin is <15min ago — accepting as online`);
+          return { verified: true, method: "online_now", detail: "Character logged in within the last 15 minutes (Honu tracking lag)" };
+        }
+      }
+
       return { verified: false, method: "online_now", detail: "Character is not currently online in PlanetSide 2" };
     }
 

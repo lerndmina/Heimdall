@@ -17,6 +17,7 @@ import Modal from "@/components/ui/Modal";
 import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
+import { RowActionMenu, RowActionItem, RowActionSeparator } from "@/components/ui/RowActionMenu";
 
 // ── PS2 Constants (frontend mirror) ────────────────────────────
 
@@ -45,10 +46,9 @@ const FACTION_COLORS: Record<number, string> = {
 };
 
 const SERVER_NAMES: Record<number, string> = {
-  1: "Connery",
-  10: "Miller",
-  13: "Cobalt",
-  17: "Emerald",
+  1: "Osprey",
+  10: "Wainwright",
+  19: "Jaeger",
   40: "SolTech",
 };
 
@@ -115,9 +115,8 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
   const [showManualLink, setShowManualLink] = useState(false);
   const [manualForm, setManualForm] = useState({ characterName: "", characterId: "", discordId: "", factionId: 0, serverId: 0 });
 
-  // Active action menu
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  // Active action menu (stores row id + trigger element for portal positioning)
+  const [menuState, setMenuState] = useState<{ id: string; el: HTMLButtonElement } | null>(null);
 
   // ── Fetch players ──────────────────────────────────────────
 
@@ -156,17 +155,6 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
   useRealtimeEvent("planetside:player_linked", () => fetchPlayers());
   useRealtimeEvent("planetside:link_requested", () => fetchPlayers());
   useRealtimeEvent("planetside:player_unlinked", () => fetchPlayers());
-
-  // Close action menu on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setActiveMenu(null);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   // ── Debounced search ──────────────────────────────────────
 
@@ -369,37 +357,15 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                       </td>
                       <td className="px-4 py-3 text-zinc-400 text-xs">{formatDate(player.linkedAt)}</td>
                       <td className="px-4 py-3 text-right">
-                        <div className="relative inline-block" ref={activeMenu === player._id ? menuRef : undefined}>
-                          <button
-                            onClick={() => setActiveMenu(activeMenu === player._id ? null : player._id)}
-                            className="rounded p-1 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors">
-                            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                            </svg>
-                          </button>
-                          {activeMenu === player._id && (
-                            <div className="absolute right-0 z-20 mt-1 w-40 rounded-md border border-zinc-700/50 bg-zinc-800 py-1 shadow-xl">
-                              {!player.revokedAt && player.linkedAt && (
-                                <button
-                                  onClick={() => {
-                                    setRevokeTarget(player);
-                                    setActiveMenu(null);
-                                  }}
-                                  className="w-full px-3 py-1.5 text-left text-sm text-orange-400 hover:bg-white/5">
-                                  Revoke Link
-                                </button>
-                              )}
-                              <button
-                                onClick={() => {
-                                  setDeleteTarget(player);
-                                  setActiveMenu(null);
-                                }}
-                                className="w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-white/5">
-                                Delete Record
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        <button
+                          onClick={(e) =>
+                            setMenuState((prev) => (prev?.id === player._id ? null : { id: player._id, el: e.currentTarget }))
+                          }
+                          className="rounded p-1 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors">
+                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                          </svg>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -407,6 +373,21 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
               </tbody>
             </table>
           </div>
+
+          {/* Action menu portal — rendered once outside the table, driven by menuState */}
+          {(() => {
+            const activePlayer = players.find((p) => p._id === menuState?.id) ?? null;
+            return (
+              <RowActionMenu open={!!menuState} anchorEl={menuState?.el ?? null} onClose={() => setMenuState(null)}>
+                {activePlayer && !activePlayer.revokedAt && activePlayer.linkedAt && (
+                  <RowActionItem variant="warning" onClick={() => { setRevokeTarget(activePlayer); setMenuState(null); }}>Revoke Link</RowActionItem>
+                )}
+                {activePlayer && (
+                  <RowActionItem variant="danger" onClick={() => { setDeleteTarget(activePlayer); setMenuState(null); }}>Delete Record</RowActionItem>
+                )}
+              </RowActionMenu>
+            );
+          })()}
 
           {/* Pagination */}
           {pagination.pages > 1 && (
