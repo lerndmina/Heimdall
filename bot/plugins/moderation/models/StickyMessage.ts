@@ -12,11 +12,26 @@ const StickyMessageSchema = new Schema(
     guildId: { type: String, required: true, index: true },
     channelId: { type: String, required: true, unique: true },
 
-    /** Plain text content of the sticky message */
+    /** Plain text content — used as embed description when useEmbed is true */
     content: { type: String, required: true, maxlength: 2000 },
 
-    /** Optional embed colour (decimal) — 0 means no embed, just plain text */
+    /** Whether to send as an embed (true) or plain text (false) */
+    useEmbed: { type: Boolean, default: false },
+
+    /** Embed title */
+    embedTitle: { type: String, default: null, maxlength: 256 },
+
+    /** Embed colour (decimal integer) */
     color: { type: Number, default: 0 },
+
+    /** Embed image URL */
+    embedImage: { type: String, default: null, maxlength: 2048 },
+
+    /** Embed thumbnail URL */
+    embedThumbnail: { type: String, default: null, maxlength: 2048 },
+
+    /** Embed footer text */
+    embedFooter: { type: String, default: null, maxlength: 2048 },
 
     /** ID of the currently posted sticky message (for deletion on refresh) */
     currentMessageId: { type: String, default: null },

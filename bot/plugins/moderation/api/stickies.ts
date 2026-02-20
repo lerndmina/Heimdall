@@ -82,7 +82,8 @@ export function createStickyRoutes(deps: StickyApiDeps): Router {
     try {
       const guildId = req.params.guildId as string;
       const channelId = req.params.channelId as string;
-      const { content, color, detectionBehavior, detectionDelay, conversationDuration, conversationDeleteBehavior, sendOrder } = req.body;
+      const { content, color, useEmbed, embedTitle, embedImage, embedThumbnail, embedFooter, detectionBehavior, detectionDelay, conversationDuration, conversationDeleteBehavior, sendOrder } =
+        req.body;
       const modId = req.header("X-User-Id");
 
       if (!modId) {
@@ -111,6 +112,11 @@ export function createStickyRoutes(deps: StickyApiDeps): Router {
 
       const sticky = await deps.stickyMessageService.setSticky(guildId, channelId, content, modId, {
         color: typeof color === "number" ? color : 0,
+        useEmbed: typeof useEmbed === "boolean" ? useEmbed : undefined,
+        embedTitle: typeof embedTitle === "string" ? embedTitle || null : undefined,
+        embedImage: typeof embedImage === "string" ? embedImage || null : undefined,
+        embedThumbnail: typeof embedThumbnail === "string" ? embedThumbnail || null : undefined,
+        embedFooter: typeof embedFooter === "string" ? embedFooter || null : undefined,
         detectionBehavior: detectionBehavior ?? undefined,
         detectionDelay: typeof detectionDelay === "number" ? detectionDelay : undefined,
         conversationDuration: typeof conversationDuration === "number" ? conversationDuration : undefined,

@@ -44,6 +44,11 @@ export class StickyMessageService {
     moderatorId: string,
     options?: {
       color?: number;
+      useEmbed?: boolean;
+      embedTitle?: string | null;
+      embedImage?: string | null;
+      embedThumbnail?: string | null;
+      embedFooter?: string | null;
       detectionBehavior?: string;
       detectionDelay?: number;
       conversationDuration?: number;
@@ -74,6 +79,11 @@ export class StickyMessageService {
       enabled: true,
       currentMessageId: null,
     };
+    if (options?.useEmbed !== undefined) updateDoc.useEmbed = options.useEmbed;
+    if (options?.embedTitle !== undefined) updateDoc.embedTitle = options.embedTitle;
+    if (options?.embedImage !== undefined) updateDoc.embedImage = options.embedImage;
+    if (options?.embedThumbnail !== undefined) updateDoc.embedThumbnail = options.embedThumbnail;
+    if (options?.embedFooter !== undefined) updateDoc.embedFooter = options.embedFooter;
     if (options?.detectionBehavior !== undefined) updateDoc.detectionBehavior = options.detectionBehavior;
     if (options?.detectionDelay !== undefined) updateDoc.detectionDelay = options.detectionDelay;
     if (options?.conversationDuration !== undefined) updateDoc.conversationDuration = options.conversationDuration;
@@ -278,8 +288,16 @@ export class StickyMessageService {
   private async postSticky(channel: TextChannel | NewsChannel, sticky: StickyDoc): Promise<void> {
     try {
       let sent;
-      if (sticky.color && sticky.color > 0) {
-        const embed = new EmbedBuilder().setColor(sticky.color).setDescription(sticky.content).setFooter({ text: "📌 Sticky Message" });
+      // Use embed mode if useEmbed is true, or legacy behavior: color > 0
+      const shouldEmbed = (sticky as any).useEmbed || (sticky.color && sticky.color > 0);
+      if (shouldEmbed) {
+        const embed = new EmbedBuilder();
+        if (sticky.color && sticky.color > 0) embed.setColor(sticky.color);
+        if ((sticky as any).embedTitle) embed.setTitle((sticky as any).embedTitle);
+        if (sticky.content) embed.setDescription(sticky.content);
+        if ((sticky as any).embedImage) embed.setImage((sticky as any).embedImage);
+        if ((sticky as any).embedThumbnail) embed.setThumbnail((sticky as any).embedThumbnail);
+        embed.setFooter({ text: (sticky as any).embedFooter || "📌 Sticky Message" });
         sent = await channel.send({ embeds: [embed] });
       } else {
         sent = await channel.send({ content: `📌 ${sticky.content}` });

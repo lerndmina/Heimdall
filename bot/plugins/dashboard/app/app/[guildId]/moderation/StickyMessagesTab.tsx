@@ -8,6 +8,7 @@ import Textarea from "@/components/ui/Textarea";
 import TextInput from "@/components/ui/TextInput";
 import Modal from "@/components/ui/Modal";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
+import EmbedEditor, { type EmbedData } from "@/components/ui/EmbedEditor";
 import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
@@ -20,6 +21,11 @@ interface StickyMessage {
   channelName: string;
   content: string;
   color: number;
+  useEmbed: boolean;
+  embedTitle?: string;
+  embedImage?: string;
+  embedThumbnail?: string;
+  embedFooter?: string;
   currentMessageId?: string;
   moderatorId: string;
   enabled: boolean;
@@ -33,29 +39,6 @@ interface StickyMessage {
 }
 
 // ── Color Helpers ────────────────────────────────────────
-
-const COLOR_PRESETS: { label: string; value: number }[] = [
-  { label: "No Embed (plain text)", value: 0 },
-  { label: "Blue", value: 0x5865f2 },
-  { label: "Green", value: 0x57f287 },
-  { label: "Yellow", value: 0xfee75c },
-  { label: "Red", value: 0xed4245 },
-  { label: "Orange", value: 0xe67e22 },
-  { label: "Purple", value: 0x9b59b6 },
-  { label: "White", value: 0xffffff },
-];
-
-function decimalToHex(decimal: number): string {
-  if (decimal === 0) return "";
-  return "#" + decimal.toString(16).padStart(6, "0");
-}
-
-function hexToDecimal(hex: string): number {
-  if (!hex || hex === "#") return 0;
-  const clean = hex.replace("#", "");
-  if (!/^[0-9a-fA-F]{1,6}$/.test(clean)) return 0;
-  return parseInt(clean, 16);
-}
 
 function getColorDot(color: number): string {
   if (color === 0) return "transparent";
@@ -75,8 +58,8 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
   const [editing, setEditing] = useState<StickyMessage | null>(null);
   const [draftChannel, setDraftChannel] = useState("");
   const [draftContent, setDraftContent] = useState("");
-  const [draftColor, setDraftColor] = useState(0);
-  const [draftColorHex, setDraftColorHex] = useState("");
+  const [draftUseEmbed, setDraftUseEmbed] = useState(false);
+  const [draftEmbed, setDraftEmbed] = useState<EmbedData>({});
   const [draftDetectionBehavior, setDraftDetectionBehavior] = useState<"instant" | "delay">("instant");
   const [draftDetectionDelay, setDraftDetectionDelay] = useState(5);
   const [draftConversationDuration, setDraftConversationDuration] = useState(10);
@@ -118,8 +101,8 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
     setEditing(null);
     setDraftChannel("");
     setDraftContent("");
-    setDraftColor(0);
-    setDraftColorHex("");
+    setDraftUseEmbed(false);
+    setDraftEmbed({});
     setDraftDetectionBehavior("instant");
     setDraftDetectionDelay(5);
     setDraftConversationDuration(10);
@@ -132,8 +115,17 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
     setEditing(sticky);
     setDraftChannel(sticky.channelId);
     setDraftContent(sticky.content);
-    setDraftColor(sticky.color);
-    setDraftColorHex(decimalToHex(sticky.color));
+    // Migrate legacy: if color > 0 but useEmbed isn't set, treat as embed mode
+    const isEmbed = sticky.useEmbed || sticky.color > 0;
+    setDraftUseEmbed(isEmbed);
+    setDraftEmbed({
+      title: sticky.embedTitle ?? "",
+      description: "",
+      color: sticky.color > 0 ? "#" + sticky.color.toString(16).padStart(6, "0") : "",
+      image: sticky.embedImage ?? "",
+      thumbnail: sticky.embedThumbnail ?? "",
+      footer: sticky.embedFooter ?? "",
+    });
     setDraftDetectionBehavior(sticky.detectionBehavior ?? "instant");
     setDraftDetectionDelay(sticky.detectionDelay ?? 5);
     setDraftConversationDuration(sticky.conversationDuration ?? 10);
@@ -167,11 +159,25 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
 
     setSaving(true);
     try {
+      // Convert hex color to decimal
+      let colorDecimal = 0;
+      if (draftUseEmbed && draftEmbed.color) {
+        const clean = draftEmbed.color.replace("#", "");
+        if (/^[0-9a-fA-F]{1,6}$/.test(clean)) {
+          colorDecimal = parseInt(clean, 16);
+        }
+      }
+
       const res = await fetchApi<StickyMessage>(guildId, `moderation/stickies/${draftChannel}`, {
         method: "PUT",
         body: JSON.stringify({
           content: draftContent.trim(),
-          color: draftColor,
+          color: colorDecimal,
+          useEmbed: draftUseEmbed,
+          embedTitle: draftUseEmbed ? draftEmbed.title || "" : "",
+          embedImage: draftUseEmbed ? draftEmbed.image || "" : "",
+          embedThumbnail: draftUseEmbed ? draftEmbed.thumbnail || "" : "",
+          embedFooter: draftUseEmbed ? draftEmbed.footer || "" : "",
           detectionBehavior: draftDetectionBehavior,
           detectionDelay: draftDetectionDelay,
           conversationDuration: draftConversationDuration,
@@ -233,17 +239,6 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
     } catch {
       toast.error("Failed to connect to API");
     }
-  };
-
-  // ── Color preset handler ──
-  const selectColorPreset = (value: number) => {
-    setDraftColor(value);
-    setDraftColorHex(decimalToHex(value));
-  };
-
-  const handleHexChange = (hex: string) => {
-    setDraftColorHex(hex);
-    setDraftColor(hexToDecimal(hex));
   };
 
   // ── Loading ──
@@ -321,11 +316,11 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
                         {sticky.content}
                       </td>
                       <td className="py-3 pr-4">
-                        {sticky.color === 0 ? (
+                        {!sticky.useEmbed && sticky.color === 0 ? (
                           <span className="text-xs text-zinc-500">Plain text</span>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <span className="inline-block h-3 w-3 rounded-full border border-zinc-600" style={{ backgroundColor: getColorDot(sticky.color) }} />
+                            {sticky.color > 0 && <span className="inline-block h-3 w-3 rounded-full border border-zinc-600" style={{ backgroundColor: getColorDot(sticky.color) }} />}
                             <span className="text-xs text-zinc-400">Embed</span>
                           </div>
                         )}
@@ -407,39 +402,27 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
             />
           )}
 
-          {/* Content */}
+          {/* Message content — used as embed description when in embed mode */}
           <Textarea
-            label="Message Content"
-            description="The message that will be pinned at the bottom of the channel."
+            label={draftUseEmbed ? "Embed Description" : "Message Content"}
+            description={draftUseEmbed ? "The main text body of the embed." : "The message that will be pinned at the bottom of the channel."}
             value={draftContent}
             onChange={setDraftContent}
             placeholder="Enter the sticky message content…"
-            maxLength={2000}
-            rows={5}
+            maxLength={draftUseEmbed ? 4096 : 2000}
+            rows={4}
           />
 
-          {/* Color presets */}
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">Embed Color</label>
-            <p className="mb-2 text-xs text-zinc-500">Plain text sends as a regular message. Choosing a color wraps the message in an embed.</p>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {COLOR_PRESETS.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  onClick={() => selectColorPreset(preset.value)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                    draftColor === preset.value ? "border-primary-500 bg-primary-500/10 text-primary-300" : "border-zinc-700/30 text-zinc-400 hover:bg-white/5"
-                  }`}>
-                  {preset.value !== 0 && <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getColorDot(preset.value) }} />}
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Custom hex input */}
-            <TextInput label="" value={draftColorHex} onChange={handleHexChange} placeholder="#5865f2" description="Or enter a custom hex color" />
+          {/* Embed toggle + editor */}
+          <div className="border-t border-zinc-700/30 pt-4 mt-4">
+            <Toggle label="Send as Embed" description="Wrap the message in a rich embed with optional title, color, images, and footer" checked={draftUseEmbed} onChange={setDraftUseEmbed} />
           </div>
+
+          {draftUseEmbed && (
+            <div className="space-y-3 rounded-lg border border-zinc-700/30 p-4">
+              <EmbedEditor value={draftEmbed} onChange={setDraftEmbed} hideHeading descriptionRows={0} />
+            </div>
+          )}
 
           {/* Conversation Detection Settings */}
           <div className="border-t border-zinc-700/30 pt-4 mt-4">
