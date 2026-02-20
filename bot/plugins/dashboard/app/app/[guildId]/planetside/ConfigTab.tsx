@@ -430,7 +430,16 @@ function StepOutfit({
     <div className="space-y-4">
       <p className="text-sm text-zinc-400">Configure the PlanetSide 2 outfit that this server is associated with. This is used for account verification and outfit-specific features.</p>
       <Toggle label="Enable PlanetSide Integration" checked={draft.enabled} onChange={(v) => update("enabled", v)} />
-      <TextInput label="Outfit Tag" value={draft.outfitTag} onChange={(v) => { update("outfitTag", v); setLookupSuccess(null); setLookupError(null); }} placeholder="e.g. KOTV" />
+      <TextInput
+        label="Outfit Tag"
+        value={draft.outfitTag}
+        onChange={(v) => {
+          update("outfitTag", v);
+          setLookupSuccess(null);
+          setLookupError(null);
+        }}
+        placeholder="e.g. KOTV"
+      />
       <TextInput label="Outfit Name" value={draft.outfitName} onChange={(v) => update("outfitName", v)} placeholder="e.g. Keepers of the Vanu" />
       <div className="space-y-1.5">
         <TextInput
@@ -444,8 +453,7 @@ function StepOutfit({
           type="button"
           onClick={handleLookup}
           disabled={lookupLoading || !draft.outfitTag.trim()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed">
           {lookupLoading ? (
             <>
               <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
