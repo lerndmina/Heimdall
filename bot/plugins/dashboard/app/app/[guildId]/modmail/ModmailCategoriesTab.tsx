@@ -2,14 +2,19 @@
  * Modmail Categories Management Tab
  *
  * Allows creating, editing, and managing modmail categories with form fields.
+ * - Forum channel chosen via dropdown (forum channels only)
+ * - Staff roles use an add/remove chip pattern
+ * - Webhook auto-created by the bot when category is saved
  */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
+import { Card, CardTitle, CardContent } from "@/components/ui/Card";
 import TextInput from "@/components/ui/TextInput";
 import Toggle from "@/components/ui/Toggle";
-import { fetchDashboardApi } from "@/lib/api";
+import ChannelCombobox from "@/components/ui/ChannelCombobox";
+import RoleCombobox from "@/components/ui/RoleCombobox";
+import { fetchDashboardApi, fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
@@ -19,7 +24,8 @@ interface Category {
   description?: string;
   emoji?: string;
   forumChannelId: string;
-  webhookId: string;
+  /** webhookId is server-managed — read-only in the UI */
+  webhookId?: string;
   staffRoleIds: string[];
   priority: number;
   formFields: FormField[];
@@ -41,6 +47,19 @@ interface ModmailCategoriesTabProps {
   guildId: string;
 }
 
+/** Blank form state for new categories */
+const EMPTY_FORM: Partial<Category> = {
+  name: "",
+  description: "",
+  emoji: "",
+  forumChannelId: "",
+  staffRoleIds: [],
+  priority: 0,
+  formFields: [],
+  resolveAutoCloseHours: 24,
+  enabled: true,
+};
+
 export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,18 +68,27 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
   const [showAddForm, setShowAddForm] = useState(false);
 
   // Form state for add/edit
-  const [formData, setFormData] = useState<Partial<Category>>({
-    name: "",
-    description: "",
-    emoji: "",
-    forumChannelId: "",
-    webhookId: "",
-    staffRoleIds: [],
-    priority: 0,
-    formFields: [],
-    resolveAutoCloseHours: 24,
-    enabled: true,
-  });
+  const [formData, setFormData] = useState<Partial<Category>>({ ...EMPTY_FORM });
+
+  // Role picker state
+  const [selectedRoleId, setSelectedRoleId] = useState("");
+
+  // Role name cache for chip display
+  const [roleNames, setRoleNames] = useState<Record<string, string>>({});
+
+  // Hydrate role names whenever the selected list changes
+  useEffect(() => {
+    const missing = (formData.staffRoleIds ?? []).filter((id) => !roleNames[id]);
+    if (missing.length === 0) return;
+    fetchApi<{ roles: { id: string; name: string }[] }>(guildId, "roles", { cacheKey: `roles-${guildId}`, cacheTtl: 60_000 }).then((res) => {
+      if (res.success && res.data) {
+        const map: Record<string, string> = {};
+        res.data.roles.forEach((r) => (map[r.id] = r.name));
+        setRoleNames((prev) => ({ ...prev, ...map }));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.staffRoleIds, guildId]);
 
   const loadCategories = useCallback(async () => {
     setLoading(true);
@@ -87,9 +115,27 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
     loadCategories();
   });
 
+  // ── Role picker helpers ────────────────────────────────────
+
+  const addRole = () => {
+    if (!selectedRoleId) return;
+    if ((formData.staffRoleIds ?? []).includes(selectedRoleId)) {
+      setSelectedRoleId("");
+      return;
+    }
+    setFormData((f) => ({ ...f, staffRoleIds: [...(f.staffRoleIds ?? []), selectedRoleId] }));
+    setSelectedRoleId("");
+  };
+
+  const removeRole = (roleId: string) => {
+    setFormData((f) => ({ ...f, staffRoleIds: (f.staffRoleIds ?? []).filter((id) => id !== roleId) }));
+  };
+
+  // ── Save / edit / delete ───────────────────────────────────
+
   const handleSave = async () => {
-    if (!formData.name?.trim() || !formData.forumChannelId?.trim() || !formData.webhookId?.trim()) {
-      toast.error("Name, Forum Channel ID, and Webhook ID are required");
+    if (!formData.name?.trim() || !formData.forumChannelId?.trim()) {
+      toast.error("Name and Forum Channel are required");
       return;
     }
 
@@ -111,7 +157,6 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
           description: formData.description,
           emoji: formData.emoji,
           forumChannelId: formData.forumChannelId || "",
-          webhookId: formData.webhookId || "",
           staffRoleIds: formData.staffRoleIds || [],
           priority: formData.priority || 0,
           formFields: formData.formFields || [],
@@ -148,6 +193,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
     setFormData(cat);
     setEditingIndex(index);
     setShowAddForm(true);
+    setSelectedRoleId("");
   };
 
   const handleDelete = async (index: number) => {
@@ -176,18 +222,8 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
   };
 
   const resetForm = () => {
-    setFormData({
-      name: "",
-      description: "",
-      emoji: "",
-      forumChannelId: "",
-      webhookId: "",
-      staffRoleIds: [],
-      priority: 0,
-      formFields: [],
-      resolveAutoCloseHours: 24,
-      enabled: true,
-    });
+    setFormData({ ...EMPTY_FORM });
+    setSelectedRoleId("");
   };
 
   if (loading && categories.length === 0) {
@@ -230,25 +266,64 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
               <TextInput label="Emoji" description="Optional emoji (e.g., 📨)" value={formData.emoji || ""} onChange={(val) => setFormData({ ...formData, emoji: val })} />
             </div>
 
-            <TextInput
-              label="Description"
-              description="Optional description shown when selecting category"
-              value={formData.description || ""}
-              onChange={(val) => setFormData({ ...formData, description: val })}
-            />
+            <TextInput label="Description" description="Optional description shown when selecting category" value={formData.description || ""} onChange={(val) => setFormData({ ...formData, description: val })} />
 
             <div className="grid grid-cols-2 gap-4">
-              <TextInput
-                label="Forum Channel ID"
-                description="Discord forum channel ID where threads are created"
+              <ChannelCombobox
+                guildId={guildId}
+                channelType="forum"
+                label="Forum Channel"
+                description="Forum channel where modmail threads are created"
                 value={formData.forumChannelId || ""}
                 onChange={(val) => setFormData({ ...formData, forumChannelId: val })}
-                required
+                placeholder="Select a forum channel…"
               />
-
-              <TextInput label="Webhook ID" description="Webhook ID for relaying messages" value={formData.webhookId || ""} onChange={(val) => setFormData({ ...formData, webhookId: val })} required />
+              <div className="flex items-start">
+                <div className="mt-1 rounded-lg border border-zinc-700/30 bg-white/[0.03] px-3 py-2.5 text-xs text-zinc-500 w-full">
+                  🔗 Webhook is created automatically by the bot when you save.
+                </div>
+              </div>
             </div>
 
+            {/* Staff roles multi-picker */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-zinc-200">Staff Roles</p>
+              <p className="text-xs text-zinc-500">Roles that can handle tickets in this category</p>
+
+              {(formData.staffRoleIds ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {(formData.staffRoleIds ?? []).map((roleId) => (
+                    <span key={roleId} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700/50 bg-white/5 px-2.5 py-1 text-xs text-zinc-300">
+                      @{roleNames[roleId] ?? roleId}
+                      <button onClick={() => removeRole(roleId)} className="text-zinc-500 hover:text-red-400 transition-colors leading-none" aria-label="Remove role">
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <RoleCombobox
+                    guildId={guildId}
+                    value={selectedRoleId}
+                    onChange={setSelectedRoleId}
+                    placeholder="Select a role to add…"
+                    excludeIds={formData.staffRoleIds ?? []}
+                    includeEveryone={false}
+                  />
+                </div>
+                <button
+                  onClick={addRole}
+                  disabled={!selectedRoleId}
+                  className="self-end rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/10 disabled:opacity-40">
+                  Add
+                </button>
+              </div>
+            </div>
+
+            {/* Priority + Auto-close */}
             <div className="grid grid-cols-2 gap-4">
               <TextInput
                 label="Priority"
@@ -257,7 +332,6 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
                 value={String(formData.priority || 0)}
                 onChange={(val) => setFormData({ ...formData, priority: parseInt(val) || 0 })}
               />
-
               <TextInput
                 label="Auto-close After Resolve (hours)"
                 description="Hours until thread closes after being resolved"
@@ -266,21 +340,6 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
                 onChange={(val) => setFormData({ ...formData, resolveAutoCloseHours: parseInt(val) || 24 })}
               />
             </div>
-
-            <TextInput
-              label="Staff Role IDs"
-              description="Comma-separated role IDs that can handle this category"
-              value={formData.staffRoleIds?.join(", ") || ""}
-              onChange={(val) =>
-                setFormData({
-                  ...formData,
-                  staffRoleIds: val
-                    .split(",")
-                    .map((id) => id.trim())
-                    .filter(Boolean),
-                })
-              }
-            />
 
             <Toggle
               label="Enabled"
@@ -336,13 +395,14 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
                         <span className="text-zinc-500">Forum Channel:</span> <span className="font-mono text-zinc-400">{cat.forumChannelId}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500">Webhook:</span> <span className="font-mono text-zinc-400">{cat.webhookId}</span>
-                      </div>
-                      <div>
                         <span className="text-zinc-500">Priority:</span> <span className="text-zinc-400">{cat.priority}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500">Staff Roles:</span> <span className="text-zinc-400">{cat.staffRoleIds.length}</span>
+                        <span className="text-zinc-500">Staff Roles:</span> <span className="text-zinc-400">{cat.staffRoleIds.length > 0 ? `${cat.staffRoleIds.length} role${cat.staffRoleIds.length !== 1 ? "s" : ""}` : "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500">Webhook:</span>{" "}
+                        <span className={cat.webhookId ? "text-emerald-400" : "text-zinc-500"}>{cat.webhookId ? "Configured" : "Pending save"}</span>
                       </div>
                       <div className="col-span-2">
                         <span className="text-zinc-500">Auto-close:</span> <span className="text-zinc-400">{cat.resolveAutoCloseHours}h after resolve</span>

@@ -907,6 +907,29 @@ export class ModmailService {
   // ========================================
 
   /**
+   * Ensure a webhook exists for a given forum channel, creating one if needed.
+   * Returns the webhookId and encrypted token ready to store on the category.
+   */
+  async ensureWebhook(guild: Guild, forumChannelId: string): Promise<{ webhookId: string; encryptedWebhookToken: string } | null> {
+    try {
+      const channel = guild.channels.cache.get(forumChannelId) as ForumChannel | undefined;
+      if (!channel) {
+        this.logger.warn(`Forum channel ${forumChannelId} not found in guild ${guild.id}`);
+        return null;
+      }
+      const result = await this.createWebhook(guild, channel);
+      if (!result) return null;
+      return {
+        webhookId: result.webhookId,
+        encryptedWebhookToken: this.encryptWebhookToken(result.webhookToken),
+      };
+    } catch (error) {
+      this.logger.error("Failed to ensure webhook for category:", error);
+      return null;
+    }
+  }
+
+  /**
    * Create a webhook for a modmail category
    */
   async createWebhook(guild: Guild, forumChannel: ForumChannel): Promise<{ webhookId: string; webhookToken: string } | null> {

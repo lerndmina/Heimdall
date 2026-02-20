@@ -32,7 +32,7 @@ interface ConfigUpdateRequest {
     description?: string;
     emoji?: string;
     forumChannelId: string;
-    webhookId: string;
+    webhookId?: string; // optional — auto-created if absent
     staffRoleIds: string[];
     priority: number;
     formFields: Array<{
@@ -288,7 +288,48 @@ export function configUpdateRoute(deps: ApiDependencies) {
 
       // Update categories if provided
       if (updateData.categories !== undefined) {
-        config.categories = updateData.categories as any; // Type will be validated by Mongoose
+        // Resolve webhooks: preserve existing if same channel, otherwise auto-create
+        const guild = await deps.lib.thingGetter.getGuild(guildId as string);
+
+        const resolvedCategories: any[] = [];
+        for (const incoming of updateData.categories) {
+          const existing = (config.categories as any[]).find((c: any) => c.id === incoming.id);
+          const sameChannel = existing && existing.forumChannelId === incoming.forumChannelId;
+          const hasWebhook = sameChannel && existing.webhookId && existing.encryptedWebhookToken;
+
+          if (hasWebhook) {
+            // Preserve existing webhook
+            resolvedCategories.push({
+              ...incoming,
+              webhookId: existing.webhookId,
+              encryptedWebhookToken: existing.encryptedWebhookToken,
+            });
+          } else {
+            // Auto-create / get-or-create webhook for this forum channel
+            if (!guild) {
+              res.status(503).json({
+                success: false,
+                error: { code: "BOT_NOT_READY", message: "Bot could not resolve Discord guild" },
+              });
+              return;
+            }
+            const webhook = await deps.modmailService.ensureWebhook(guild, incoming.forumChannelId);
+            if (!webhook) {
+              res.status(400).json({
+                success: false,
+                error: { code: "WEBHOOK_FAILED", message: `Failed to create webhook for forum channel ${incoming.forumChannelId}. Ensure the channel exists and the bot has Manage Webhooks permission.` },
+              });
+              return;
+            }
+            resolvedCategories.push({
+              ...incoming,
+              webhookId: webhook.webhookId,
+              encryptedWebhookToken: webhook.encryptedWebhookToken,
+            });
+          }
+        }
+
+        config.categories = resolvedCategories as any;
       }
 
       await config.save();

@@ -23,8 +23,8 @@ interface ChannelComboboxProps {
   guildId: string;
   value: string;
   onChange: (value: string) => void;
-  /** Channel type filter: "text" | "voice" | "category" | "all" (default: "text") */
-  channelType?: "text" | "voice" | "category" | "all";
+  /** Channel type filter: "text" | "voice" | "category" | "forum" | "all" (default: "text") */
+  channelType?: "text" | "voice" | "category" | "forum" | "all";
   placeholder?: string;
   disabled?: boolean;
   error?: boolean;

@@ -803,6 +803,7 @@ export class ApiManager {
         text: [ChannelType.GuildText],
         voice: [ChannelType.GuildVoice],
         category: [ChannelType.GuildCategory],
+        forum: [ChannelType.GuildForum],
         all: [ChannelType.GuildText, ChannelType.GuildVoice, ChannelType.GuildCategory, ChannelType.GuildForum, ChannelType.GuildAnnouncement, ChannelType.GuildStageVoice],
       };
 
