@@ -10,6 +10,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Card, CardTitle, CardContent } from "@/components/ui/Card";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Spinner from "@/components/ui/Spinner";
@@ -17,7 +18,6 @@ import Modal from "@/components/ui/Modal";
 import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
-import { RowActionMenu, RowActionItem, RowActionSeparator } from "@/components/ui/RowActionMenu";
 
 // ── PS2 Constants (frontend mirror) ────────────────────────────
 
@@ -115,8 +115,47 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
   const [showManualLink, setShowManualLink] = useState(false);
   const [manualForm, setManualForm] = useState({ characterName: "", characterId: "", discordId: "", factionId: 0, serverId: 0 });
 
-  // Active action menu (stores row id + trigger element for portal positioning)
-  const [menuState, setMenuState] = useState<{ id: string; el: HTMLButtonElement } | null>(null);
+  // Action menu (matches Minecraft PlayersTab pattern — numeric coords, not DOM refs)
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  // Close action menu on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Adjust position after portal renders (viewport-aware)
+  useEffect(() => {
+    if (!openMenu || !menuAnchor || !menuRef.current) return;
+    const menuRect = menuRef.current.getBoundingClientRect();
+    const menuWidth = menuRect.width || 176;
+    const menuHeight = menuRect.height || 0;
+    const left = Math.min(Math.max(8, menuAnchor.right - menuWidth), window.innerWidth - menuWidth - 8);
+    const below = menuAnchor.bottom + 6;
+    const above = menuAnchor.top - menuHeight - 6;
+    const top = below + menuHeight > window.innerHeight - 8 ? Math.max(8, above) : below;
+    setMenuPosition({ top, left });
+    setMenuVisible(true);
+  }, [openMenu, menuAnchor]);
+
+  const openActionMenu = (rowId: string, target: HTMLButtonElement) => {
+    const rect = target.getBoundingClientRect();
+    const menuWidth = 176;
+    const left = Math.min(Math.max(8, rect.right - menuWidth), window.innerWidth - menuWidth - 8);
+    setMenuAnchor({ top: rect.top, bottom: rect.bottom, right: rect.right });
+    setMenuPosition({ top: rect.bottom + 6, left });
+    setMenuVisible(false);
+    setOpenMenu(rowId);
+  };
 
   // ── Fetch players ──────────────────────────────────────────
 
@@ -359,8 +398,11 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={(e) => {
-                            const el = e.currentTarget;
-                            setMenuState((prev) => (prev?.id === player._id ? null : { id: player._id, el }));
+                            if (openMenu === player._id) {
+                              setOpenMenu(null);
+                              return;
+                            }
+                            openActionMenu(player._id, e.currentTarget);
                           }}
                           className="rounded p-1 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors">
                           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
@@ -375,34 +417,39 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
             </table>
           </div>
 
-          {/* Action menu portal — rendered once outside the table, driven by menuState */}
-          {(() => {
-            const activePlayer = players.find((p) => p._id === menuState?.id) ?? null;
-            return (
-              <RowActionMenu open={!!menuState} anchorEl={menuState?.el ?? null} onClose={() => setMenuState(null)}>
-                {activePlayer && !activePlayer.revokedAt && activePlayer.linkedAt && (
-                  <RowActionItem
-                    variant="warning"
-                    onClick={() => {
-                      setRevokeTarget(activePlayer);
-                      setMenuState(null);
-                    }}>
-                    Revoke Link
-                  </RowActionItem>
-                )}
-                {activePlayer && (
-                  <RowActionItem
-                    variant="danger"
+          {/* Action menu portal — inline createPortal like Minecraft PlayersTab */}
+          {openMenu &&
+            menuPosition &&
+            (() => {
+              const activePlayer = players.find((p) => p._id === openMenu) ?? null;
+              if (!activePlayer) return null;
+              return createPortal(
+                <div
+                  ref={menuRef}
+                  style={{ position: "fixed", top: menuPosition.top, left: menuPosition.left, zIndex: 60 }}
+                  className={`w-44 rounded-lg border border-zinc-700/30 bg-zinc-900/40 backdrop-blur-xl py-1 shadow-xl ${menuVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                  {!activePlayer.revokedAt && activePlayer.linkedAt && (
+                    <button
+                      onClick={() => {
+                        setRevokeTarget(activePlayer);
+                        setOpenMenu(null);
+                      }}
+                      className="w-full px-3 py-1.5 text-left text-sm text-orange-400 transition-colors hover:bg-white/5 hover:text-orange-300">
+                      Revoke Link
+                    </button>
+                  )}
+                  <button
                     onClick={() => {
                       setDeleteTarget(activePlayer);
-                      setMenuState(null);
-                    }}>
+                      setOpenMenu(null);
+                    }}
+                    className="w-full px-3 py-1.5 text-left text-sm text-red-400 transition-colors hover:bg-white/5 hover:text-red-300">
                     Delete Record
-                  </RowActionItem>
-                )}
-              </RowActionMenu>
-            );
-          })()}
+                  </button>
+                </div>,
+                document.body,
+              );
+            })()}
 
           {/* Pagination */}
           {pagination.pages > 1 && (
