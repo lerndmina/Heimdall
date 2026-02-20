@@ -10,7 +10,8 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { CommandContext } from "./CommandManager.js";
 import type { CommandManager } from "./CommandManager.js";
-import type { LibAPI } from "../../plugins/lib/index.js";
+import type { ComponentCallbackService } from "./services/ComponentCallbackService.js";
+import { nanoid } from "nanoid";
 
 /**
  * Build the help command's SlashCommandBuilder data.
@@ -107,9 +108,10 @@ function buildHelpPages(commandManager: CommandManager, guildId: string): HelpPa
 
 /**
  * Create the help command execute function.
- * Requires commandManager reference for building mentions.
+ * Requires commandManager reference for building mentions and
+ * componentCallbackService for registering ephemeral button callbacks.
  */
-export function createHelpExecute(commandManager: CommandManager) {
+export function createHelpExecute(commandManager: CommandManager, componentCallbackService: ComponentCallbackService) {
   return async (context: CommandContext) => {
     const { interaction, client } = context;
     const guildId = interaction.guildId;
@@ -177,32 +179,61 @@ export function createHelpExecute(commandManager: CommandManager) {
       return embed;
     };
 
-    const buildButtons = (pageIndex: number) => {
-      if (pages.length <= 1) return [];
+    // If single page, no buttons needed
+    if (pages.length <= 1) {
+      await interaction.reply({
+        embeds: [buildEmbed(0)],
+        ephemeral: true,
+      });
+      return;
+    }
 
+    // Register ephemeral button callbacks via ComponentCallbackService
+    // so the InteractionHandler can route them properly
+    const HELP_TTL = 120; // seconds
+    const pageIndicatorId = nanoid(12);
+
+    const navigateTo = async (btnInteraction: import("discord.js").ButtonInteraction | import("discord.js").AnySelectMenuInteraction, newPage: number) => {
+      if (btnInteraction.user.id !== interaction.user.id) {
+        await btnInteraction.reply({ content: "This isn't your help menu.", ephemeral: true });
+        return;
+      }
+      currentPage = newPage;
+      await btnInteraction.update({
+        embeds: [buildEmbed(currentPage)],
+        components: buildButtons(currentPage),
+      });
+    };
+
+    const firstId = await componentCallbackService.register(async (i) => navigateTo(i, 0), HELP_TTL);
+    const prevId = await componentCallbackService.register(async (i) => navigateTo(i, Math.max(0, currentPage - 1)), HELP_TTL);
+    const nextId = await componentCallbackService.register(async (i) => navigateTo(i, Math.min(pages.length - 1, currentPage + 1)), HELP_TTL);
+    const lastId = await componentCallbackService.register(async (i) => navigateTo(i, pages.length - 1), HELP_TTL);
+
+    const buildButtons = (pageIndex: number) => {
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
-          .setCustomId("help_first")
+          .setCustomId(firstId)
           .setEmoji("⏮")
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(pageIndex === 0),
         new ButtonBuilder()
-          .setCustomId("help_prev")
+          .setCustomId(prevId)
           .setEmoji("◀")
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(pageIndex === 0),
         new ButtonBuilder()
-          .setCustomId("help_page")
+          .setCustomId(pageIndicatorId)
           .setLabel(`${pageIndex + 1}/${pages.length}`)
           .setStyle(ButtonStyle.Primary)
           .setDisabled(true),
         new ButtonBuilder()
-          .setCustomId("help_next")
+          .setCustomId(nextId)
           .setEmoji("▶")
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(pageIndex === pages.length - 1),
         new ButtonBuilder()
-          .setCustomId("help_last")
+          .setCustomId(lastId)
           .setEmoji("⏭")
           .setStyle(ButtonStyle.Secondary)
           .setDisabled(pageIndex === pages.length - 1),
@@ -211,50 +242,10 @@ export function createHelpExecute(commandManager: CommandManager) {
       return [row];
     };
 
-    const reply = await interaction.reply({
+    await interaction.reply({
       embeds: [buildEmbed(currentPage)],
       components: buildButtons(currentPage),
       ephemeral: true,
-      fetchReply: true,
-    });
-
-    if (pages.length <= 1) return;
-
-    const collector = reply.createMessageComponentCollector({ time: 120_000 });
-
-    collector.on("collect", async (btnInteraction) => {
-      if (btnInteraction.user.id !== interaction.user.id) {
-        await btnInteraction.reply({ content: "This isn't your help menu.", ephemeral: true });
-        return;
-      }
-
-      switch (btnInteraction.customId) {
-        case "help_first":
-          currentPage = 0;
-          break;
-        case "help_prev":
-          currentPage = Math.max(0, currentPage - 1);
-          break;
-        case "help_next":
-          currentPage = Math.min(pages.length - 1, currentPage + 1);
-          break;
-        case "help_last":
-          currentPage = pages.length - 1;
-          break;
-      }
-
-      await btnInteraction.update({
-        embeds: [buildEmbed(currentPage)],
-        components: buildButtons(currentPage),
-      });
-    });
-
-    collector.on("end", async () => {
-      try {
-        await interaction.editReply({ components: [] });
-      } catch {
-        // Message may have been deleted
-      }
     });
   };
 }

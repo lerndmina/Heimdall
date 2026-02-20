@@ -194,7 +194,7 @@ async function onReady(readyClient: Client<true>): Promise<void> {
   commandManager.registerCommand({
     data: buildHelpCommandData(),
     config: { pluginName: "core" },
-    execute: createHelpExecute(commandManager),
+    execute: createHelpExecute(commandManager, componentCallbackService),
   });
 
   // Register commands now that plugins are loaded
