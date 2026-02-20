@@ -46,7 +46,7 @@ export function renderTemplate(template: string, vars: TemplateVars): string {
  * Build an embed from an embed config object with variable interpolation.
  */
 export function renderEmbed(
-  embedConfig: { title?: string; description?: string; color?: number; fields?: Array<{ name: string; value: string; inline?: boolean }> },
+  embedConfig: { title?: string; description?: string; color?: number; image?: string; thumbnail?: string; footer?: string; fields?: Array<{ name: string; value: string; inline?: boolean }> },
   vars: TemplateVars,
 ): EmbedBuilder {
   const embed = new EmbedBuilder();
@@ -59,6 +59,15 @@ export function renderEmbed(
   }
   if (embedConfig.color !== undefined) {
     embed.setColor(embedConfig.color);
+  }
+  if (embedConfig.image) {
+    embed.setImage(renderTemplate(embedConfig.image, vars));
+  }
+  if (embedConfig.thumbnail) {
+    embed.setThumbnail(renderTemplate(embedConfig.thumbnail, vars));
+  }
+  if (embedConfig.footer) {
+    embed.setFooter({ text: renderTemplate(embedConfig.footer, vars) });
   }
   if (embedConfig.fields) {
     for (const field of embedConfig.fields) {

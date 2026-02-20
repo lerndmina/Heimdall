@@ -33,12 +33,22 @@ import Modal from "@/components/ui/Modal";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
+import EmbedEditor, { type EmbedData } from "@/components/ui/EmbedEditor";
 import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 import StickyMessagesTab from "./StickyMessagesTab";
 
 // ── Types ────────────────────────────────────────────────
+
+interface DmEmbedConfig {
+  title?: string;
+  description?: string;
+  color?: number;
+  image?: string;
+  thumbnail?: string;
+  footer?: string;
+}
 
 interface ModerationConfig {
   guildId: string;
@@ -50,7 +60,7 @@ interface ModerationConfig {
   muteRoleId?: string;
   dmOnInfraction: boolean;
   defaultDmTemplate?: string;
-  defaultDmEmbed: boolean;
+  defaultDmEmbed?: DmEmbedConfig | null;
   dmMode: string;
   immuneRoles: string[];
   escalationTiers: EscalationTier[];
@@ -1586,6 +1596,7 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
   const [dmOnInfraction, setDmOnInfraction] = useState(true);
   const [defaultDmTemplate, setDefaultDmTemplate] = useState("");
   const [dmMode, setDmMode] = useState("text");
+  const [defaultDmEmbed, setDefaultDmEmbed] = useState<EmbedData>({});
 
   const loadConfig = useCallback(async () => {
     const res = await fetchApi<ModerationConfig>(guildId, "moderation/config", { skipCache: true });
@@ -1601,6 +1612,20 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
       setDmOnInfraction(c.dmOnInfraction);
       setDefaultDmTemplate(c.defaultDmTemplate ?? "");
       setDmMode(c.dmMode);
+      // Load embed config — convert color from decimal to hex for EmbedEditor
+      if (c.defaultDmEmbed && typeof c.defaultDmEmbed === "object") {
+        const e = c.defaultDmEmbed;
+        setDefaultDmEmbed({
+          title: e.title ?? "",
+          description: e.description ?? "",
+          color: e.color ? "#" + e.color.toString(16).padStart(6, "0") : "",
+          image: e.image ?? "",
+          thumbnail: e.thumbnail ?? "",
+          footer: e.footer ?? "",
+        });
+      } else {
+        setDefaultDmEmbed({});
+      }
     }
     setLoading(false);
   }, [guildId]);
@@ -1631,6 +1656,17 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
         muteRoleId: muteMode === "role" ? muteRoleId || undefined : null,
         dmOnInfraction,
         defaultDmTemplate: defaultDmTemplate || undefined,
+        defaultDmEmbed:
+          dmMode === "embed" || dmMode === "both"
+            ? {
+                title: defaultDmEmbed.title || undefined,
+                description: defaultDmEmbed.description || undefined,
+                color: defaultDmEmbed.color ? parseInt(defaultDmEmbed.color.replace("#", ""), 16) || undefined : undefined,
+                image: defaultDmEmbed.image || undefined,
+                thumbnail: defaultDmEmbed.thumbnail || undefined,
+                footer: defaultDmEmbed.footer || undefined,
+              }
+            : undefined,
         dmMode,
       }),
     });
@@ -1707,16 +1743,26 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
               </select>
             </div>
 
-            <Textarea
-              label="Default DM Template"
-              value={defaultDmTemplate}
-              onChange={setDefaultDmTemplate}
-              placeholder="You received a {action} in {server} for: {reason}"
-              rows={3}
-              disabled={!canManage}
-            />
+            {(dmMode === "text" || dmMode === "both") && (
+              <Textarea
+                label="Default DM Template"
+                value={defaultDmTemplate}
+                onChange={setDefaultDmTemplate}
+                placeholder="You received a {action} in {server} for: {reason}"
+                rows={3}
+                disabled={!canManage}
+              />
+            )}
+
+            {(dmMode === "embed" || dmMode === "both") && (
+              <div className="rounded-lg border border-zinc-700/30 p-4 space-y-3">
+                <EmbedEditor value={defaultDmEmbed} onChange={setDefaultDmEmbed} disabled={!canManage} heading="DM Embed" descriptionPlaceholder="You received a {action} in {server} for: {reason}" />
+              </div>
+            )}
+
             <details className="text-xs">
               <summary className="text-zinc-400 cursor-pointer hover:text-zinc-300">Available variables</summary>
+              <p className="mt-1 mb-1 text-zinc-500">Use these in both the text template and embed fields (title, description, footer).</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-zinc-400">
                 <div>
                   <code className="text-amber-400/70">{"{server}"}</code> — Server name
