@@ -114,6 +114,11 @@ export function createConfigRoutes(deps: PlanetSideApiDependencies): Router {
 
       const config = await PlanetSideConfig.findOneAndUpdate({ guildId }, { ...modelData, guildId }, { upsert: true, new: true, runValidators: true }).lean();
 
+      // If a census status channel is now configured, (re-)start the monitor
+      if (config.channels?.censusStatus) {
+        deps.censusMonitorService.startForGuild(guildId as string);
+      }
+
       res.json({
         success: true,
         data: modelToDashboard(config),

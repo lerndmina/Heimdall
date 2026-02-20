@@ -46,10 +46,28 @@ export function createCensusStatusRoutes(deps: PlanetSideApiDependencies): Route
             consecutiveFailures: status.honu?.consecutiveFailures ?? 0,
             consecutiveSuccesses: status.honu?.consecutiveSuccesses ?? 0,
           },
+          fisu: {
+            online: (status as any).fisu?.online ?? null,
+            lastChecked: (status as any).fisu?.lastChecked ?? null,
+            lastChange: (status as any).fisu?.lastChange ?? null,
+            consecutiveFailures: (status as any).fisu?.consecutiveFailures ?? 0,
+            consecutiveSuccesses: (status as any).fisu?.consecutiveSuccesses ?? 0,
+          },
           statusMessageId: status.statusMessageId,
           statusChannelId: status.statusChannelId,
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // POST /start — Start the census monitor for this guild (triggers immediate poll)
+  router.post("/start", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { guildId } = req.params;
+      deps.censusMonitorService.startForGuild(guildId as string);
+      res.json({ success: true, data: { message: "Census monitor started" } });
     } catch (error) {
       next(error);
     }

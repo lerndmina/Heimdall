@@ -92,6 +92,7 @@ export class CensusMonitorService {
         channelId: config.channels.censusStatus,
         census: { online: true, lastChange: Date.now(), consecutiveFailures: 0, consecutiveSuccesses: 0 },
         honu: { online: true, lastChange: Date.now(), consecutiveFailures: 0, consecutiveSuccesses: 0 },
+        fisu: { online: true, lastChange: Date.now(), consecutiveFailures: 0, consecutiveSuccesses: 0 },
       });
     }
 
@@ -143,6 +144,32 @@ export class CensusMonitorService {
       }
     }
 
+    // ── Check Fisu health ──────────────────────────────────────
+    const fisuData = await this.apiService.fisuGetPopulation();
+    const fisuOnline = Array.isArray(fisuData) && fisuData.length > 0;
+    if (!status.fisu) (status as any).fisu = { online: true, lastChange: Date.now(), consecutiveFailures: 0, consecutiveSuccesses: 0 };
+    if (fisuOnline) {
+      status.fisu.consecutiveSuccesses++;
+      status.fisu.consecutiveFailures = 0;
+      status.fisu.lastChecked = new Date();
+
+      if (!status.fisu.online && status.fisu.consecutiveSuccesses >= THRESHOLD) {
+        status.fisu.online = true;
+        status.fisu.lastChange = Date.now();
+        log.info(`Fisu API back online for guild ${guildId}`);
+      }
+    } else {
+      status.fisu.consecutiveFailures++;
+      status.fisu.consecutiveSuccesses = 0;
+      status.fisu.lastChecked = new Date();
+
+      if (status.fisu.online && status.fisu.consecutiveFailures >= THRESHOLD) {
+        status.fisu.online = false;
+        status.fisu.lastChange = Date.now();
+        log.warn(`Fisu API went offline for guild ${guildId}`);
+      }
+    }
+
     await status.save();
 
     // ── Update status message ──────────────────────────────────
@@ -164,20 +191,28 @@ export class CensusMonitorService {
 
       const textChannel = channel as TextChannel;
 
-      const honuStatusEmoji = status.honu.online ? "🟢" : status.honu.consecutiveFailures > 0 ? "🟡" : "🔴";
-      const censusStatusEmoji = status.census.online ? "🟢" : status.census.consecutiveFailures > 0 ? "🟡" : "🔴";
+      const honuEmoji = status.honu.online ? "🟢" : status.honu.consecutiveFailures > 0 ? "🟡" : "🔴";
+      const censusEmoji = status.census.online ? "🟢" : status.census.consecutiveFailures > 0 ? "🟡" : "🔴";
+      const fisuEmoji = status.fisu?.online ? "🟢" : (status.fisu?.consecutiveFailures ?? 0) > 0 ? "🟡" : "🔴";
 
       const honuStatusText = status.honu.online ? "Online" : status.honu.consecutiveFailures < THRESHOLD ? `Unstable (${status.honu.consecutiveFailures}/${THRESHOLD} failures)` : "Offline";
-
       const censusStatusText = status.census.online ? "Online" : status.census.consecutiveFailures < THRESHOLD ? `Unstable (${status.census.consecutiveFailures}/${THRESHOLD} failures)` : "Offline";
+      const fisuStatusText = status.fisu?.online
+        ? "Online"
+        : (status.fisu?.consecutiveFailures ?? 0) < THRESHOLD
+          ? `Unstable (${status.fisu?.consecutiveFailures ?? 0}/${THRESHOLD} failures)`
+          : "Offline";
+
+      const allOnline = status.honu.online && status.census.online && (status.fisu?.online ?? true);
+      const allOffline = !status.honu.online && !status.census.online && !(status.fisu?.online ?? true);
 
       const embed = this.lib
         .createEmbedBuilder()
         .setTitle("🛰️ PlanetSide 2 API Status")
-        .setColor(status.honu.online && status.census.online ? 0x00ff00 : !status.honu.online && !status.census.online ? 0xff0000 : 0xffa500)
+        .setColor(allOnline ? 0x00ff00 : allOffline ? 0xff0000 : 0xffa500)
         .addFields(
           {
-            name: `${honuStatusEmoji} Honu API`,
+            name: `${honuEmoji} Honu API`,
             value:
               `**Status:** ${honuStatusText}\n` +
               `**Last Change:** <t:${Math.floor(status.honu.lastChange / 1000)}:R>\n` +
@@ -185,11 +220,19 @@ export class CensusMonitorService {
             inline: true,
           },
           {
-            name: `${censusStatusEmoji} Census API`,
+            name: `${censusEmoji} Census API`,
             value:
               `**Status:** ${censusStatusText}\n` +
               `**Last Change:** <t:${Math.floor(status.census.lastChange / 1000)}:R>\n` +
               (status.census.lastChecked ? `**Last Checked:** <t:${Math.floor(status.census.lastChecked.getTime() / 1000)}:R>` : ""),
+            inline: true,
+          },
+          {
+            name: `${fisuEmoji} Fisu API`,
+            value:
+              `**Status:** ${fisuStatusText}\n` +
+              `**Last Change:** <t:${Math.floor((status.fisu?.lastChange ?? Date.now()) / 1000)}:R>\n` +
+              (status.fisu?.lastChecked ? `**Last Checked:** <t:${Math.floor(new Date(status.fisu.lastChecked).getTime() / 1000)}:R>` : ""),
             inline: true,
           },
         )

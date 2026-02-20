@@ -25,6 +25,7 @@ interface CensusStatusData {
   guildId: string;
   census: ApiHealth;
   honu: ApiHealth;
+  fisu: ApiHealth;
   statusMessageId?: string;
   statusChannelId?: string;
 }
@@ -155,7 +156,7 @@ export default function StatusTab({ guildId }: { guildId: string }) {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <ApiHealthCard name="Honu API" description="Real-time data, character lookup, population" health={healthStatus?.honu ?? null} testResult={testResults?.honu} />
               <ApiHealthCard name="Census API" description="Daybreak official — character stats, verification" health={healthStatus?.census ?? null} testResult={testResults?.census} />
-              <ApiHealthCard name="Fisu API" description="Fallback — population data" health={null} testResult={testResults?.fisu} />
+              <ApiHealthCard name="Fisu API" description="Fallback — population data" health={healthStatus?.fisu ?? null} testResult={testResults?.fisu} />
             </div>
           )}
         </CardContent>

@@ -26,6 +26,7 @@ const CensusStatusSchema = new Schema(
     // Nested API health trackers
     census: { type: ApiHealthSchema, default: () => ({}) },
     honu: { type: ApiHealthSchema, default: () => ({}) },
+    fisu: { type: ApiHealthSchema, default: () => ({}) },
 
     // Status message
     statusMessageId: { type: String },

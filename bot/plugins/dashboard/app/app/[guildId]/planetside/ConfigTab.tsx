@@ -105,6 +105,10 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
   const [sendingPanel, setSendingPanel] = useState(false);
   const [panelResult, setPanelResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
+  // Start Monitoring state
+  const [startingMonitor, setStartingMonitor] = useState(false);
+  const [monitorResult, setMonitorResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
   const fetchConfig = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -177,6 +181,25 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
       setPanelResult({ ok: false, msg: "Failed to connect to API." });
     } finally {
       setSendingPanel(false);
+    }
+  };
+
+  // ── Start Monitor handler ───────────────────────────────
+
+  const handleStartMonitor = async () => {
+    setStartingMonitor(true);
+    setMonitorResult(null);
+    try {
+      const res = await fetchApi(guildId, "planetside/census-status/start", { method: "POST", body: JSON.stringify({}) });
+      if (res.success) {
+        setMonitorResult({ ok: true, msg: "Monitoring started — first check running now!" });
+      } else {
+        setMonitorResult({ ok: false, msg: res.error?.message ?? "Failed to start monitoring." });
+      }
+    } catch {
+      setMonitorResult({ ok: false, msg: "Failed to connect to API." });
+    } finally {
+      setStartingMonitor(false);
     }
   };
 
@@ -387,6 +410,25 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
                 (Re-)sends the linking panel to <DiscordMention type="channel" id={config.channels.panel} guildId={guildId} />
               </span>
               {panelResult && <span className={`ml-auto text-xs font-medium ${panelResult.ok ? "text-green-400" : "text-red-400"}`}>{panelResult.msg}</span>}
+            </div>
+          )}
+
+          {/* Start Monitor action */}
+          {config.channels.censusStatus && (
+            <div className="mt-4 flex items-center gap-3 border-t border-zinc-700 pt-4">
+              <button
+                onClick={() => {
+                  setMonitorResult(null);
+                  handleStartMonitor();
+                }}
+                disabled={startingMonitor}
+                className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                {startingMonitor ? "Starting…" : "Start Monitoring"}
+              </button>
+              <span className="text-xs text-zinc-400">
+                (Re-)starts the Census/Honu/Fisu status panel in <DiscordMention type="channel" id={config.channels.censusStatus} guildId={guildId} />
+              </span>
+              {monitorResult && <span className={`ml-auto text-xs font-medium ${monitorResult.ok ? "text-green-400" : "text-red-400"}`}>{monitorResult.msg}</span>}
             </div>
           )}
         </CardContent>
