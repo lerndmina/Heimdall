@@ -314,7 +314,27 @@ export class PlanetSideApiService {
       const data: any = await res.json();
       if (!data?.result) return null;
 
-      return data.result.map((entry: any) => ({
+      // Fisu returns { result: { "1": [...], "10": [...] } } for multi-world
+      // and { result: [...] } for single-world queries
+      const result = data.result;
+      const entries: any[] = [];
+
+      if (Array.isArray(result)) {
+        // Single-world: result is an array directly
+        entries.push(...result);
+      } else if (typeof result === "object") {
+        // Multi-world: result is keyed by world ID, each value is an array
+        for (const worldEntries of Object.values(result)) {
+          if (Array.isArray(worldEntries)) {
+            // Take the latest entry (first) from each world
+            if (worldEntries.length > 0) entries.push(worldEntries[0]);
+          }
+        }
+      } else {
+        return null;
+      }
+
+      return entries.map((entry: any) => ({
         worldId: entry.worldId,
         vs: entry.vs || 0,
         nc: entry.nc || 0,

@@ -54,7 +54,7 @@ export async function onLoad(context: PluginContext): Promise<PlanetSidePluginAP
   const censusServiceId = process.env.CENSUS_SERVICE_ID || "s:example";
   const honuBaseUrl = process.env.HONU_BASE_URL || "https://wt.honu.pw";
 
-  apiService = new PlanetSideApiService(censusServiceId, honuBaseUrl);
+  apiService = new PlanetSideApiService(honuBaseUrl, censusServiceId);
   censusMonitorService = new CensusMonitorService(client, lib, apiService);
   panelService = new PlanetSidePanelService(lib, lib.componentCallbackService, logger, apiService);
   panelService.initialize();
