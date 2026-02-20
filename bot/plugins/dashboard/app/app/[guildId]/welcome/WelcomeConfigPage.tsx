@@ -14,6 +14,8 @@ import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
+import Toggle from "@/components/ui/Toggle";
+import EmbedEditor, { type EmbedData } from "@/components/ui/EmbedEditor";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
@@ -25,6 +27,12 @@ interface WelcomeConfig {
   guildId: string;
   channelId: string;
   message: string;
+  useEmbed?: boolean;
+  embedTitle?: string;
+  embedColor?: number;
+  embedImage?: string;
+  embedThumbnail?: string;
+  embedFooter?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -49,6 +57,8 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
   const [editing, setEditing] = useState(false);
   const [draftChannel, setDraftChannel] = useState("");
   const [draftMessage, setDraftMessage] = useState("");
+  const [draftUseEmbed, setDraftUseEmbed] = useState(false);
+  const [draftEmbed, setDraftEmbed] = useState<EmbedData>({});
   const [saving, setSaving] = useState(false);
 
   // Variables
@@ -118,9 +128,20 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
 
     setSaving(true);
     try {
+      const embedColor = draftUseEmbed && draftEmbed.color ? parseInt(draftEmbed.color.replace("#", ""), 16) || undefined : undefined;
+
       const res = await fetchApi<WelcomeConfig>(guildId, "welcome/config", {
         method: "PUT",
-        body: JSON.stringify({ channelId: draftChannel, message: draftMessage }),
+        body: JSON.stringify({
+          channelId: draftChannel,
+          message: draftMessage,
+          useEmbed: draftUseEmbed,
+          embedTitle: draftUseEmbed ? draftEmbed.title?.trim() || undefined : undefined,
+          embedColor,
+          embedImage: draftUseEmbed ? draftEmbed.image?.trim() || undefined : undefined,
+          embedThumbnail: draftUseEmbed ? draftEmbed.thumbnail?.trim() || undefined : undefined,
+          embedFooter: draftUseEmbed ? draftEmbed.footer?.trim() || undefined : undefined,
+        }),
       });
       if (res.success) {
         setConfig({ guildId, channelId: draftChannel, message: draftMessage, createdAt: res.data?.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString() });
@@ -180,9 +201,19 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
     if (isCreate) {
       setDraftChannel("");
       setDraftMessage("Welcome to {guild}, {mention}! You are member #{membercount}.");
+      setDraftUseEmbed(false);
+      setDraftEmbed({});
     } else if (config) {
       setDraftChannel(config.channelId);
       setDraftMessage(config.message);
+      setDraftUseEmbed(config.useEmbed ?? false);
+      setDraftEmbed({
+        title: config.embedTitle ?? "",
+        color: config.embedColor ? `#${config.embedColor.toString(16).padStart(6, "0")}` : "",
+        image: config.embedImage ?? "",
+        thumbnail: config.embedThumbnail ?? "",
+        footer: config.embedFooter ?? "",
+      });
     }
     setEditing(true);
   };
@@ -225,14 +256,19 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
             />
 
             <Textarea
-              label="Message Template"
-              description="The welcome message to send. Use variables below to personalize it."
+              label={draftUseEmbed ? "Embed Description" : "Message Template"}
+              description={draftUseEmbed ? "The main text of the embed. Use variables below to personalize it." : "The welcome message to send. Use variables below to personalize it."}
               value={draftMessage}
               onChange={setDraftMessage}
-              maxLength={2000}
+              maxLength={draftUseEmbed ? 4096 : 2000}
               rows={5}
               placeholder="Welcome to the server, {mention}!"
             />
+
+            {/* Send as Embed toggle */}
+            <Toggle label="Send as Embed" description="Display the welcome message as a rich embed instead of plain text" checked={draftUseEmbed} onChange={setDraftUseEmbed} />
+
+            {draftUseEmbed && <EmbedEditor value={draftEmbed} onChange={setDraftEmbed} descriptionRows={0} heading="Embed Settings" compact />}
 
             {/* Variable reference */}
             <div>
@@ -322,7 +358,10 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
           <FieldDisplay label="Channel" value={`<#${config.channelId}>`}>
             <span className="text-sm text-zinc-200">#{config.channelId}</span>
           </FieldDisplay>
-          <FieldDisplay label="Message Template">
+          <FieldDisplay label="Format">
+            <span className="text-sm text-zinc-200">{config.useEmbed ? "Rich Embed" : "Plain Text"}</span>
+          </FieldDisplay>
+          <FieldDisplay label={config.useEmbed ? "Embed Description" : "Message Template"}>
             <div className="mt-1 rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm p-3">
               <pre className="whitespace-pre-wrap text-sm text-zinc-200 font-sans">{config.message}</pre>
             </div>

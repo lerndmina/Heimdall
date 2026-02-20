@@ -3,6 +3,7 @@
  */
 
 import type { Client, GuildMember, TextChannel } from "discord.js";
+import { EmbedBuilder } from "discord.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import type { LibAPI } from "../../lib/index.js";
 import WelcomeMessageModel, { type IWelcomeMessage } from "../models/WelcomeMessage.js";
@@ -61,8 +62,29 @@ export class WelcomeService {
   }
 
   /** Create or update the welcome config (upsert). */
-  async upsertConfig(guildId: string, channelId: string, message: string): Promise<IWelcomeMessage> {
-    const doc = await WelcomeMessageModel.findOneAndUpdate({ guildId }, { guildId, channelId, message }, { upsert: true, new: true });
+  async upsertConfig(
+    guildId: string,
+    channelId: string,
+    message: string,
+    embedOpts?: {
+      useEmbed?: boolean;
+      embedTitle?: string;
+      embedColor?: number;
+      embedImage?: string;
+      embedThumbnail?: string;
+      embedFooter?: string;
+    },
+  ): Promise<IWelcomeMessage> {
+    const update: Record<string, any> = { guildId, channelId, message };
+    if (embedOpts) {
+      update.useEmbed = embedOpts.useEmbed ?? false;
+      update.embedTitle = embedOpts.embedTitle;
+      update.embedColor = embedOpts.embedColor;
+      update.embedImage = embedOpts.embedImage;
+      update.embedThumbnail = embedOpts.embedThumbnail;
+      update.embedFooter = embedOpts.embedFooter;
+    }
+    const doc = await WelcomeMessageModel.findOneAndUpdate({ guildId }, update, { upsert: true, new: true });
     return doc;
   }
 
@@ -99,7 +121,19 @@ export class WelcomeService {
    * Send a welcome message for a member using the guild's config.
    * Can also be called with an ad-hoc config object for testing.
    */
-  async sendWelcomeMessage(config: { channelId: string; message: string }, member: GuildMember): Promise<{ success: boolean; error?: string }> {
+  async sendWelcomeMessage(
+    config: {
+      channelId: string;
+      message: string;
+      useEmbed?: boolean | null;
+      embedTitle?: string | null;
+      embedColor?: number | null;
+      embedImage?: string | null;
+      embedThumbnail?: string | null;
+      embedFooter?: string | null;
+    },
+    member: GuildMember,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const channel = await this.lib.thingGetter.getChannel(config.channelId);
 
@@ -124,10 +158,35 @@ export class WelcomeService {
 
       const parsed = this.parseMessage(config.message, member);
 
-      await textChannel.send({
-        content: parsed,
-        allowedMentions: { parse: ["users"] },
-      });
+      if (config.useEmbed) {
+        const embed = new EmbedBuilder().setDescription(parsed);
+
+        if (config.embedTitle) {
+          embed.setTitle(this.parseMessage(config.embedTitle, member));
+        }
+        if (config.embedColor != null && config.embedColor > 0) {
+          embed.setColor(config.embedColor);
+        }
+        if (config.embedImage) {
+          embed.setImage(config.embedImage);
+        }
+        if (config.embedThumbnail) {
+          embed.setThumbnail(config.embedThumbnail);
+        }
+        if (config.embedFooter) {
+          embed.setFooter({ text: this.parseMessage(config.embedFooter, member) });
+        }
+
+        await textChannel.send({
+          embeds: [embed],
+          allowedMentions: { parse: ["users"] },
+        });
+      } else {
+        await textChannel.send({
+          content: parsed,
+          allowedMentions: { parse: ["users"] },
+        });
+      }
 
       log.info(`Welcome message sent for ${member.user.username} in guild ${member.guild.name}`);
       return { success: true };

@@ -45,7 +45,7 @@ export function createConfigUpdateRoutes(deps: WelcomeApiDependencies): Router {
   router.put("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
-      const { channelId, message } = req.body;
+      const { channelId, message, useEmbed, embedTitle, embedColor, embedImage, embedThumbnail, embedFooter } = req.body;
 
       // Validate body
       if (!channelId || typeof channelId !== "string") {
@@ -74,7 +74,14 @@ export function createConfigUpdateRoutes(deps: WelcomeApiDependencies): Router {
 
       // Check if this is an update or create
       const existing = await deps.welcomeService.getConfig(guildId);
-      const config = await deps.welcomeService.upsertConfig(guildId, channelId, message);
+      const config = await deps.welcomeService.upsertConfig(guildId, channelId, message, {
+        useEmbed: !!useEmbed,
+        embedTitle: embedTitle || undefined,
+        embedColor: typeof embedColor === "number" ? embedColor : undefined,
+        embedImage: embedImage || undefined,
+        embedThumbnail: embedThumbnail || undefined,
+        embedFooter: embedFooter || undefined,
+      });
 
       res.status(existing ? 200 : 201).json({
         success: true,
@@ -82,6 +89,12 @@ export function createConfigUpdateRoutes(deps: WelcomeApiDependencies): Router {
           guildId: config.guildId,
           channelId: config.channelId,
           message: config.message,
+          useEmbed: (config as any).useEmbed ?? false,
+          embedTitle: (config as any).embedTitle,
+          embedColor: (config as any).embedColor,
+          embedImage: (config as any).embedImage,
+          embedThumbnail: (config as any).embedThumbnail,
+          embedFooter: (config as any).embedFooter,
           wasCreated: !existing,
         },
       });
