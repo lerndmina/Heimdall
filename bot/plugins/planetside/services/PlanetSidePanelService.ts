@@ -101,12 +101,7 @@ export class PlanetSidePanelService {
         description = `Hello! Click the button below and link your PlanetSide 2 account.\n\n` + `Once verified, you will be given your role automatically.`;
       }
 
-      const embed = this.lib
-        .createEmbedBuilder()
-        .setTitle(panelTitle)
-        .setDescription(description)
-        .setColor(panelColor)
-        .setFooter({ text: panelFooter });
+      const embed = this.lib.createEmbedBuilder().setTitle(panelTitle).setDescription(description).setColor(panelColor).setFooter({ text: panelFooter });
 
       if (panelShowTimestamp) {
         embed.setTimestamp(new Date());

@@ -536,13 +536,7 @@ function StepPanel({
         rows={4}
         maxLength={2000}
       />
-      <TextInput
-        label="Embed Color"
-        value={draft.panel.color}
-        onChange={(v) => updatePanel("color", v)}
-        placeholder="#de3b79"
-        description="Hex color for the embed accent. Default: #de3b79 (pink)."
-      />
+      <TextInput label="Embed Color" value={draft.panel.color} onChange={(v) => updatePanel("color", v)} placeholder="#de3b79" description="Hex color for the embed accent. Default: #de3b79 (pink)." />
       <TextInput
         label="Footer Text"
         value={draft.panel.footerText}
