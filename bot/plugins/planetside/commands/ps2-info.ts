@@ -91,11 +91,11 @@ export async function execute(context: CommandContext): Promise<void> {
     { name: "Server", value: getServerName(serverId), inline: true },
   );
 
-  // Online status
-  if (onlineStatus) {
+  // Online status (Honu returns raw boolean)
+  if (onlineStatus !== null) {
     embed.addFields({
       name: "Status",
-      value: onlineStatus.online ? "🟢 Online" : "🔴 Offline",
+      value: onlineStatus ? "🟢 Online" : "🔴 Offline",
       inline: true,
     });
   }

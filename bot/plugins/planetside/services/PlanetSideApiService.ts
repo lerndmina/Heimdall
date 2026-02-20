@@ -26,11 +26,7 @@ export interface HonuCharacter {
   dateLastLogin?: string;
 }
 
-export interface HonuOnlineStatus {
-  online: boolean;
-  worldID?: number;
-  lastLogin?: string;
-}
+// NOTE: GET /api/character/{charID}/online returns a raw boolean, not an object
 
 export interface HonuOutfit {
   id: string;
@@ -176,9 +172,9 @@ export class PlanetSideApiService {
     return this.honuFetch<HonuCharacter>(`/api/character/${charId}`, honuBaseUrl);
   }
 
-  /** Get online status of a character */
-  async getCharacterOnlineStatus(charId: string, honuBaseUrl?: string): Promise<HonuOnlineStatus | null> {
-    return this.honuFetch<HonuOnlineStatus>(`/api/character/${charId}/online`, honuBaseUrl);
+  /** Get online status of a character. Honu returns a raw boolean (true/false), not an object. */
+  async getCharacterOnlineStatus(charId: string, honuBaseUrl?: string): Promise<boolean | null> {
+    return this.honuFetch<boolean>(`/api/character/${charId}/online`, honuBaseUrl);
   }
 
   /** Get character stats */
@@ -424,11 +420,12 @@ export class PlanetSideApiService {
   ): Promise<{ verified: boolean; method: string; detail: string }> {
     if (method === "online_now") {
       const status = await this.getCharacterOnlineStatus(charId, options?.honuBaseUrl);
-      if (status?.online) {
+      log.debug(`Honu online status for ${charId}: ${JSON.stringify(status)}`);
+      if (status === true) {
         return { verified: true, method: "online_now", detail: "Character is currently online" };
       }
 
-      // Fallback to recent_login if Honu can't determine online status
+      // Fallback to recent_login if Honu can't determine online status (API error)
       if (status === null) {
         log.warn(`Honu online check failed for ${charId}, falling back to Census recent_login`);
         return this.verifyCharacter(charId, "recent_login", windowMinutes, options);
