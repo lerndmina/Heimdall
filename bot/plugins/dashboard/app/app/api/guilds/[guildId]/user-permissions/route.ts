@@ -32,7 +32,11 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   // Fetch member info + permission overrides + settings + bot owner in parallel
   const [memberData, permData, settingsData, permissionDefs, isBotOwner] = await Promise.all([
     fetchBotApi<MemberInfo>(`/api/guilds/${guildId}/members/${session.user.id}`, `member:${guildId}:${session.user.id}`, TTL_MEMBER),
-    fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(`/api/guilds/${guildId}/dashboard-permissions`, `perms:${guildId}`, TTL_PERMISSIONS),
+    fetchBotApi<{ permissions: Array<{ discordRoleId: string; overrides: Record<string, "allow" | "deny">; position: number }> }>(
+      `/api/guilds/${guildId}/dashboard-permissions`,
+      `perms:${guildId}`,
+      TTL_PERMISSIONS,
+    ),
     fetchBotApi<{ settings: { hideDeniedFeatures: boolean } }>(`/api/guilds/${guildId}/dashboard-settings`, `settings:${guildId}`, TTL_SETTINGS),
     fetchBotApi<{ categories: PermissionCategory[] }>(`/api/guilds/${guildId}/permission-defs`, `permdefs:${guildId}`, TTL_PERMISSION_DEFS),
     checkBotOwner(session.user.id),

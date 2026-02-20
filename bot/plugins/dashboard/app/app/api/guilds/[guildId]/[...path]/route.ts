@@ -48,11 +48,7 @@ async function proxyRequest(req: NextRequest, { params }: RouteParams) {
 
   if (requiredAction) {
     // Fetch member info (roles, isOwner, isAdmin)
-    const memberData = await fetchBotApi<MemberInfo>(
-      `/api/guilds/${guildId}/members/${session.user.id}`,
-      `member:${guildId}:${session.user.id}`,
-      TTL_MEMBER,
-    );
+    const memberData = await fetchBotApi<MemberInfo>(`/api/guilds/${guildId}/members/${session.user.id}`, `member:${guildId}:${session.user.id}`, TTL_MEMBER);
 
     if (!memberData) {
       return NextResponse.json({ error: "Could not verify member permissions" }, { status: 403 });
