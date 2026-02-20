@@ -55,6 +55,7 @@ The project consists of two main components:
 ### 🔌 Built-in Plugins
 
 #### Community Management
+
 - **Tickets** - Support ticket system
 - **Modmail** - DM-based modmail support system with forum threads and webhook relay
 - **Logging** - Server event logging with per-category channels and subcategory toggles
@@ -63,6 +64,7 @@ The project consists of two main components:
 - **Tags** - Guild-specific text tags with CRUD, usage tracking, and autocomplete
 
 #### Utilities
+
 - **Reminders** - Personal reminders with context-aware ticket/modmail integration, background delivery, and dashboard API
 - **TempVC** - Join-to-create temporary voice channel system
 - **Minigames** - Fun minigames including Connect4, TicTacToe, Dice gambling, and HeimdallCoin economy
@@ -70,6 +72,7 @@ The project consists of two main components:
 - **Ping** - Simple ping command for testing
 
 #### Integration
+
 - **Minecraft** - Minecraft whitelist integration — account linking, RCON, role sync, leave revocation
 - **Support-Core** - Core support system infrastructure for tickets and modmail
 - **Lib** - Shared utilities library for Heimdall plugins
@@ -119,6 +122,7 @@ Heimdall Ecosystem
 ### Plugin System
 
 Heimdall uses a manifest-based plugin system where each plugin declares:
+
 - **Dependencies** - Required plugins that must load first
 - **API Routes** - REST endpoints exposed by the plugin
 - **Environment Variables** - Required/optional configuration
@@ -153,12 +157,14 @@ Plugins are loaded in dependency order, ensuring proper initialization.
 ### Discord Bot Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/lerndmina/Heimdall.git
    cd Heimdall/bot
    ```
 
 2. **Install dependencies**
+
    ```bash
    # Using Bun (recommended)
    bun install
@@ -168,12 +174,14 @@ Plugins are loaded in dependency order, ensuring proper initialization.
    ```
 
 3. **Configure environment variables**
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration (see Configuration section)
    ```
 
 4. **Start MongoDB and Redis**
+
    ```bash
    # Using Docker Compose (example)
    docker-compose up -d mongodb redis
@@ -182,6 +190,7 @@ Plugins are loaded in dependency order, ensuring proper initialization.
    ```
 
 5. **Run the bot**
+
    ```bash
    # Development mode
    bun run dev
@@ -263,10 +272,12 @@ openssl rand -hex 32
 ### Inviting the Bot
 
 Generate an invite URL with these scopes and permissions:
+
 - **Scopes**: `bot`, `applications.commands`
 - **Bot Permissions**: Administrator (or customize as needed)
 
 Example URL:
+
 ```
 https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands
 ```
@@ -284,18 +295,22 @@ Most plugins support per-guild configuration through Discord commands. After inv
 ## Available Plugins
 
 ### Tickets Plugin
+
 Support ticket system with categories, transcripts, and role-based access.
 
 **Commands:**
+
 - `/ticket create` - Create a new support ticket
 - `/ticket close` - Close the current ticket
 - `/ticket add <user>` - Add user to ticket
 - `/ticket remove <user>` - Remove user from ticket
 
 ### Modmail Plugin
+
 DM-based modmail support system with forum threads and webhook relay.
 
 **Features:**
+
 - Users DM the bot to create modmail threads
 - Staff respond via Discord forum threads
 - All messages are relayed bidirectionally via webhook
@@ -304,23 +319,28 @@ DM-based modmail support system with forum threads and webhook relay.
 - Auto-close toggle and forum tag helpers
 
 ### Minecraft Plugin
+
 Minecraft whitelist integration with account linking, RCON, role sync, and leave revocation.
 
 **Commands:**
+
 - `/link-minecraft <username>` - Start linking your Minecraft account
 - `/confirm-code <code>` - Confirm your authentication code
 - `/unlink-minecraft` - Unlink your Minecraft account
 - `/minecraft-status` - View your link status
 
 **Admin Commands:**
+
 - `/minecraft-approve <user>` - Approve whitelist application
 - `/minecraft-deny <user>` - Deny whitelist application
 - `/minecraft-manage` - Open management dashboard
 
 ### Logging Plugin
+
 Server event logging with per-category channels and subcategory toggles.
 
 **Logged Events:**
+
 - Message edits and deletions
 - Member joins, leaves, and updates
 - Role changes
@@ -329,40 +349,49 @@ Server event logging with per-category channels and subcategory toggles.
 - Moderation actions
 
 ### TempVC Plugin
+
 Join-to-create temporary voice channel system with full user control.
 
 **Features:**
+
 - Join designated channel to create your own VC
 - Full control over your channel (name, limit, permissions)
 - Channel auto-deletes when empty
 - Customizable creation channel
 
 ### Welcome Plugin
+
 Welcome messages for new members with template variables.
 
 **Features:**
+
 - Welcome messages in designated channel
 - Direct message welcome
 - Customizable embed messages
 - Variable support (`{user}`, `{server}`, `{memberCount}`)
 
 ### Minigames Plugin
+
 Fun minigames including Connect4, TicTacToe, Dice gambling, and HeimdallCoin economy.
 
 **Games:**
+
 - `/connect4 <opponent>` - Play Connect Four
 - `/tictactoe <opponent>` - Play Tic-Tac-Toe
 - `/dice [sides]` - Roll dice (gambling)
 
 **Economy:**
+
 - `/balance` - Check your HeimdallCoin balance
 - `/daily` - Claim daily coins
 - `/leaderboard` - View richest users
 
 ### Suggestions Plugin
+
 Community suggestion system with voting, categories, AI titles, and dual embed/forum modes.
 
 **Features:**
+
 - Submit suggestions with `/suggest`
 - Voting system with upvote/downvote
 - Organize by categories
@@ -370,9 +399,11 @@ Community suggestion system with voting, categories, AI titles, and dual embed/f
 - Support for both embed and forum thread modes
 
 ### Tags Plugin
+
 Guild-specific text tags with CRUD, usage tracking, and autocomplete.
 
 **Commands:**
+
 - `/tag <name>` - Display a tag
 - `/tag create <name> <content>` - Create a new tag
 - `/tag edit <name> <content>` - Edit existing tag
@@ -380,18 +411,22 @@ Guild-specific text tags with CRUD, usage tracking, and autocomplete.
 - Usage tracking and autocomplete support
 
 ### Reminders Plugin
+
 Personal reminders with context-aware ticket/modmail integration, background delivery, and dashboard API.
 
 **Features:**
+
 - `/remind <time> <message>` - Set a reminder
 - Context-aware: remembers if set in a ticket or modmail thread
 - Background delivery service ensures reminders are sent
 - Dashboard API for managing reminders
 
 ### Dev Plugin
+
 Owner-only developer utilities (database tools, diagnostics).
 
 **Features:**
+
 - Database management tools
 - MongoDB import/export utilities
 - Diagnostic commands
@@ -399,6 +434,7 @@ Owner-only developer utilities (database tools, diagnostics).
 - Owner-only access
 
 ### Ping Plugin
+
 Simple ping command for testing bot latency and responsiveness.
 
 ---
@@ -527,6 +563,7 @@ bun run lint:fix
 ### Creating a Custom Plugin
 
 1. **Create plugin directory**
+
    ```bash
    cd bot/plugins
    mkdir my-plugin
@@ -534,6 +571,7 @@ bun run lint:fix
    ```
 
 2. **Create manifest.json**
+
    ```json
    {
      "name": "my-plugin",
@@ -548,16 +586,17 @@ bun run lint:fix
    ```
 
 3. **Create plugin entry point (index.ts)**
+
    ```typescript
-   import { Plugin } from '@types/plugin';
+   import { Plugin } from "@types/plugin";
 
    export default class MyPlugin extends Plugin {
      async onLoad() {
-       this.logger.info('My plugin loaded!');
+       this.logger.info("My plugin loaded!");
      }
 
      async onUnload() {
-       this.logger.info('My plugin unloaded!');
+       this.logger.info("My plugin unloaded!");
      }
    }
    ```
@@ -600,6 +639,7 @@ Currently, the project doesn't have automated tests. Testing is done manually:
 ### Bot Won't Start
 
 **Check environment variables**
+
 ```bash
 cd bot
 cat .env
@@ -608,6 +648,7 @@ cat .env
 Ensure all required variables are set (see Configuration section).
 
 **Check database connections**
+
 ```bash
 # Test MongoDB
 mongosh $MONGODB_URI
@@ -617,6 +658,7 @@ redis-cli -u $REDIS_URL ping
 ```
 
 **Check logs**
+
 - Enable debug logging: `DEBUG_LOG=true`
 - Enable file logging: `LOG_TO_FILE=true`
 - Check console output for errors
@@ -640,6 +682,7 @@ redis-cli -u $REDIS_URL ping
 See the [Minecraft Plugin README](minecraft-plugin/README.md) troubleshooting section for detailed help.
 
 **Common Issues:**
+
 - API connection failures: Check `api.baseUrl` and network connectivity
 - Auth codes not working: Verify bot API is running
 - Performance issues: Increase cache timeout values
@@ -654,11 +697,13 @@ See the [Minecraft Plugin README](minecraft-plugin/README.md) troubleshooting se
 ### Database Issues
 
 **MongoDB connection errors:**
+
 - Verify MongoDB is running: `systemctl status mongodb`
 - Check connection string format
 - Ensure database user has proper permissions
 
 **Redis connection errors:**
+
 - Verify Redis is running: `systemctl status redis`
 - Check Redis URL format
 - Test connection: `redis-cli ping`
@@ -722,6 +767,7 @@ See [LICENSE](./LICENSE) for full terms.
 **Developed by**: [lerndmina](https://github.com/lerndmina)
 
 **Built with**:
+
 - [Discord.js](https://discord.js.org) - Discord API wrapper
 - [Bun](https://bun.sh) - Fast JavaScript runtime
 - [MongoDB](https://www.mongodb.com) - Database
