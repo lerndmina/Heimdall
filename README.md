@@ -706,7 +706,14 @@ Contributions are welcome! Please follow these guidelines:
 
 ## License
 
-This project is open source. Please check the repository for license information.
+This project is licensed under the **Heimdall Noncommercial Single-Server License (NC-1S) v1.0**.
+
+- ✅ Public source code, modification, and self-hosting are allowed
+- ✅ Noncommercial use is allowed
+- ⚠️ Hosting is limited to **one active server at a time** per person/organization
+- ❌ Commercial use is not allowed
+
+See [LICENSE](./LICENSE) for full terms.
 
 ---
 
