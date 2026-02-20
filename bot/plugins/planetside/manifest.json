@@ -1,0 +1,10 @@
+{
+  "name": "planetside",
+  "version": "1.0.0",
+  "description": "PlanetSide 2 integration — account linking, Census/Honu API, population tracking, outfit management",
+  "dependencies": ["lib"],
+  "optionalDependencies": [],
+  "requiredEnv": [],
+  "optionalEnv": ["CENSUS_SERVICE_ID", "HONU_BASE_URL"],
+  "apiRoutePrefix": "/planetside"
+}
