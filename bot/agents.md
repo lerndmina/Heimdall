@@ -382,3 +382,39 @@ If `npm install` was used by mistake, run `bun install` afterwards to sync the l
 
 - `bun.lock` is up to date (`bun install` produces no changes)
 - `bun run build` (or `npx tsc --noEmit`) passes with no type errors
+
+---
+
+## Git Workflow for Agents
+
+After making code changes, **always commit using the git tools** — don't leave changes unstaged.
+
+### Commit approach
+
+- Group related changes into logical commits (one feature/fix per commit) rather than one giant commit per session
+- Use [Conventional Commits](https://www.conventionalcommits.org/) format: `feat(scope):`, `fix(scope):`, `chore(scope):`, `perf(scope):`, `refactor(scope):`
+- Stage and commit each group before moving on to the next area of work
+
+### Using the git tools
+
+```
+mcp_gitkraken_git_add_or_commit  action="add"    files=[...]   # stage specific files
+mcp_gitkraken_git_add_or_commit  action="commit" message="..." # commit staged files
+```
+
+To see what's changed before staging:
+```
+mcp_gitkraken_git_status  directory="..."
+```
+
+### Example groupings
+
+| Group | Files |
+|-------|-------|
+| New plugin (model + service + API + events) | All files in `plugins/<name>/` |
+| Dashboard embed support for one plugin | model + service + api route + dashboard page |
+| Shared UI component | `plugins/dashboard/app/components/ui/<Name>.tsx` |
+| Core infrastructure changes | `src/core/*.ts`, `src/index.ts` |
+| Build/config | `package.json`, `tsconfig.json`, `.gitignore`, etc. |
+
+New untracked files (e.g. new plugins, new components) must be staged explicitly — `git add` of the directory path will include all nested files.
