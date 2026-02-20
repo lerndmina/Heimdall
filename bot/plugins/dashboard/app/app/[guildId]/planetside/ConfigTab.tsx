@@ -209,7 +209,7 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
       {
         id: "outfit",
         label: "Outfit Details",
-        content: <StepOutfit draft={draft} update={update} />,
+        content: <StepOutfit draft={draft} update={update} guildId={guildId} />,
         validate: () => true, // outfit info is optional
       },
       {
@@ -379,23 +379,88 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
 function StepOutfit({
   draft,
   update,
+  guildId,
 }: {
   draft: Omit<PlanetSideConfig, "guildId">;
   update: <K extends keyof Omit<PlanetSideConfig, "guildId">>(key: K, value: Omit<PlanetSideConfig, "guildId">[K]) => void;
+  guildId: string;
 }) {
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupSuccess, setLookupSuccess] = useState<string | null>(null);
+
+  const handleLookup = async () => {
+    const tag = draft.outfitTag.trim();
+    if (!tag) {
+      setLookupError("Enter an outfit tag first.");
+      return;
+    }
+
+    setLookupLoading(true);
+    setLookupError(null);
+    setLookupSuccess(null);
+
+    try {
+      const res = await fetchApi<{
+        id: string;
+        name: string;
+        tag: string;
+        factionID: number;
+        worldID: number;
+        memberCount: number | null;
+      }>(guildId, `planetside/outfit-lookup?tag=${encodeURIComponent(tag)}`);
+
+      if (res.success && res.data) {
+        update("outfitId", res.data.id);
+        if (res.data.name) update("outfitName", res.data.name);
+        if (res.data.tag) update("outfitTag", res.data.tag);
+        const memberInfo = res.data.memberCount ? ` (${res.data.memberCount} members)` : "";
+        setLookupSuccess(`Found: [${res.data.tag}] ${res.data.name}${memberInfo}`);
+      } else {
+        setLookupError(res.error?.message ?? "Outfit not found.");
+      }
+    } catch {
+      setLookupError("Failed to connect to API.");
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-zinc-400">Configure the PlanetSide 2 outfit that this server is associated with. This is used for account verification and outfit-specific features.</p>
       <Toggle label="Enable PlanetSide Integration" checked={draft.enabled} onChange={(v) => update("enabled", v)} />
-      <TextInput label="Outfit Tag" value={draft.outfitTag} onChange={(v) => update("outfitTag", v)} placeholder="e.g. KOTV" />
+      <TextInput label="Outfit Tag" value={draft.outfitTag} onChange={(v) => { update("outfitTag", v); setLookupSuccess(null); setLookupError(null); }} placeholder="e.g. KOTV" />
       <TextInput label="Outfit Name" value={draft.outfitName} onChange={(v) => update("outfitName", v)} placeholder="e.g. Keepers of the Vanu" />
-      <TextInput
-        label="Outfit ID (Census)"
-        value={draft.outfitId}
-        onChange={(v) => update("outfitId", v)}
-        placeholder="Census outfit_id (optional)"
-        description="The numeric outfit ID from Census API. Used for outfit membership checks."
-      />
+      <div className="space-y-1.5">
+        <TextInput
+          label="Outfit ID (Census)"
+          value={draft.outfitId}
+          onChange={(v) => update("outfitId", v)}
+          placeholder="Census outfit_id (optional)"
+          description="The numeric outfit ID from Census API. Used for outfit membership checks."
+        />
+        <button
+          type="button"
+          onClick={handleLookup}
+          disabled={lookupLoading || !draft.outfitTag.trim()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {lookupLoading ? (
+            <>
+              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Looking up…
+            </>
+          ) : (
+            <>Fetch from Honu</>
+          )}
+        </button>
+        {lookupSuccess && <p className="text-xs text-emerald-400">{lookupSuccess}</p>}
+        {lookupError && <p className="text-xs text-red-400">{lookupError}</p>}
+      </div>
     </div>
   );
 }
