@@ -317,7 +317,10 @@ export function configUpdateRoute(deps: ApiDependencies) {
             if (!webhook) {
               res.status(400).json({
                 success: false,
-                error: { code: "WEBHOOK_FAILED", message: `Failed to create webhook for forum channel ${incoming.forumChannelId}. Ensure the channel exists and the bot has Manage Webhooks permission.` },
+                error: {
+                  code: "WEBHOOK_FAILED",
+                  message: `Failed to create webhook for forum channel ${incoming.forumChannelId}. Ensure the channel exists and the bot has Manage Webhooks permission.`,
+                },
               });
               return;
             }

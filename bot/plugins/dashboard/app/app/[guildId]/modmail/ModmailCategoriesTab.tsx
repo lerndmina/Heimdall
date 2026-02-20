@@ -87,7 +87,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
         setRoleNames((prev) => ({ ...prev, ...map }));
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.staffRoleIds, guildId]);
 
   const loadCategories = useCallback(async () => {
@@ -266,7 +266,12 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
               <TextInput label="Emoji" description="Optional emoji (e.g., 📨)" value={formData.emoji || ""} onChange={(val) => setFormData({ ...formData, emoji: val })} />
             </div>
 
-            <TextInput label="Description" description="Optional description shown when selecting category" value={formData.description || ""} onChange={(val) => setFormData({ ...formData, description: val })} />
+            <TextInput
+              label="Description"
+              description="Optional description shown when selecting category"
+              value={formData.description || ""}
+              onChange={(val) => setFormData({ ...formData, description: val })}
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <ChannelCombobox
@@ -279,9 +284,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
                 placeholder="Select a forum channel…"
               />
               <div className="flex items-start">
-                <div className="mt-1 rounded-lg border border-zinc-700/30 bg-white/[0.03] px-3 py-2.5 text-xs text-zinc-500 w-full">
-                  🔗 Webhook is created automatically by the bot when you save.
-                </div>
+                <div className="mt-1 rounded-lg border border-zinc-700/30 bg-white/[0.03] px-3 py-2.5 text-xs text-zinc-500 w-full">🔗 Webhook is created automatically by the bot when you save.</div>
               </div>
             </div>
 
@@ -398,11 +401,11 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
                         <span className="text-zinc-500">Priority:</span> <span className="text-zinc-400">{cat.priority}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500">Staff Roles:</span> <span className="text-zinc-400">{cat.staffRoleIds.length > 0 ? `${cat.staffRoleIds.length} role${cat.staffRoleIds.length !== 1 ? "s" : ""}` : "—"}</span>
+                        <span className="text-zinc-500">Staff Roles:</span>{" "}
+                        <span className="text-zinc-400">{cat.staffRoleIds.length > 0 ? `${cat.staffRoleIds.length} role${cat.staffRoleIds.length !== 1 ? "s" : ""}` : "—"}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500">Webhook:</span>{" "}
-                        <span className={cat.webhookId ? "text-emerald-400" : "text-zinc-500"}>{cat.webhookId ? "Configured" : "Pending save"}</span>
+                        <span className="text-zinc-500">Webhook:</span> <span className={cat.webhookId ? "text-emerald-400" : "text-zinc-500"}>{cat.webhookId ? "Configured" : "Pending save"}</span>
                       </div>
                       <div className="col-span-2">
                         <span className="text-zinc-500">Auto-close:</span> <span className="text-zinc-400">{cat.resolveAutoCloseHours}h after resolve</span>

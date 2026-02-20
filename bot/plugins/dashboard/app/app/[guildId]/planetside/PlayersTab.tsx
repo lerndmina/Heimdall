@@ -466,9 +466,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                   ref={menuRef}
                   style={{ position: "fixed", top: menuPosition.top, left: menuPosition.left, zIndex: 60 }}
                   className={`w-44 rounded-lg border border-zinc-700/30 bg-zinc-900/40 backdrop-blur-xl py-1 shadow-xl ${menuVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-                  <button
-                    onClick={() => openEditModal(activePlayer)}
-                    className="w-full px-3 py-1.5 text-left text-sm text-blue-400 transition-colors hover:bg-white/5 hover:text-blue-300">
+                  <button onClick={() => openEditModal(activePlayer)} className="w-full px-3 py-1.5 text-left text-sm text-blue-400 transition-colors hover:bg-white/5 hover:text-blue-300">
                     ✎ Edit
                   </button>
                   <div className="my-1 border-t border-zinc-700/30" />
