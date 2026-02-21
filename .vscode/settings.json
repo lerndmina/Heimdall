@@ -6,5 +6,6 @@
     "editor.formatOnSave": false
   },
   "files.exclude": {},
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "java.compile.nullAnalysis.mode": "automatic"
 }
