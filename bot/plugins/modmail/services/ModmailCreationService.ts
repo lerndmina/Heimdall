@@ -404,7 +404,7 @@ export class ModmailCreationService {
 
     const formResponses = modmail.formResponses;
     if (formResponses && formResponses.length > 0) {
-      const formResponseMessages = this.buildFormResponseMessages(formResponses as Array<{ value?: string }>);
+      const formResponseMessages = this.buildFormResponseMessages(formResponses as Array<{ fieldLabel?: string; value?: string }>);
       for (const formResponseMessage of formResponseMessages) {
         await thread.send({ content: formResponseMessage });
       }
@@ -440,7 +440,7 @@ export class ModmailCreationService {
    * Build one or more bot messages containing form responses in markdown format.
    * Splits into multiple messages when nearing Discord's 2000-char limit.
    */
-  private buildFormResponseMessages(formResponses: Array<{ value?: string }>): string[] {
+  private buildFormResponseMessages(formResponses: Array<{ fieldLabel?: string; value?: string }>): string[] {
     const title = "# Form Responses:";
     const maxLength = 2000;
     const messages: string[] = [];
@@ -448,11 +448,13 @@ export class ModmailCreationService {
     let current = title;
 
     for (let i = 0; i < formResponses.length; i++) {
-      const answer = (formResponses[i]?.value || "(no response)").trim() || "(no response)";
+      const response = formResponses[i];
+      const label = response?.fieldLabel || `Question ${i + 1}`;
+      const answer = (response?.value || "(no response)").trim() || "(no response)";
 
       // Keep each section bounded so we can safely chunk across messages.
       const boundedAnswer = answer.length > 1500 ? `${answer.substring(0, 1497)}...` : answer;
-      const section = `\n## Question ${i + 1}\n${boundedAnswer}\n`;
+      const section = `\n## ${label}\n${boundedAnswer}\n`;
 
       if ((current + section).length > maxLength) {
         messages.push(current.trimEnd());
