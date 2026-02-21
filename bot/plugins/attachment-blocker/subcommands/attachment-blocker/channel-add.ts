@@ -17,8 +17,8 @@ export async function handleChannelAdd(context: CommandContext, pluginAPI: Attac
   const timeoutSeconds = interaction.options.getInteger("timeout");
   const timeoutDuration = timeoutSeconds !== null ? timeoutSeconds * 1000 : undefined;
 
-  if (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement && channel.type !== ChannelType.GuildVoice) {
-    await interaction.editReply("❌ The channel must be a text, announcement, or voice channel.");
+  if (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement && channel.type !== ChannelType.GuildVoice && channel.type !== ChannelType.GuildForum) {
+    await interaction.editReply("❌ The channel must be a text, announcement, voice, or forum channel.");
     return;
   }
 

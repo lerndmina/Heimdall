@@ -14,6 +14,7 @@ import Toggle from "@/components/ui/Toggle";
 import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
+import Combobox from "@/components/ui/Combobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
 import NumberInput from "@/components/ui/NumberInput";
 import Tabs from "@/components/ui/Tabs";
@@ -136,11 +137,15 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
     setLoading(true);
     setError(null);
     try {
-      const [configRes, channelsRes, discordChannelsRes, rolesRes, tempvcConfigRes, openersRes, voiceChannelsRes] = await Promise.all([
+      const [configRes, channelsRes, discordChannelsRes, discordForumChannelsRes, rolesRes, tempvcConfigRes, openersRes, voiceChannelsRes] = await Promise.all([
         fetchApi<GuildConfig>(guildId, "attachment-blocker/config", { skipCache: true }),
         fetchApi<ChannelOverride[]>(guildId, "attachment-blocker/channels", { skipCache: true }),
         fetchApi<{ channels: { id: string; name: string }[] }>(guildId, "channels?type=text", {
           cacheKey: `channels-${guildId}-text`,
+          cacheTtl: 60_000,
+        }),
+        fetchApi<{ channels: { id: string; name: string }[] }>(guildId, "channels?type=forum", {
+          cacheKey: `channels-${guildId}-forum`,
           cacheTtl: 60_000,
         }),
         fetchApi<{ roles: { id: string; name: string }[] }>(guildId, "roles", {
@@ -162,6 +167,12 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
         const map: Record<string, string> = {};
         for (const ch of discordChannelsRes.data.channels) {
           map[ch.id] = ch.name;
+        }
+        // Merge forum channels into the same map
+        if (discordForumChannelsRes.success && discordForumChannelsRes.data) {
+          for (const ch of discordForumChannelsRes.data.channels) {
+            map[ch.id] = ch.name;
+          }
         }
         setChannelNames(map);
       }
@@ -1103,15 +1114,21 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
         }>
         <div className="space-y-4">
           {!editingChannel && (
-            <ChannelCombobox
-              guildId={guildId}
-              value={channelFormId}
-              onChange={setChannelFormId}
-              channelType="text"
-              label="Channel"
-              description="Select the channel to override rules for"
-              disabled={savingChannel}
-            />
+            <div className="space-y-1.5">
+              <p className="block text-sm font-medium text-zinc-200">Channel</p>
+              <p className="text-xs text-zinc-500">Select the channel to override rules for (text or forum channels)</p>
+              <Combobox
+                options={Object.entries(channelNames).map(([id, name]) => ({
+                  value: id,
+                  label: `#${name}`,
+                }))}
+                value={channelFormId}
+                onChange={setChannelFormId}
+                placeholder="Select a channel…"
+                disabled={savingChannel}
+                loading={loading}
+              />
+            </div>
           )}
 
           <Toggle label="Enabled" description="Whether attachment blocking is active for this channel" checked={channelFormEnabled} onChange={setChannelFormEnabled} disabled={savingChannel} />

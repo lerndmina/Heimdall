@@ -36,7 +36,7 @@ export const data = new SlashCommandBuilder()
           .setName("add")
           .setDescription("Add or update a channel-specific override")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildForum),
           )
           .addStringOption((opt) =>
             opt
@@ -59,7 +59,7 @@ export const data = new SlashCommandBuilder()
           .setName("remove")
           .setDescription("Remove a channel override (revert to guild defaults)")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Channel to remove override from").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+            opt.setName("channel").setDescription("Channel to remove override from").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildForum),
           ),
       ),
   )
@@ -85,7 +85,7 @@ export const data = new SlashCommandBuilder()
           .setName("channel-add")
           .setDescription("Add a bypass role for a specific channel")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildForum),
           )
           .addRoleOption((opt) => opt.setName("role").setDescription("Role to bypass checks in this channel").setRequired(true)),
       )
@@ -94,7 +94,7 @@ export const data = new SlashCommandBuilder()
           .setName("channel-remove")
           .setDescription("Remove a bypass role from a specific channel")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildForum),
           )
           .addRoleOption((opt) => opt.setName("role").setDescription("Role to remove from this channel bypass").setRequired(true)),
       )
@@ -103,7 +103,7 @@ export const data = new SlashCommandBuilder()
           .setName("channel-list")
           .setDescription("List bypass roles for a specific channel")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice),
+            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildForum),
           ),
       ),
   )
