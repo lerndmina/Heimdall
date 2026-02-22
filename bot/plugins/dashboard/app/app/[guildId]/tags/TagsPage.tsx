@@ -56,7 +56,7 @@ const SORT_OPTIONS = [
 // ── Component ────────────────────────────────────────────
 
 export default function TagsPage({ guildId }: { guildId: string }) {
-  const canManage = useCanManage("tags.manage");
+  const canManage = useCanManage("tags.manage_tags");
   const { data: session } = useSession();
 
   // List state
@@ -81,6 +81,9 @@ export default function TagsPage({ guildId }: { guildId: string }) {
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Slash command toggle loading state (stores the tag name currently being toggled)
+  const [togglingSlashCommand, setTogglingSlashCommand] = useState<string | null>(null);
 
   // ── Fetch ──
   const fetchTags = useCallback(async () => {
@@ -230,19 +233,22 @@ export default function TagsPage({ guildId }: { guildId: string }) {
 
   const toggleSlashCommand = async (tag: Tag, enabled: boolean) => {
     if (!canManage) return;
+    setTogglingSlashCommand(tag.name);
     try {
       const res = await fetchApi(guildId, `tags/${encodeURIComponent(tag.name)}/slash-command`, {
         method: "PATCH",
         body: JSON.stringify({ enabled }),
       });
       if (res.success) {
-        toast.success(enabled ? `/${tag.name} enabled` : `/${tag.name} disabled`);
+        toast.success(enabled ? `/${tag.name} registered as a slash command` : `/${tag.name} removed as a slash command`);
         fetchTags();
       } else {
         toast.error(res.error?.message ?? "Failed to update command status");
       }
     } catch {
       toast.error("Failed to connect to API");
+    } finally {
+      setTogglingSlashCommand(null);
     }
   };
 
@@ -349,11 +355,24 @@ export default function TagsPage({ guildId }: { guildId: string }) {
                       <td className="py-3 pr-4 text-zinc-500">{new Date(tag.createdAt).toLocaleDateString()}</td>
                       {canManage && (
                         <td className="py-3 text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+                          <div className={`flex items-center justify-end gap-1 transition ${togglingSlashCommand === tag.name ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                             <button
                               onClick={() => toggleSlashCommand(tag, !tag.registerAsSlashCommand)}
-                              className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
-                              {tag.registerAsSlashCommand ? "Disable Command" : "Enable Command"}
+                              disabled={togglingSlashCommand === tag.name}
+                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed">
+                              {togglingSlashCommand === tag.name ? (
+                                <>
+                                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                                    <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                  </svg>
+                                  {tag.registerAsSlashCommand ? "Removing…" : "Registering…"}
+                                </>
+                              ) : tag.registerAsSlashCommand ? (
+                                "Disable Command"
+                              ) : (
+                                "Enable Command"
+                              )}
                             </button>
                             <button onClick={() => openEditModal(tag)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
                               Edit
