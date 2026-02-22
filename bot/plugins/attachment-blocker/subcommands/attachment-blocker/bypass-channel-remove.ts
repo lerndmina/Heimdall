@@ -19,12 +19,15 @@ export async function handleBypassChannelRemove(context: CommandContext, pluginA
   const isSupportedChannelType =
     channel.type === ChannelType.GuildText ||
     channel.type === ChannelType.GuildAnnouncement ||
+    channel.type === ChannelType.PublicThread ||
+    channel.type === ChannelType.PrivateThread ||
+    channel.type === ChannelType.AnnouncementThread ||
     channel.type === ChannelType.GuildVoice ||
     channel.type === ChannelType.GuildForum ||
     (typeof guildMediaType === "number" && channel.type === guildMediaType);
 
   if (!isSupportedChannelType) {
-    await interaction.editReply("❌ The channel must be a text-capable guild channel (text, announcement, forum, media, or voice).");
+    await interaction.editReply("❌ The channel must be a guild text-capable channel (text, announcement, thread, forum, media, or voice).");
     return;
   }
 

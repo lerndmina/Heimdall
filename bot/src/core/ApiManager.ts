@@ -815,7 +815,14 @@ export class ApiManager {
       const typeFilter = (req.query.type as string) || "text";
       const guildMediaType = (ChannelType as unknown as Record<string, number>).GuildMedia;
 
-      const textLikeTypes: ChannelType[] = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildForum];
+      const textLikeTypes: ChannelType[] = [
+        ChannelType.GuildText,
+        ChannelType.GuildAnnouncement,
+        ChannelType.GuildForum,
+        ChannelType.PublicThread,
+        ChannelType.PrivateThread,
+        ChannelType.AnnouncementThread,
+      ];
       if (typeof guildMediaType === "number") {
         textLikeTypes.push(guildMediaType as ChannelType);
       }

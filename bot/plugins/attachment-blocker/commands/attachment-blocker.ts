@@ -7,6 +7,9 @@ import { SlashCommandBuilder, PermissionFlagsBits, ChannelType } from "discord.j
 const attachmentBlockerChannelTypes = [
   ChannelType.GuildText,
   ChannelType.GuildAnnouncement,
+  ChannelType.PublicThread,
+  ChannelType.PrivateThread,
+  ChannelType.AnnouncementThread,
   ChannelType.GuildVoice,
   ChannelType.GuildForum,
   ChannelType.GuildMedia,
