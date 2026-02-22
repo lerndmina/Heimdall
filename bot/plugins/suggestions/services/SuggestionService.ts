@@ -27,6 +27,7 @@ import type { LibAPI } from "../../lib/index.js";
 import type { GuildEnvService } from "../../../src/core/services/GuildEnvService.js";
 import type { ComponentCallbackService } from "../../../src/core/services/ComponentCallbackService.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 import { createSuggestionEmbed, createSuggestionButtons, createManagementButtons, SuggestionButtonIds, SuggestionManagementButtonIds } from "../utils/SuggestionEmbeds.js";
 import { canUserVote, setVoteCooldown, formatTimeRemaining, canUserSubmitSuggestion, setSubmissionCooldown } from "../utils/SuggestionValidation.js";
 import { generateAISuggestionTitle, generateFallbackTitle } from "../utils/AIHelper.js";
@@ -469,6 +470,11 @@ export class SuggestionService {
 
       await interaction.update({ content: `Suggestion ${newStatus}!`, components: [] });
       await this.updateVoteDisplay(suggestion.id);
+
+      broadcastDashboardChange(suggestion.guildId as string, "suggestions", "status_updated", {
+        data: { suggestionId: suggestion.id, status: newStatus, managedBy: interaction.user.id },
+      });
+
       log.info(`Suggestion ${suggestion.id} ${newStatus} by ${interaction.user.id}`);
     } catch (error) {
       log.error(`Error updating suggestion status:`, error);

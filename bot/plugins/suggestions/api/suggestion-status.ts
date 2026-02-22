@@ -40,13 +40,15 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { SuggestionsApiDependencies } from "./index.js";
 import Suggestion, { SuggestionStatus } from "../models/Suggestion.js";
+import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
 
 export function createSuggestionStatusRoutes(deps: SuggestionsApiDependencies): Router {
   const router = Router({ mergeParams: true });
 
   router.patch("/:suggestionId/status", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { guildId, suggestionId } = req.params;
+      const guildId = req.params.guildId as string;
+      const suggestionId = req.params.suggestionId as string;
       const { status } = req.body;
       const managedBy = req.header("X-User-Id");
 
@@ -85,7 +87,11 @@ export function createSuggestionStatusRoutes(deps: SuggestionsApiDependencies): 
       }
 
       // Update the vote display on the message
-      await deps.suggestionService.updateVoteDisplay(suggestionId as string);
+      await deps.suggestionService.updateVoteDisplay(suggestionId);
+
+      broadcastDashboardChange(guildId, "suggestions", "status_updated", {
+        data: { suggestionId, status, managedBy },
+      });
 
       res.json({ success: true, data: suggestion });
     } catch (error) {
