@@ -222,7 +222,7 @@ export class AttachmentBlockerService {
    * 2. TempVC opener override (if channel is an active temp VC)
    * 3. Guild defaults (fallback)
    */
-  async resolveEffectiveConfig(guildId: string, channelId: string): Promise<EffectiveConfig> {
+  async resolveEffectiveConfig(guildId: string, channelId: string, parentChannelId?: string | null): Promise<EffectiveConfig> {
     const [guildConfig, channelConfig] = await Promise.all([this.getGuildConfig(guildId), this.getChannelConfig(channelId)]);
 
     // No guild config at all → feature is disabled
@@ -246,6 +246,21 @@ export class AttachmentBlockerService {
         bypassRoleIds,
         isChannelOverride: true,
       };
+    }
+
+    // Thread channels inherit forum/parent channel override when they don't have a direct override.
+    if (parentChannelId && parentChannelId !== channelId) {
+      const parentChannelConfig = await this.getChannelConfig(parentChannelId);
+      if (parentChannelConfig) {
+        const bypassRoleIds = [...new Set([...(guildConfig.bypassRoleIds ?? []), ...(parentChannelConfig.bypassRoleIds ?? [])])];
+        return {
+          enabled: parentChannelConfig.enabled && guildConfig.enabled,
+          allowedTypes: (parentChannelConfig.allowedTypes && parentChannelConfig.allowedTypes.length > 0 ? parentChannelConfig.allowedTypes : guildConfig.defaultAllowedTypes) as AttachmentType[],
+          timeoutDuration: parentChannelConfig.timeoutDuration ?? guildConfig.defaultTimeoutDuration,
+          bypassRoleIds,
+          isChannelOverride: true,
+        };
+      }
     }
 
     // Check if this is a temp VC — resolve opener rules
@@ -317,7 +332,8 @@ export class AttachmentBlockerService {
     // Skip voice messages — they're handled by vc-transcription, not regular uploads
     if (message.flags.has(MessageFlags.IsVoiceMessage)) return false;
 
-    const effectiveConfig = await this.resolveEffectiveConfig(message.guildId, message.channel.id);
+    const parentChannelId = message.channel.isThread() ? message.channel.parentId : null;
+    const effectiveConfig = await this.resolveEffectiveConfig(message.guildId, message.channel.id, parentChannelId);
 
     // Role bypass (global + channel additive)
     const member = message.member || (await this.lib.thingGetter.getMember(message.guild, message.author.id));
