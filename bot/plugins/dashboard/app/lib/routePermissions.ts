@@ -188,6 +188,21 @@ const routeMap: Record<string, string> = {
   "PUT /moderation/locks/config": "moderation.manage_config",
   "POST /moderation/locks/*/unlock": "moderation.manage_config",
 
+  // ── PlanetSide 2 ──
+  "GET /planetside/config": "planetside.view_config",
+  "PUT /planetside/config": "planetside.manage_config",
+  "GET /planetside/players": "planetside.view_players",
+  "GET /planetside/players/*": "planetside.view_players",
+  "POST /planetside/players/*": "planetside.manage_players",
+  "PUT /planetside/players/*": "planetside.manage_players",
+  "DELETE /planetside/players/*": "planetside.manage_players",
+  "GET /planetside/census-status": "planetside.view_census_status",
+  "POST /planetside/census-status/*": "planetside.view_census_status",
+  "GET /planetside/population": "planetside.view_population",
+  "GET /planetside/population/*": "planetside.view_population",
+  "GET /planetside/outfit-lookup": "planetside.manage_config",
+  "POST /planetside/send-panel": "planetside.manage_config",
+
   // ── Sticky Messages ──
   "GET /moderation/stickies": "moderation.view_config",
   "GET /moderation/stickies/*": "moderation.view_config",

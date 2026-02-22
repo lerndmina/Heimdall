@@ -122,6 +122,7 @@ export const permissionCategories: PermissionCategory[] = [
     actions: [
       { key: "view_config", label: "View Configuration", description: "View the current Temp VC configuration." },
       { key: "manage_config", label: "Manage Configuration", description: "Edit Temp VC settings and generators." },
+      { key: "manage_channels", label: "Manage Active Channels", description: "Delete or force-manage active temporary voice channels." },
     ],
   },
   {
