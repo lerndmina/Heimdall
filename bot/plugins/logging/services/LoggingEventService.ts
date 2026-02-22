@@ -60,7 +60,8 @@ export class LoggingEventService {
   async handleMessageDelete(message: Message | PartialMessage): Promise<void> {
     try {
       if (message.author?.bot) return;
-      if (!message.content && !message.attachments?.size) return;
+      // Don't bail on no content — partial messages (uncached) have null content
+      // but we still want to log that a deletion occurred.
 
       const guildId = message.guild?.id;
       if (!guildId) return;
@@ -69,8 +70,12 @@ export class LoggingEventService {
       if (!cfg) return;
       if (!this.service.isSubcategoryEnabled(cfg.subcategories, MessageSubcategory.DELETES)) return;
 
-      const logChannel = message.guild?.channels.cache.get(cfg.channelId);
+      const logChannel =
+        (message.guild?.channels.cache.get(cfg.channelId) ??
+          (await this.lib.thingGetter.getChannel(cfg.channelId))) as TextChannel | null;
       if (!logChannel?.isTextBased()) return;
+
+      const isPartial = message.partial || message.content === null;
 
       const embed = this.lib
         .createEmbedBuilder()
@@ -84,12 +89,14 @@ export class LoggingEventService {
         )
         .setTimestamp();
 
-      if (message.content) {
+      if (isPartial) {
+        embed.addFields({ name: "Content", value: "*Not available — message was not cached*" });
+      } else if (message.content) {
         const content = message.content.length > 1024 ? `${message.content.substring(0, 1021)}...` : message.content;
         embed.addFields({ name: "Content", value: content });
       }
 
-      if (message.attachments && message.attachments.size > 0) {
+      if (!isPartial && message.attachments && message.attachments.size > 0) {
         const list = message.attachments.map((a) => `• [${a.name}](${a.url})`).join("\n");
         embed.addFields({
           name: `📎 Attachments (${message.attachments.size})`,
@@ -97,7 +104,7 @@ export class LoggingEventService {
         });
       }
 
-      if (message.stickers && message.stickers.size > 0) {
+      if (!isPartial && message.stickers && message.stickers.size > 0) {
         embed.addFields({
           name: `🎨 Stickers (${message.stickers.size})`,
           value: message.stickers.map((s) => `• ${s.name}`).join("\n"),
@@ -118,6 +125,8 @@ export class LoggingEventService {
   async handleMessageUpdate(oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage): Promise<void> {
     try {
       if (newMessage.author?.bot) return;
+      // If either side is partial/uncached we can't show a meaningful before/after diff
+      if (oldMessage.partial || newMessage.partial) return;
       if (!oldMessage.content || !newMessage.content) return;
       if (oldMessage.content === newMessage.content) return;
 
@@ -133,7 +142,9 @@ export class LoggingEventService {
       if (!cfg) return;
       if (!this.service.isSubcategoryEnabled(cfg.subcategories, MessageSubcategory.EDITS)) return;
 
-      const logChannel = newMessage.guild?.channels.cache.get(cfg.channelId);
+      const logChannel =
+        (newMessage.guild?.channels.cache.get(cfg.channelId) ??
+          (await this.lib.thingGetter.getChannel(cfg.channelId))) as TextChannel | null;
       if (!logChannel?.isTextBased()) return;
 
       this.recentEdits.set(newMessage.id, now);
@@ -175,7 +186,9 @@ export class LoggingEventService {
       if (!cfg) return;
       if (!this.service.isSubcategoryEnabled(cfg.subcategories, MessageSubcategory.BULK_DELETES)) return;
 
-      const logChannel = channel.guild.channels.cache.get(cfg.channelId);
+      const logChannel =
+        (channel.guild.channels.cache.get(cfg.channelId) ??
+          (await this.lib.thingGetter.getChannel(cfg.channelId))) as TextChannel | null;
       if (!logChannel?.isTextBased()) return;
 
       const authorCounts = new Map<string, number>();
