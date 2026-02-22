@@ -530,8 +530,22 @@ export class ApiManager {
 
           if (userRoleOverrides.length === 0) continue;
 
-          // Check that the user isn't explicitly denied access via _deny_access
-          const hasDeny = userRoleOverrides.some((p) => p.overrides["_deny_access"] === "deny");
+          // Check _deny_access using role hierarchy (highest-positioned role wins)
+          const sortedOverrides = userRoleOverrides
+            .map((p) => ({
+              ...p,
+              position: guild.roles.cache.get(p.discordRoleId)?.position ?? 0,
+            }))
+            .sort((a, b) => b.position - a.position);
+
+          let hasDeny = false;
+          for (const p of sortedOverrides) {
+            const val = p.overrides["_deny_access"];
+            if (val) {
+              hasDeny = val === "deny";
+              break;
+            }
+          }
           if (hasDeny) continue;
 
           accessibleGuildIds.push(guildId);
