@@ -793,7 +793,7 @@ export class ApiManager {
 
     // Guild channels — for channel pickers in the dashboard
     // Supports ?type=text|voice|category|all (default: text)
-    this.app.get("/api/guilds/:guildId/channels", (req: Request, res: Response) => {
+    this.app.get("/api/guilds/:guildId/channels", async (req: Request, res: Response) => {
       const key = req.header("X-API-Key");
       if (!key || !this.verifyApiKey(key)) {
         res.status(401).json({ error: "Unauthorized" });
@@ -837,7 +837,16 @@ export class ApiManager {
 
       const allowedTypes = typeMap[typeFilter] ?? [ChannelType.GuildText];
 
-      const channels = guild.channels.cache
+      let channelCollection = guild.channels.cache;
+      try {
+        // Ensure forum/media channels are included even if cache is cold/incomplete.
+        const fetchedChannels = await guild.channels.fetch();
+        channelCollection = fetchedChannels.filter((ch): ch is NonNullable<typeof ch> => !!ch);
+      } catch (error) {
+        log.warn(`[API] Failed to fully fetch channels for guild ${guildId}, falling back to cache:`, error);
+      }
+
+      const channels = channelCollection
         .filter((ch) => allowedTypes.includes(ch.type))
         .sort((a, b) => ("position" in a ? a.position : 0) - ("position" in b ? b.position : 0))
         .map((ch) => ({
