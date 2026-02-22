@@ -2,18 +2,8 @@
  * /attachment-blocker command — Configure attachment blocking rules per-guild and per-channel.
  */
 
-import { SlashCommandBuilder, PermissionFlagsBits, ChannelType } from "discord.js";
-
-const attachmentBlockerChannelTypes = [
-  ChannelType.GuildText,
-  ChannelType.GuildAnnouncement,
-  ChannelType.PublicThread,
-  ChannelType.PrivateThread,
-  ChannelType.AnnouncementThread,
-  ChannelType.GuildVoice,
-  ChannelType.GuildForum,
-  ChannelType.GuildMedia,
-] as const;
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import { ATTACHMENT_BLOCKER_SUPPORTED_CHANNEL_TYPES } from "../../lib/utils/channelTypes.js";
 
 export const data = new SlashCommandBuilder()
   .setName("attachment-blocker")
@@ -47,7 +37,11 @@ export const data = new SlashCommandBuilder()
           .setName("add")
           .setDescription("Add or update a channel-specific override")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(...attachmentBlockerChannelTypes),
+            opt
+              .setName("channel")
+              .setDescription("Target channel")
+              .setRequired(true)
+              .addChannelTypes(...ATTACHMENT_BLOCKER_SUPPORTED_CHANNEL_TYPES),
           )
           .addStringOption((opt) =>
             opt
@@ -70,7 +64,11 @@ export const data = new SlashCommandBuilder()
           .setName("remove")
           .setDescription("Remove a channel override (revert to guild defaults)")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Channel to remove override from").setRequired(true).addChannelTypes(...attachmentBlockerChannelTypes),
+            opt
+              .setName("channel")
+              .setDescription("Channel to remove override from")
+              .setRequired(true)
+              .addChannelTypes(...ATTACHMENT_BLOCKER_SUPPORTED_CHANNEL_TYPES),
           ),
       ),
   )
@@ -96,7 +94,11 @@ export const data = new SlashCommandBuilder()
           .setName("channel-add")
           .setDescription("Add a bypass role for a specific channel")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(...attachmentBlockerChannelTypes),
+            opt
+              .setName("channel")
+              .setDescription("Target channel")
+              .setRequired(true)
+              .addChannelTypes(...ATTACHMENT_BLOCKER_SUPPORTED_CHANNEL_TYPES),
           )
           .addRoleOption((opt) => opt.setName("role").setDescription("Role to bypass checks in this channel").setRequired(true)),
       )
@@ -105,7 +107,11 @@ export const data = new SlashCommandBuilder()
           .setName("channel-remove")
           .setDescription("Remove a bypass role from a specific channel")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(...attachmentBlockerChannelTypes),
+            opt
+              .setName("channel")
+              .setDescription("Target channel")
+              .setRequired(true)
+              .addChannelTypes(...ATTACHMENT_BLOCKER_SUPPORTED_CHANNEL_TYPES),
           )
           .addRoleOption((opt) => opt.setName("role").setDescription("Role to remove from this channel bypass").setRequired(true)),
       )
@@ -114,7 +120,11 @@ export const data = new SlashCommandBuilder()
           .setName("channel-list")
           .setDescription("List bypass roles for a specific channel")
           .addChannelOption((opt) =>
-            opt.setName("channel").setDescription("Target channel").setRequired(true).addChannelTypes(...attachmentBlockerChannelTypes),
+            opt
+              .setName("channel")
+              .setDescription("Target channel")
+              .setRequired(true)
+              .addChannelTypes(...ATTACHMENT_BLOCKER_SUPPORTED_CHANNEL_TYPES),
           ),
       ),
   )

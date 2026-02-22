@@ -20,6 +20,7 @@ import log from "../utils/logger";
 import { broadcastDashboardChange } from "./broadcast";
 import { resolveRouteAction } from "./dashboardRoutePermissions";
 import { ThingGetter } from "../../plugins/lib/utils/ThingGetter.js";
+import { DASHBOARD_TEXT_CHANNEL_TYPES } from "../../plugins/lib/utils/channelTypes.js";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
 import DashboardSettings from "../../plugins/dashboard/models/DashboardSettings.js";
 import LoggingConfig, { LoggingCategory } from "../../plugins/logging/models/LoggingConfig.js";
@@ -813,19 +814,7 @@ export class ApiManager {
       }
 
       const typeFilter = (req.query.type as string) || "text";
-      const guildMediaType = (ChannelType as unknown as Record<string, number>).GuildMedia;
-
-      const textLikeTypes: ChannelType[] = [
-        ChannelType.GuildText,
-        ChannelType.GuildAnnouncement,
-        ChannelType.GuildForum,
-        ChannelType.PublicThread,
-        ChannelType.PrivateThread,
-        ChannelType.AnnouncementThread,
-      ];
-      if (typeof guildMediaType === "number") {
-        textLikeTypes.push(guildMediaType as ChannelType);
-      }
+      const textLikeTypes: ChannelType[] = [...DASHBOARD_TEXT_CHANNEL_TYPES];
 
       const typeMap: Record<string, ChannelType[]> = {
         text: textLikeTypes,

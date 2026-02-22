@@ -2,11 +2,12 @@
  * /attachment-blocker channel add — Add or update a per-channel override.
  */
 
-import { ChannelType, type TextChannel } from "discord.js";
+import { type TextChannel } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
 import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { AttachmentBlockerPluginAPI } from "../../index.js";
 import { AttachmentType, AttachmentTypeLabels } from "../../utils/attachment-types.js";
+import { isAttachmentBlockerSupportedChannelType } from "../../../lib/utils/channelTypes.js";
 
 export async function handleChannelAdd(context: CommandContext, pluginAPI: AttachmentBlockerPluginAPI): Promise<void> {
   const { interaction } = context;
@@ -17,16 +18,7 @@ export async function handleChannelAdd(context: CommandContext, pluginAPI: Attac
   const timeoutSeconds = interaction.options.getInteger("timeout");
   const timeoutDuration = timeoutSeconds !== null ? timeoutSeconds * 1000 : undefined;
 
-  const guildMediaType = (ChannelType as unknown as Record<string, number>).GuildMedia;
-  const isSupportedChannelType =
-    channel.type === ChannelType.GuildText ||
-    channel.type === ChannelType.GuildAnnouncement ||
-    channel.type === ChannelType.PublicThread ||
-    channel.type === ChannelType.PrivateThread ||
-    channel.type === ChannelType.AnnouncementThread ||
-    channel.type === ChannelType.GuildVoice ||
-    channel.type === ChannelType.GuildForum ||
-    (typeof guildMediaType === "number" && channel.type === guildMediaType);
+  const isSupportedChannelType = isAttachmentBlockerSupportedChannelType(channel.type);
 
   if (!isSupportedChannelType) {
     await interaction.editReply("❌ The channel must be a guild text-capable channel (text, announcement, thread, forum, media, or voice).");
