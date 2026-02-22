@@ -813,12 +813,19 @@ export class ApiManager {
       }
 
       const typeFilter = (req.query.type as string) || "text";
+      const guildMediaType = (ChannelType as unknown as Record<string, number>).GuildMedia;
+
+      const textLikeTypes: ChannelType[] = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildForum];
+      if (typeof guildMediaType === "number") {
+        textLikeTypes.push(guildMediaType as ChannelType);
+      }
+
       const typeMap: Record<string, ChannelType[]> = {
-        text: [ChannelType.GuildText],
+        text: textLikeTypes,
         voice: [ChannelType.GuildVoice],
         category: [ChannelType.GuildCategory],
         forum: [ChannelType.GuildForum],
-        all: [ChannelType.GuildText, ChannelType.GuildVoice, ChannelType.GuildCategory, ChannelType.GuildForum, ChannelType.GuildAnnouncement, ChannelType.GuildStageVoice],
+        all: [...textLikeTypes, ChannelType.GuildVoice, ChannelType.GuildCategory, ChannelType.GuildStageVoice],
       };
 
       const allowedTypes = typeMap[typeFilter] ?? [ChannelType.GuildText];
