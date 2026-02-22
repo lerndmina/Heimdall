@@ -7,6 +7,7 @@ import type { Request, Response, NextFunction } from "express";
 import type { ApiDependencies } from "./index.js";
 import ModmailConfig from "../models/ModmailConfig.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { MAX_MODMAIL_CATEGORIES, MAX_MODMAIL_STAFF_ROLES, MAX_MODMAIL_FORM_FIELDS, MAX_NAME_LENGTH } from "../../../src/core/DashboardLimits.js";
 
 const log = createLogger("modmail:api:config-update");
 
@@ -227,6 +228,66 @@ export function configUpdateRoute(deps: ApiDependencies) {
             },
           });
           return;
+        }
+      }
+
+      // Validate threadNamingPattern length
+      if (updateData.threadNamingPattern !== undefined && updateData.threadNamingPattern.length > MAX_NAME_LENGTH) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "INVALID_PARAMETER",
+            message: `threadNamingPattern must be ${MAX_NAME_LENGTH} characters or less`,
+          },
+        });
+        return;
+      }
+
+      // Validate globalStaffRoleIds array length
+      if (updateData.globalStaffRoleIds !== undefined && updateData.globalStaffRoleIds.length > MAX_MODMAIL_STAFF_ROLES) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "INVALID_PARAMETER",
+            message: `globalStaffRoleIds cannot exceed ${MAX_MODMAIL_STAFF_ROLES} entries`,
+          },
+        });
+        return;
+      }
+
+      // Validate categories array length and inner arrays
+      if (updateData.categories !== undefined) {
+        if (updateData.categories.length > MAX_MODMAIL_CATEGORIES) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: "INVALID_PARAMETER",
+              message: `Cannot have more than ${MAX_MODMAIL_CATEGORIES} categories`,
+            },
+          });
+          return;
+        }
+        for (const cat of updateData.categories) {
+          if (cat.staffRoleIds && cat.staffRoleIds.length > MAX_MODMAIL_STAFF_ROLES) {
+            res.status(400).json({
+              success: false,
+              error: {
+                code: "INVALID_PARAMETER",
+                message: `Category "${cat.name}" cannot have more than ${MAX_MODMAIL_STAFF_ROLES} staff roles`,
+              },
+            });
+            return;
+          }
+          if (cat.formFields && cat.formFields.length > MAX_MODMAIL_FORM_FIELDS) {
+            res.status(400).json({
+              success: false,
+              error: {
+                code: "INVALID_PARAMETER",
+                message: `Category "${cat.name}" cannot have more than ${MAX_MODMAIL_FORM_FIELDS} form fields`,
+              },
+            });
+            return;
+          }
         }
       }
 

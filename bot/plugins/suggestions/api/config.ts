@@ -50,6 +50,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import type { SuggestionsApiDependencies } from "./index.js";
 import { SuggestionConfigHelper } from "../models/SuggestionConfig.js";
 import SuggestionConfig from "../models/SuggestionConfig.js";
+import { MAX_SUGGESTION_CHANNELS, MIN_VOTE_COOLDOWN, MAX_VOTE_COOLDOWN, MIN_SUBMISSION_COOLDOWN, MAX_SUBMISSION_COOLDOWN } from "../../../src/core/DashboardLimits.js";
 
 export function createConfigRoutes(deps: SuggestionsApiDependencies): Router {
   const router = Router({ mergeParams: true });
@@ -88,10 +89,40 @@ export function createConfigRoutes(deps: SuggestionsApiDependencies): Router {
       }
 
       const updateData: Record<string, unknown> = {};
-      if (maxChannels !== undefined) updateData.maxChannels = maxChannels;
-      if (voteCooldown !== undefined) updateData.voteCooldown = voteCooldown;
-      if (submissionCooldown !== undefined) updateData.submissionCooldown = submissionCooldown;
-      if (enableCategories !== undefined) updateData.enableCategories = enableCategories;
+      if (maxChannels !== undefined) {
+        const val = Number(maxChannels);
+        if (!Number.isInteger(val) || val < 1 || val > MAX_SUGGESTION_CHANNELS) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: `maxChannels must be an integer between 1 and ${MAX_SUGGESTION_CHANNELS}` },
+          });
+          return;
+        }
+        updateData.maxChannels = val;
+      }
+      if (voteCooldown !== undefined) {
+        const val = Number(voteCooldown);
+        if (!Number.isInteger(val) || val < MIN_VOTE_COOLDOWN || val > MAX_VOTE_COOLDOWN) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: `voteCooldown must be an integer between ${MIN_VOTE_COOLDOWN} and ${MAX_VOTE_COOLDOWN}` },
+          });
+          return;
+        }
+        updateData.voteCooldown = val;
+      }
+      if (submissionCooldown !== undefined) {
+        const val = Number(submissionCooldown);
+        if (!Number.isInteger(val) || val < MIN_SUBMISSION_COOLDOWN || val > MAX_SUBMISSION_COOLDOWN) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: `submissionCooldown must be an integer between ${MIN_SUBMISSION_COOLDOWN} and ${MAX_SUBMISSION_COOLDOWN}` },
+          });
+          return;
+        }
+        updateData.submissionCooldown = val;
+      }
+      if (enableCategories !== undefined) updateData.enableCategories = Boolean(enableCategories);
       updateData.updatedBy = updatedBy;
 
       const config = await SuggestionConfig.findOneAndUpdate({ guildId }, updateData, { new: true, upsert: true });

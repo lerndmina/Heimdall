@@ -13,6 +13,7 @@ import type { ModerationApiDeps } from "./index.js";
 import type { ChannelLockService } from "../services/ChannelLockService.js";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import { ChannelType, type TextChannel, type NewsChannel } from "discord.js";
+import { MAX_LOCK_BYPASS_ROLES } from "../../../src/core/DashboardLimits.js";
 
 export interface LockApiDeps extends ModerationApiDeps {
   channelLockService: ChannelLockService;
@@ -62,6 +63,14 @@ export function createLockRoutes(deps: LockApiDeps): Router {
         res.status(400).json({
           success: false,
           error: { code: "INVALID_INPUT", message: "All role IDs must be strings" },
+        });
+        return;
+      }
+
+      if (lockBypassRoles.length > MAX_LOCK_BYPASS_ROLES) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `lockBypassRoles cannot exceed ${MAX_LOCK_BYPASS_ROLES} entries` },
         });
         return;
       }

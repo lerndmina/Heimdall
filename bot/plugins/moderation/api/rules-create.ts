@@ -8,6 +8,8 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import type { ModerationApiDeps } from "./index.js";
 import { validateRegex } from "../utils/regex-engine.js";
 import { parseWildcardPatterns } from "../utils/wildcard.js";
+import { MAX_AUTOMOD_RULES, MAX_AUTOMOD_PATTERNS, MAX_AUTOMOD_ACTIONS, MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_ID_ARRAY_LENGTH } from "../../../src/core/DashboardLimits.js";
+import AutomodRule from "../models/AutomodRule.js";
 
 export function createRulesCreateRoutes(deps: ModerationApiDeps): Router {
   const router = Router({ mergeParams: true });
@@ -42,10 +44,74 @@ export function createRulesCreateRoutes(deps: ModerationApiDeps): Router {
         return;
       }
 
+      if (typeof name === "string" && name.length > MAX_NAME_LENGTH) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `name must be ${MAX_NAME_LENGTH} characters or less` },
+        });
+        return;
+      }
+
       if (!actions || !Array.isArray(actions) || actions.length === 0) {
         res.status(400).json({
           success: false,
           error: { code: "INVALID_INPUT", message: "actions (non-empty array) is required" },
+        });
+        return;
+      }
+
+      if (actions.length > MAX_AUTOMOD_ACTIONS) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `actions cannot exceed ${MAX_AUTOMOD_ACTIONS} entries` },
+        });
+        return;
+      }
+
+      // Check per-guild rule count
+      const existingRuleCount = await AutomodRule.countDocuments({ guildId });
+      if (existingRuleCount >= MAX_AUTOMOD_RULES) {
+        res.status(400).json({
+          success: false,
+          error: { code: "LIMIT_REACHED", message: `Cannot create more than ${MAX_AUTOMOD_RULES} automod rules per guild` },
+        });
+        return;
+      }
+
+      // Validate channel/role filter array sizes
+      if (channelInclude && Array.isArray(channelInclude) && channelInclude.length > MAX_ID_ARRAY_LENGTH) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `channelInclude cannot exceed ${MAX_ID_ARRAY_LENGTH} entries` },
+        });
+        return;
+      }
+      if (channelExclude && Array.isArray(channelExclude) && channelExclude.length > MAX_ID_ARRAY_LENGTH) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `channelExclude cannot exceed ${MAX_ID_ARRAY_LENGTH} entries` },
+        });
+        return;
+      }
+      if (roleInclude && Array.isArray(roleInclude) && roleInclude.length > MAX_ID_ARRAY_LENGTH) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `roleInclude cannot exceed ${MAX_ID_ARRAY_LENGTH} entries` },
+        });
+        return;
+      }
+      if (roleExclude && Array.isArray(roleExclude) && roleExclude.length > MAX_ID_ARRAY_LENGTH) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `roleExclude cannot exceed ${MAX_ID_ARRAY_LENGTH} entries` },
+        });
+        return;
+      }
+
+      if (dmTemplate !== undefined && typeof dmTemplate === "string" && dmTemplate.length > MAX_DESCRIPTION_LENGTH) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `dmTemplate must be ${MAX_DESCRIPTION_LENGTH} characters or less` },
         });
         return;
       }
@@ -95,6 +161,14 @@ export function createRulesCreateRoutes(deps: ModerationApiDeps): Router {
         res.status(400).json({
           success: false,
           error: { code: "INVALID_INPUT", message: "At least one pattern (wildcard or regex) is required" },
+        });
+        return;
+      }
+
+      if (patterns.length > MAX_AUTOMOD_PATTERNS) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `Cannot have more than ${MAX_AUTOMOD_PATTERNS} patterns per rule` },
         });
         return;
       }

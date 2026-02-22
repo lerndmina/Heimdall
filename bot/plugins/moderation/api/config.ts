@@ -60,12 +60,40 @@ export function createConfigRoutes(deps: ModerationApiDeps): Router {
       if (automodEnabled !== undefined) updates.automodEnabled = automodEnabled;
       if (logChannelId !== undefined) updates.logChannelId = logChannelId;
       if (pointDecayEnabled !== undefined) updates.pointDecayEnabled = pointDecayEnabled;
-      if (pointDecayDays !== undefined) updates.pointDecayDays = pointDecayDays;
+      if (pointDecayDays !== undefined) {
+        const days = Number(pointDecayDays);
+        if (!Number.isFinite(days) || days < 1 || days > 365) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: "pointDecayDays must be between 1 and 365" },
+          });
+          return;
+        }
+        updates.pointDecayDays = days;
+      }
       if (dmOnInfraction !== undefined) updates.dmOnInfraction = dmOnInfraction;
-      if (defaultDmTemplate !== undefined) updates.defaultDmTemplate = defaultDmTemplate;
+      if (defaultDmTemplate !== undefined) {
+        if (typeof defaultDmTemplate === "string" && defaultDmTemplate.length > 2000) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: "defaultDmTemplate must be 2000 characters or less" },
+          });
+          return;
+        }
+        updates.defaultDmTemplate = defaultDmTemplate;
+      }
       if (defaultDmEmbed !== undefined) updates.defaultDmEmbed = defaultDmEmbed;
       if (dmMode !== undefined) updates.dmMode = dmMode;
-      if (immuneRoles !== undefined) updates.immuneRoles = immuneRoles;
+      if (immuneRoles !== undefined) {
+        if (!Array.isArray(immuneRoles) || immuneRoles.length > 25) {
+          res.status(400).json({
+            success: false,
+            error: { code: "INVALID_INPUT", message: "immuneRoles must be an array of at most 25 role IDs" },
+          });
+          return;
+        }
+        updates.immuneRoles = immuneRoles;
+      }
       if (muteMode !== undefined) {
         if (!["native", "role"].includes(muteMode)) {
           res.status(400).json({

@@ -13,6 +13,8 @@ import type { ModerationApiDeps } from "./index.js";
 import type { StickyMessageService } from "../services/StickyMessageService.js";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import { broadcastDashboardChange } from "../../../src/core/broadcast.js";
+import { MAX_STICKIES, MIN_STICKY_DETECTION_DELAY } from "../../../src/core/DashboardLimits.js";
+import StickyMessage from "../models/StickyMessage.js";
 
 export interface StickyApiDeps extends ModerationApiDeps {
   stickyMessageService: StickyMessageService;
@@ -106,6 +108,28 @@ export function createStickyRoutes(deps: StickyApiDeps): Router {
         res.status(400).json({
           success: false,
           error: { code: "INVALID_INPUT", message: "content must be 2000 characters or less" },
+        });
+        return;
+      }
+
+      // Enforce per-guild sticky count limit (only for new stickies)
+      const existingSticky = await deps.stickyMessageService.getSticky(channelId);
+      if (!existingSticky) {
+        const stickyCount = await StickyMessage.countDocuments({ guildId });
+        if (stickyCount >= MAX_STICKIES) {
+          res.status(400).json({
+            success: false,
+            error: { code: "LIMIT_REACHED", message: `Cannot have more than ${MAX_STICKIES} sticky messages per guild` },
+          });
+          return;
+        }
+      }
+
+      // Enforce minimum detection delay to prevent rapid re-sending
+      if (typeof detectionDelay === "number" && detectionDelay < MIN_STICKY_DETECTION_DELAY) {
+        res.status(400).json({
+          success: false,
+          error: { code: "INVALID_INPUT", message: `detectionDelay must be at least ${MIN_STICKY_DETECTION_DELAY}ms` },
         });
         return;
       }

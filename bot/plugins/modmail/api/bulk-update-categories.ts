@@ -7,6 +7,7 @@ import type { Request, Response, NextFunction } from "express";
 import type { ApiDependencies } from "./index.js";
 import Modmail from "../models/Modmail.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { MAX_MODMAIL_BULK_UPDATE_SIZE } from "../../../src/core/DashboardLimits.js";
 
 const log = createLogger("modmail:api:bulk-update-categories");
 
@@ -107,6 +108,14 @@ export function bulkUpdateCategoriesRoute(_deps: ApiDependencies) {
         res.status(400).json({
           success: false,
           error: "Invalid request: updates array is required and must not be empty",
+        });
+        return;
+      }
+
+      if (updates.length > MAX_MODMAIL_BULK_UPDATE_SIZE) {
+        res.status(400).json({
+          success: false,
+          error: `Bulk update is limited to ${MAX_MODMAIL_BULK_UPDATE_SIZE} items per request`,
         });
         return;
       }

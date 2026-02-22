@@ -15,6 +15,7 @@ import TicketCategory from "../models/TicketCategory.js";
 import { CategoryType } from "../types/index.js";
 import { nanoid } from "nanoid";
 import { createQuestionsRoutes } from "./questions";
+import { MAX_TICKET_CATEGORIES } from "../../../src/core/DashboardLimits.js";
 
 export function createCategoriesRoutes(deps: ApiDependencies): Router {
   const { categoryService } = deps;
@@ -147,6 +148,16 @@ export function createCategoriesRoutes(deps: ApiDependencies): Router {
         res.status(400).json({
           success: false,
           error: "Child categories require discordCategoryId",
+        });
+        return;
+      }
+
+      // Enforce per-guild category count limit
+      const existingCount = await TicketCategory.countDocuments({ guildId });
+      if (existingCount >= MAX_TICKET_CATEGORIES) {
+        res.status(400).json({
+          success: false,
+          error: `Cannot create more than ${MAX_TICKET_CATEGORIES} ticket categories per guild`,
         });
         return;
       }

@@ -15,6 +15,7 @@ import TicketOpener from "../models/TicketOpener.js";
 import TicketCategory from "../models/TicketCategory.js";
 import { OpenerUIType, MAX_OPENER_CATEGORIES } from "../types/index.js";
 import { nanoid } from "nanoid";
+import { MAX_TICKET_OPENERS } from "../../../src/core/DashboardLimits.js";
 
 export function createOpenersRoutes(_deps: ApiDependencies): Router {
   const router = Router({ mergeParams: true });
@@ -142,6 +143,16 @@ export function createOpenersRoutes(_deps: ApiDependencies): Router {
         res.status(400).json({
           success: false,
           error: `Maximum ${MAX_OPENER_CATEGORIES} categories per opener`,
+        });
+        return;
+      }
+
+      // Enforce per-guild opener count limit
+      const existingCount = await TicketOpener.countDocuments({ guildId });
+      if (existingCount >= MAX_TICKET_OPENERS) {
+        res.status(400).json({
+          success: false,
+          error: `Cannot create more than ${MAX_TICKET_OPENERS} ticket openers per guild`,
         });
         return;
       }

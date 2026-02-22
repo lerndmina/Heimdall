@@ -12,6 +12,7 @@ import VoiceTranscriptionConfig from "../models/VoiceTranscriptionConfig.js";
 import { TranscriptionMode, WhisperProvider, FilterMode, LOCAL_WHISPER_MODELS, OPENAI_WHISPER_MODELS } from "../types/index.js";
 import { isModelDownloaded, WHISPER_MODELS } from "../utils/TranscribeMessage.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import { MAX_CONCURRENT_TRANSCRIPTIONS, MAX_QUEUE_SIZE } from "../../../src/core/DashboardLimits.js";
 import type { VCTranscriptionApiDependencies } from "./index.js";
 
 const log = createLogger("vc-transcription");
@@ -206,10 +207,10 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
       // Validate maxConcurrentTranscriptions
       if (maxConcurrentTranscriptions !== undefined) {
         const val = Number(maxConcurrentTranscriptions);
-        if (!Number.isInteger(val) || val < 1 || val > 10) {
+        if (!Number.isInteger(val) || val < 1 || val > MAX_CONCURRENT_TRANSCRIPTIONS) {
           return res.status(400).json({
             success: false,
-            error: { message: "maxConcurrentTranscriptions must be an integer between 1 and 10" },
+            error: { message: `maxConcurrentTranscriptions must be an integer between 1 and ${MAX_CONCURRENT_TRANSCRIPTIONS}` },
           });
         }
         update.maxConcurrentTranscriptions = val;
@@ -218,10 +219,10 @@ export function createConfigRoutes(deps: VCTranscriptionApiDependencies): Router
       // Validate maxQueueSize
       if (maxQueueSize !== undefined) {
         const val = Number(maxQueueSize);
-        if (!Number.isInteger(val) || val < 0) {
+        if (!Number.isInteger(val) || val < 0 || val > MAX_QUEUE_SIZE) {
           return res.status(400).json({
             success: false,
-            error: { message: "maxQueueSize must be a non-negative integer (0 = unlimited)" },
+            error: { message: `maxQueueSize must be an integer between 0 and ${MAX_QUEUE_SIZE}` },
           });
         }
         update.maxQueueSize = val;

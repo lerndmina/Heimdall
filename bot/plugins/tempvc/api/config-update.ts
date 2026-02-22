@@ -58,6 +58,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import type { TempVCApiDependencies } from "./index.js";
 import TempVC from "../models/TempVC.js";
 import ActiveTempChannels from "../models/ActiveTempChannels.js";
+import { MAX_TEMPVC_CHANNELS } from "../../../src/core/DashboardLimits.js";
 
 export function createConfigUpdateRoutes(_deps: TempVCApiDependencies): Router {
   const router = Router({ mergeParams: true });
@@ -72,6 +73,14 @@ export function createConfigUpdateRoutes(_deps: TempVCApiDependencies): Router {
         res.status(400).json({
           success: false,
           error: { code: "VALIDATION_ERROR", message: "channels must be an array" },
+        });
+        return;
+      }
+
+      if (channels.length > MAX_TEMPVC_CHANNELS) {
+        res.status(400).json({
+          success: false,
+          error: { code: "LIMIT_REACHED", message: `Cannot have more than ${MAX_TEMPVC_CHANNELS} creator channels` },
         });
         return;
       }
