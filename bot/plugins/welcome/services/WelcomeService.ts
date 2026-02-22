@@ -195,4 +195,91 @@ export class WelcomeService {
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   }
+
+  /**
+   * Send a test welcome message to the configured channel using mock member data.
+   * Used by the dashboard "Test Message" button.
+   */
+  async sendTestMessage(guildId: string): Promise<{ success: boolean; channelId?: string; parsedMessage?: string; error?: string }> {
+    const config = await this.getConfig(guildId);
+    if (!config) {
+      return { success: false, error: "No welcome configuration found" };
+    }
+
+    const guild = await this.lib.thingGetter.getGuild(guildId);
+    const guildName = guild?.name ?? "Example Server";
+    const memberCount = guild?.memberCount ?? 100;
+
+    // Parse the message with mock data
+    const mockReplacements: Record<string, string> = {
+      "{username}": "new_member",
+      "{displayname}": "New Member",
+      "{mention}": "@new_member",
+      "{id}": "123456789012345678",
+      "{guild}": guildName,
+      "{membercount}": memberCount.toString(),
+      "{newline}": "\n",
+    };
+
+    let parsed = config.message;
+    for (const [placeholder, value] of Object.entries(mockReplacements)) {
+      const escaped = placeholder.replace(/[{}]/g, "\\$&");
+      parsed = parsed.replace(new RegExp(escaped, "g"), value);
+    }
+
+    const channel = await this.lib.thingGetter.getChannel(config.channelId);
+    if (!channel || !channel.isTextBased() || channel.isDMBased()) {
+      log.error(`Welcome test channel ${config.channelId} not found or not a guild text channel`);
+      return { success: false, channelId: config.channelId, error: "Welcome channel not found or is not a text channel" };
+    }
+
+    const textChannel = channel as TextChannel;
+
+    const permissions = textChannel.permissionsFor(this.client.user);
+    if (!permissions?.has("SendMessages")) {
+      return { success: false, channelId: config.channelId, error: "Bot lacks SendMessages permission in the configured channel" };
+    }
+
+    try {
+      if (config.useEmbed) {
+        const embed = new EmbedBuilder().setDescription(parsed);
+
+        if (config.embedTitle) {
+          let parsedTitle = config.embedTitle;
+          for (const [placeholder, value] of Object.entries(mockReplacements)) {
+            const escaped = placeholder.replace(/[{}]/g, "\\$&");
+            parsedTitle = parsedTitle.replace(new RegExp(escaped, "g"), value);
+          }
+          embed.setTitle(parsedTitle);
+        }
+        if (config.embedColor != null && config.embedColor > 0) {
+          embed.setColor(config.embedColor);
+        }
+        if (config.embedImage) {
+          embed.setImage(config.embedImage);
+        }
+        if (config.embedThumbnail) {
+          embed.setThumbnail(config.embedThumbnail);
+        }
+        if (config.embedFooter) {
+          let parsedFooter = config.embedFooter;
+          for (const [placeholder, value] of Object.entries(mockReplacements)) {
+            const escaped = placeholder.replace(/[{}]/g, "\\$&");
+            parsedFooter = parsedFooter.replace(new RegExp(escaped, "g"), value);
+          }
+          embed.setFooter({ text: parsedFooter });
+        }
+
+        await textChannel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+      } else {
+        await textChannel.send({ content: parsed, allowedMentions: { parse: [] } });
+      }
+
+      log.info(`Test welcome message sent to channel ${config.channelId} in guild ${guildId}`);
+      return { success: true, channelId: config.channelId, parsedMessage: parsed };
+    } catch (error) {
+      log.error("Error sending test welcome message:", error);
+      return { success: false, channelId: config.channelId, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  }
 }

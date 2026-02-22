@@ -66,8 +66,6 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
   const [showVars, setShowVars] = useState(false);
 
   // Test / Delete modals
-  const [testResult, setTestResult] = useState<string | null>(null);
-  const [showTestModal, setShowTestModal] = useState(false);
   const [testing, setTesting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -162,10 +160,9 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
   const handleTest = async () => {
     setTesting(true);
     try {
-      const res = await fetchApi<{ parsedMessage: string }>(guildId, "welcome/test", { method: "POST" });
-      if (res.success && res.data) {
-        setTestResult(res.data.parsedMessage);
-        setShowTestModal(true);
+      const res = await fetchApi<{ channelId: string }>(guildId, "welcome/test", { method: "POST" });
+      if (res.success) {
+        toast.success("Test message sent to the configured channel");
       } else {
         toast.error(res.error?.message ?? "Test failed");
       }
@@ -419,16 +416,6 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
           </button>
         </div>
       )}
-
-      {/* Test result modal */}
-      <Modal open={showTestModal} onClose={() => setShowTestModal(false)} title="Test Welcome Message">
-        <div className="space-y-3">
-          <p className="text-sm text-zinc-400">This is how the welcome message will look with sample data:</p>
-          <div className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm p-4">
-            <pre className="whitespace-pre-wrap text-sm text-zinc-200 font-sans">{testResult}</pre>
-          </div>
-        </div>
-      </Modal>
 
       {/* Delete confirmation modal */}
       <Modal
