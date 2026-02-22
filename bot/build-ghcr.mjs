@@ -71,10 +71,17 @@ function exec(cmd, opts = {}) {
 
 function execQuiet(cmd) {
   try {
-    return execSync(cmd, { cwd: __dirname, encoding: "utf-8" }).trim();
+    return execSync(cmd, { cwd: __dirname, encoding: "utf-8", stdio: "pipe" }).trim();
   } catch {
     return null;
   }
+}
+
+function nativePlatform() {
+  // Kept for reference; buildx sets $BUILDPLATFORM automatically
+  const os = process.platform === "win32" ? "windows" : "linux";
+  const arch = process.arch === "x64" ? "amd64" : process.arch;
+  return `${os}/${arch}`;
 }
 
 function streamCmd(cmd, args) {
@@ -115,8 +122,72 @@ function requireDockerRunning() {
 }
 
 function checkBuildx() {
-  const v = execQuiet("docker buildx version");
-  return v !== null;
+  return execQuiet("docker buildx version") !== null;
+}
+
+function detectDistro() {
+  try {
+    const osRelease = readFileSync("/etc/os-release", "utf-8");
+    const idLine = osRelease.split("\n").find((l) => l.startsWith("ID=")) || "";
+    const idLike = osRelease.split("\n").find((l) => l.startsWith("ID_LIKE=")) || "";
+    const id = idLine.replace(/^ID=/, "").replace(/"/g, "").trim().toLowerCase();
+    const like = idLike.replace(/^ID_LIKE=/, "").replace(/"/g, "").trim().toLowerCase();
+    if (id === "arch" || like.includes("arch")) return "arch";
+    if (["debian", "ubuntu"].includes(id) || like.includes("debian") || like.includes("ubuntu")) return "debian";
+    if (["fedora", "rhel", "centos"].includes(id) || like.includes("fedora") || like.includes("rhel")) return "fedora";
+  } catch {
+    // not Linux or no /etc/os-release
+  }
+  return "unknown";
+}
+
+async function ensureBuildx() {
+  if (checkBuildx()) return true;
+
+  console.log();
+  err("docker buildx is not installed.");
+  console.log(`${c.yellow}  The Heimdall Dockerfile uses \$BUILDPLATFORM and multi-stage BuildKit${c.reset}`);
+  console.log(`${c.yellow}  features that require buildx. The legacy 'docker build' will not work.${c.reset}`);
+  console.log();
+
+  const isWindows = process.platform === "win32";
+  const distro = isWindows ? "windows" : detectDistro();
+
+  const installCmds = {
+    arch:    "sudo pacman -S docker-buildx",
+    debian:  "sudo apt-get install -y docker-buildx-plugin",
+    fedora:  "sudo dnf install -y docker-buildx-plugin",
+    windows: null, // install via Docker Desktop
+    unknown: null,
+  };
+
+  const installCmd = installCmds[distro] ?? null;
+
+  if (installCmd) {
+    info(`Detected package manager — install command: ${c.bold}${installCmd}${c.reset}`);
+    const doInstall = await confirm("Run that command now?", true);
+    if (doInstall) {
+      try {
+        exec(installCmd);
+        if (checkBuildx()) {
+          ok("docker buildx installed successfully!");
+          return true;
+        } else {
+          err("buildx still not found after install. You may need to restart your shell or re-add the Docker plugin directory to PATH.");
+          return false;
+        }
+      } catch {
+        err("Install command failed. Try running it manually.");
+        return false;
+      }
+    }
+  } else {
+    info("Install docker buildx from: https://docs.docker.com/go/buildx/");
+    if (isWindows) info("On Windows, install or update Docker Desktop to get buildx.");
+  }
+
+  console.log();
+  return false;
 }
 
 function isLoggedIntoGhcr() {
@@ -280,8 +351,12 @@ async function actionBuild(cfg) {
   console.log(`${c.bold}${c.bgBlue}${c.white}  🔨  Build Docker Image  ${c.reset}`);
   console.log();
 
+  // Buildx is required — the Dockerfile uses $BUILDPLATFORM / BuildKit features
+  if (!(await ensureBuildx())) {
+    return { tags: [], error: true };
+  }
+
   const version = getPackageVersion();
-  const hasBuildx = checkBuildx();
   const platforms = cfg.platforms || "linux/amd64";
   const isMultiPlatform = platforms.includes(",");
 
@@ -317,7 +392,7 @@ async function actionBuild(cfg) {
   info(`Tags:       ${tags.join(", ")}`);
   if (shaTag) info(`SHA Tag:    ${shaTag} ${c.dim}(applied on push)${c.reset}`);
   info(`Platforms:  ${platforms}`);
-  info(`Buildx:     ${hasBuildx ? "yes" : "no (falling back to docker build)"}`);
+  info(`Mode:       ${isMultiPlatform ? "multi-platform buildx (push during build)" : "single-platform buildx (--load)"}`);
   console.log();
 
   const proceed = await confirm("Start build?");
@@ -334,36 +409,35 @@ async function actionBuild(cfg) {
   console.log();
   const startTime = Date.now();
 
+  // Ensure a builder instance exists for all builds
+  const builderExists = execQuiet("docker buildx inspect heimdall-builder");
+  if (!builderExists) {
+    info("Creating buildx builder instance (first build may pull buildkit)...");
+    exec("docker buildx create --name heimdall-builder --driver docker-container --use");
+  } else {
+    exec("docker buildx use heimdall-builder");
+  }
+
   try {
-    if (hasBuildx && isMultiPlatform) {
-      // Multi-platform build with buildx
+    if (isMultiPlatform) {
+      // Multi-platform build — must push directly (no local multi-arch load support)
       info("Using docker buildx for multi-platform build...");
       const pushTags = withShaTag(tags);
-
-      // Ensure a builder exists
-      const builderExists = execQuiet("docker buildx inspect heimdall-builder");
-      if (!builderExists) {
-        info("Creating buildx builder instance (first build will pull buildkit)...");
-        exec("docker buildx create --name heimdall-builder --driver docker-container --use");
-      } else {
-        exec("docker buildx use heimdall-builder");
-      }
 
       await streamCmd("docker", ["buildx", "build", "--platform", platforms, ...pushTags.flatMap((t) => ["-t", imageRef(cfg, t)]), "--push", "."]);
       ok("Multi-platform build & push complete!");
 
-      // Stop the builder container (it persists otherwise)
       execQuiet("docker buildx stop heimdall-builder");
       info("Builder container stopped.");
 
-      // Save tags as default for next run
       cfg.lastTags = baseTags.join(",");
       saveConfig(cfg);
 
       return { tags: pushTags, pushed: true };
     } else {
-      // Standard build
-      await streamCmd("docker", ["build", ...tags.flatMap((t) => ["-t", imageRef(cfg, t)]), "."]);
+      // Single-platform buildx build — load into local daemon
+      info(`Building for ${platforms} with buildx...`);
+      await streamCmd("docker", ["buildx", "build", "--platform", platforms, "--load", ...tags.flatMap((t) => ["-t", imageRef(cfg, t)]), "."]);
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
