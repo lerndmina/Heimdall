@@ -35,40 +35,21 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
         return;
       }
 
-      // Upsert player by UUID (track all connections)
-      let player = await MinecraftPlayer.findOne({ guildId, minecraftUuid: uuid });
+      const now = new Date();
+
+      // Update player by UUID and keep username in sync (avoids duplicate records on rename)
+      let player = await MinecraftPlayer.findOneAndUpdate({ guildId, minecraftUuid: uuid }, { $set: { minecraftUsername: username, lastConnectionAttempt: now } }, { new: true });
 
       if (!player) {
-        // Check by username (may be a pending auth from /link-minecraft — no UUID yet)
-        player = await MinecraftPlayer.findOne({
-          guildId,
-          minecraftUsername: { $regex: new RegExp(`^${escapeRegex(username)}$`, "i") },
-          $or: [{ minecraftUuid: { $exists: false } }, { minecraftUuid: null }],
-        });
-
-        if (player) {
-          player.minecraftUuid = uuid;
-        }
+        // Fallback: migrate existing username record to this UUID (legacy or pre-link entries)
+        player = await MinecraftPlayer.findOneAndUpdate(
+          { guildId, minecraftUsername: { $regex: new RegExp(`^${escapeRegex(username)}$`, "i") } },
+          { $set: { minecraftUuid: uuid, minecraftUsername: username, lastConnectionAttempt: now } },
+          { new: true },
+        );
       }
 
-      if (player) {
-        // Handle username change (Mojang allows name changes)
-        if (player.minecraftUsername.toLowerCase() !== username.toLowerCase()) {
-          // Check if the new username conflicts with another player
-          const duplicate = await MinecraftPlayer.findOne({
-            guildId,
-            minecraftUsername: { $regex: new RegExp(`^${escapeRegex(username)}$`, "i") },
-            minecraftUuid: { $ne: uuid },
-          }).lean();
-
-          if (!duplicate) {
-            player.minecraftUsername = username;
-          }
-        }
-
-        player.lastConnectionAttempt = new Date();
-        await player.save();
-      } else {
+      if (!player) {
         // Unknown player with no record — don't create a phantom record.
         // They need to use /link-minecraft in Discord first.
         const message = config.authRejectionMessage || "§cYou are not whitelisted. Use /link-minecraft in Discord to get started.";

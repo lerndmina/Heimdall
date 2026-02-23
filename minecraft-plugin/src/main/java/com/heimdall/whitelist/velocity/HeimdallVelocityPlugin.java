@@ -21,8 +21,10 @@ import org.slf4j.Logger;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -42,6 +44,7 @@ public class HeimdallVelocityPlugin {
   private WhitelistManager whitelistManager;
   private WhitelistCache whitelistCache;
   private VelocityLuckPermsManager luckPermsManager;
+  private final Map<UUID, Long> linkCooldowns = new ConcurrentHashMap<>();
 
   @Inject
   public HeimdallVelocityPlugin(ProxyServer server, Logger logger, @DataDirectory Path dataDirectory) {
@@ -85,6 +88,7 @@ public class HeimdallVelocityPlugin {
 
     // Register command
     server.getCommandManager().register("hwl", new HeimdallCommand(), "heimdallwhitelist");
+    server.getCommandManager().register("linkdiscord", new LinkDiscordCommand());
 
     logger.info("Heimdall Whitelist Plugin (Velocity) enabled successfully!");
     logger.info("API URL: " + configProvider.getString("api.baseUrl", "Not set"));
@@ -408,6 +412,95 @@ public class HeimdallVelocityPlugin {
     @Override
     public boolean hasPermission(Invocation invocation) {
       return invocation.source().hasPermission("heimdall.admin");
+    }
+  }
+
+  /**
+   * Player command to request a Discord link code (Velocity parity with Paper).
+   */
+  private class LinkDiscordCommand implements SimpleCommand {
+
+    @Override
+    public void execute(Invocation invocation) {
+      CommandSource source = invocation.source();
+
+      if (!(source instanceof Player)) {
+        source.sendMessage(colorize("&cThis command can only be used by players!"));
+        return;
+      }
+
+      Player player = (Player) source;
+
+      if (!player.hasPermission("heimdall.linkdiscord")) {
+        player.sendMessage(colorize("&cYou don't have permission to use this command!"));
+        return;
+      }
+
+      if (!configProvider.getBoolean("enabled", false)) {
+        player.sendMessage(colorize("&cWhitelist system is currently disabled. Please contact an administrator."));
+        return;
+      }
+
+      // Simple cooldown (30s) to prevent spam; staff can bypass
+      if (!player.hasPermission("heimdall.bypass")) {
+        long now = System.currentTimeMillis();
+        long lastUsed = linkCooldowns.getOrDefault(player.getUniqueId(), 0L);
+        long cooldownMs = 30_000L;
+
+        if (now - lastUsed < cooldownMs) {
+          long remainingSeconds = (cooldownMs - (now - lastUsed)) / 1000;
+          player
+              .sendMessage(colorize("&cPlease wait " + remainingSeconds + " seconds before using this command again."));
+          return;
+        }
+
+        linkCooldowns.put(player.getUniqueId(), now);
+      }
+
+      player.sendMessage(colorize("&eRequesting Discord link code..."));
+
+      // Run API call off the main thread to avoid blocking the proxy
+      CompletableFuture.supplyAsync(() -> {
+        try {
+          return whitelistManager.requestLinkCode(player.getUsername().toLowerCase(), player.getUniqueId().toString());
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }).thenAccept(code -> {
+        server.getScheduler().buildTask(HeimdallVelocityPlugin.this, () -> {
+          StringBuilder borderBuilder = new StringBuilder();
+          for (int i = 0; i < 50; i++) {
+            borderBuilder.append("=");
+          }
+          String border = "&a" + borderBuilder.toString();
+          player.sendMessage(colorize(border));
+          player.sendMessage(colorize("&eYour Discord Link Code: &a&l" + code));
+          player.sendMessage(colorize("&7Go to Discord and use: &f/confirm-code " + code));
+          player.sendMessage(colorize("&7This code expires in 5 minutes"));
+          player.sendMessage(colorize(border));
+        }).schedule();
+      }).exceptionally(ex -> {
+        server.getScheduler().buildTask(HeimdallVelocityPlugin.this, () -> {
+          String errorMessage = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
+          if (errorMessage != null && errorMessage.contains("No linkable account")) {
+            player.sendMessage(colorize(
+                "&cYou don't have a linkable account. You may already be linked to Discord, or you're not whitelisted on this server."));
+          } else if (errorMessage != null && errorMessage.contains("API")) {
+            player.sendMessage(colorize("&cFailed to generate link code (Error: " + errorMessage
+                + "). Please try again in a moment or contact staff if this persists."));
+          } else {
+            player.sendMessage(colorize(
+                "&cFailed to generate link code. Please try again or contact staff if this persists."));
+          }
+          logger.warning("Link code generation failed for " + player.getUsername() + ": " + errorMessage);
+        }).schedule();
+        return null;
+      });
+    }
+
+    @Override
+    public boolean hasPermission(Invocation invocation) {
+      return invocation.source().hasPermission("heimdall.linkdiscord");
     }
   }
 
