@@ -346,17 +346,18 @@ export class AttachmentBlockerService {
     if (effectiveConfig.allowedTypes.includes(AttachmentType.ALL)) return false;
 
     const isNoneSet = effectiveConfig.allowedTypes.includes(AttachmentType.NONE);
+    const attachmentMimeTypes = this.extractAttachmentMimeTypes(message);
+    const forwardedEmbedTypes = this.extractForwardedEmbedTypes(message);
+    const combinedContent = this.getCombinedMessageContent(message);
 
     // Skip if no attachments, no content to check, and NONE is not set
-    if (!isNoneSet && message.attachments.size === 0 && !message.content) return false;
+    if (!isNoneSet && attachmentMimeTypes.length === 0 && forwardedEmbedTypes.length === 0 && !combinedContent) return false;
 
     let shouldDelete = false;
     const blockedReasons: string[] = [];
 
-    // Check each attachment
-    for (const [, attachment] of message.attachments.entries()) {
-      const mimeType = attachment.contentType?.toLowerCase() || "";
-
+    // Check each attachment (message attachments + forwarded message snapshot attachments)
+    for (const mimeType of attachmentMimeTypes) {
       if (isNoneSet) {
         shouldDelete = true;
         if (blockedReasons.length < 1) blockedReasons.push("No attachments allowed");
@@ -373,9 +374,28 @@ export class AttachmentBlockerService {
       }
     }
 
+    // Check forwarded embed media types (image/video/gif) from message snapshots
+    for (const embedType of forwardedEmbedTypes) {
+      if (isNoneSet) {
+        shouldDelete = true;
+        if (blockedReasons.length < 1) blockedReasons.push("No attachments allowed");
+        continue;
+      }
+
+      if (!effectiveConfig.allowedTypes.includes(embedType)) {
+        shouldDelete = true;
+        const reason = `${AttachmentTypeLabels[embedType]} not allowed`;
+        if (blockedReasons.length < 1) {
+          blockedReasons.push(reason);
+        } else {
+          blockedReasons.push(AttachmentTypeLabels[embedType]);
+        }
+      }
+    }
+
     // Check for media links (GIF links vs video links checked independently)
-    if (!isNoneSet && message.content) {
-      const disallowed = detectDisallowedLinks(message.content, effectiveConfig.allowedTypes);
+    if (!isNoneSet && combinedContent) {
+      const disallowed = detectDisallowedLinks(combinedContent, effectiveConfig.allowedTypes);
       if (disallowed) {
         shouldDelete = true;
         const linkTypes = getDetectedLinkTypes(disallowed.links);
@@ -385,8 +405,8 @@ export class AttachmentBlockerService {
           blockedReasons.push(linkTypes);
         }
       }
-    } else if (isNoneSet && message.content) {
-      const disallowed = detectDisallowedLinks(message.content, []);
+    } else if (isNoneSet && combinedContent) {
+      const disallowed = detectDisallowedLinks(combinedContent, []);
       if (disallowed) {
         shouldDelete = true;
         const linkTypes = getDetectedLinkTypes(disallowed.links);
@@ -446,6 +466,119 @@ export class AttachmentBlockerService {
   private hasBypassRole(member: GuildMember, bypassRoleIds: string[]): boolean {
     if (!bypassRoleIds || bypassRoleIds.length === 0) return false;
     return bypassRoleIds.some((roleId) => member.roles.cache.has(roleId));
+  }
+
+  private getCombinedMessageContent(message: Message): string {
+    const parts: string[] = [];
+    if (message.content) parts.push(message.content);
+
+    for (const snapshot of this.getMessageSnapshots(message)) {
+      if (typeof snapshot.content === "string" && snapshot.content.length > 0) {
+        parts.push(snapshot.content);
+      }
+    }
+
+    return parts.join("\n");
+  }
+
+  private extractAttachmentMimeTypes(message: Message): string[] {
+    const mimeTypes: string[] = [];
+
+    for (const [, attachment] of message.attachments.entries()) {
+      const mimeType = this.resolveAttachmentMimeType(attachment);
+      if (mimeType) mimeTypes.push(mimeType);
+    }
+
+    for (const snapshot of this.getMessageSnapshots(message)) {
+      const snapshotAttachments = snapshot.attachments;
+      if (!snapshotAttachments || typeof snapshotAttachments.entries !== "function") continue;
+
+      for (const [, attachment] of snapshotAttachments.entries()) {
+        const mimeType = this.resolveAttachmentMimeType(attachment);
+        if (mimeType) mimeTypes.push(mimeType);
+      }
+    }
+
+    return mimeTypes;
+  }
+
+  private extractForwardedEmbedTypes(message: Message): AttachmentType[] {
+    const detected = new Set<AttachmentType>();
+
+    for (const snapshot of this.getMessageSnapshots(message)) {
+      const embeds = Array.isArray(snapshot.embeds) ? snapshot.embeds : [];
+      for (const embed of embeds) {
+        const embedType = typeof embed?.type === "string" ? embed.type.toLowerCase() : "";
+
+        if (embedType === "gifv") {
+          detected.add(AttachmentType.GIF);
+          continue;
+        }
+
+        if (embedType === "video" || embed?.video?.url) {
+          detected.add(AttachmentType.VIDEO);
+          continue;
+        }
+
+        if (embedType === "image" || embed?.image?.url) {
+          const imageUrl = embed.image?.url;
+          if (typeof imageUrl === "string" && imageUrl.toLowerCase().endsWith(".gif")) {
+            detected.add(AttachmentType.GIF);
+          } else {
+            detected.add(AttachmentType.IMAGE);
+          }
+        }
+      }
+    }
+
+    return Array.from(detected);
+  }
+
+  private getMessageSnapshots(message: Message): any[] {
+    const snapshots = (message as Message & { messageSnapshots?: { values?: () => IterableIterator<any>; map?: (cb: (value: any) => any) => any[] } }).messageSnapshots;
+    if (!snapshots) return [];
+
+    if (typeof snapshots.values === "function") {
+      return Array.from(snapshots.values());
+    }
+
+    if (typeof snapshots.map === "function") {
+      return snapshots.map((snapshot) => snapshot);
+    }
+
+    return [];
+  }
+
+  private resolveAttachmentMimeType(attachment: { contentType?: string | null; name?: string | null; url?: string | null; proxyURL?: string | null }): string {
+    const rawContentType = attachment.contentType?.toLowerCase();
+    if (rawContentType) {
+      return rawContentType;
+    }
+
+    const fileRef = (attachment.name || attachment.url || attachment.proxyURL || "").toLowerCase();
+    if (!fileRef) return "";
+
+    if (fileRef.endsWith(".gif")) return "image/gif";
+    if (fileRef.endsWith(".apng")) return "image/apng";
+    if (fileRef.endsWith(".png")) return "image/png";
+    if (fileRef.endsWith(".jpg") || fileRef.endsWith(".jpeg")) return "image/jpeg";
+    if (fileRef.endsWith(".webp")) return "image/webp";
+    if (fileRef.endsWith(".bmp")) return "image/bmp";
+    if (fileRef.endsWith(".svg")) return "image/svg+xml";
+    if (fileRef.endsWith(".mp4")) return "video/mp4";
+    if (fileRef.endsWith(".webm")) return "video/webm";
+    if (fileRef.endsWith(".mov")) return "video/quicktime";
+    if (fileRef.endsWith(".mkv")) return "video/x-matroska";
+    if (fileRef.endsWith(".avi")) return "video/x-msvideo";
+    if (fileRef.endsWith(".mp3")) return "audio/mpeg";
+    if (fileRef.endsWith(".wav")) return "audio/wav";
+    if (fileRef.endsWith(".ogg")) return "audio/ogg";
+    if (fileRef.endsWith(".flac")) return "audio/flac";
+    if (fileRef.endsWith(".m4a")) return "audio/x-m4a";
+    if (fileRef.endsWith(".aac")) return "audio/aac";
+    if (fileRef.endsWith(".opus")) return "audio/opus";
+
+    return "";
   }
 
   // ── Cache Helpers ──────────────────────────────────────

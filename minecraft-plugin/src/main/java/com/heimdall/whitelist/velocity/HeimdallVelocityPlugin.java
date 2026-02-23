@@ -482,12 +482,18 @@ public class HeimdallVelocityPlugin {
       }).exceptionally(ex -> {
         server.getScheduler().buildTask(HeimdallVelocityPlugin.this, () -> {
           String errorMessage = ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage();
-          if (errorMessage != null && errorMessage.contains("No linkable account")) {
+          if (errorMessage != null && errorMessage.toLowerCase().contains("already linked")) {
+            player.sendMessage(colorize("&eThis Minecraft account is already linked."));
+            String info = extractUserFacingLinkError(errorMessage);
+            if (info != null && !info.isBlank()) {
+              player.sendMessage(colorize("&7" + info));
+            }
+          } else if (errorMessage != null && errorMessage.contains("No linkable account")) {
             player.sendMessage(colorize(
                 "&cYou don't have a linkable account. You may already be linked to Discord, or you're not whitelisted on this server."));
           } else if (errorMessage != null && errorMessage.contains("API")) {
-            player.sendMessage(colorize("&cFailed to generate link code (Error: " + errorMessage
-                + "). Please try again in a moment or contact staff if this persists."));
+            player.sendMessage(colorize(
+                "&cFailed to generate link code. Please try again in a moment or contact staff if this persists."));
           } else {
             player.sendMessage(colorize(
                 "&cFailed to generate link code. Please try again or contact staff if this persists."));
@@ -502,6 +508,24 @@ public class HeimdallVelocityPlugin {
     public boolean hasPermission(Invocation invocation) {
       return invocation.source().hasPermission("heimdall.linkdiscord");
     }
+  }
+
+  private String extractUserFacingLinkError(String rawMessage) {
+    if (rawMessage == null || rawMessage.isBlank()) {
+      return null;
+    }
+
+    int lastRuntimeIdx = rawMessage.lastIndexOf("RuntimeException:");
+    String cleaned = lastRuntimeIdx >= 0 ? rawMessage.substring(lastRuntimeIdx + "RuntimeException:".length())
+        : rawMessage;
+
+    cleaned = cleaned
+        .replace("java.util.concurrent.ExecutionException:", "")
+        .replace("java.lang.RuntimeException:", "")
+        .replace("API request failed:", "")
+        .trim();
+
+    return cleaned.isBlank() ? null : cleaned;
   }
 
   // Getters for other classes if needed

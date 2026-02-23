@@ -40,11 +40,25 @@ export function createLinkRoutes(deps: MinecraftApiDependencies): Router {
       }).lean();
 
       if (existingLinked) {
+        const displayName = existingLinked.discordDisplayName?.trim();
+        const usernameLabel = existingLinked.discordUsername?.trim();
+        const discordId = existingLinked.discordId?.trim();
+
+        const accountParts: string[] = [];
+        if (displayName) accountParts.push(displayName);
+        if (usernameLabel) accountParts.push(`(@${usernameLabel})`);
+        if (discordId) accountParts.push(`[ID: ${discordId}]`);
+
+        const accountInfo = accountParts.length > 0 ? accountParts.join(" ") : "a Discord account";
+
         res.json({
           success: true,
           data: {
             alreadyLinked: true,
-            message: "Your account is already linked to a Discord account",
+            message: `Your Minecraft account is already linked to ${accountInfo}.`,
+            discordDisplayName: displayName ?? null,
+            discordUsername: usernameLabel ?? null,
+            discordId: discordId ?? null,
           },
         });
         return;
