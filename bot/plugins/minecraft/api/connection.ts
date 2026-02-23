@@ -177,9 +177,10 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
 
       // Check if player has been revoked — give specific message
       if (player.revokedAt) {
-        const message = player.revocationReason
-          ? `§cYour whitelist has been revoked: §f${player.revocationReason}`
-          : config.applicationRejectionMessage || "§cYour whitelist has been revoked. Please contact staff for more information.";
+        const reason = (player.revocationReason || "").trim();
+        const reasonSegment = reason ? `: §f${reason}` : "";
+        const revokedTemplate = config.whitelistRevokedMessage || "§cYour whitelist has been revoked{reason}.\n§7Please contact staff for more information.";
+        const message = revokedTemplate.replace("{reason}", reasonSegment);
 
         res.json({
           success: true,

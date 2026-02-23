@@ -128,6 +128,7 @@ function modelToDashboard(config: Record<string, any>): Record<string, any> {
     authPendingMessage: config.authPendingMessage ?? "§eYour authentication code is: §6{code}\n§7Go back to Discord and click §fConfirm Code §7to complete linking.",
     authRejectionMessage: config.authRejectionMessage ?? "§cTo join this server:\n§7• Join the Discord server\n§7• Use §f/link-minecraft {username}\n§7• Follow the instructions to link your account",
     applicationRejectionMessage: config.applicationRejectionMessage ?? "§cYour whitelist application has been rejected.\n§7Please contact staff for more information.",
+    whitelistRevokedMessage: config.whitelistRevokedMessage ?? "§cYour whitelist has been revoked{reason}.\n§7Please contact staff for more information.",
     whitelistPendingApprovalMessage: config.whitelistPendingApprovalMessage ?? "§eYour whitelist application is pending staff approval.\n§7Please wait for a staff member to review your request.",
     whitelistPendingScheduledMessage: config.whitelistPendingScheduledMessage ?? "§eYou will be whitelisted {schedule}.\n§7Please check back later!",
   };

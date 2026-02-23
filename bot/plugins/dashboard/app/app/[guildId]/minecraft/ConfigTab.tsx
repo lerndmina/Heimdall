@@ -64,6 +64,7 @@ interface MinecraftConfig {
   authPendingMessage: string;
   authRejectionMessage: string;
   applicationRejectionMessage: string;
+  whitelistRevokedMessage: string;
   whitelistPendingApprovalMessage: string;
   whitelistPendingScheduledMessage: string;
 }
@@ -98,6 +99,7 @@ const DEFAULT_CONFIG: Omit<MinecraftConfig, "guildId"> = {
   authPendingMessage: "§eYour authentication code is: §6{code}\n§7Go back to Discord and click §fConfirm Code §7to complete linking.",
   authRejectionMessage: "§cTo join this server:\n§7• Join the Discord server\n§7• Use §f/link-minecraft {username}\n§7• Follow the instructions to link your account",
   applicationRejectionMessage: "§cYour whitelist application has been rejected.\n§7Please contact staff for more information.",
+  whitelistRevokedMessage: "§cYour whitelist has been revoked{reason}.\n§7Please contact staff for more information.",
   whitelistPendingApprovalMessage: "§eYour whitelist application is pending staff approval.\n§7Please wait for a staff member to review your request.",
   whitelistPendingScheduledMessage: "§eYou will be whitelisted {schedule}.\n§7Please check back later!",
 };
@@ -383,6 +385,7 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
             <FieldDisplay label="Auth Code Shown" value={config.authPendingMessage || "(default)"} />
             <FieldDisplay label="Not Linked / Rejected" value={config.authRejectionMessage || "(default)"} />
             <FieldDisplay label="Application Rejected" value={config.applicationRejectionMessage || "(default)"} />
+            <FieldDisplay label="Whitelist Revoked" value={config.whitelistRevokedMessage || "(default)"} />
             <FieldDisplay label="Pending (Staff Approval)" value={config.whitelistPendingApprovalMessage || "(default)"} />
             <FieldDisplay label="Pending (Scheduled)" value={config.whitelistPendingScheduledMessage || "(default)"} />
           </div>
@@ -533,6 +536,8 @@ function StepMessages({ draft, update }: StepProps) {
         <code className="text-zinc-300">\n</code> for new lines.
         <br />
         Available placeholders: <code className="text-zinc-300">{"{player}"}</code> — player's Minecraft username, <code className="text-zinc-300">{"{code}"}</code> — authentication code.
+        <br />
+        Additional placeholder: <code className="text-zinc-300">{"{reason}"}</code> — revocation reason (only for revoked whitelist message).
       </div>
 
       <Textarea
@@ -571,6 +576,16 @@ function StepMessages({ draft, update }: StepProps) {
         value={draft.applicationRejectionMessage}
         onChange={(v) => update("applicationRejectionMessage", v)}
         placeholder="§cYour whitelist application has been rejected."
+        rows={3}
+        maxLength={300}
+      />
+
+      <Textarea
+        label="Whitelist Revoked"
+        description="Shown when a player's whitelist has been revoked. Placeholder: {reason}"
+        value={draft.whitelistRevokedMessage}
+        onChange={(v) => update("whitelistRevokedMessage", v)}
+        placeholder="§cYour whitelist has been revoked{reason}."
         rows={3}
         maxLength={300}
       />
@@ -909,6 +924,7 @@ function StepReview({ draft }: { draft: Omit<MinecraftConfig, "guildId"> }) {
           <ReviewRow label="Auth Code" value={draft.authPendingMessage || "(default)"} />
           <ReviewRow label="Not Linked" value={draft.authRejectionMessage || "(default)"} />
           <ReviewRow label="App Rejected" value={draft.applicationRejectionMessage || "(default)"} />
+          <ReviewRow label="Whitelist Revoked" value={draft.whitelistRevokedMessage || "(default)"} />
           <ReviewRow label="Pending (Staff)" value={draft.whitelistPendingApprovalMessage || "(default)"} />
           <ReviewRow label="Pending (Scheduled)" value={draft.whitelistPendingScheduledMessage || "(default)"} />
         </ReviewSection>

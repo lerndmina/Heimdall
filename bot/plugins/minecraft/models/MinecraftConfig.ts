@@ -113,6 +113,10 @@ const MinecraftConfigSchema = new Schema(
       type: String,
       default: "§cYour whitelist application has been rejected.\n§7Please contact staff for more information.",
     },
+    whitelistRevokedMessage: {
+      type: String,
+      default: "§cYour whitelist has been revoked{reason}.\n§7Please contact staff for more information.",
+    },
     whitelistPendingApprovalMessage: {
       type: String,
       default: "§eYour whitelist application is pending staff approval.\n§7Please wait for a staff member to review your request.",
