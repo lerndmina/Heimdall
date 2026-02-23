@@ -70,9 +70,7 @@ export class LoggingEventService {
       if (!cfg) return;
       if (!this.service.isSubcategoryEnabled(cfg.subcategories, MessageSubcategory.DELETES)) return;
 
-      const logChannel =
-        (message.guild?.channels.cache.get(cfg.channelId) ??
-          (await this.lib.thingGetter.getChannel(cfg.channelId))) as TextChannel | null;
+      const logChannel = (message.guild?.channels.cache.get(cfg.channelId) ?? (await this.lib.thingGetter.getChannel(cfg.channelId))) as TextChannel | null;
       if (!logChannel?.isTextBased()) return;
 
       const isPartial = message.partial || message.content === null;
@@ -142,9 +140,7 @@ export class LoggingEventService {
       if (!cfg) return;
       if (!this.service.isSubcategoryEnabled(cfg.subcategories, MessageSubcategory.EDITS)) return;
 
-      const logChannel =
-        (newMessage.guild?.channels.cache.get(cfg.channelId) ??
-          (await this.lib.thingGetter.getChannel(cfg.channelId))) as TextChannel | null;
+      const logChannel = (newMessage.guild?.channels.cache.get(cfg.channelId) ?? (await this.lib.thingGetter.getChannel(cfg.channelId))) as TextChannel | null;
       if (!logChannel?.isTextBased()) return;
 
       this.recentEdits.set(newMessage.id, now);
@@ -186,9 +182,7 @@ export class LoggingEventService {
       if (!cfg) return;
       if (!this.service.isSubcategoryEnabled(cfg.subcategories, MessageSubcategory.BULK_DELETES)) return;
 
-      const logChannel =
-        (channel.guild.channels.cache.get(cfg.channelId) ??
-          (await this.lib.thingGetter.getChannel(cfg.channelId))) as TextChannel | null;
+      const logChannel = (channel.guild.channels.cache.get(cfg.channelId) ?? (await this.lib.thingGetter.getChannel(cfg.channelId))) as TextChannel | null;
       if (!logChannel?.isTextBased()) return;
 
       const authorCounts = new Map<string, number>();
