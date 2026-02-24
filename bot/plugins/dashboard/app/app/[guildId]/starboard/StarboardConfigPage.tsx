@@ -184,8 +184,8 @@ export default function StarboardConfigPage({ guildId }: Props) {
       <Card>
         <CardHeader>
           <div>
-            <CardTitle>Board Configuration</CardTitle>
-            <CardDescription>Initial implementation: one editable board with emoji customization and moderation queue settings.</CardDescription>
+            <CardTitle>Starboard Configuration</CardTitle>
+            <CardDescription>This dashboard currently manages one board configuration (emoji, channel, threshold, and moderation).</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -275,7 +275,7 @@ export default function StarboardConfigPage({ guildId }: Props) {
               onClick={() => void saveBoard()}
               disabled={!canManage || saving}
               className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50">
-              {saving ? "Saving..." : hasBoard ? "Save Board" : "Create Board"}
+              {saving ? "Saving..." : hasBoard ? "Save Configuration" : "Create Configuration"}
             </button>
 
             {hasBoard && (

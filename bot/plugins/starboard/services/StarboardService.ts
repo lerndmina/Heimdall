@@ -68,7 +68,11 @@ export class StarboardService {
   }
 
   async getConfig(guildId: string): Promise<StarboardConfigDocument | null> {
-    return StarboardConfigModel.findOne({ guildId });
+    const config = await StarboardConfigModel.findOne({ guildId });
+    if (!config) return null;
+
+    await this.ensureBoardIds(config);
+    return config;
   }
 
   async ensureConfig(guildId: string): Promise<StarboardConfigDocument> {
