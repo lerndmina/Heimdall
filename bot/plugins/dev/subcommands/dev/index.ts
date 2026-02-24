@@ -4,6 +4,7 @@
 
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
 import { handleMongoImport } from "./mongo-import.js";
+import { handleActivity } from "./activity.js";
 
 export async function execute(context: CommandContext): Promise<void> {
   const { interaction } = context;
@@ -23,6 +24,9 @@ export async function execute(context: CommandContext): Promise<void> {
   switch (subcommand) {
     case "mongo-import":
       await handleMongoImport(context);
+      break;
+    case "activity":
+      await handleActivity(context);
       break;
     default:
       await interaction.reply({ content: "❌ Unknown subcommand.", ephemeral: true });

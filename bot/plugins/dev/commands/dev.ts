@@ -18,7 +18,8 @@ export const data = new SlashCommandBuilder()
       .addStringOption((opt) => opt.setName("database").setDescription("Target database name").setRequired(true))
       .addStringOption((opt) => opt.setName("collection").setDescription("Target collection name").setRequired(true))
       .addBooleanOption((opt) => opt.setName("drop").setDescription("Drop the collection before importing (default: false)")),
-  );
+  )
+  .addSubcommand((sub) => sub.setName("activity").setDescription("Manage the bot's activity and online status"));
 
 export const config = {
   allowInDMs: true,
