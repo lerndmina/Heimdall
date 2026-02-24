@@ -18,6 +18,7 @@ import type { LibAPI } from "../../lib/index.js";
 import { ApplicationService } from "./ApplicationService.js";
 import { ApplicationSessionService, type ApplicationAnswer, type ApplicationQuestionType } from "./ApplicationSessionService.js";
 import { ApplicationReviewService } from "./ApplicationReviewService.js";
+import { formatApplicationMessage } from "../utils/messagePlaceholders.js";
 
 type QuestionType = "short" | "long" | "select_single" | "select_multi" | "button" | "number";
 
@@ -403,7 +404,16 @@ export class ApplicationFlowService {
 
       if (latestForm.completionMessage) {
         const user = await this.client.users.fetch(latestSession.userId).catch(() => null);
-        if (user) await user.send({ content: latestForm.completionMessage }).catch(() => null);
+        if (user) {
+          const content = formatApplicationMessage(latestForm.completionMessage, {
+            userId: latestSession.userId,
+            userDisplayName: latestSession.userDisplayName,
+            formName: latestForm.name,
+            applicationId: result.applicationId,
+            guildId: latestSession.guildId,
+          });
+          await user.send({ content }).catch(() => null);
+        }
       }
 
       await buttonInteraction.reply({

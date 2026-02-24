@@ -17,6 +17,7 @@ import type { ModmailPluginAPI } from "../../modmail/index.js";
 import type { ApplicationSession } from "./ApplicationSessionService.js";
 import { ApplicationService } from "./ApplicationService.js";
 import { buildReviewComponents, buildSubmissionEmbed } from "../utils/ApplicationEmbeds.js";
+import { formatApplicationMessage } from "../utils/messagePlaceholders.js";
 
 export class ApplicationReviewService {
   constructor(
@@ -140,7 +141,7 @@ export class ApplicationReviewService {
     }
 
     await this.applyDecisionRoles(interaction.guild, updated.userId, form, status);
-    await this.tryNotifyApplicant(updated.userId, form, status, reason);
+    await this.tryNotifyApplicant(updated, form, status, reason);
     await this.updateSubmissionMessage(interaction.guildId, updated.applicationId);
 
     broadcastDashboardChange(interaction.guildId, "applications", "updated", { requiredAction: "applications.review" });
@@ -174,7 +175,7 @@ export class ApplicationReviewService {
     if (guild) {
       await this.applyDecisionRoles(guild, updated.userId, form, status);
     }
-    await this.tryNotifyApplicant(updated.userId, form, status, reason);
+    await this.tryNotifyApplicant(updated, form, status, reason);
     await this.updateSubmissionMessage(guildId, applicationId);
     broadcastDashboardChange(guildId, "applications", "updated", { requiredAction: "applications.review" });
 
@@ -289,13 +290,24 @@ export class ApplicationReviewService {
     }
   }
 
-  private async tryNotifyApplicant(userId: string, form: any, status: "approved" | "denied", reason?: string): Promise<void> {
+  private async tryNotifyApplicant(submission: any, form: any, status: "approved" | "denied", reason?: string): Promise<void> {
     const text = status === "approved" ? form.acceptMessage : form.denyMessage;
     if (!text || typeof text !== "string") return;
 
     try {
-      const user = await this.client.users.fetch(userId);
-      await user.send({ content: reason ? `${text}\n\nReason: ${reason}` : text });
+      const user = await this.client.users.fetch(submission.userId);
+      const content = formatApplicationMessage(text, {
+        userId: submission.userId,
+        userDisplayName: submission.userDisplayName,
+        formName: submission.formName || form?.name,
+        applicationId: submission.applicationId,
+        applicationNumber: submission.applicationNumber,
+        status,
+        reason,
+        reviewerId: submission.reviewedBy,
+        guildId: submission.guildId,
+      });
+      await user.send({ content });
     } catch (error) {
       this.logger.debug("Could not DM applicant", error);
     }
