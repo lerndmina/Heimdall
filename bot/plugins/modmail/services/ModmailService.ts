@@ -32,6 +32,8 @@ export interface CreateModmailData {
   /** Message refs queued while the user was answering form questions */
   queuedMessageRefs?: Array<{ channelId: string; messageId: string }>;
   categoryId?: string;
+  includeCategoryRoleMentions?: boolean;
+  includeGlobalRoleMentions?: boolean;
   formResponses?: FormResponse[];
   createdVia?: "dm" | "command" | "button" | "api";
 }

@@ -150,6 +150,24 @@ export class ModmailEmbeds {
   }
 
   /**
+   * Thread opened by staff notification for user
+   */
+  static threadOpenedByStaff(guildName: string, categoryName: string, staffDisplayName: string): HeimdallEmbedBuilder {
+    const description = `A staff member from **${guildName}** has opened a modmail thread for you.
+
+**Category:** ${categoryName}
+**Opened by:** ${staffDisplayName}
+
+Their opening message is included below.
+
+Continue replying here to add to your conversation.
+
+Once your issue is resolved, you can use the **Close** button below to close the ticket.`;
+
+    return ModmailEmbeds.success("Modmail Opened", description).setFooter({ text: MODMAIL_FOOTER });
+  }
+
+  /**
    * Thread closed notification — mirrored to both user DM and staff thread
    */
   static threadClosed(closedBy: string, reason?: string): HeimdallEmbedBuilder {

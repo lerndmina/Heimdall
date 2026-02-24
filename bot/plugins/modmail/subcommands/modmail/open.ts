@@ -11,6 +11,7 @@ import { ModmailPermissions } from "../../utils/ModmailPermissions.js";
 import { requireConfig } from "../../utils/subcommandGuards.js";
 import { createCloseTicketRow } from "../../utils/modmailButtons.js";
 import { createLogger } from "../../../../src/core/Logger.js";
+import { formatStaffReply } from "../../utils/formatStaffReply.js";
 
 const log = createLogger("modmail:cmd:open");
 
@@ -23,10 +24,18 @@ export async function handleOpen(context: CommandContext, pluginAPI: ModmailPlug
 
   const user = interaction.options.getUser("user", true);
   const reason = interaction.options.getString("reason") || "Staff-initiated modmail";
+  const mentionRoles = interaction.options.getBoolean("mention_roles");
+  const mentionCategoryRoles = interaction.options.getBoolean("mention_category_roles");
+  const mentionGlobalRoles = interaction.options.getBoolean("mention_global_roles");
   const categoryId = interaction.options.getString("category");
+
+  const hasGranularMentionOverrides = mentionCategoryRoles !== null || mentionGlobalRoles !== null;
+  const includeCategoryRoleMentions = hasGranularMentionOverrides ? (mentionCategoryRoles ?? false) : mentionRoles === true;
+  const includeGlobalRoleMentions = hasGranularMentionOverrides ? (mentionGlobalRoles ?? false) : mentionRoles === true;
 
   // Check permissions
   const member = interaction.member as GuildMember;
+  const staffDisplayName = member.displayName || interaction.user.displayName || interaction.user.username;
   const isStaff = await ModmailPermissions.isStaff(member, interaction.guildId!);
   if (!isStaff) {
     await interaction.editReply({
@@ -108,6 +117,8 @@ export async function handleOpen(context: CommandContext, pluginAPI: ModmailPlug
       userId: user.id,
       userDisplayName,
       initialMessage: reason,
+      includeCategoryRoleMentions,
+      includeGlobalRoleMentions,
       categoryId: resolvedCategoryId,
       createdVia: "command",
     });
@@ -124,8 +135,12 @@ export async function handleOpen(context: CommandContext, pluginAPI: ModmailPlug
       const closeRow = await createCloseTicketRow(pluginAPI.lib);
 
       await user.send({
-        embeds: [ModmailEmbeds.threadCreated(interaction.guild!.name, category.name, reason)],
+        embeds: [ModmailEmbeds.threadOpenedByStaff(interaction.guild!.name, category.name, staffDisplayName)],
         components: [closeRow],
+      });
+
+      await user.send({
+        content: formatStaffReply(reason, staffDisplayName, interaction.guild!.name),
       });
     } catch {
       // User has DMs disabled, continue anyway

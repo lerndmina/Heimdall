@@ -132,7 +132,10 @@ export class ModmailCreationService {
 
     // 5. Create forum thread
     try {
-      const thread = await this.createForumThread(modmailDoc, config, category);
+      const thread = await this.createForumThread(modmailDoc, config, category, {
+        includeCategoryRoleMentions: data.includeCategoryRoleMentions ?? true,
+        includeGlobalRoleMentions: data.includeGlobalRoleMentions ?? true,
+      });
 
       // 6. Update modmail with thread ID
       modmailDoc.forumThreadId = thread.id;
@@ -246,7 +249,12 @@ export class ModmailCreationService {
    * Create the forum thread for the modmail
    * Creates thread with initial message containing user info and initial message
    */
-  async createForumThread(modmail: IModmail & Document, config: IModmailConfig, category: ModmailCategory): Promise<ThreadChannel> {
+  async createForumThread(
+    modmail: IModmail & Document,
+    config: IModmailConfig,
+    category: ModmailCategory,
+    options: { includeCategoryRoleMentions: boolean; includeGlobalRoleMentions: boolean },
+  ): Promise<ThreadChannel> {
     // Get forum channel
     const channel = await this.lib.thingGetter.getChannel(category.forumChannelId);
     if (!channel || channel.type !== ChannelType.GuildForum) {
@@ -307,7 +315,9 @@ export class ModmailCreationService {
     }
 
     // Build staff role mentions for the starter message content
-    const staffRoles = [...category.staffRoleIds, ...((config.globalStaffRoleIds as string[]) || [])];
+    const categoryStaffRoles = options.includeCategoryRoleMentions ? category.staffRoleIds : [];
+    const globalStaffRoles = options.includeGlobalRoleMentions ? (config.globalStaffRoleIds as string[]) || [] : [];
+    const staffRoles = [...new Set([...categoryStaffRoles, ...globalStaffRoles])];
     const mentionContent = staffRoles.length > 0 ? staffRoles.map((id) => `<@&${id}>`).join(" ") : undefined;
 
     // Create the thread with notification embed, staff mentions, and action buttons

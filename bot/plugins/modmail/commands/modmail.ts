@@ -26,6 +26,9 @@ export const data = new SlashCommandBuilder()
       .setDescription("Open a modmail thread for a user")
       .addUserOption((opt) => opt.setName("user").setDescription("User to open thread for").setRequired(true))
       .addStringOption((opt) => opt.setName("reason").setDescription("Reason for opening").setMaxLength(1024))
+      .addBooleanOption((opt) => opt.setName("mention_roles").setDescription("Mention both category and global staff roles (legacy shortcut, default: off)"))
+      .addBooleanOption((opt) => opt.setName("mention_category_roles").setDescription("Mention category staff roles in the thread opener (default: off)"))
+      .addBooleanOption((opt) => opt.setName("mention_global_roles").setDescription("Mention global staff roles in the thread opener (default: off)"))
       .addStringOption((opt) => opt.setName("category").setDescription("Category to use").setAutocomplete(true)),
   )
   .addSubcommand((sub) =>
