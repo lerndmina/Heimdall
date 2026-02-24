@@ -9,6 +9,10 @@ import type { RedisClientType } from "redis";
 import type mongoose from "mongoose";
 import type { HeimdallClient } from "../../../src/types/Client.js";
 import type { WebSocketManager } from "../../../src/core/WebSocketManager.js";
+import type { EventManager } from "../../../src/core/EventManager.js";
+import type { ApiManager } from "../../../src/core/ApiManager.js";
+import type { ComponentCallbackService } from "../../../src/core/services/ComponentCallbackService.js";
+import type { PermissionRegistry } from "../../../src/core/PermissionRegistry.js";
 import type { LibAPI } from "../../lib/index.js";
 import { nanoid } from "nanoid";
 
@@ -28,6 +32,11 @@ export const PanelId = {
   DATABASE: "database",
   COMMANDS: "commands",
   DEBUG: "debug",
+  PLUGINS: "plugins",
+  GUILDS: "guilds",
+  MAINTENANCE: "maintenance",
+  EVAL: "eval",
+  TASKS: "tasks",
 } as const;
 
 export type PanelIdType = (typeof PanelId)[keyof typeof PanelId];
@@ -39,7 +48,12 @@ export const PANEL_NAV_OPTIONS = [
   { label: "💾 Cache / Redis", value: PanelId.CACHE, description: "Inspect & flush the Redis cache" },
   { label: "🗄️ Database", value: PanelId.DATABASE, description: "MongoDB stats & collection tools" },
   { label: "⚡ Commands", value: PanelId.COMMANDS, description: "Refresh or delete slash commands" },
-  { label: "🪲 Debug", value: PanelId.DEBUG, description: "Log level, Sentry, process info" },
+  { label: "🪲 Debug", value: PanelId.DEBUG, description: "Log level, Sentry, env vars" },
+  { label: "🧩 Plugins", value: PanelId.PLUGINS, description: "Plugin info, events, API routes" },
+  { label: "🏠 Guilds", value: PanelId.GUILDS, description: "Browse & manage joined guilds" },
+  { label: "🛠️ Maintenance", value: PanelId.MAINTENANCE, description: "Restart or shutdown the bot" },
+  { label: "📝 Eval", value: PanelId.EVAL, description: "Execute JavaScript code" },
+  { label: "⏰ Tasks", value: PanelId.TASKS, description: "Background task registry" },
 ] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,6 +69,10 @@ export interface DevPanelContext {
   redis: RedisClientType;
   mongoose: typeof mongoose;
   wsManager: WebSocketManager;
+  eventManager: EventManager;
+  apiManager: ApiManager;
+  componentCallbackService: ComponentCallbackService;
+  permissionRegistry: PermissionRegistry;
   /** Navigate to another panel by ID. Edits the original reply in-place. */
   navigate: (panelId: string) => Promise<void>;
 }

@@ -19,6 +19,11 @@ import { buildCachePanel } from "./cachePanel.js";
 import { buildDatabasePanel } from "./databasePanel.js";
 import { buildCommandsPanel } from "./commandsPanel.js";
 import { buildDebugPanel } from "./debugPanel.js";
+import { buildPluginsPanel } from "./pluginsPanel.js";
+import { buildGuildsPanel } from "./guildsPanel.js";
+import { buildMaintenancePanel } from "./maintenancePanel.js";
+import { buildEvalPanel } from "./evalPanel.js";
+import { buildTasksPanel } from "./tasksPanel.js";
 
 const panelBuilders: Record<string, PanelBuilder> = {
   [PanelId.MAIN]: buildMainMenu,
@@ -28,6 +33,11 @@ const panelBuilders: Record<string, PanelBuilder> = {
   [PanelId.DATABASE]: buildDatabasePanel,
   [PanelId.COMMANDS]: buildCommandsPanel,
   [PanelId.DEBUG]: buildDebugPanel,
+  [PanelId.PLUGINS]: buildPluginsPanel,
+  [PanelId.GUILDS]: buildGuildsPanel,
+  [PanelId.MAINTENANCE]: buildMaintenancePanel,
+  [PanelId.EVAL]: buildEvalPanel,
+  [PanelId.TASKS]: buildTasksPanel,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,7 +53,7 @@ export async function handleDevPanel(context: CommandContext): Promise<void> {
     return;
   }
 
-  const { commandManager, redis, mongoose, wsManager } = getDevServices();
+  const { commandManager, redis, mongoose, wsManager, eventManager, apiManager, componentCallbackService, permissionRegistry } = getDevServices();
 
   await interaction.deferReply({ ephemeral: true });
 
@@ -65,6 +75,10 @@ export async function handleDevPanel(context: CommandContext): Promise<void> {
     redis,
     mongoose,
     wsManager,
+    eventManager,
+    apiManager,
+    componentCallbackService,
+    permissionRegistry,
     navigate,
   };
 

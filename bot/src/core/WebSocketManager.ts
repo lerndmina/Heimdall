@@ -581,4 +581,28 @@ export class WebSocketManager {
   private async setupRedis(): Promise<void> {
     // Placeholder for future Redis pub/sub fanout
   }
+
+  /** Public stats snapshot for the dev panel. */
+  getStats(): {
+    started: boolean;
+    port: number;
+    totalClients: number;
+    authenticatedUsers: number;
+    guildRooms: number;
+    totalSubscribers: number;
+  } {
+    const totalClients = this.wss?.clients.size ?? 0;
+    let totalSubscribers = 0;
+    for (const sockets of this.guildRooms.values()) {
+      totalSubscribers += sockets.size;
+    }
+    return {
+      started: this.wss !== null,
+      port: this.port,
+      totalClients,
+      authenticatedUsers: this.connectionsByUser.size,
+      guildRooms: this.guildRooms.size,
+      totalSubscribers,
+    };
+  }
 }

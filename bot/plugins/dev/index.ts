@@ -4,8 +4,13 @@ import type { RedisClientType } from "redis";
 import type mongoose from "mongoose";
 import type { HeimdallClient } from "../../src/types/Client.js";
 import type { WebSocketManager } from "../../src/core/WebSocketManager.js";
+import type { EventManager } from "../../src/core/EventManager.js";
+import type { ApiManager } from "../../src/core/ApiManager.js";
+import type { ComponentCallbackService } from "../../src/core/services/ComponentCallbackService.js";
+import type { PermissionRegistry } from "../../src/core/PermissionRegistry.js";
 import BotActivityModel from "./models/BotActivityModel.js";
 import { activityRotationService, applyPreset } from "./services/ActivityRotationService.js";
+import { taskRegistry } from "./services/BackgroundTaskRegistry.js";
 
 export const commands = "./commands";
 export const api = "./api";
@@ -16,6 +21,10 @@ let _redis: RedisClientType;
 let _mongoose: typeof mongoose;
 let _client: HeimdallClient;
 let _wsManager: WebSocketManager;
+let _eventManager: EventManager;
+let _apiManager: ApiManager;
+let _componentCallbackService: ComponentCallbackService;
+let _permissionRegistry: PermissionRegistry;
 
 /** Retrieve stored core service references (available after onLoad). */
 export function getDevServices() {
@@ -25,11 +34,15 @@ export function getDevServices() {
     mongoose: _mongoose,
     client: _client,
     wsManager: _wsManager,
+    eventManager: _eventManager,
+    apiManager: _apiManager,
+    componentCallbackService: _componentCallbackService,
+    permissionRegistry: _permissionRegistry,
   };
 }
 
 export async function onLoad(context: PluginContext): Promise<PluginAPI> {
-  const { client, logger, commandManager, redis, mongoose, wsManager } = context;
+  const { client, logger, commandManager, redis, mongoose, wsManager, eventManager, apiManager, componentCallbackService, permissionRegistry } = context;
 
   // Store references for the dev panel
   _commandManager = commandManager;
@@ -37,6 +50,20 @@ export async function onLoad(context: PluginContext): Promise<PluginAPI> {
   _mongoose = mongoose;
   _client = client as unknown as HeimdallClient;
   _wsManager = wsManager;
+  _eventManager = eventManager;
+  _apiManager = apiManager;
+  _componentCallbackService = componentCallbackService;
+  _permissionRegistry = permissionRegistry;
+
+  // Register the activity rotation task
+  taskRegistry.register({
+    id: "activity-rotation",
+    plugin: "dev",
+    label: "Activity Rotation",
+    intervalMs: 0, // dynamic, set on start
+    isRunning: activityRotationService.isRunning,
+    description: "Cycles bot presence through saved presets",
+  });
 
   // ── Restore persisted activity/rotation on startup ───────────────────────
   try {

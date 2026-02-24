@@ -6,6 +6,8 @@ import { ActionRowBuilder, ButtonStyle, type ButtonInteraction } from "discord.j
 import { createBackButton, PANEL_TTL, PanelId, formatBytes, formatUptime, type DevPanelContext, type PanelResult } from "../devPanel.js";
 import { createLogger, LogLevel, type LoggerFunction } from "../../../../src/core/Logger.js";
 import { captureException } from "../../../../src/utils/sentry.js";
+import { envLoader } from "../../../../src/utils/env.js";
+import type { GlobalEnv } from "../../../../src/types/Env.js";
 
 /** Root logger used to toggle global debug logging on/off. */
 const rootLog: LoggerFunction = createLogger("dev:debug-panel");
@@ -21,6 +23,17 @@ export async function buildDebugPanel(ctx: DevPanelContext): Promise<PanelResult
   const mem = process.memoryUsage();
   const cpuUsage = process.cpuUsage();
 
+  // ── Environment variable status ──────────────────────────────────────────
+  const globalEnv = envLoader.getGlobalEnv();
+  const sensitiveKeys = new Set<keyof GlobalEnv>(["BOT_TOKEN", "MONGODB_URI", "REDIS_URL", "ENCRYPTION_KEY", "INTERNAL_API_KEY", "SENTRY_DSN"]);
+  const envLines: string[] = [];
+  for (const [key, value] of Object.entries(globalEnv) as [keyof GlobalEnv, unknown][]) {
+    const isSet = value !== undefined && value !== null && value !== "" && !(Array.isArray(value) && value.length === 0);
+    const icon = isSet ? "✅" : "❌";
+    const display = sensitiveKeys.has(key) ? (isSet ? "••••••" : "—") : String(value);
+    envLines.push(`${icon} \`${key}\`: ${display}`);
+  }
+
   const embed = lib
     .createEmbedBuilder()
     .setTitle("🪲 Debug Tools")
@@ -34,6 +47,7 @@ export async function buildDebugPanel(ctx: DevPanelContext): Promise<PanelResult
       { name: "Heap", value: `${formatBytes(mem.heapUsed)} / ${formatBytes(mem.heapTotal)}`, inline: true },
       { name: "RSS", value: formatBytes(mem.rss), inline: true },
       { name: "CPU (user/sys)", value: `${Math.round(cpuUsage.user / 1000)}ms / ${Math.round(cpuUsage.system / 1000)}ms`, inline: true },
+      { name: "Environment Variables", value: envLines.join("\n"), inline: false },
     );
 
   // ── Buttons ──────────────────────────────────────────────────────────────
