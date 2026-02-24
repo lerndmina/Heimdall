@@ -18,7 +18,8 @@
     "attachment-blocker",
     "moderation",
     "rolebuttons",
-    "planetside"
+    "planetside",
+    "applications"
   ],
   "requiredEnv": ["INTERNAL_API_KEY", "NEXTAUTH_SECRET", "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "OWNER_IDS"],
   "optionalEnv": ["DASHBOARD_PORT", "NEXT_PUBLIC_WS_URL", "WS_PUBLIC_URL"]

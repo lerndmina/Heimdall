@@ -54,6 +54,7 @@ const NAV_ITEMS: NavItemDef[] = [
   { label: "Modmail", href: (id) => `/${id}/modmail`, icon: <ModmailIcon />, category: "modmail", plugin: "modmail" },
   { label: "Tickets", href: (id) => `/${id}/tickets`, icon: <TicketsIcon />, category: "tickets", plugin: "tickets" },
   { label: "Suggestions", href: (id) => `/${id}/suggestions`, icon: <SuggestionsIcon />, category: "suggestions", plugin: "suggestions" },
+  { label: "Applications", href: (id) => `/${id}/applications`, icon: <SuggestionsIcon />, category: "applications", plugin: "applications" },
   { label: "Tags", href: (id) => `/${id}/tags`, icon: <TagsIcon />, category: "tags", plugin: "tags" },
   { label: "Role Buttons", href: (id) => `/${id}/rolebuttons`, icon: <RoleButtonsIcon />, category: "rolebuttons", plugin: "rolebuttons" },
   { label: "Logging", href: (id) => `/${id}/logging`, icon: <LoggingIcon />, category: "logging", plugin: "logging" },

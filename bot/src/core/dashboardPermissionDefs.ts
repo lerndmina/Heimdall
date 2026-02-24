@@ -98,6 +98,16 @@ export const permissionCategories: PermissionCategory[] = [
     ],
   },
   {
+    key: "applications",
+    label: "Applications",
+    description: "Manage application forms, submissions, and review workflow.",
+    actions: [
+      { key: "view", label: "View Applications", description: "View forms and submissions." },
+      { key: "manage", label: "Manage Forms", description: "Create, edit, delete, and post application forms." },
+      { key: "review", label: "Review Submissions", description: "Approve, deny, and open linked modmail for submissions." },
+    ],
+  },
+  {
     key: "logging",
     label: "Logging",
     description: "Configure event logging channels and categories.",
