@@ -106,6 +106,20 @@ export function WelcomeIcon() {
   );
 }
 
+/** Starboard / star icon */
+export function StarboardIcon() {
+  return (
+    <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.5}
+        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.955a1 1 0 00.95.69h4.158c.969 0 1.371 1.24.588 1.81l-3.364 2.445a1 1 0 00-.364 1.118l1.286 3.955c.3.922-.755 1.688-1.539 1.118l-3.364-2.445a1 1 0 00-1.176 0l-3.364 2.445c-.783.57-1.838-.196-1.539-1.118l1.286-3.955a1 1 0 00-.364-1.118L3.067 9.382c-.783-.57-.38-1.81.588-1.81h4.158a1 1 0 00.95-.69l1.286-3.955z"
+      />
+    </svg>
+  );
+}
+
 /** TempVC / microphone icon */
 export function TempVCIcon() {
   return (

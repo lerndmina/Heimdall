@@ -1,0 +1,10 @@
+{
+  "name": "starboard",
+  "version": "1.0.0",
+  "description": "Starboard with configurable boards and optional moderation approval",
+  "dependencies": ["lib"],
+  "optionalDependencies": ["logging"],
+  "requiredEnv": [],
+  "optionalEnv": [],
+  "apiRoutePrefix": "/starboard"
+}

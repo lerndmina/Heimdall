@@ -116,6 +116,16 @@ export const permissionCategories: PermissionCategory[] = [
     ],
   },
   {
+    key: "starboard",
+    label: "Starboard",
+    description: "Configure starboard boards and moderate pending starboard candidates.",
+    actions: [
+      { key: "view_config", label: "View Configuration", description: "View starboard board settings and pending queue." },
+      { key: "manage_config", label: "Manage Configuration", description: "Create and edit starboard boards, emoji, thresholds, and channels." },
+      { key: "moderate", label: "Moderate Queue", description: "Approve or deny pending starboard candidates." },
+    ],
+  },
+  {
     key: "tempvc",
     label: "Temporary Voice Channels",
     description: "Configure temporary voice channel creation and settings.",
