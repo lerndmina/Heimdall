@@ -528,87 +528,141 @@ function StepWhitelist({ draft, update }: StepProps) {
   );
 }
 
+/** Small pill badges listing the placeholders available for a given message. */
+function PlaceholderHints({ placeholders }: { placeholders: { token: string; hint: string }[] }) {
+  return (
+    <div className="mb-1 flex flex-wrap gap-1.5">
+      {placeholders.map(({ token, hint }) => (
+        <span
+          key={token}
+          title={hint}
+          className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-white/5 px-2 py-0.5 font-mono text-[11px] text-zinc-300 cursor-default select-all">
+          {token}
+          <span className="font-sans text-[10px] text-zinc-500 not-italic normal-case">— {hint}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function StepMessages({ draft, update }: StepProps) {
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-zinc-700/30 bg-white/5 px-4 py-3 text-xs text-zinc-400">
         💡 These messages are shown to players when they connect to your Minecraft server. Use <code className="text-zinc-300">§</code> for Minecraft colour codes and{" "}
-        <code className="text-zinc-300">\n</code> for new lines.
-        <br />
-        Available placeholders: <code className="text-zinc-300">{"{player}"}</code> — player's Minecraft username, <code className="text-zinc-300">{"{code}"}</code> — authentication code.
-        <br />
-        Additional placeholder: <code className="text-zinc-300">{"{reason}"}</code> — revocation reason (only for revoked whitelist message).
+        <code className="text-zinc-300">\n</code> for new lines. Click any placeholder badge below to copy it.
       </div>
 
-      <Textarea
-        label="Welcome Back (Whitelisted)"
-        description="Shown to a whitelisted player when they connect. Placeholder: {player}"
-        value={draft.authSuccessMessage}
-        onChange={(v) => update("authSuccessMessage", v)}
-        placeholder="§aWelcome back, {player}!"
-        rows={2}
-        maxLength={300}
-      />
+      <div>
+        <PlaceholderHints placeholders={[{ token: "{player}", hint: "Minecraft username" }]} />
+        <Textarea
+          label="Welcome Back (Whitelisted)"
+          description="Shown to a whitelisted player when they connect."
+          value={draft.authSuccessMessage}
+          onChange={(v) => update("authSuccessMessage", v)}
+          placeholder="§aWelcome back, {player}!"
+          rows={2}
+          maxLength={300}
+        />
+      </div>
 
-      <Textarea
-        label="Auth Code Shown"
-        description="Shown when a player connects to receive their authentication code. Placeholders: {code}, {player}"
-        value={draft.authPendingMessage}
-        onChange={(v) => update("authPendingMessage", v)}
-        placeholder="§eYour authentication code is: §6{code}"
-        rows={3}
-        maxLength={300}
-      />
+      <div>
+        <PlaceholderHints
+          placeholders={[
+            { token: "{player}", hint: "Minecraft username" },
+            { token: "{code}", hint: "authentication code" },
+          ]}
+        />
+        <Textarea
+          label="Auth Code Shown"
+          description="Shown when a player connects to receive their authentication code."
+          value={draft.authPendingMessage}
+          onChange={(v) => update("authPendingMessage", v)}
+          placeholder="§eYour authentication code is: §6{code}"
+          rows={3}
+          maxLength={300}
+        />
+      </div>
 
-      <Textarea
-        label="Not Linked / Rejected"
-        description="Shown when an unknown player connects who hasn't started the linking process"
-        value={draft.authRejectionMessage}
-        onChange={(v) => update("authRejectionMessage", v)}
-        placeholder="§cTo join this server, link your account…"
-        rows={3}
-        maxLength={300}
-      />
+      <div>
+        <PlaceholderHints
+          placeholders={[
+            { token: "{player}", hint: "Minecraft username" },
+            { token: "{username}", hint: "Minecraft username (use in /link-minecraft command)" },
+          ]}
+        />
+        <Textarea
+          label="Not Linked / Rejected"
+          description="Shown when an unknown player connects who hasn't started the linking process."
+          value={draft.authRejectionMessage}
+          onChange={(v) => update("authRejectionMessage", v)}
+          placeholder="§cTo join this server, link your account…"
+          rows={3}
+          maxLength={300}
+        />
+      </div>
 
-      <Textarea
-        label="Application Rejected"
-        description="Shown when a player whose application was rejected tries to connect"
-        value={draft.applicationRejectionMessage}
-        onChange={(v) => update("applicationRejectionMessage", v)}
-        placeholder="§cYour whitelist application has been rejected."
-        rows={3}
-        maxLength={300}
-      />
+      <div>
+        <PlaceholderHints placeholders={[{ token: "{player}", hint: "Minecraft username" }]} />
+        <Textarea
+          label="Application Rejected"
+          description="Shown when a player whose application was rejected tries to connect."
+          value={draft.applicationRejectionMessage}
+          onChange={(v) => update("applicationRejectionMessage", v)}
+          placeholder="§cYour whitelist application has been rejected."
+          rows={3}
+          maxLength={300}
+        />
+      </div>
 
-      <Textarea
-        label="Whitelist Revoked"
-        description="Shown when a player's whitelist has been revoked. Placeholder: {reason}"
-        value={draft.whitelistRevokedMessage}
-        onChange={(v) => update("whitelistRevokedMessage", v)}
-        placeholder="§cYour whitelist has been revoked{reason}."
-        rows={3}
-        maxLength={300}
-      />
+      <div>
+        <PlaceholderHints
+          placeholders={[
+            { token: "{player}", hint: "Minecraft username" },
+            { token: "{reason}", hint: "revocation reason (empty if none)" },
+          ]}
+        />
+        <Textarea
+          label="Whitelist Revoked"
+          description="Shown when a player's whitelist has been revoked."
+          value={draft.whitelistRevokedMessage}
+          onChange={(v) => update("whitelistRevokedMessage", v)}
+          placeholder="§cYour whitelist has been revoked{reason}."
+          rows={3}
+          maxLength={300}
+        />
+      </div>
 
-      <Textarea
-        label="Pending (Staff Approval)"
-        description="Shown when a player is linked but waiting for staff to approve their whitelist. Placeholder: {player}"
-        value={draft.whitelistPendingApprovalMessage}
-        onChange={(v) => update("whitelistPendingApprovalMessage", v)}
-        placeholder="§eYour whitelist application is pending staff approval."
-        rows={3}
-        maxLength={300}
-      />
+      <div>
+        <PlaceholderHints placeholders={[{ token: "{player}", hint: "Minecraft username" }]} />
+        <Textarea
+          label="Pending (Staff Approval)"
+          description="Shown when a player is linked but waiting for staff to approve their whitelist."
+          value={draft.whitelistPendingApprovalMessage}
+          onChange={(v) => update("whitelistPendingApprovalMessage", v)}
+          placeholder="§eYour whitelist application is pending staff approval."
+          rows={3}
+          maxLength={300}
+        />
+      </div>
 
-      <Textarea
-        label="Pending (Scheduled)"
-        description="Shown when auto-whitelist is on a delay or schedule. Placeholders: {player}, {schedule} (auto-filled with timing)"
-        value={draft.whitelistPendingScheduledMessage}
-        onChange={(v) => update("whitelistPendingScheduledMessage", v)}
-        placeholder="§eYou will be whitelisted {schedule}."
-        rows={3}
-        maxLength={300}
-      />
+      <div>
+        <PlaceholderHints
+          placeholders={[
+            { token: "{player}", hint: "Minecraft username" },
+            { token: "{schedule}", hint: 'auto-filled with timing (e.g. "in 30 minutes")' },
+          ]}
+        />
+        <Textarea
+          label="Pending (Scheduled)"
+          description="Shown when auto-whitelist is on a delay or schedule."
+          value={draft.whitelistPendingScheduledMessage}
+          onChange={(v) => update("whitelistPendingScheduledMessage", v)}
+          placeholder="§eYou will be whitelisted {schedule}."
+          rows={3}
+          maxLength={300}
+        />
+      </div>
     </div>
   );
 }

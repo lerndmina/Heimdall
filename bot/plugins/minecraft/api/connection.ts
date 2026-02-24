@@ -58,7 +58,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
           success: true,
           data: {
             whitelisted: false,
-            message: message.replace("{player}", username),
+            message: message.replace("{player}", username).replace("{username}", username),
           },
         });
         return;
@@ -266,7 +266,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
         success: true,
         data: {
           whitelisted: false,
-          message: message.replace("{player}", username),
+          message: message.replace("{player}", username).replace("{username}", username),
         },
       });
     } catch (error) {
