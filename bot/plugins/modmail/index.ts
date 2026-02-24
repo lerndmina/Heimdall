@@ -131,7 +131,18 @@ export async function onLoad(context: PluginContext): Promise<ModmailPluginAPI> 
   const questionHandler = new ModmailQuestionHandler(client, sessionService, creationService, lib, logger);
 
   // Initialize interaction service
-  const interactionService = new ModmailInteractionService(client, modmailService, sessionService, creationService, categoryService, lib, lib.componentCallbackService, logger, supportCore);
+  const interactionService = new ModmailInteractionService(
+    client,
+    modmailService,
+    sessionService,
+    creationService,
+    questionHandler,
+    categoryService,
+    lib,
+    lib.componentCallbackService,
+    logger,
+    supportCore,
+  );
 
   // Initialize interaction handlers
   await interactionService.initialize();

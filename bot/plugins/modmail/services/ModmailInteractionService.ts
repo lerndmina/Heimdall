@@ -14,6 +14,7 @@ import type { ModmailService } from "./ModmailService.js";
 import type { ModmailSessionService, CreateSessionData } from "./ModmailSessionService.js";
 import type { ModmailCreationService } from "./ModmailCreationService.js";
 import type { ModmailCategoryService } from "./ModmailCategoryService.js";
+import type { ModmailQuestionHandler } from "../utils/ModmailQuestionHandler.js";
 import type { ModmailCategory } from "../models/ModmailConfig.js";
 import type { IModmail } from "../models/Modmail.js";
 import { ModmailStatus } from "../models/Modmail.js";
@@ -36,6 +37,7 @@ export class ModmailInteractionService {
     private modmailService: ModmailService,
     private sessionService: ModmailSessionService,
     private creationService: ModmailCreationService,
+    private questionHandler: ModmailQuestionHandler,
     private categoryService: ModmailCategoryService,
     private lib: LibAPI,
     private componentCallbackService: ComponentCallbackService,
@@ -333,54 +335,38 @@ export class ModmailInteractionService {
     const guildId = interaction.guild.id;
     const userId = interaction.user.id;
 
-    // Get config
-    const config = await this.modmailService.getConfig(guildId);
-    if (!config) {
+    const eligibility = await this.creationService.checkOpenEligibility({
+      guildId,
+      userId,
+      duplicatePolicy: "open-or-resolved",
+    });
+
+    if (!eligibility.success) {
+      const errorMessage =
+        eligibility.code === "already_open"
+          ? "❌ You already have an active or recently resolved modmail conversation in this server."
+          : eligibility.code === "user_banned"
+            ? "❌ You are banned from using modmail in this server."
+            : eligibility.code === "not_configured"
+              ? "❌ Modmail is not configured in this server."
+              : "❌ No modmail categories are available.";
+
       await interaction.reply({
-        content: "❌ Modmail is not configured in this server.",
+        content: errorMessage,
         ephemeral: true,
       });
       return;
     }
 
-    // Check if banned
-    const isBanned = await this.modmailService.isUserBanned(guildId, userId);
-    if (isBanned) {
-      await interaction.reply({
-        content: "❌ You are banned from using modmail in this server.",
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // Check existing open modmail
-    const hasOpen = await this.modmailService.userHasOpenModmail(guildId, userId);
-    if (hasOpen) {
-      await interaction.reply({
-        content: "❌ You already have an open modmail conversation. Please wait for a response or close your existing ticket.",
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // Get enabled categories
-    const categories = (config.categories as ModmailCategory[]).filter((c) => c.enabled);
-
-    if (categories.length === 0) {
-      await interaction.reply({
-        content: "❌ No modmail categories are available.",
-        ephemeral: true,
-      });
-      return;
-    }
+    const categories = eligibility.enabledCategories || [];
 
     if (categories.length === 1) {
       // Single category
       const firstCategory = categories[0];
       if (firstCategory) {
         if (firstCategory.formFields && firstCategory.formFields.length > 0) {
-          // Category has form fields — show form modal
-          await this.showFormModal(interaction, firstCategory, guildId);
+          // Category has form fields — gather initial reason, then use shared question flow
+          await this.showReasonAndStartQuestionFlow(interaction, firstCategory, guildId);
         } else {
           // No form fields — show reason modal directly
           await this.showReasonModal(interaction, firstCategory.id, guildId);
@@ -428,6 +414,9 @@ export class ModmailInteractionService {
   private async showReasonModal(interaction: ButtonInteraction | StringSelectMenuInteraction, categoryId: string, guildId: string): Promise<void> {
     const modalId = nanoid(12);
 
+    const config = await this.modmailService.getConfig(guildId);
+    const minimumMessageLength = Math.max(1, config?.minimumMessageLength || 10);
+
     const modal = new ModalBuilder().setCustomId(modalId).setTitle("Contact Support");
 
     const reasonInput = new TextInputBuilder()
@@ -435,7 +424,7 @@ export class ModmailInteractionService {
       .setLabel("How can we help you?")
       .setStyle(TextInputStyle.Paragraph)
       .setPlaceholder("Describe your issue or question...")
-      .setMinLength(10)
+      .setMinLength(minimumMessageLength)
       .setMaxLength(2000)
       .setRequired(true);
 
@@ -458,21 +447,22 @@ export class ModmailInteractionService {
       const member = interaction.member as GuildMember | null;
       const userDisplayName = member?.displayName || interaction.user.displayName || interaction.user.username;
 
-      // Create the modmail
-      const result = await this.creationService.createModmail({
+      // Create the modmail via shared open orchestration
+      const openResult = await this.creationService.openModmail({
         guildId,
         userId: interaction.user.id,
         userDisplayName,
         initialMessage: reason,
         categoryId,
+        duplicatePolicy: "open-or-resolved",
         createdVia: "button",
       });
 
-      if (result.success) {
+      if (openResult.success && openResult.creationResult?.success) {
+        const result = openResult.creationResult;
+
         // Fetch category name for DM
-        const config = await this.modmailService.getConfig(guildId);
-        const category = (config?.categories as ModmailCategory[])?.find((c) => c.id === categoryId);
-        const categoryName = category?.name || "General Support";
+        const categoryName = openResult.category?.name || "General Support";
 
         await this.sendCreationConfirmation({
           user: interaction.user,
@@ -483,8 +473,15 @@ export class ModmailInteractionService {
           replyTarget: submission,
         });
       } else {
+        const errorMessage =
+          openResult.code === "already_open"
+            ? "You already have an active or recently resolved modmail conversation in this server."
+            : openResult.code === "user_banned"
+              ? "You are banned from using modmail in this server."
+              : openResult.message || "Failed to create modmail. Please try again later.";
+
         await submission.editReply({
-          embeds: [ModmailEmbeds.error("Creation Failed", result.userMessage || "Failed to create modmail. Please try again later.")],
+          embeds: [ModmailEmbeds.error("Creation Failed", errorMessage)],
         });
       }
     } catch (error) {
@@ -522,8 +519,8 @@ export class ModmailInteractionService {
 
     // If category has form fields, we need to collect them first
     if (category.formFields && category.formFields.length > 0) {
-      // Create a session and show form modal
-      await this.showFormModal(interaction, category, guildId);
+      // Gather initial reason, then use shared question flow
+      await this.showReasonAndStartQuestionFlow(interaction, category, guildId);
     } else {
       // No form fields - show reason modal directly (use category.id which we verified exists)
       await this.showReasonModal(interaction, category.id, guildId);
@@ -533,35 +530,24 @@ export class ModmailInteractionService {
   /**
    * Show form modal for categories with custom form fields
    */
-  private async showFormModal(interaction: StringSelectMenuInteraction | ButtonInteraction, category: ModmailCategory, guildId: string): Promise<void> {
+  private async showReasonAndStartQuestionFlow(interaction: StringSelectMenuInteraction | ButtonInteraction, category: ModmailCategory, guildId: string): Promise<void> {
     const modalId = nanoid(12);
-    const formFields = category.formFields || [];
+    const config = await this.modmailService.getConfig(guildId);
+    const minimumMessageLength = Math.max(1, config?.minimumMessageLength || 10);
 
-    // Discord modals can have max 5 text inputs
-    const fieldsToShow = formFields.slice(0, 5);
+    const modal = new ModalBuilder().setCustomId(modalId).setTitle("Contact Support");
 
-    const modal = new ModalBuilder().setCustomId(modalId).setTitle(`${category.name} Request`);
+    const reasonInput = new TextInputBuilder()
+      .setCustomId("reason")
+      .setLabel("How can we help you?")
+      .setStyle(TextInputStyle.Paragraph)
+      .setPlaceholder("Describe your issue or question...")
+      .setMinLength(minimumMessageLength)
+      .setMaxLength(2000)
+      .setRequired(true);
 
-    for (const field of fieldsToShow) {
-      const input = new TextInputBuilder()
-        .setCustomId(field.id)
-        .setLabel(field.label)
-        .setStyle(field.type === "paragraph" ? TextInputStyle.Paragraph : TextInputStyle.Short)
-        .setRequired(field.required);
-
-      if (field.placeholder) {
-        input.setPlaceholder(field.placeholder);
-      }
-      if (field.minLength) {
-        input.setMinLength(field.minLength);
-      }
-      if (field.maxLength) {
-        input.setMaxLength(field.maxLength);
-      }
-
-      const row = new ActionRowBuilder<TextInputBuilder>().addComponents(input);
-      modal.addComponents(row);
-    }
+    const row = new ActionRowBuilder<TextInputBuilder>().addComponents(reasonInput);
+    modal.addComponents(row);
 
     await interaction.showModal(modal);
 
@@ -571,94 +557,28 @@ export class ModmailInteractionService {
         time: 900_000, // 15 minutes
       });
 
-      await submission.deferReply({ ephemeral: true });
-
-      // Collect form responses
-      const formResponses = fieldsToShow.map((field) => ({
-        fieldId: field.id,
-        fieldLabel: field.label,
-        fieldType: field.type as "short" | "paragraph" | "select" | "number",
-        value: submission.fields.getTextInputValue(field.id),
-      }));
-
-      // Get initial message from first field or a summary
-      const initialMessage = formResponses.map((r) => `**${r.fieldLabel}**: ${r.value}`).join("\n");
+      const reason = submission.fields.getTextInputValue("reason");
 
       // Get user display name
       const member = interaction.member as GuildMember | null;
       const userDisplayName = member?.displayName || interaction.user.displayName || interaction.user.username;
 
-      // Create the modmail with form responses
-      const result = await this.creationService.createModmail({
+      const sessionData: CreateSessionData = {
         guildId,
         userId: interaction.user.id,
         userDisplayName,
-        initialMessage,
         categoryId: category.id,
-        formResponses,
-        createdVia: "button",
-      });
+        initialMessage: reason,
+      };
 
-      if (result.success) {
-        await this.sendCreationConfirmation({
-          user: interaction.user,
-          guildName: interaction.guild!.name,
-          categoryName: category.name,
-          ticketNumber: result.metadata?.ticketNumber,
-          initialMessage,
-          replyTarget: submission,
-        });
-      } else {
-        await submission.editReply({
-          embeds: [ModmailEmbeds.error("Creation Failed", result.userMessage || "Failed to create modmail. Please try again later.")],
-        });
-      }
+      const sessionId = await this.sessionService.createSession(sessionData);
+
+      // Do not defer here — question handler may need to open another modal.
+      await this.questionHandler.processNextStep(submission, sessionId);
     } catch (error) {
       // Modal timed out or was dismissed
-      this.logger.debug(`Form modal timed out or was dismissed for user ${interaction.user.id}`);
+      this.logger.debug(`Question flow reason modal timed out or was dismissed for user ${interaction.user.id}`);
     }
-  }
-
-  /**
-   * Handle multi-select question answer
-   */
-  private async handleQuestionSelect(interaction: StringSelectMenuInteraction): Promise<void> {
-    // Get session ID from user
-    const sessionId = await this.sessionService.getUserActiveSession(interaction.user.id);
-    if (!sessionId) {
-      await interaction.reply({
-        content: "❌ Your session has expired. Please start over.",
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // Get the actual session
-    const session = await this.sessionService.getSession(sessionId);
-    if (!session) {
-      await interaction.reply({
-        content: "❌ Your session has expired. Please start over.",
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // Store the answer(s)
-    const selectedValues = interaction.values.join(", ");
-    const currentStep = session.currentStep;
-
-    // Record the answer
-    await this.sessionService.recordAnswer(sessionId, `step_${currentStep}`, selectedValues);
-
-    // Advance to next step
-    await this.sessionService.updateSession(sessionId, {
-      currentStep: currentStep + 1,
-    });
-
-    await interaction.reply({
-      content: "✅ Answer recorded.",
-      ephemeral: true,
-    });
   }
 
   // ========================================

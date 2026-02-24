@@ -4,11 +4,9 @@
 
 import type { GuildMember } from "discord.js";
 import type { CommandContext } from "../../../../src/core/CommandManager.js";
-import { broadcastDashboardChange } from "../../../../src/core/broadcast.js";
 import type { ModmailPluginAPI } from "../../index.js";
 import { ModmailEmbeds } from "../../utils/ModmailEmbeds.js";
 import { ModmailPermissions } from "../../utils/ModmailPermissions.js";
-import { requireConfig } from "../../utils/subcommandGuards.js";
 import { createCloseTicketRow } from "../../utils/modmailButtons.js";
 import { createLogger } from "../../../../src/core/Logger.js";
 import { formatStaffReply } from "../../utils/formatStaffReply.js";
@@ -16,11 +14,8 @@ import { formatStaffReply } from "../../utils/formatStaffReply.js";
 const log = createLogger("modmail:cmd:open");
 
 export async function handleOpen(context: CommandContext, pluginAPI: ModmailPluginAPI): Promise<void> {
-  const { interaction, client } = context;
+  const { interaction } = context;
   await interaction.deferReply({ ephemeral: true });
-
-  const config = await requireConfig(interaction, pluginAPI);
-  if (!config) return;
 
   const user = interaction.options.getUser("user", true);
   const reason = interaction.options.getString("reason") || "Staff-initiated modmail";
@@ -59,73 +54,65 @@ export async function handleOpen(context: CommandContext, pluginAPI: ModmailPlug
     return;
   }
 
-  // Check if user is banned
-  const isBanned = await pluginAPI.modmailService.isUserBanned(interaction.guildId!, user.id);
-  if (isBanned) {
-    await interaction.editReply({
-      embeds: [ModmailEmbeds.warning("User Banned", `${user.username} is currently banned from using modmail.\n\n` + "Use `/modmail unban` to lift the ban first.")],
-    });
-    return;
-  }
-
-  // Check for existing open modmail
-  const hasOpen = await pluginAPI.modmailService.userHasOpenModmail(interaction.guildId!, user.id);
-  if (hasOpen) {
-    await interaction.editReply({
-      embeds: [ModmailEmbeds.warning("Already Open", `${user.username} already has an open modmail thread.\n\n` + "Close the existing thread before opening a new one.")],
-    });
-    return;
-  }
-
-  // Determine category
-  let resolvedCategoryId = categoryId;
-  if (!resolvedCategoryId) {
-    resolvedCategoryId = config.defaultCategoryId || config.categories[0]?.id;
-  }
-
-  if (!resolvedCategoryId) {
-    await interaction.editReply({
-      embeds: [ModmailEmbeds.error("No Category", "No modmail categories are configured.")],
-    });
-    return;
-  }
-
-  // Verify category exists
-  const category = config.categories.find((cat) => cat.id === resolvedCategoryId);
-  if (!category) {
-    await interaction.editReply({
-      embeds: [ModmailEmbeds.error("Invalid Category", "The selected category does not exist.")],
-    });
-    return;
-  }
-
-  if (!category.enabled) {
-    await interaction.editReply({
-      embeds: [ModmailEmbeds.error("Category Disabled", "The selected category is currently disabled.")],
-    });
-    return;
-  }
-
   try {
     // Get target member for display name
     const targetMember = await pluginAPI.lib.thingGetter.getMember(interaction.guild!, user.id);
     const userDisplayName = targetMember?.displayName || user.displayName || user.username;
 
-    // Create the modmail
-    const result = await pluginAPI.creationService.createModmail({
+    // Create the modmail via shared open orchestration
+    const openResult = await pluginAPI.creationService.openModmail({
       guildId: interaction.guildId!,
       userId: user.id,
       userDisplayName,
       initialMessage: reason,
+      categoryId: categoryId || undefined,
       includeCategoryRoleMentions,
       includeGlobalRoleMentions,
-      categoryId: resolvedCategoryId,
+      duplicatePolicy: "open-or-resolved",
       createdVia: "command",
     });
 
-    if (!result.success) {
+    if (!openResult.success) {
+      switch (openResult.code) {
+        case "user_banned":
+          await interaction.editReply({
+            embeds: [ModmailEmbeds.warning("User Banned", `${user.username} is currently banned from using modmail.\n\nUse \`/modmail unban\` to lift the ban first.`)],
+          });
+          return;
+        case "already_open":
+          await interaction.editReply({
+            embeds: [ModmailEmbeds.warning("Already Open", `${user.username} already has an open or resolved modmail thread.\n\nClose the existing thread before opening a new one.`)],
+          });
+          return;
+        case "invalid_category":
+          await interaction.editReply({
+            embeds: [ModmailEmbeds.error("Invalid Category", openResult.message || "The selected category does not exist.")],
+          });
+          return;
+        case "category_disabled":
+          await interaction.editReply({
+            embeds: [ModmailEmbeds.error("Category Disabled", openResult.message || "The selected category is currently disabled.")],
+          });
+          return;
+        case "no_category":
+          await interaction.editReply({
+            embeds: [ModmailEmbeds.error("No Category", openResult.message || "No modmail categories are configured.")],
+          });
+          return;
+        default:
+          await interaction.editReply({
+            embeds: [ModmailEmbeds.error("Creation Failed", openResult.message || "Failed to create modmail thread.")],
+          });
+          return;
+      }
+    }
+
+    const result = openResult.creationResult;
+    const category = openResult.category;
+
+    if (!result?.success || !category) {
       await interaction.editReply({
-        embeds: [ModmailEmbeds.error("Creation Failed", result.error || "Failed to create modmail thread.")],
+        embeds: [ModmailEmbeds.error("Creation Failed", "Failed to create modmail thread.")],
       });
       return;
     }
@@ -154,7 +141,6 @@ export async function handleOpen(context: CommandContext, pluginAPI: ModmailPlug
         ),
       ],
     });
-    broadcastDashboardChange(interaction.guildId!, "modmail", "conversation_created", { requiredAction: "modmail.view_conversations" });
   } catch (error) {
     log.error("Modmail open error:", error);
     await interaction.editReply({

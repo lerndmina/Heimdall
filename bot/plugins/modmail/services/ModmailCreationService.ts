@@ -13,7 +13,7 @@ import type { Client, ForumChannel, ThreadChannel, Message, Attachment } from "d
 import { ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { ModmailService, CreateModmailData } from "./ModmailService.js";
 import type { ModmailCategoryService } from "./ModmailCategoryService.js";
-import Modmail, { type IModmail, ModmailStatus, MessageType, MessageContext, type MessageAttachment } from "../models/Modmail.js";
+import Modmail, { type IModmail, MessageType, MessageContext, type MessageAttachment } from "../models/Modmail.js";
 import type { IModmailConfig, ModmailCategory } from "../models/ModmailConfig.js";
 import type { PluginLogger } from "../../../src/types/Plugin.js";
 import type { LibAPI } from "../../lib/index.js";
@@ -47,6 +47,39 @@ export interface ModmailCreationResult {
   };
 }
 
+export type DuplicateConversationPolicy = "open-only" | "open-or-resolved";
+
+export interface OpenModmailRequest {
+  guildId: string;
+  userId: string;
+  userDisplayName: string;
+  initialMessage: string;
+  categoryId?: string;
+  initialMessageRef?: CreateModmailData["initialMessageRef"];
+  queuedMessageRefs?: CreateModmailData["queuedMessageRefs"];
+  formResponses?: CreateModmailData["formResponses"];
+  includeCategoryRoleMentions?: boolean;
+  includeGlobalRoleMentions?: boolean;
+  createdVia?: "dm" | "command" | "button" | "api";
+  duplicatePolicy?: DuplicateConversationPolicy;
+}
+
+export interface OpenModmailResult {
+  success: boolean;
+  code?: "not_configured" | "user_banned" | "already_open" | "invalid_category" | "category_disabled" | "no_category" | "creation_failed";
+  message?: string;
+  category?: ModmailCategory;
+  creationResult?: ModmailCreationResult;
+}
+
+export interface OpenEligibilityResult {
+  success: boolean;
+  code?: "not_configured" | "user_banned" | "already_open" | "no_category";
+  message?: string;
+  config?: IModmailConfig;
+  enabledCategories?: ModmailCategory[];
+}
+
 /** Discord DM file-size limit for bots (8 MB) */
 const DM_FILE_SIZE_LIMIT = 8 * 1024 * 1024;
 
@@ -76,6 +109,169 @@ export class ModmailCreationService {
    */
   setFlowService(flowService: ModmailFlowService): void {
     this.flowService = flowService;
+  }
+
+  /**
+   * Shared orchestration for opening modmail across entry points.
+   * Performs preflight policy checks, resolves category, then delegates to createModmail().
+   */
+  async openModmail(request: OpenModmailRequest): Promise<OpenModmailResult> {
+    const duplicatePolicy = request.duplicatePolicy || "open-only";
+    const eligibility = await this.checkOpenEligibility({
+      guildId: request.guildId,
+      userId: request.userId,
+      duplicatePolicy,
+    });
+
+    if (!eligibility.success || !eligibility.config) {
+      return {
+        success: false,
+        code: eligibility.code,
+        message: eligibility.message,
+      };
+    }
+
+    const categoryResolution = this.resolveCategoryForOpen(eligibility.config, request.categoryId);
+    if (!categoryResolution.category) {
+      return {
+        success: false,
+        code: categoryResolution.code,
+        message: categoryResolution.message,
+      };
+    }
+
+    const result = await this.createModmail({
+      guildId: request.guildId,
+      userId: request.userId,
+      userDisplayName: request.userDisplayName,
+      initialMessage: request.initialMessage,
+      categoryId: categoryResolution.category.id,
+      initialMessageRef: request.initialMessageRef,
+      queuedMessageRefs: request.queuedMessageRefs,
+      formResponses: request.formResponses,
+      includeCategoryRoleMentions: request.includeCategoryRoleMentions,
+      includeGlobalRoleMentions: request.includeGlobalRoleMentions,
+      createdVia: request.createdVia,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        code: "creation_failed",
+        message: result.error || result.userMessage || "Failed to create modmail thread.",
+        category: categoryResolution.category,
+        creationResult: result,
+      };
+    }
+
+    return {
+      success: true,
+      category: categoryResolution.category,
+      creationResult: result,
+    };
+  }
+
+  /**
+   * Shared preflight eligibility check for modmail opening.
+   */
+  async checkOpenEligibility(params: { guildId: string; userId: string; duplicatePolicy?: DuplicateConversationPolicy }): Promise<OpenEligibilityResult> {
+    const config = await this.modmailService.getConfig(params.guildId);
+    if (!config) {
+      return {
+        success: false,
+        code: "not_configured",
+        message: "Modmail is not configured in this server.",
+      };
+    }
+
+    const isBanned = await this.modmailService.isUserBanned(params.guildId, params.userId);
+    if (isBanned) {
+      return {
+        success: false,
+        code: "user_banned",
+        message: "You are banned from using modmail in this server.",
+      };
+    }
+
+    const policy = params.duplicatePolicy || "open-only";
+    const hasExisting = await this.hasExistingConversation(params.guildId, params.userId, policy);
+    if (hasExisting) {
+      return {
+        success: false,
+        code: "already_open",
+        message: "You already have an active or recently resolved modmail conversation in this server.",
+      };
+    }
+
+    const enabledCategories = (config.categories as ModmailCategory[]).filter((c) => c.enabled);
+    if (enabledCategories.length === 0) {
+      return {
+        success: false,
+        code: "no_category",
+        message: "No modmail categories are available.",
+      };
+    }
+
+    return {
+      success: true,
+      config,
+      enabledCategories,
+    };
+  }
+
+  private async hasExistingConversation(guildId: string, userId: string, policy: DuplicateConversationPolicy): Promise<boolean> {
+    return this.modmailService.userHasBlockingModmail(guildId, userId, policy);
+  }
+
+  private resolveCategoryForOpen(
+    config: IModmailConfig,
+    categoryId?: string,
+  ): {
+    category: ModmailCategory | null;
+    code: "invalid_category" | "category_disabled" | "no_category";
+    message: string;
+  } {
+    const categories = config.categories as ModmailCategory[];
+
+    if (categoryId) {
+      const specifiedCategory = categories.find((cat) => cat.id === categoryId);
+      if (!specifiedCategory) {
+        return {
+          category: null,
+          code: "invalid_category",
+          message: "The selected category does not exist.",
+        };
+      }
+
+      if (!specifiedCategory.enabled) {
+        return {
+          category: null,
+          code: "category_disabled",
+          message: "The selected category is currently disabled.",
+        };
+      }
+
+      return {
+        category: specifiedCategory,
+        code: "no_category",
+        message: "",
+      };
+    }
+
+    const fallbackCategory = this.determineCategory(config, undefined);
+    if (!fallbackCategory) {
+      return {
+        category: null,
+        code: "no_category",
+        message: "No modmail categories are configured.",
+      };
+    }
+
+    return {
+      category: fallbackCategory,
+      code: "no_category",
+      message: "",
+    };
   }
 
   /**

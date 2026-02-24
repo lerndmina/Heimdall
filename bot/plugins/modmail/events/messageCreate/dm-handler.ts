@@ -311,8 +311,8 @@ async function findEligibleGuilds(client: HeimdallClient, pluginAPI: ModmailPlug
       const isBanned = await pluginAPI.modmailService.isUserBanned(guild.id, userId);
       if (isBanned) continue;
 
-      // Check if user already has open modmail in this guild
-      const hasOpen = await pluginAPI.modmailService.userHasOpenModmail(guild.id, userId);
+      // Check if user already has a blocking modmail in this guild
+      const hasOpen = await pluginAPI.modmailService.userHasBlockingModmail(guild.id, userId, "open-or-resolved");
       if (hasOpen) continue;
 
       eligibleGuilds.push(guild);
@@ -704,7 +704,7 @@ async function createModmailDirectly(client: HeimdallClient, pluginAPI: ModmailP
   });
 
   try {
-    const result = await pluginAPI.creationService.createModmail({
+    const openResult = await pluginAPI.creationService.openModmail({
       guildId: guild.id,
       userId: message.author.id,
       userDisplayName: session.userDisplayName,
@@ -712,13 +712,16 @@ async function createModmailDirectly(client: HeimdallClient, pluginAPI: ModmailP
       initialMessageRef: session.initialMessageRef,
       queuedMessageRefs: session.queuedMessageRefs,
       categoryId,
+      duplicatePolicy: "open-or-resolved",
       createdVia: "dm",
     });
+
+    const result = openResult.creationResult;
 
     // Clean up session
     await pluginAPI.sessionService.deleteSession(sessionId);
 
-    if (result.success && result.metadata) {
+    if (openResult.success && result?.success && result.metadata) {
       // Get category name for confirmation
       const config = await pluginAPI.modmailService.getConfig(guild.id);
       const category = config?.categories?.find((c: { id: string }) => c.id === categoryId);
@@ -736,7 +739,7 @@ async function createModmailDirectly(client: HeimdallClient, pluginAPI: ModmailP
       log.info(`Created modmail ${result.modmailId} for user ${message.author.id} in guild ${guild.id}`);
     } else {
       await loadingReply.edit({
-        embeds: [ModmailEmbeds.error("Creation Failed", result.userMessage || "Failed to create modmail. Please try again.")],
+        embeds: [ModmailEmbeds.error("Creation Failed", result?.userMessage || openResult.message || "Failed to create modmail. Please try again.")],
       });
     }
   } catch (error) {
@@ -775,7 +778,7 @@ async function createModmailFromInteraction(
   });
 
   try {
-    const result = await pluginAPI.creationService.createModmail({
+    const openResult = await pluginAPI.creationService.openModmail({
       guildId: guild.id,
       userId: originalMessage.author.id,
       userDisplayName: session.userDisplayName,
@@ -783,13 +786,16 @@ async function createModmailFromInteraction(
       initialMessageRef: session.initialMessageRef,
       queuedMessageRefs: session.queuedMessageRefs,
       categoryId,
+      duplicatePolicy: "open-or-resolved",
       createdVia: "dm",
     });
+
+    const result = openResult.creationResult;
 
     // Clean up session
     await pluginAPI.sessionService.deleteSession(sessionId);
 
-    if (result.success && result.metadata) {
+    if (openResult.success && result?.success && result.metadata) {
       // Get category name for confirmation
       const config = await pluginAPI.modmailService.getConfig(guild.id);
       const category = config?.categories?.find((c: { id: string }) => c.id === categoryId);
@@ -807,7 +813,7 @@ async function createModmailFromInteraction(
       log.info(`Created modmail ${result.modmailId} for user ${originalMessage.author.id} in guild ${guild.id}`);
     } else {
       await interaction.editReply({
-        embeds: [ModmailEmbeds.error("Creation Failed", result.userMessage || "Failed to create modmail. Please try again.")],
+        embeds: [ModmailEmbeds.error("Creation Failed", result?.userMessage || openResult.message || "Failed to create modmail. Please try again.")],
         components: [],
       });
     }

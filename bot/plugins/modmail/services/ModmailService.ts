@@ -858,6 +858,18 @@ export class ModmailService {
   }
 
   /**
+   * Check if user has a blocking modmail conversation in a guild based on duplicate policy
+   */
+  async userHasBlockingModmail(guildId: string, userId: string, policy: "open-only" | "open-or-resolved"): Promise<boolean> {
+    try {
+      return await Modmail.userHasBlockingModmail(guildId, userId, policy);
+    } catch (error) {
+      this.logger.error(`Failed to check blocking modmail for user ${userId}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Check if user is banned from modmail (via SupportBanService)
    */
   async isUserBanned(guildId: string, userId: string): Promise<boolean> {

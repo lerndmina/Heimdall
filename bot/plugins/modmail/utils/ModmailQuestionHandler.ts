@@ -545,7 +545,7 @@ export class ModmailQuestionHandler {
     });
 
     // Create the modmail
-    const result: ModmailCreationResult = await this.creationService.createModmail({
+    const openResult = await this.creationService.openModmail({
       guildId: session.guildId,
       userId: session.userId,
       userDisplayName: session.userDisplayName,
@@ -554,8 +554,14 @@ export class ModmailQuestionHandler {
       initialMessageRef: session.initialMessageRef,
       queuedMessageRefs: session.queuedMessageRefs,
       formResponses,
+      duplicatePolicy: "open-or-resolved",
       createdVia: "dm",
     });
+
+    const result: ModmailCreationResult = openResult.creationResult || {
+      success: false,
+      userMessage: openResult.message,
+    };
 
     // Delete session
     await this.sessionService.deleteSession(sessionId);
