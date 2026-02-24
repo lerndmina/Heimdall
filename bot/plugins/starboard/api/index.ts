@@ -4,6 +4,7 @@ import { createConfigGetRoutes } from "./config-get.js";
 import { createConfigUpdateRoutes } from "./config-update.js";
 import { createEntriesRoutes } from "./entries.js";
 import { createEmojiRoutes } from "./emojis.js";
+import { createTestingResetRoutes } from "./testing-reset.js";
 
 export type StarboardApiDependencies = Pick<StarboardPluginAPI, "starboardService" | "lib">;
 
@@ -19,6 +20,7 @@ export function createRouter(api: StarboardPluginAPI): Router {
   router.use("/config", createConfigUpdateRoutes(deps));
   router.use("/entries", createEntriesRoutes(deps));
   router.use("/emojis", createEmojiRoutes(deps));
+  router.use("/testing", createTestingResetRoutes(deps));
 
   return router;
 }

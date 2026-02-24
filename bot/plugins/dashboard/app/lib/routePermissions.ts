@@ -143,6 +143,16 @@ const routeMap: Record<string, string> = {
   "DELETE /welcome/config": "welcome.manage_config",
   "POST /welcome/test": "welcome.manage_config",
 
+  // ── Starboard ──
+  "GET /starboard/config": "starboard.view_config",
+  "PUT /starboard/config/boards": "starboard.manage_config",
+  "DELETE /starboard/config/boards/*": "starboard.manage_config",
+  "GET /starboard/entries": "starboard.view_config",
+  "POST /starboard/entries/*/*/approve": "starboard.moderate",
+  "POST /starboard/entries/*/*/deny": "starboard.moderate",
+  "GET /starboard/emojis": "starboard.view_config",
+  "DELETE /starboard/testing/reset-backend": "starboard.manage_config",
+
   // ── Temp VC ──
   "GET /tempvc": "tempvc.view_config",
   "GET /tempvc/config": "tempvc.view_config",

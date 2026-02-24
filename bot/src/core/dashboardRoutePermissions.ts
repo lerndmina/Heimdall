@@ -129,6 +129,7 @@ const routeMap: Record<string, string> = {
   "POST /starboard/entries/*/*/approve": "starboard.moderate",
   "POST /starboard/entries/*/*/deny": "starboard.moderate",
   "GET /starboard/emojis": "starboard.view_config",
+  "DELETE /starboard/testing/reset-backend": "starboard.manage_config",
 
   "GET /tempvc": "tempvc.view_config",
   "GET /tempvc/config": "tempvc.view_config",

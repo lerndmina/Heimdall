@@ -142,17 +142,30 @@ export class StarboardService {
     const normalizedBoardId = normalizeBoardId(boardId);
     if (!normalizedBoardId) return false;
 
-    const config = await StarboardConfigModel.findOneAndUpdate(
-      { guildId, "boards.boardId": normalizedBoardId },
-      { $pull: { boards: { boardId: normalizedBoardId } } },
-      { new: true },
-    );
+    const config = await StarboardConfigModel.findOneAndUpdate({ guildId, "boards.boardId": normalizedBoardId }, { $pull: { boards: { boardId: normalizedBoardId } } }, { new: true });
     if (!config) return false;
 
     await StarboardEntryModel.deleteMany({ guildId, boardId: normalizedBoardId });
 
     broadcastDashboardChange(guildId, "starboard", "config_updated", { requiredAction: "starboard.manage_config" });
     return true;
+  }
+
+  async resetGuildBackendData(guildId: string): Promise<{ deletedConfigs: number; deletedEntries: number }> {
+    const [configResult, entriesResult] = await Promise.all([StarboardConfigModel.deleteMany({ guildId }), StarboardEntryModel.deleteMany({ guildId })]);
+
+    broadcastDashboardChange(guildId, "starboard", "backend_reset", {
+      requiredAction: "starboard.manage_config",
+      data: {
+        deletedConfigs: configResult.deletedCount ?? 0,
+        deletedEntries: entriesResult.deletedCount ?? 0,
+      },
+    });
+
+    return {
+      deletedConfigs: configResult.deletedCount ?? 0,
+      deletedEntries: entriesResult.deletedCount ?? 0,
+    };
   }
 
   async getBoard(guildId: string, boardId: string): Promise<IStarboardBoard | null> {

@@ -9,6 +9,7 @@ import NumberInput from "@/components/ui/NumberInput";
 import Toggle from "@/components/ui/Toggle";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import DiscordEmoji from "@/components/ui/DiscordEmoji";
+import Modal from "@/components/ui/Modal";
 import { fetchApi } from "@/lib/api";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 
@@ -73,6 +74,8 @@ export default function StarboardConfigPage({ guildId }: Props) {
   const [pendingEntries, setPendingEntries] = useState<StarboardEntry[]>([]);
   const [recentEntries, setRecentEntries] = useState<StarboardEntry[]>([]);
   const [serverEmojis, setServerEmojis] = useState<GuildEmoji[]>([]);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const hasBoard = !!board.boardId;
 
@@ -178,6 +181,28 @@ export default function StarboardConfigPage({ guildId }: Props) {
 
     toast.success(action === "approve" ? "Entry approved." : "Entry denied.");
     await fetchConfig();
+  }
+
+  async function resetBackendData() {
+    if (!canManage) return;
+
+    setResetting(true);
+    try {
+      const res = await fetchApi<{ deletedConfigs: number; deletedEntries: number }>(guildId, "starboard/testing/reset-backend", {
+        method: "DELETE",
+      });
+
+      if (!res.success) {
+        toast.error(res.error?.message ?? "Failed to reset starboard backend data.");
+        return;
+      }
+
+      setShowResetModal(false);
+      toast.success(`Starboard backend reset complete (${res.data?.deletedEntries ?? 0} entries removed).`);
+      await fetchConfig();
+    } finally {
+      setResetting(false);
+    }
   }
 
   const topEmojiSuggestions = useMemo(() => serverEmojis.slice(0, 10), [serverEmojis]);
@@ -373,10 +398,7 @@ export default function StarboardConfigPage({ guildId }: Props) {
           ) : (
             <div className="space-y-3">
               {recentEntries.map((entry) => {
-                const postUrl =
-                  entry.starboardChannelId && entry.starboardMessageId
-                    ? `https://discord.com/channels/${guildId}/${entry.starboardChannelId}/${entry.starboardMessageId}`
-                    : null;
+                const postUrl = entry.starboardChannelId && entry.starboardMessageId ? `https://discord.com/channels/${guildId}/${entry.starboardChannelId}/${entry.starboardMessageId}` : null;
 
                 return (
                   <div key={`${entry.boardId}:${entry.sourceMessageId}:${entry.updatedAt}`} className="rounded-xl border border-zinc-700/40 bg-zinc-900/30 p-4 text-sm text-zinc-200">
@@ -401,6 +423,51 @@ export default function StarboardConfigPage({ guildId }: Props) {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Danger Zone</CardTitle>
+            <CardDescription>Testing utility to wipe Starboard database records for this guild.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+            <p className="text-sm text-red-300">This deletes Starboard backend data (configuration and tracked entries) for this guild. Existing Discord messages are not deleted.</p>
+            <button
+              type="button"
+              onClick={() => setShowResetModal(true)}
+              disabled={!canManage || resetting}
+              className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:opacity-50">
+              {resetting ? "Resetting..." : "Reset Starboard Backend Data"}
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Modal
+        open={showResetModal}
+        onClose={() => {
+          if (!resetting) setShowResetModal(false);
+        }}
+        title="Reset Starboard Backend Data"
+        maxWidth="max-w-md"
+        footer={
+          <>
+            <button onClick={() => setShowResetModal(false)} disabled={resetting} className="rounded-lg px-4 py-2 text-sm text-zinc-400 transition hover:bg-white/5 disabled:opacity-50">
+              Cancel
+            </button>
+            <button
+              onClick={() => void resetBackendData()}
+              disabled={!canManage || resetting}
+              className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:opacity-50">
+              {resetting ? "Resetting..." : "Delete Backend Data"}
+            </button>
+          </>
+        }>
+        <p className="text-sm text-zinc-300">This action removes Starboard configuration and entry records for this guild only.</p>
+        <p className="mt-2 text-xs text-zinc-400">Use this for testing resets. Starboard posts already sent in Discord are not removed by this action.</p>
+      </Modal>
     </div>
   );
 }
