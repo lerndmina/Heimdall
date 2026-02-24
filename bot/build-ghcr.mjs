@@ -2,6 +2,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Heimdall — Interactive Docker Build & Publish to GHCR
 // Run:  node build-ghcr.mjs   (or)   bun build-ghcr.mjs
+// CLI:  node build-ghcr.mjs --build-push [--tags latest,v1.2.3] [--platforms linux/amd64]
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createInterface } from "readline/promises";
@@ -226,6 +227,13 @@ function withShaTag(tags) {
   return [...new Set([...stripShaTags(tags), shaTag])];
 }
 
+function parseCsv(value) {
+  return (value || "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
 function localImageExists(ref) {
   return execQuiet(`docker image inspect ${ref}`) !== null;
 }
@@ -290,6 +298,301 @@ async function choose(prompt, options) {
     if (idx >= 0 && idx < options.length) return idx;
     warn("Invalid choice, try again.");
   }
+}
+
+function printCliHelp() {
+  console.log(`
+Heimdall GHCR builder
+
+Usage:
+  node build-ghcr.mjs [flags]
+  bun build-ghcr.mjs [flags]
+
+Modes:
+  --build              Build image only
+  --push               Push existing local image tags
+  --build-push         Build then push
+
+Common flags:
+  --owner <name>       Override GitHub owner/org
+  --repo <name>        Override image repo
+  --platforms <list>   Build platforms (default: config or linux/amd64)
+  --tags <list>        Comma-separated tags (default: config last tags or latest,v<package-version>)
+  --no-sha             Do not include sha-<gitsha> tag on push flows
+  --login              Perform docker login to ghcr.io before operations
+  --pat <token>        PAT for login (write:packages)
+  --yes                Skip interactive confirmations in CLI mode
+  --help               Show this help
+
+Examples:
+  node build-ghcr.mjs --build-push
+  node build-ghcr.mjs --build-push --tags latest,v1.2.0 --platforms linux/amd64,linux/arm64
+  node build-ghcr.mjs --push --tags latest
+`);
+}
+
+function parseCliArgs(argv) {
+  const cli = {
+    build: false,
+    push: false,
+    buildPush: false,
+    owner: null,
+    repo: null,
+    platforms: null,
+    tags: null,
+    includeSha: true,
+    login: false,
+    pat: null,
+    yes: false,
+    help: false,
+  };
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    const next = argv[i + 1];
+
+    switch (arg) {
+      case "--build":
+        cli.build = true;
+        break;
+      case "--push":
+        cli.push = true;
+        break;
+      case "--build-push":
+        cli.buildPush = true;
+        break;
+      case "--owner":
+        cli.owner = next || null;
+        i++;
+        break;
+      case "--repo":
+        cli.repo = next || null;
+        i++;
+        break;
+      case "--platforms":
+        cli.platforms = next || null;
+        i++;
+        break;
+      case "--tags":
+        cli.tags = next || null;
+        i++;
+        break;
+      case "--no-sha":
+        cli.includeSha = false;
+        break;
+      case "--login":
+        cli.login = true;
+        break;
+      case "--pat":
+        cli.pat = next || null;
+        i++;
+        break;
+      case "--yes":
+        cli.yes = true;
+        break;
+      case "-h":
+      case "--help":
+        cli.help = true;
+        break;
+      default:
+        if (arg?.startsWith("--")) {
+          err(`Unknown flag: ${arg}`);
+          cli.help = true;
+        }
+    }
+  }
+
+  if ((cli.build && cli.push) || cli.buildPush) {
+    cli.buildPush = true;
+    cli.build = false;
+    cli.push = false;
+  }
+
+  return cli;
+}
+
+function isCliMode(cli) {
+  return cli.build || cli.push || cli.buildPush || cli.help;
+}
+
+async function loginWithConfig(cfg) {
+  if (!cfg.pat) {
+    err("Cannot login: PAT not set. Provide --pat or run interactive Configure/Login first.");
+    return false;
+  }
+  if (!cfg.owner) {
+    err("Cannot login: owner not set. Provide --owner or run interactive Configure first.");
+    return false;
+  }
+
+  info("Logging in to ghcr.io...");
+  try {
+    execSync(`echo ${cfg.pat} | docker login ghcr.io -u ${cfg.owner} --password-stdin`, {
+      cwd: __dirname,
+      stdio: ["pipe", "inherit", "inherit"],
+    });
+    ok("Successfully logged in to ghcr.io!");
+    return true;
+  } catch {
+    err("Login failed. Check your PAT and username.");
+    return false;
+  }
+}
+
+function resolveDefaultTags(cfg) {
+  const version = getPackageVersion();
+  const remembered = cfg.lastTags ? parseCsv(cfg.lastTags) : [];
+  const tags = remembered.length > 0 ? remembered : ["latest", `v${version}`];
+  return stripShaTags(tags);
+}
+
+async function buildNonInteractive(cfg, { tags, platforms, push }) {
+  if (!(await ensureBuildx())) {
+    return { ok: false, tags: [] };
+  }
+
+  if (!requireDockerRunning()) {
+    return { ok: false, tags: [] };
+  }
+
+  const effectivePlatforms = platforms || cfg.platforms || "linux/amd64";
+  const isMultiPlatform = effectivePlatforms.includes(",");
+  const baseTags = stripShaTags(tags);
+  const tagsToBuild = [...new Set(baseTags)];
+
+  if (isMultiPlatform && !push) {
+    err("Multi-platform builds require --push or --build-push (buildx cannot --load multi-platform images)." );
+    return { ok: false, tags: [] };
+  }
+
+  info(`Image: ghcr.io/${cfg.owner}/${cfg.repo}`);
+  info(`Tags: ${tagsToBuild.join(", ")}`);
+  info(`Platforms: ${effectivePlatforms}`);
+  info(`Mode: ${isMultiPlatform ? "multi-platform buildx" : "single-platform buildx"}`);
+
+  const builderExists = execQuiet("docker buildx inspect heimdall-builder");
+  if (!builderExists) {
+    info("Creating buildx builder instance...");
+    exec("docker buildx create --name heimdall-builder --driver docker-container --use");
+  } else {
+    exec("docker buildx use heimdall-builder");
+  }
+
+  try {
+    if (isMultiPlatform) {
+      const pushTags = withShaTag(tagsToBuild);
+      await streamCmd("docker", ["buildx", "build", "--platform", effectivePlatforms, ...pushTags.flatMap((t) => ["-t", imageRef(cfg, t)]), "--push", "."]);
+      ok("Multi-platform build and push completed.");
+      cfg.lastTags = baseTags.join(",");
+      saveConfig(cfg);
+      execQuiet("docker buildx stop heimdall-builder");
+      return { ok: true, tags: pushTags, pushed: true };
+    }
+
+    await streamCmd("docker", ["buildx", "build", "--platform", effectivePlatforms, "--load", ...tagsToBuild.flatMap((t) => ["-t", imageRef(cfg, t)]), "."]);
+    ok("Build completed.");
+    cfg.lastTags = baseTags.join(",");
+    saveConfig(cfg);
+    return { ok: true, tags: tagsToBuild, pushed: false };
+  } catch (e) {
+    err(`Build failed: ${e.message}`);
+    return { ok: false, tags: [] };
+  }
+}
+
+async function pushNonInteractive(cfg, tags, includeSha = true) {
+  if (!requireDockerRunning()) return false;
+
+  const selectedTags = [...new Set(stripShaTags(tags))];
+  const toPush = includeSha ? withShaTag(selectedTags) : selectedTags;
+
+  for (const tag of toPush) {
+    const ref = imageRef(cfg, tag);
+    if (!localImageExists(ref)) {
+      const canCreate = includeSha && /^sha-[a-f0-9]{7,40}$/i.test(tag) ? ensureLocalTag(cfg, tag, selectedTags) : false;
+      if (!canCreate) {
+        warn(`Skipping ${ref} (local tag does not exist)`);
+        continue;
+      }
+    }
+
+    info(`Pushing ${ref}...`);
+    await streamCmd("docker", ["push", ref]);
+    ok(`Pushed ${ref}`);
+  }
+
+  return true;
+}
+
+async function runCliMode(cli) {
+  if (cli.help) {
+    printCliHelp();
+    return 0;
+  }
+
+  checkDocker();
+
+  const cfg = loadConfig();
+  let changed = false;
+  if (cli.owner && cli.owner !== cfg.owner) {
+    cfg.owner = cli.owner;
+    changed = true;
+  }
+  if (cli.repo && cli.repo !== cfg.repo) {
+    cfg.repo = cli.repo;
+    changed = true;
+  }
+  if (cli.platforms && cli.platforms !== cfg.platforms) {
+    cfg.platforms = cli.platforms;
+    changed = true;
+  }
+  if (cli.pat && cli.pat !== cfg.pat) {
+    cfg.pat = cli.pat;
+    changed = true;
+  }
+  if (changed) saveConfig(cfg);
+
+  if (!cfg.owner || !cfg.repo) {
+    err("Owner/repo are not configured. Use --owner/--repo or run interactive Configure.");
+    return 1;
+  }
+
+  if (cli.login) {
+    const loggedIn = await loginWithConfig(cfg);
+    if (!loggedIn) return 1;
+  }
+
+  const tags = cli.tags ? stripShaTags(parseCsv(cli.tags)) : resolveDefaultTags(cfg);
+  if (tags.length === 0) {
+    err("No tags resolved. Provide --tags or configure default tags first.");
+    return 1;
+  }
+
+  if (cli.buildPush) {
+    const buildResult = await buildNonInteractive(cfg, { tags, platforms: cli.platforms, push: true });
+    if (!buildResult.ok) return 1;
+    if (!buildResult.pushed) {
+      await pushNonInteractive(cfg, buildResult.tags, cli.includeSha);
+    }
+    return 0;
+  }
+
+  if (cli.build) {
+    const buildResult = await buildNonInteractive(cfg, { tags, platforms: cli.platforms, push: false });
+    return buildResult.ok ? 0 : 1;
+  }
+
+  if (cli.push) {
+    if (!cli.login && !isLoggedIntoGhcr()) {
+      err("Not logged in to ghcr.io. Use --login (and optionally --pat) or login manually.");
+      return 1;
+    }
+    await pushNonInteractive(cfg, tags, cli.includeSha);
+    return 0;
+  }
+
+  err("No mode selected. Use --build, --push, or --build-push.");
+  return 1;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -605,6 +908,12 @@ async function actionCleanup(cfg) {
 // Main loop
 // ─────────────────────────────────────────────────────────────────────────────
 async function main() {
+  const cli = parseCliArgs(process.argv.slice(2));
+  if (isCliMode(cli)) {
+    const code = await runCliMode(cli);
+    process.exit(code);
+  }
+
   checkDocker();
   const cfg = loadConfig();
 
