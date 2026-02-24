@@ -52,12 +52,7 @@ export async function buildCommandsPanel(ctx: DevPanelContext): Promise<PanelRes
 
   const deleteBtn = lib
     .createButtonBuilder(async (i: ButtonInteraction) => {
-      const confirmed = await requireConfirmation(
-        i,
-        "Delete All Commands",
-        "DELETE ALL",
-        "This will delete ALL commands from ALL guilds and globally, then re-register /dev to this guild.",
-      );
+      const confirmed = await requireConfirmation(i, "Delete All Commands", "DELETE ALL", "This will delete ALL commands from ALL guilds and globally, then re-register /dev to this guild.");
       if (!confirmed) return;
 
       const clientId = client.user?.id;
