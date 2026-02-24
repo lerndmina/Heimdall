@@ -93,15 +93,23 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
   const [deleteOpener, setDeleteOpener] = useState<SuggestionOpener | null>(null);
   const [deletingOpener, setDeletingOpener] = useState(false);
 
+  // AI key management
+  const [hasAiApiKey, setHasAiApiKey] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [savingApiKey, setSavingApiKey] = useState(false);
+  const [showDeleteApiKeyModal, setShowDeleteApiKeyModal] = useState(false);
+  const [deletingApiKey, setDeletingApiKey] = useState(false);
+
   // ── Fetch ──
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     setNotFound(false);
     try {
-      const [configRes, openersRes] = await Promise.all([
+      const [configRes, openersRes, apiKeyRes] = await Promise.all([
         fetchApi<SuggestionConfig>(guildId, "suggestions/config", { skipCache: true }),
         fetchApi<SuggestionOpener[]>(guildId, "suggestions/openers", { skipCache: true }),
+        fetchApi<{ hasApiKey: boolean }>(guildId, "suggestions/apikey/status", { skipCache: true }),
       ]);
 
       if (configRes.success && configRes.data) {
@@ -113,6 +121,10 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
       }
       if (openersRes.success && openersRes.data) {
         setOpeners(openersRes.data);
+      }
+
+      if (apiKeyRes.success && apiKeyRes.data) {
+        setHasAiApiKey(Boolean(apiKeyRes.data.hasApiKey));
       }
     } catch {
       setError("Failed to connect to API");
@@ -194,6 +206,51 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
       toast.error("Failed to connect to API");
     } finally {
       setDeletingOpener(false);
+    }
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!apiKeyInput.trim()) {
+      toast.error("Please enter an API key");
+      return;
+    }
+
+    setSavingApiKey(true);
+    try {
+      const res = await fetchApi(guildId, "suggestions/apikey", {
+        method: "PUT",
+        body: JSON.stringify({ apiKey: apiKeyInput.trim() }),
+      });
+
+      if (res.success) {
+        setHasAiApiKey(true);
+        setApiKeyInput("");
+        toast.success("Suggestions AI API key saved and encrypted");
+      } else {
+        toast.error(res.error?.message ?? "Failed to save API key");
+      }
+    } catch {
+      toast.error("Failed to connect to API");
+    } finally {
+      setSavingApiKey(false);
+    }
+  };
+
+  const handleDeleteApiKey = async () => {
+    setDeletingApiKey(true);
+    try {
+      const res = await fetchApi(guildId, "suggestions/apikey", { method: "DELETE" });
+      if (res.success) {
+        setHasAiApiKey(false);
+        toast.success("Suggestions AI API key removed");
+      } else {
+        toast.error(res.error?.message ?? "Failed to remove API key");
+      }
+    } catch {
+      toast.error("Failed to connect to API");
+    } finally {
+      setDeletingApiKey(false);
+      setShowDeleteApiKeyModal(false);
     }
   };
 
@@ -286,6 +343,42 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
         </CardContent>
       </Card>
 
+      <Card>
+        <div className="flex items-center justify-between">
+          <CardTitle>AI Title API Key</CardTitle>
+          <StatusBadge variant={hasAiApiKey ? "success" : "neutral"}>{hasAiApiKey ? "Configured" : "Not Configured"}</StatusBadge>
+        </div>
+        <CardDescription className="mt-1">Per-guild encrypted OpenAI key used for AI-generated suggestion titles.</CardDescription>
+        <CardContent>
+          <div className="mt-4 space-y-3">
+            <input
+              type="password"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              disabled={!canManage || savingApiKey}
+              placeholder={hasAiApiKey ? "Enter new key to rotate" : "sk-..."}
+              className="w-full rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-2 text-sm text-zinc-200 outline-none transition focus:border-primary-500 disabled:opacity-50"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleSaveApiKey}
+                disabled={!canManage || savingApiKey}
+                className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-500 disabled:opacity-50">
+                {savingApiKey ? "Saving…" : hasAiApiKey ? "Rotate Key" : "Save Key"}
+              </button>
+              {hasAiApiKey && (
+                <button
+                  onClick={() => setShowDeleteApiKeyModal(true)}
+                  disabled={!canManage}
+                  className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300 transition hover:bg-red-500/20 disabled:opacity-50">
+                  Remove Key
+                </button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Configured channels (read-only) */}
       {config.channels.length > 0 && (
         <Card>
@@ -341,6 +434,26 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
       {canManage && <EditButton onClick={openEditWizard} />}
 
       {/* Delete opener modal */}
+      <Modal
+        open={showDeleteApiKeyModal}
+        onClose={() => setShowDeleteApiKeyModal(false)}
+        title="Remove Suggestions AI Key"
+        footer={
+          <>
+            <button onClick={() => setShowDeleteApiKeyModal(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteApiKey}
+              disabled={deletingApiKey}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50">
+              {deletingApiKey ? "Removing…" : "Remove"}
+            </button>
+          </>
+        }>
+        <p className="text-sm text-zinc-400">Remove the encrypted OpenAI API key for suggestions AI titles in this guild?</p>
+      </Modal>
+
       <Modal
         open={deleteOpener !== null}
         onClose={() => setDeleteOpener(null)}

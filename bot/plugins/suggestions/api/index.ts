@@ -12,13 +12,23 @@ import { createSuggestionStatusRoutes } from "./suggestion-status.js";
 import { createSuggestionStatsRoutes } from "./suggestion-stats.js";
 import { createOpenerRoutes } from "./openers.js";
 import { createCategoryRoutes } from "./categories.js";
+import { createApiKeyRoutes } from "./apikey.js";
 import type { SuggestionsPluginAPI } from "../index.js";
+import type { GuildEnvService } from "../../../src/core/services/GuildEnvService.js";
 
 /** @deprecated Use createRouter instead */
-export type SuggestionsApiDependencies = Pick<SuggestionsPluginAPI, "suggestionService" | "lib">;
+export interface SuggestionsApiDependencies {
+  suggestionService: SuggestionsPluginAPI["suggestionService"];
+  lib: SuggestionsPluginAPI["lib"];
+  guildEnvService: GuildEnvService;
+}
 
 export function createRouter(api: SuggestionsPluginAPI): Router {
-  const deps = { suggestionService: api.suggestionService, lib: api.lib };
+  const deps: SuggestionsApiDependencies = {
+    suggestionService: api.suggestionService,
+    lib: api.lib,
+    guildEnvService: api.guildEnvService,
+  };
   const router = Router({ mergeParams: true });
 
   // GET/PUT   /api/guilds/:guildId/suggestions/config
@@ -39,6 +49,9 @@ export function createRouter(api: SuggestionsPluginAPI): Router {
 
   // CRUD      /api/guilds/:guildId/suggestions/categories
   router.use("/categories", createCategoryRoutes(deps));
+
+  // GET/PUT/DELETE /api/guilds/:guildId/suggestions/apikey
+  router.use("/", createApiKeyRoutes(deps));
 
   return router;
 }

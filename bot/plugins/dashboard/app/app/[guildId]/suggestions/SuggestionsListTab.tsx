@@ -52,7 +52,8 @@ interface SuggestionListResponse {
 
 // ── Constants ────────────────────────────────────────────
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const STATUS_FILTERS = ["all", "pending", "approved", "denied"] as const;
 const SORT_OPTIONS = [
   { value: "createdAt", label: "Newest" },
@@ -75,6 +76,8 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sort, setSort] = useState<string>("createdAt");
   const [page, setPage] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
   // Manage modal
   const [manageTarget, setManageTarget] = useState<Suggestion | null>(null);
@@ -89,8 +92,9 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.set("status", statusFilter);
       params.set("sort", sort);
-      params.set("limit", String(PAGE_SIZE));
-      params.set("offset", String(page * PAGE_SIZE));
+      params.set("limit", String(pageSize));
+      params.set("offset", String(page * pageSize));
+      if (searchQuery.trim()) params.set("q", searchQuery.trim());
 
       const [listRes, statsRes] = await Promise.all([
         fetchApi<SuggestionListResponse>(guildId, `suggestions?${params.toString()}`, { skipCache: true }),
@@ -112,7 +116,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [guildId, statusFilter, sort, page]);
+  }, [guildId, statusFilter, sort, page, pageSize, searchQuery]);
 
   useEffect(() => {
     fetchSuggestions();
@@ -124,9 +128,9 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
 
   useEffect(() => {
     setPage(0);
-  }, [statusFilter, sort]);
+  }, [statusFilter, sort, searchQuery, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // ── Manage (approve/deny) ──
   const handleManage = async () => {
@@ -203,6 +207,12 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
 
       {/* Filters row */}
       <div className="flex flex-wrap items-center gap-3">
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search title, content, reason, or ID"
+          className="min-w-[260px] flex-1 rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-1.5 text-xs text-zinc-200 outline-none transition placeholder:text-zinc-500 focus:border-primary-500"
+        />
         <div className="flex rounded-lg border border-zinc-700/30 overflow-hidden">
           {STATUS_FILTERS.map((s) => (
             <button
@@ -223,13 +233,29 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
             </option>
           ))}
         </select>
+        <select
+          value={String(pageSize)}
+          onChange={(e) => setPageSize(Number(e.target.value) || DEFAULT_PAGE_SIZE)}
+          className="rounded-lg border border-zinc-700/30 bg-white/5 backdrop-blur-sm px-3 py-1.5 text-xs text-zinc-200 outline-none transition focus:border-primary-500">
+          {PAGE_SIZE_OPTIONS.map((size) => (
+            <option key={size} value={size}>
+              {size} / page
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Suggestion list */}
       {suggestions.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center py-12 text-center">
+          <Card className="flex flex-col items-center justify-center py-12 text-center">
           <CardTitle>No Suggestions</CardTitle>
-          <CardDescription className="mt-2 max-w-md">{statusFilter !== "all" ? `No ${statusFilter} suggestions found.` : "No suggestions have been submitted yet."}</CardDescription>
+          <CardDescription className="mt-2 max-w-md">
+            {searchQuery.trim()
+              ? "No suggestions match your search."
+              : statusFilter !== "all"
+                ? `No ${statusFilter} suggestions found.`
+                : "No suggestions have been submitted yet."}
+          </CardDescription>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -298,7 +324,7 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-2">
               <p className="text-xs text-zinc-500">
-                {total} suggestion{total !== 1 ? "s" : ""}
+                Showing {Math.min(total, page * pageSize + 1)}-{Math.min(total, (page + 1) * pageSize)} of {total} suggestion{total !== 1 ? "s" : ""}
               </p>
               <div className="flex items-center gap-2">
                 <button

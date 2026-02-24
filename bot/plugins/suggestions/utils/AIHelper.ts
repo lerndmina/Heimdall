@@ -5,13 +5,16 @@
 
 import { createLogger } from "../../../src/core/Logger.js";
 import type { GuildEnvService } from "../../../src/core/services/GuildEnvService.js";
+import { SUGGESTIONS_OPENAI_KEY_ENV } from "../api/apikey.js";
 
 const log = createLogger("suggestions:ai");
 
 /** Generate a suggestion title using AI. Falls back to truncated text if unavailable. */
 export async function generateAISuggestionTitle(suggestion: string, reason: string, guildId: string, guildEnvService: GuildEnvService): Promise<string> {
   try {
-    const apiKey = await guildEnvService.getEnv(guildId, "OPENAI_API_KEY");
+    const suggestionsApiKey = await guildEnvService.getEnv(guildId, SUGGESTIONS_OPENAI_KEY_ENV);
+    const legacyApiKey = suggestionsApiKey ? null : await guildEnvService.getEnv(guildId, "OPENAI_API_KEY");
+    const apiKey = suggestionsApiKey ?? legacyApiKey;
 
     if (!apiKey) {
       log.debug(`No OpenAI API key found for guild ${guildId}, using fallback title`);
@@ -72,6 +75,8 @@ export function generateFallbackTitle(suggestion: string): string {
 
 /** Check if guild has AI features enabled and API key configured */
 export async function hasAICapabilities(guildId: string, guildEnvService: GuildEnvService): Promise<boolean> {
-  const apiKey = await guildEnvService.getEnv(guildId, "OPENAI_API_KEY");
+  const primary = await guildEnvService.getEnv(guildId, SUGGESTIONS_OPENAI_KEY_ENV);
+  const legacy = primary ? null : await guildEnvService.getEnv(guildId, "OPENAI_API_KEY");
+  const apiKey = primary ?? legacy;
   return !!apiKey;
 }

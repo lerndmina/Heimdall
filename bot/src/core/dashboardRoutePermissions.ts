@@ -84,6 +84,9 @@ const routeMap: Record<string, string> = {
   "PUT /suggestions/categories/reorder": "suggestions.manage_categories",
   "GET /suggestions/openers": "suggestions.manage_config",
   "DELETE /suggestions/openers/*": "suggestions.manage_config",
+  "GET /suggestions/apikey/status": "suggestions.manage_config",
+  "PUT /suggestions/apikey": "suggestions.manage_config",
+  "DELETE /suggestions/apikey": "suggestions.manage_config",
 
   "GET /tags": "tags.view_tags",
   "GET /tags/*": "tags.view_tags",

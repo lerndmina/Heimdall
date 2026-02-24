@@ -27,6 +27,11 @@
  *         schema:
  *           type: string
  *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Case-insensitive search across id/title/suggestion/reason
+ *       - in: query
  *         name: sort
  *         schema:
  *           type: string
@@ -48,6 +53,10 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import type { SuggestionsApiDependencies } from "./index.js";
 import Suggestion, { SuggestionHelper } from "../models/Suggestion.js";
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function createSuggestionsListRoutes(deps: SuggestionsApiDependencies): Router {
   const router = Router({ mergeParams: true });
 
@@ -57,6 +66,7 @@ export function createSuggestionsListRoutes(deps: SuggestionsApiDependencies): R
       const status = req.query.status as string | undefined;
       const channelId = req.query.channelId as string | undefined;
       const userId = req.query.userId as string | undefined;
+      const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const sort = (req.query.sort as string) || "createdAt";
       const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
       const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
@@ -65,6 +75,10 @@ export function createSuggestionsListRoutes(deps: SuggestionsApiDependencies): R
       if (status) filter.status = status;
       if (channelId) filter.channelId = channelId;
       if (userId) filter.userId = userId;
+      if (q) {
+        const regex = new RegExp(escapeRegex(q), "i");
+        filter.$or = [{ id: regex }, { title: regex }, { suggestion: regex }, { reason: regex }];
+      }
 
       const sortObj: Record<string, 1 | -1> = sort === "votes" ? {} : { createdAt: -1 };
 
