@@ -63,6 +63,10 @@ const StarboardBoardSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    postAsEmbed: {
+      type: Boolean,
+      default: true,
+    },
     maxMessageAgeDays: {
       type: Number,
       default: 0,

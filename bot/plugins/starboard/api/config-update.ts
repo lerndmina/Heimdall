@@ -55,6 +55,7 @@ export function createConfigUpdateRoutes(deps: StarboardApiDependencies): Router
         ignoredRoleIds: Array.isArray(board.ignoredRoleIds) ? (board.ignoredRoleIds.filter((v): v is string => typeof v === "string") as string[]) : [],
         requiredRoleIds: Array.isArray(board.requiredRoleIds) ? (board.requiredRoleIds.filter((v): v is string => typeof v === "string") as string[]) : [],
         allowNSFW: typeof board.allowNSFW === "boolean" ? board.allowNSFW : false,
+        postAsEmbed: typeof board.postAsEmbed === "boolean" ? board.postAsEmbed : true,
         maxMessageAgeDays: typeof board.maxMessageAgeDays === "number" ? board.maxMessageAgeDays : 0,
         autoLockThreshold: typeof board.autoLockThreshold === "number" ? board.autoLockThreshold : 0,
         moderationEnabled: typeof board.moderationEnabled === "boolean" ? board.moderationEnabled : false,

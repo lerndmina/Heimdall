@@ -22,6 +22,7 @@ interface StarboardBoard {
   selfStar: boolean;
   removeOnUnreact: boolean;
   allowNSFW: boolean;
+  postAsEmbed: boolean;
   moderationEnabled: boolean;
   moderationChannelId: string | null;
 }
@@ -33,6 +34,8 @@ interface StarboardEntry {
   count: number;
   status: string;
   updatedAt: string;
+  starboardMessageId?: string | null;
+  starboardChannelId?: string | null;
 }
 
 interface GuildEmoji {
@@ -51,6 +54,7 @@ const EMPTY_BOARD: StarboardBoard = {
   selfStar: false,
   removeOnUnreact: true,
   allowNSFW: false,
+  postAsEmbed: true,
   moderationEnabled: false,
   moderationChannelId: null,
 };
@@ -67,6 +71,7 @@ export default function StarboardConfigPage({ guildId }: Props) {
   const [saving, setSaving] = useState(false);
   const [board, setBoard] = useState<StarboardBoard>(EMPTY_BOARD);
   const [pendingEntries, setPendingEntries] = useState<StarboardEntry[]>([]);
+  const [recentEntries, setRecentEntries] = useState<StarboardEntry[]>([]);
   const [serverEmojis, setServerEmojis] = useState<GuildEmoji[]>([]);
 
   const hasBoard = !!board.boardId;
@@ -74,9 +79,10 @@ export default function StarboardConfigPage({ guildId }: Props) {
   const fetchConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const [configRes, pendingRes, emojisRes] = await Promise.all([
+      const [configRes, pendingRes, recentRes, emojisRes] = await Promise.all([
         fetchApi<{ boards: StarboardBoard[] }>(guildId, "starboard/config", { skipCache: true }),
         fetchApi<{ entries: StarboardEntry[] }>(guildId, "starboard/entries?status=pending&limit=25", { skipCache: true }),
+        fetchApi<{ entries: StarboardEntry[] }>(guildId, "starboard/entries?limit=25", { skipCache: true }),
         fetchApi<{ emojis: GuildEmoji[] }>(guildId, "starboard/emojis", { skipCache: true }),
       ]);
 
@@ -87,6 +93,11 @@ export default function StarboardConfigPage({ guildId }: Props) {
 
       if (pendingRes.success) {
         setPendingEntries(pendingRes.data?.entries ?? []);
+      }
+
+      if (recentRes.success) {
+        const entries = recentRes.data?.entries ?? [];
+        setRecentEntries(entries.filter((entry) => entry.status !== "pending"));
       }
 
       if (emojisRes.success) {
@@ -248,6 +259,13 @@ export default function StarboardConfigPage({ guildId }: Props) {
           <Toggle label="Allow self-stars" checked={board.selfStar} onChange={(checked) => setBoard((prev) => ({ ...prev, selfStar: checked }))} disabled={!canManage || saving} />
           <Toggle label="Remove below threshold" checked={board.removeOnUnreact} onChange={(checked) => setBoard((prev) => ({ ...prev, removeOnUnreact: checked }))} disabled={!canManage || saving} />
           <Toggle label="Allow NSFW source channels" checked={board.allowNSFW} onChange={(checked) => setBoard((prev) => ({ ...prev, allowNSFW: checked }))} disabled={!canManage || saving} />
+          <Toggle
+            label="Post as embed"
+            description="When off, the bot forwards the message as plain text instead of using an embed card."
+            checked={board.postAsEmbed}
+            onChange={(checked) => setBoard((prev) => ({ ...prev, postAsEmbed: checked }))}
+            disabled={!canManage || saving}
+          />
 
           <Toggle
             label="Require moderation approval"
@@ -337,6 +355,48 @@ export default function StarboardConfigPage({ guildId }: Props) {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Recent Starboard Entries</CardTitle>
+            <CardDescription>Tracks messages currently linked to the starboard system.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {recentEntries.length === 0 ? (
+            <p className="text-sm text-zinc-400">No posted entries yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {recentEntries.map((entry) => {
+                const postUrl =
+                  entry.starboardChannelId && entry.starboardMessageId
+                    ? `https://discord.com/channels/${guildId}/${entry.starboardChannelId}/${entry.starboardMessageId}`
+                    : null;
+
+                return (
+                  <div key={`${entry.boardId}:${entry.sourceMessageId}:${entry.updatedAt}`} className="rounded-xl border border-zinc-700/40 bg-zinc-900/30 p-4 text-sm text-zinc-200">
+                    <p>
+                      <span className="text-zinc-400">Source:</span> {entry.sourceMessageId}
+                    </p>
+                    <p>
+                      <span className="text-zinc-400">Count:</span> {entry.count}
+                    </p>
+                    <p>
+                      <span className="text-zinc-400">Status:</span> {entry.status}
+                    </p>
+                    {postUrl && (
+                      <a href={postUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex text-xs text-primary-400 transition hover:text-primary-300">
+                        Open Starboard Post
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

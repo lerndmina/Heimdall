@@ -2,10 +2,12 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  Collection,
   EmbedBuilder,
-  type Message,
+  Message,
   type MessageReaction,
   type PartialMessageReaction,
+  type Snowflake,
   type User,
   type PartialUser,
   type GuildMember,
@@ -96,6 +98,7 @@ export class StarboardService {
       ignoredRoleIds: board.ignoredRoleIds ?? [],
       requiredRoleIds: board.requiredRoleIds ?? [],
       allowNSFW: board.allowNSFW ?? false,
+      postAsEmbed: board.postAsEmbed ?? true,
       maxMessageAgeDays: Math.max(0, Number(board.maxMessageAgeDays ?? 0)),
       autoLockThreshold: Math.max(0, Number(board.autoLockThreshold ?? 0)),
       moderationEnabled: board.moderationEnabled ?? false,
@@ -170,20 +173,96 @@ export class StarboardService {
     return StarboardEntryModel.find(query).sort({ updatedAt: -1 }).limit(limit);
   }
 
-  private async getOrCreateEntry(guildId: string, boardId: string, message: Message): Promise<StarboardEntryDocument> {
+  private async getOrCreateEntry(guildId: string, boardId: string, boardChannelId: string, message: Message): Promise<StarboardEntryDocument> {
     const existing = await StarboardEntryModel.findOne({ guildId, boardId, sourceMessageId: message.id });
     if (existing) return existing;
+
+    const sameSourceInChannel = await StarboardEntryModel.find({
+      guildId,
+      sourceMessageId: message.id,
+      starboardChannelId: boardChannelId,
+    }).limit(2);
+
+    if (sameSourceInChannel.length === 1) {
+      const recovered = sameSourceInChannel[0];
+      if (recovered && recovered.boardId !== boardId) {
+        recovered.boardId = boardId;
+        await recovered.save();
+        log.warn(`Re-linked starboard entry ${recovered.id} to board ${boardId} in guild ${guildId}`);
+      }
+      if (recovered) return recovered;
+    }
 
     return StarboardEntryModel.create({
       guildId,
       boardId,
       sourceMessageId: message.id,
       sourceChannelId: message.channelId,
-      status: "posted",
+      status: "pending",
       reactorIds: [],
       count: 0,
       locked: false,
     });
+  }
+
+  private async findExistingStarboardPost(channel: { messages: { fetch: (input: unknown) => Promise<unknown> } }, sourceMessage: Message): Promise<Message | null> {
+    try {
+      const fetched = await channel.messages.fetch({ limit: 50 });
+      if (!(fetched instanceof Collection)) return null;
+
+      for (const candidate of fetched.values()) {
+        if (!(candidate instanceof Message)) continue;
+
+        const matchesFooter = candidate.embeds.some((embed) => (embed.footer?.text ?? "").includes(sourceMessage.id));
+        const matchesForwardUrl = typeof candidate.content === "string" && candidate.content.includes(sourceMessage.url);
+
+        if (matchesFooter || matchesForwardUrl) {
+          return candidate;
+        }
+      }
+    } catch {
+      // ignore fetch/search failures
+    }
+
+    return null;
+  }
+
+  private buildForwardContent(message: Message, board: IStarboardBoard, count: number): string {
+    const lines: string[] = [];
+    lines.push(`${board.emoji} **${count}** in <#${message.channelId}>`);
+    lines.push(`**${message.author.tag}**`);
+
+    if (message.content?.trim()) {
+      lines.push(message.content.trim());
+    }
+
+    const attachmentUrls = message.attachments.map((attachment) => attachment.url).filter(Boolean);
+    if (attachmentUrls.length > 0) {
+      lines.push(...attachmentUrls);
+    }
+
+    lines.push(message.url);
+    return lines.join("\n");
+  }
+
+  private async resolveReactionUsers(reaction: MessageReaction | PartialMessageReaction): Promise<Collection<Snowflake, User> | null> {
+    try {
+      return await reaction.users.fetch();
+    } catch {
+      return null;
+    }
+  }
+
+  private async syncEntryReactionState(entry: StarboardEntryDocument, reaction: MessageReaction | PartialMessageReaction): Promise<void> {
+    const users = await this.resolveReactionUsers(reaction);
+    if (users) {
+      const reactors = users.filter((reactor) => !reactor.bot);
+      entry.reactorIds = Array.from(reactors.keys());
+      entry.count = reactors.size;
+      return;
+    }
+
+    entry.count = entry.reactorIds.length;
   }
 
   private getImageUrlFromMessage(message: Message): string | null {
@@ -231,18 +310,41 @@ export class StarboardService {
       return;
     }
 
-    const embed = this.buildBaseEmbed(sourceMessage, board, entry.count, `${board.emoji} ${board.name}`, 0xfacc15);
-    const row = this.createJumpRow(sourceMessage);
+    const postAsEmbed = board.postAsEmbed ?? true;
+    const embed = postAsEmbed ? this.buildBaseEmbed(sourceMessage, board, entry.count, `${board.emoji} ${board.name}`, 0xfacc15) : null;
+    const row = postAsEmbed ? this.createJumpRow(sourceMessage) : null;
+    const content = postAsEmbed ? undefined : this.buildForwardContent(sourceMessage, board, entry.count);
 
     if (entry.starboardMessageId) {
       const msg = await channel.messages.fetch(entry.starboardMessageId).catch(() => null);
       if (msg) {
-        await msg.edit({ embeds: [embed], components: [row] });
+        await msg.edit({
+          content,
+          embeds: embed ? [embed] : [],
+          components: row ? [row] : [],
+        });
         return;
       }
     }
 
-    const posted = await channel.send({ embeds: [embed], components: [row] });
+    const existingPosted = await this.findExistingStarboardPost(channel as unknown as { messages: { fetch: (input: unknown) => Promise<unknown> } }, sourceMessage);
+    if (existingPosted) {
+      entry.starboardMessageId = existingPosted.id;
+      entry.starboardChannelId = channel.id;
+      await existingPosted.edit({
+        content,
+        embeds: embed ? [embed] : [],
+        components: row ? [row] : [],
+      });
+      if (entry.status === "pending") entry.status = "approved";
+      return;
+    }
+
+    const posted = await channel.send({
+      content,
+      embeds: embed ? [embed] : [],
+      components: row ? [row] : [],
+    });
     entry.starboardMessageId = posted.id;
     entry.starboardChannelId = channel.id;
     if (entry.status === "pending") entry.status = "approved";
@@ -358,12 +460,8 @@ export class StarboardService {
       if (!reactionMatchesEmoji(reaction, board.emoji)) continue;
       if (!this.isEligibleByBoardRules(message, user.id, board)) continue;
 
-      const entry = await this.getOrCreateEntry(message.guildId, board.boardId, message);
-
-      if (!entry.reactorIds.includes(user.id)) {
-        entry.reactorIds.push(user.id);
-      }
-      entry.count = entry.reactorIds.length;
+      const entry = await this.getOrCreateEntry(message.guildId, board.boardId, board.channelId, message);
+      await this.syncEntryReactionState(entry, reaction);
 
       if (entry.count >= board.threshold) {
         const shouldUseModeration = board.moderationEnabled && !!board.moderationChannelId;
@@ -374,7 +472,8 @@ export class StarboardService {
             continue;
           }
 
-          if (entry.status !== "approved" && entry.status !== "posted") {
+          const alreadyPosted = !!entry.starboardMessageId && (entry.status === "approved" || entry.status === "posted");
+          if (!alreadyPosted) {
             entry.status = "pending";
             await this.postOrUpdateModerationMessage(entry, board, message);
           } else {
@@ -415,8 +514,7 @@ export class StarboardService {
       });
       if (!entry) continue;
 
-      entry.reactorIds = entry.reactorIds.filter((id) => id !== user.id);
-      entry.count = entry.reactorIds.length;
+      await this.syncEntryReactionState(entry, reaction);
 
       const belowThreshold = entry.count < board.threshold;
       if (belowThreshold) {
