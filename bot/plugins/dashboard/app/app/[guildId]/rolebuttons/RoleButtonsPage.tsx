@@ -150,6 +150,16 @@ export default function RoleButtonsPage({ guildId }: { guildId: string }) {
       return;
     }
 
+    // Client-side validation: each button needs a label and a role
+    const invalidButtons = (draft.buttons ?? []).reduce<number[]>((acc, btn, i) => {
+      if (!btn.roleId || !btn.label.trim()) acc.push(i + 1);
+      return acc;
+    }, []);
+    if (invalidButtons.length > 0) {
+      toast.error(`Button${invalidButtons.length > 1 ? "s" : ""} ${invalidButtons.join(", ")} ${invalidButtons.length > 1 ? "are" : "is"} missing a required Role or Label.`);
+      return;
+    }
+
     setSaving(true);
     const res = await fetchApi<Panel>(guildId, `rolebuttons/${draft.id}`, {
       method: "PUT",
@@ -315,91 +325,95 @@ export default function RoleButtonsPage({ guildId }: { guildId: string }) {
                 )}
               </div>
 
-              {draft.buttons.map((button, index) => (
-                <div key={button.id} className="space-y-2 rounded-lg border border-zinc-700/30 p-3">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <TextInput
-                      label={`Label #${index + 1}`}
-                      value={button.label}
-                      onChange={(value) => {
-                        const next = [...draft.buttons];
-                        next[index] = { ...button, label: value };
-                        setDraft({ ...draft, buttons: next });
-                      }}
-                      disabled={!canManage}
-                    />
-                    <TextInput
-                      label="Emoji"
-                      value={button.emoji ?? ""}
-                      onChange={(value) => {
-                        const next = [...draft.buttons];
-                        next[index] = { ...button, emoji: value };
-                        setDraft({ ...draft, buttons: next });
-                      }}
-                      disabled={!canManage}
-                    />
-                    <RoleCombobox
-                      guildId={guildId}
-                      value={button.roleId}
-                      onChange={(value) => {
-                        const next = [...draft.buttons];
-                        next[index] = { ...button, roleId: value };
-                        setDraft({ ...draft, buttons: next });
-                      }}
-                      label="Role"
-                      disabled={!canManage}
-                    />
-                    <div className="space-y-1.5">
-                      <p className="text-sm font-medium text-zinc-200">Style</p>
-                      <Combobox
-                        options={styleOptions}
-                        value={String(button.style)}
+              {draft.buttons.map((button, index) => {
+                const isInvalid = !button.roleId || !button.label.trim();
+                return (
+                  <div key={button.id} className={`space-y-2 rounded-lg border p-3 ${isInvalid ? "border-red-500/50 bg-red-500/5" : "border-zinc-700/30"}`}>
+                    {isInvalid && <p className="text-xs text-red-400">Button #{index + 1}: Role and Label are required.</p>}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <TextInput
+                        label={`Label #${index + 1}`}
+                        value={button.label}
                         onChange={(value) => {
                           const next = [...draft.buttons];
-                          next[index] = { ...button, style: Number(value) };
+                          next[index] = { ...button, label: value };
+                          setDraft({ ...draft, buttons: next });
+                        }}
+                        disabled={!canManage}
+                      />
+                      <TextInput
+                        label="Emoji"
+                        value={button.emoji ?? ""}
+                        onChange={(value) => {
+                          const next = [...draft.buttons];
+                          next[index] = { ...button, emoji: value };
+                          setDraft({ ...draft, buttons: next });
+                        }}
+                        disabled={!canManage}
+                      />
+                      <RoleCombobox
+                        guildId={guildId}
+                        value={button.roleId}
+                        onChange={(value) => {
+                          const next = [...draft.buttons];
+                          next[index] = { ...button, roleId: value };
+                          setDraft({ ...draft, buttons: next });
+                        }}
+                        label="Role"
+                        disabled={!canManage}
+                      />
+                      <div className="space-y-1.5">
+                        <p className="text-sm font-medium text-zinc-200">Style</p>
+                        <Combobox
+                          options={styleOptions}
+                          value={String(button.style)}
+                          onChange={(value) => {
+                            const next = [...draft.buttons];
+                            next[index] = { ...button, style: Number(value) };
+                            setDraft({ ...draft, buttons: next });
+                          }}
+                          disabled={!canManage}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-sm font-medium text-zinc-200">Mode</p>
+                        <Combobox
+                          options={modeOptions}
+                          value={button.mode}
+                          onChange={(value) => {
+                            const next = [...draft.buttons];
+                            next[index] = { ...button, mode: value as PanelButton["mode"] };
+                            setDraft({ ...draft, buttons: next });
+                          }}
+                          disabled={!canManage}
+                        />
+                      </div>
+                      <NumberInput
+                        label="Row"
+                        value={button.row}
+                        min={0}
+                        max={4}
+                        onChange={(value) => {
+                          const next = [...draft.buttons];
+                          next[index] = { ...button, row: Number(value) || 0 };
                           setDraft({ ...draft, buttons: next });
                         }}
                         disabled={!canManage}
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <p className="text-sm font-medium text-zinc-200">Mode</p>
-                      <Combobox
-                        options={modeOptions}
-                        value={button.mode}
-                        onChange={(value) => {
-                          const next = [...draft.buttons];
-                          next[index] = { ...button, mode: value as PanelButton["mode"] };
+                    {canManage && (
+                      <button
+                        onClick={() => {
+                          const next = draft.buttons.filter((entry) => entry.id !== button.id);
                           setDraft({ ...draft, buttons: next });
                         }}
-                        disabled={!canManage}
-                      />
-                    </div>
-                    <NumberInput
-                      label="Row"
-                      value={button.row}
-                      min={0}
-                      max={4}
-                      onChange={(value) => {
-                        const next = [...draft.buttons];
-                        next[index] = { ...button, row: Number(value) || 0 };
-                        setDraft({ ...draft, buttons: next });
-                      }}
-                      disabled={!canManage}
-                    />
+                        className="rounded-lg px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10">
+                        Remove Button
+                      </button>
+                    )}
                   </div>
-                  {canManage && (
-                    <button
-                      onClick={() => {
-                        const next = draft.buttons.filter((entry) => entry.id !== button.id);
-                        setDraft({ ...draft, buttons: next });
-                      }}
-                      className="rounded-lg px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10">
-                      Remove Button
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <Toggle label="Exclusive" checked={draft.exclusive} onChange={(checked) => setDraft({ ...draft, exclusive: checked })} disabled={!canManage} />

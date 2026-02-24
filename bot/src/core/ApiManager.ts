@@ -385,9 +385,24 @@ export class ApiManager {
     });
 
     // Global error handler
-    this.app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    this.app.use((err: Error & { name?: string; errors?: Record<string, { message: string; path: string }> }, _req: Request, res: Response, _next: NextFunction) => {
       log.error("[API] Unhandled error:", err);
-      res.status(500).json({ error: "Internal server error" });
+
+      // Handle Mongoose validation errors with structured 400 responses
+      if (err.name === "ValidationError" && err.errors) {
+        const fields = Object.values(err.errors).map((e) => ({ field: e.path, message: e.message }));
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Validation failed: " + fields.map((f) => f.message).join(", "),
+            fields,
+          },
+        });
+        return;
+      }
+
+      res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: "Internal server error" } });
     });
   }
 
