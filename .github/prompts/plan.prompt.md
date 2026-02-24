@@ -1,74 +1,298 @@
-## Plan: Unified dev Panel System
+## Plan: Applications Plugin for Heimdall
 
-The current dev command has standalone subcommands (`mongo-import`, `activity`). This refactors it into a single dev command (no subcommands besides `mongo-import`) that opens an interactive control panel with a main menu and navigable sub-panels.
+**TL;DR** — Build a new `applications` plugin that lets staff create configurable application forms via the dashboard, post customizable apply panels to channels, collect responses through a step-by-step ephemeral in-channel flow (with confirm/edit at each step), post completed applications to a configurable review channel (text or forum), and let staff approve/deny (with optional reasons), manage roles, open linked modmails, and fully manage everything from the dashboard. Depends on `lib`, `support-core` (for bans), and optionally `modmail`.
 
-**Architecture**: A main menu embed with a select menu for navigation + a button row for quick actions. Selecting a category swaps the embed & components to that sub-panel's content. Every sub-panel has a "◀ Back" button to return to the main menu. All panels use ephemeral messages with 15-minute TTL components.
+---
 
-**Steps**
+### Steps
 
-**1. Create `DevPanelContext` type and store core services — index.ts**
+**1. Scaffold the plugin structure**
 
-During `onLoad`, capture `context.commandManager`, `context.client`, `context.redis`, `context.mongoose`, and the `PluginLoader` load info (by reading `context.client.plugins`). Export a `DevPluginAPI` interface extending `PluginAPI` that exposes `commandManager`, `pluginInfo` (Map of loaded plugin manifests), and `getRedis()` / `getMongoose()` accessors. This way activity.ts and the new panels can access these services through `getPluginAPI<DevPluginAPI>("dev")`.
+Create the new plugin directory at bot/plugins/applications/ following the established pattern from existing plugins like rolebuttons/modmail/tickets:
 
-**2. Create panel infrastructure — `bot/plugins/dev/utils/devPanel.ts`**
+```
+applications/
+├── index.ts              (onLoad, onDisable, exports)
+├── manifest.json         (name, deps, apiRoutePrefix: "/applications")
+├── api/
+│   └── index.ts          (dashboard REST routes)
+├── commands/
+│   └── application.ts    (slash command for posting panels)
+├── events/               (cleanup on guild leave if needed)
+├── models/
+│   ├── ApplicationForm.ts    (form template/config)
+│   ├── Application.ts        (submitted application instance)
+│   └── ApplicationSession.ts (in-progress form session, Redis-backed)
+├── services/
+│   ├── ApplicationService.ts       (core CRUD for forms + applications)
+│   ├── ApplicationFlowService.ts   (orchestrates the step-by-step question flow)
+│   └── ApplicationReviewService.ts (approve/deny/modmail/role handling)
+└── utils/
+    ├── ApplicationQuestionHandler.ts (step-by-step ephemeral flow engine)
+    └── ApplicationEmbeds.ts          (embed builders for panels, reviews, confirmations)
+```
 
-A shared framework:
+Manifest declares dependencies: `["lib", "support-core"]` and optionalDependencies: `["modmail"]`.
 
-- `DevPanel` interface: `{ buildEmbed(lib, api): EmbedBuilder, buildComponents(lib, api, refresh, navigateTo): ActionRowBuilder[] }`
-- `buildMainMenu(lib, api, navigateTo)` function that renders the home panel
-- `renderPanel(panelName, ...)` dispatcher that calls the right panel builder
-- All panels receive a `refresh()` callback (re-renders current panel) and a `navigateTo(panelName)` callback (swaps to another panel)
-- Panels: `"main"`, `"activity"`, `"status"`, `"cache"`, `"database"`, `"commands"`, `"debug"`
+---
 
-**3. Create each sub-panel (one file per panel in `bot/plugins/dev/utils/panels/`)**
+**2. Define the `ApplicationForm` model** (models/ApplicationForm.ts)
 
-- **`mainMenu.ts`** — Home embed showing bot name, uptime summary, quick stats. Select menu with options: Bot Status, Activity, Cache/Redis, Database, Commands, Debug. Buttons: none (select menu drives navigation).
+The form template stored per guild, fully configurable from the dashboard. Schema inspired by RoleButtonPanel for embed config and TicketCategory for questions:
 
-- **`statusPanel.ts`** — Embed fields: Uptime, Memory (heapUsed/rss), Guild count, User count (estimated), Shard info, Node.js version, discord.js version. Second embed or field group: Loaded plugins table (name, version, status). Button: [🔄 Refresh Stats]. No destructive actions.
+- `formId` — nanoid identifier
+- `guildId` — guild snowflake
+- `name` — human-readable form name
+- `enabled` — boolean toggle (allows disabling without deletion)
+- `embed` — reuse `RoleButtonEmbedSchema` shape: `{ title, description, color, image, thumbnail, footer, fields[] }` for the apply panel
+- `questions[]` — ordered array of:
+  - `questionId` (nanoid), `type` (enum: `SHORT`, `LONG`, `SELECT_SINGLE`, `SELECT_MULTI`, `BUTTON`, `NUMBER`), `label` (question text shown to user), `description?` (helper text), `required` (default true), `placeholder?`, `options[]?` (for select/button: `{ label, value, emoji?, description? }`), `minLength?`, `maxLength?`, `minValue?`, `maxValue?`
+- `submissionChannelId` — where completed apps are posted
+- `submissionChannelType` — `"text"` or `"forum"`
+- `reviewRoleIds[]` — roles permitted to interact with approve/deny buttons
+- `requiredRoleIds[]` — roles needed to apply
+- `restrictedRoleIds[]` — roles blocked from applying
+- `acceptRoleIds[]` — roles to add on approve
+- `denyRoleIds[]` — roles to add on deny
+- `acceptRemoveRoleIds[]` — roles to remove on approve
+- `denyRemoveRoleIds[]` — roles to remove on deny
+- `pingRoleIds[]` — roles pinged when new application is submitted
+- `cooldownSeconds` — re-apply cooldown after denial (0 = no cooldown)
+- `modmailCategoryId?` — modmail category to use when staff opens a modmail from an application
+- `completionMessage?` — DM sent to applicant on submission
+- `acceptMessage?` — DM sent on approve
+- `denyMessage?` — DM sent on deny
+- `panels[]` — posted panel instances: `{ panelId, channelId, messageId, postedAt, postedBy }`
+- `createdBy`, `createdAt`, `updatedAt`
 
-- **`activityPanel.ts`** — Refactored from current activity.ts. Same functionality (presets, rotation, status, interval), but wrapped in the panel framework with a ◀ Back button added to row 0.
+---
 
-- **`cachePanel.ts`** — Embed: Redis key count (`redis.dbSize()`), memory usage (`redis.info("memory")` → parse `used_memory_human`), a list of known key patterns & their counts (use `redis.keys("pattern*")` for small sets or `SCAN`). Buttons: [🗑️ Purge All Redis] (typed confirmation modal: "PURGE REDIS"), [🧹 Flush Components] (flushes `persistent_component:*` and ephemeral `component:*` keys). Select menu: flush by known category pattern (tickets, modmail, components, etc.).
+**3. Define the `Application` model** (models/Application.ts)
 
-- **`databasePanel.ts`** — Embed: DB name, total collections, total documents (from `mongoose.connection.db.stats()`), data size. Buttons: [☢️ Drop All Data] (typed confirmation modal: "DROP ALL DATA" — calls existing `dropAllCollections()`), [📊 Collection Stats] (sends a follow-up with per-collection doc counts). Note about `/dev mongo-import` for file imports.
+Each submitted application instance. Inspired by Modmail message tracking and Suggestion status flow:
 
-- **`commandsPanel.ts`** — Embed: registered command count (slash + context menu from `commandManager.getStats()`), guild count. Buttons: [🔄 Refresh All Guilds] (calls `commandManager.registerAllCommandsToGuilds()`, shows real-time progress by editing the message per-guild), [🔄 Refresh This Guild] (calls `commandManager.registerCommandsToGuild(interaction.guildId)`), [🗑️ Delete All Commands] (typed confirmation: "DELETE COMMANDS" — iterates guilds with REST.put empty array, then **immediately re-registers** dev to the current guild so the panel stays accessible).
+- `applicationId` — nanoid
+- `applicationNumber` — auto-incrementing per guild (like modmail's `ticketNumber`)
+- `formId` — reference to ApplicationForm
+- `formName` — denormalized for display
+- `guildId`
+- `userId`, `userDisplayName`, `userAvatarUrl` — cached user info
+- `status` — enum: `PENDING`, `APPROVED`, `DENIED`
+- `responses[]` — array of `{ questionId, questionLabel, questionType, value: string | string[] }`
+- `submissionMessageId` — the review message in the staff channel
+- `submissionChannelId`
+- `forumThreadId?` — if using forum mode
+- `reviewedBy?`, `reviewedAt?`, `reviewReason?`
+- `linkedModmailId?` — linked modmail if opened from this app
+- `createdAt`, `updatedAt`
 
-- **`debugPanel.ts`** — Embed: current log level, Sentry status (enabled/DSN configured), WS clients connected, WS guild subscriptions count. Buttons: [🐛 Toggle Debug Logging] (calls `log.configure({ minLevel: ... })`), [🚨 Sentry Test] (calls `captureException(new Error("Dev panel test"))` and confirms), [💓 Health Check] (tests MongoDB ping via `mongoose.connection.db.admin().ping()`, Redis via `redis.ping()`, reports latencies).
+---
 
-**4. Refactor dev command definition — dev.ts**
+**4. Build the ephemeral in-channel question flow** (utils/ApplicationQuestionHandler.ts)
 
-Keep `mongo-import` as a subcommand (needs file upload). Replace `activity` subcommand with a new `panel` subcommand (or just make dev without subcommand open the panel — but since `mongo-import` exists as a subcommand, Discord requires all to be subcommands). So:
+Follow the exact same pattern as ModmailQuestionHandler and TicketQuestionHandler, but adapted for ephemeral in-channel:
 
-- `/dev panel` — opens the main dev panel
-- `/dev mongo-import` — existing file import
+**Session management**: Use Redis-backed ephemeral sessions (key: `app_session:{guildId}:{userId}:{formId}`, TTL 30 min). Tracks current step index and collected responses. Prevents duplicate in-progress applications.
 
-**5. Update subcommand router — index.ts**
+**Flow per question type:**
 
-Route `case "panel"` to a new `handleDevPanel(context)` entry point that builds and replies with the main menu. Remove `case "activity"` (it's now a sub-panel within the dev panel).
+| Type                        | Presentation                                                         | Answer Collection                                                                                                |
+| --------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `SHORT` / `LONG` / `NUMBER` | Ephemeral embed showing question + "📝 Answer" button                | Button click → `showModal()` with appropriate TextInputStyle (Short/Paragraph). Modal submit → confirmation step |
+| `SELECT_SINGLE`             | Ephemeral embed + string select menu (max 25 options)                | Select fires → confirmation step                                                                                 |
+| `SELECT_MULTI`              | Ephemeral embed + string select menu with `setMaxValues()`           | Select fires → confirmation step                                                                                 |
+| `BUTTON`                    | Ephemeral embed + button row (one per option, max 5 per row, max 25) | Button click → confirmation step                                                                                 |
 
-**6. Update `onLoad` — index.ts**
+**Confirmation step** (after each answer): Update the ephemeral message to show the question, the user's answer formatted nicely, and two buttons: "✅ Confirm" and "✏️ Edit". Confirm advances to next question. Edit re-shows the current question.
 
-Store `commandManager`, `redis`, `mongoose` references in module-level variables. Export them through the `DevPluginAPI` so panels can access them. Keep existing activity restoration logic.
+**Batching text questions** (optimization): Consecutive SHORT/LONG/NUMBER questions can be batched into a single modal (up to 5 fields per Discord modal limit), following the ModmailQuestionHandler.ts. Show all answers together in the confirmation step.
 
-**Verification**
+**Final review**: After all questions answered, show a full review embed with all Q&A pairs, plus:
 
-1. `npx tsc --noEmit` — clean build
-2. Bot restart — activity restoration still works
-3. `/dev panel` — main menu renders with all 6 category options in select menu
-4. Navigate to each sub-panel → verify embed content, buttons work, ◀ Back returns to main
-5. Bot Status — shows correct guild count, uptime, plugin list
-6. Activity — all existing functionality preserved (add/delete presets, rotation, status)
-7. Cache — key count displays, purge redis with confirmation modal works
-8. Database — stats display, drop all with confirmation works
-9. Commands — refresh all guilds shows progress, delete all commands then immediately re-registers dev in current guild
-10. Debug — toggle debug logging changes output, sentry test fires, health check pings all services
+- "✅ Submit Application" button
+- "✏️ Edit Answer" button → shows a select menu to pick which question to re-answer
+- "❌ Cancel" button → deletes session, confirms cancellation
 
-**Decisions**
+**Callback pattern**: Use `ComponentCallbackService` ephemeral callbacks (like modmail) with 15-minute TTL. Each step registers the next callback. One persistent handler (`"applications.apply"`) for the initial panel button click.
 
-- `/dev panel` subcommand (not removing subcommands entirely) — `mongo-import` needs file upload which requires slash command options
-- Hybrid UX: select menu for navigation between panels, buttons for actions within panels
-- Dangerous actions use typed-confirmation modals (user must type exact phrase)
-- Delete All Commands immediately re-registers dev to the invoking guild to maintain access
-- Panel state is ephemeral (TTL components) — no persistence needed for the panel itself
-- `PluginLoader` info derived from `client.plugins` map (names/APIs) plus manifests captured at `onLoad` time
+---
+
+**5. Build the review/submission system** (services/ApplicationReviewService.ts)
+
+On submission, create the Application record and post to the configured channel:
+
+**Text channel mode**: Send a rich embed containing:
+
+- Author: applicant's avatar + name
+- Title: "Application #{number} — {formName}"
+- Fields: each Q&A pair as an embed field
+- Footer: application ID + timestamp
+- Below: persistent action button row
+
+**Forum channel mode**: Create a forum thread titled "Application #{number} — {username}" with:
+
+- Opening post: same Q&A embed
+- Action buttons on the opening post
+- Tags for status (Pending/Approved/Denied) if forum supports them
+
+**Action buttons (persistent handlers)**:
+
+- `applications.review.approve` — ✅ Approve (immediate, no reason)
+- `applications.review.deny` — ❌ Deny (immediate, no reason)
+- `applications.review.approve_reason` — ✅ Approve with Reason (opens modal)
+- `applications.review.deny_reason` — ❌ Deny with Reason (opens modal)
+- `applications.review.modmail` — 📬 Open Modmail (creates linked modmail)
+- Button link → Dashboard URL to view the application
+
+**Permission check**: Review actions check if the interacting user has one of the configured `reviewRoleIds`, following the pattern in SuggestionService persistent handler permission checking.
+
+**On approve/deny**:
+
+- Update Application status, `reviewedBy`, `reviewedAt`, `reviewReason`
+- Edit the review message/embed to show new status (color change: green/red, status field)
+- Disable buttons (or replace with status indicator)
+- Apply role changes via the guild member (add `acceptRoleIds`, remove `acceptRemoveRoleIds`, etc.)
+- DM the applicant with the configured message (if set)
+- Broadcast to dashboard via `broadcastDashboardChange()`
+- If forum mode: update thread tags, optionally archive
+
+---
+
+**6. Build the modmail integration** (services/ApplicationReviewService.ts)
+
+When staff clicks "📬 Open Modmail" on a review message:
+
+1. Check if `modmail` plugin is loaded via `context.dependencies.get("modmail")` or `client.plugins.get("modmail")`
+2. Get the modmail creation service from the modmail plugin API
+3. Call `creationService.createModmail()` with:
+   - `guildId`, `userId` (the applicant)
+   - `initialMessage`: "This modmail was opened regarding Application #{number} ({formName})"
+   - `categoryId`: the form's configured `modmailCategoryId`
+   - `formResponses`: the application's Q&A pairs converted to `FormResponse[]` format so they appear in the modmail thread
+   - `createdVia: "api"`
+4. Store the returned `modmailId` on the `Application.linkedModmailId` field
+5. Update the review message to show the modmail link
+6. Reply ephemerally to staff: "Modmail opened — {thread link}"
+
+This avoids modifying the modmail plugin's schema at all. The application reference is visible in the modmail thread via the initial message and form responses.
+
+---
+
+**7. Build the panel posting system** (services/ApplicationService.ts)
+
+Reuse the exact same pattern as RoleButtonService:
+
+- `buildPanelMessage(form)` — constructs the customizable embed from the form's `embed` config + a persistent "Apply" button via `lib.createButtonBuilderPersistent("applications.apply", { formId })`
+- `postPanel(form, channelId, userId)` — sends message, records in `form.panels[]`
+- `updatePostedPanels(form)` — edits all posted panel messages with current embed config
+- `deletePanel(form, panelIndex)` — deletes the Discord message and removes from `panels[]`
+
+---
+
+**8. Build the dashboard API** (api/index.ts)
+
+Following the pattern in rolebuttons/api and modmail/api:
+
+**Form management routes** (`/api/guilds/:guildId/applications/forms/`):
+
+- `GET /` — list all forms
+- `POST /` — create form (body: `{ name }`)
+- `GET /:formId` — get form details
+- `PUT /:formId` — update form (embed, questions, roles, channels, messages)
+- `DELETE /:formId` — delete form + optionally delete all posted panels
+- `POST /:formId/post` — post panel to channel (body: `{ channelId }`)
+- `PUT /:formId/update-posts` — sync all posted panels
+- `DELETE /:formId/posts/:postIndex` — delete a posted panel
+
+**Application management routes** (`/api/guilds/:guildId/applications/submissions/`):
+
+- `GET /` — list submissions (with filters: formId, status, userId, pagination)
+- `GET /:applicationId` — get full application detail
+- `PUT /:applicationId/status` — approve/deny from dashboard (body: `{ status, reason?, reviewedBy }`)
+- `DELETE /:applicationId` — delete application
+- `GET /stats` — aggregate stats (total, pending, approved, denied per form)
+
+**Permission actions** registered via `PermissionRegistry`:
+
+- `applications.manage` — create/edit/delete forms, post panels
+- `applications.review` — approve/deny applications
+- `applications.view` — view applications (read-only dashboard access)
+
+---
+
+**9. Build the dashboard pages** ([dashboard/app/app/[guildId]/applications/](bot/plugins/dashboard/app/app/%5BguildId%5D/applications/))
+
+Following the structure of rolebuttons dashboard page:
+
+**Forms page** (`/[guildId]/applications`):
+
+- Left panel: list of application forms + "Create New" button
+- Right panel: selected form editor with tabs:
+  - **General**: name, enable/disable, submission channel (with type selector), cooldown
+  - **Embed**: full embed editor (reuse the `EmbedEditor` component from rolebuttons — title, description, color, image, thumbnail, footer, fields)
+  - **Questions**: drag-and-drop reorderable question list. Each question card has type selector, label, description, options (for select/button types), validation settings. "Add Question" button with type picker.
+  - **Roles**: configure required, restricted, accept, deny, accept-remove, deny-remove, review, ping roles (using `RoleCombobox` components)
+  - **Messages**: completion/accept/deny message editors
+  - **Modmail**: modmail category selector (only shown if modmail plugin is loaded)
+  - **Live Preview**: rendered embed preview + apply button preview (matching rolebuttons pattern)
+  - **Actions**: Save, Post Panel, Update Posted, Delete
+
+**Submissions page** (`/[guildId]/applications/submissions`):
+
+- `DataTable` of submitted applications with columns: #, applicant, form name, status, date, actions
+- Filters: by form, by status, by date range
+- Click row → expandable detail view showing all Q&A responses
+- Approve/Deny buttons with optional reason modal
+- Link to modmail (if linked)
+- Realtime updates via `useRealtimeEvent("applications:updated", ...)`
+
+**Navigation**: Add "Applications" entry to GuildLayoutShell sidebar, gated behind the `applications` feature flag from the dashboard plugin's feature discovery.
+
+---
+
+**10. Build the slash command** (commands/application.ts)
+
+A simple `/application` command for posting panels from Discord (alternative to dashboard):
+
+- `/application post <form_name> [channel]` — posts the apply panel to the specified (or current) channel
+- `/application list` — lists forms and their status
+
+Most management should happen via the dashboard, so keep the slash command lightweight.
+
+---
+
+**11. Wire up `onLoad` and plugin API** (index.ts)
+
+Following the pattern in modmail/index.ts:
+
+- Instantiate services: `ApplicationService`, `ApplicationFlowService`, `ApplicationReviewService`
+- Register persistent handlers via `componentCallbackService`:
+  - `"applications.apply"` → entry point for the question flow
+  - `"applications.review.approve"` / `"applications.review.deny"` / etc.
+- Register permission actions
+- Export `ApplicationsPluginAPI` with references to services (for modmail or other plugins to access if needed)
+- Wire `modmail` as an optional dependency — if present, enable the "Open Modmail" button
+
+---
+
+### Verification
+
+1. **Unit test the models**: Validate ApplicationForm and Application schemas save/retrieve correctly with all field types
+2. **Test the question flow**: Create a test form with one of each question type. Click Apply, answer each, verify confirm/edit works, verify final review, submit
+3. **Test submission posting**: Verify text channel mode (embed + buttons) and forum channel mode (thread + embed + buttons) both work
+4. **Test review actions**: Approve/deny with and without reasons. Verify role changes, DM messages, embed updates, button disabling
+5. **Test modmail integration**: Click "Open Modmail" on a review. Verify modmail thread is created with application context, and `linkedModmailId` is stored
+6. **Test re-apply cooldown**: Deny an application, verify user cannot re-apply before cooldown expires
+7. **Test role restrictions**: Verify `requiredRoleIds` and `restrictedRoleIds` block/allow correctly
+8. **Dashboard**: Create/edit/delete forms, configure all settings, post panels, review submissions, approve/deny from dashboard
+9. **Build**: Run `npm run build` in bot to verify TypeScript compilation
+
+### Decisions
+
+- **Ephemeral in-channel** over DMs: keeps users in context, avoids DM-closed issues
+- **Configurable text/forum channel** for submissions: flexibility for servers with different workflows
+- **Modmail integration without modifying modmail plugin**: pass application context via `initialMessage` + `formResponses`, store the link only on the Application model
+- **Reuse `RoleButtonEmbedSchema`** for panel embed customization: maintains consistency, reduces code duplication
+- **Batch consecutive text questions into one modal** (up to 5): reduces clicks for forms with many short text questions
+- **Redis-backed ephemeral sessions** for in-progress applications (not MongoDB): fast, auto-expire, appropriate for transient flow state
+- **Persistent handlers for all review buttons**: survive bot restarts, critical for staff actions on applications that may sit for hours/days

@@ -132,7 +132,11 @@ function detectDistro() {
     const idLine = osRelease.split("\n").find((l) => l.startsWith("ID=")) || "";
     const idLike = osRelease.split("\n").find((l) => l.startsWith("ID_LIKE=")) || "";
     const id = idLine.replace(/^ID=/, "").replace(/"/g, "").trim().toLowerCase();
-    const like = idLike.replace(/^ID_LIKE=/, "").replace(/"/g, "").trim().toLowerCase();
+    const like = idLike
+      .replace(/^ID_LIKE=/, "")
+      .replace(/"/g, "")
+      .trim()
+      .toLowerCase();
     if (id === "arch" || like.includes("arch")) return "arch";
     if (["debian", "ubuntu"].includes(id) || like.includes("debian") || like.includes("ubuntu")) return "debian";
     if (["fedora", "rhel", "centos"].includes(id) || like.includes("fedora") || like.includes("rhel")) return "fedora";
@@ -155,9 +159,9 @@ async function ensureBuildx() {
   const distro = isWindows ? "windows" : detectDistro();
 
   const installCmds = {
-    arch:    "sudo pacman -S docker-buildx",
-    debian:  "sudo apt-get install -y docker-buildx-plugin",
-    fedora:  "sudo dnf install -y docker-buildx-plugin",
+    arch: "sudo pacman -S docker-buildx",
+    debian: "sudo apt-get install -y docker-buildx-plugin",
+    fedora: "sudo dnf install -y docker-buildx-plugin",
     windows: null, // install via Docker Desktop
     unknown: null,
   };
@@ -461,7 +465,7 @@ async function buildNonInteractive(cfg, { tags, platforms, push }) {
   const tagsToBuild = [...new Set(baseTags)];
 
   if (isMultiPlatform && !push) {
-    err("Multi-platform builds require --push or --build-push (buildx cannot --load multi-platform images)." );
+    err("Multi-platform builds require --push or --build-push (buildx cannot --load multi-platform images).");
     return { ok: false, tags: [] };
   }
 

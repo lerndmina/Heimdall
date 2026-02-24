@@ -247,14 +247,10 @@ export default function SuggestionsListTab({ guildId }: { guildId: string }) {
 
       {/* Suggestion list */}
       {suggestions.length === 0 ? (
-          <Card className="flex flex-col items-center justify-center py-12 text-center">
+        <Card className="flex flex-col items-center justify-center py-12 text-center">
           <CardTitle>No Suggestions</CardTitle>
           <CardDescription className="mt-2 max-w-md">
-            {searchQuery.trim()
-              ? "No suggestions match your search."
-              : statusFilter !== "all"
-                ? `No ${statusFilter} suggestions found.`
-                : "No suggestions have been submitted yet."}
+            {searchQuery.trim() ? "No suggestions match your search." : statusFilter !== "all" ? `No ${statusFilter} suggestions found.` : "No suggestions have been submitted yet."}
           </CardDescription>
         </Card>
       ) : (

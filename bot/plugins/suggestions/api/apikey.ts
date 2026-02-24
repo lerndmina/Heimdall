@@ -21,10 +21,7 @@ export function createApiKeyRoutes(deps: SuggestionsApiDependencies): Router {
     const guildId = req.params.guildId as string;
 
     try {
-      const [hasSuggestionsKey, hasLegacyKey] = await Promise.all([
-        deps.guildEnvService.hasEnv(guildId, SUGGESTIONS_OPENAI_KEY_ENV),
-        deps.guildEnvService.hasEnv(guildId, "OPENAI_API_KEY"),
-      ]);
+      const [hasSuggestionsKey, hasLegacyKey] = await Promise.all([deps.guildEnvService.hasEnv(guildId, SUGGESTIONS_OPENAI_KEY_ENV), deps.guildEnvService.hasEnv(guildId, "OPENAI_API_KEY")]);
 
       return res.json({
         success: true,
