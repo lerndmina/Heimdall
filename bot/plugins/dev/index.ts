@@ -1,12 +1,42 @@
 import type { PluginContext, PluginAPI, PluginLogger } from "../../src/types/Plugin.js";
+import type { CommandManager } from "../../src/core/CommandManager.js";
+import type { RedisClientType } from "redis";
+import type mongoose from "mongoose";
+import type { HeimdallClient } from "../../src/types/Client.js";
+import type { WebSocketManager } from "../../src/core/WebSocketManager.js";
 import BotActivityModel from "./models/BotActivityModel.js";
 import { activityRotationService, applyPreset } from "./services/ActivityRotationService.js";
 
 export const commands = "./commands";
 export const api = "./api";
 
+// ── Module-level service references for the dev panel ──────────────────────
+let _commandManager: CommandManager;
+let _redis: RedisClientType;
+let _mongoose: typeof mongoose;
+let _client: HeimdallClient;
+let _wsManager: WebSocketManager;
+
+/** Retrieve stored core service references (available after onLoad). */
+export function getDevServices() {
+  return {
+    commandManager: _commandManager,
+    redis: _redis,
+    mongoose: _mongoose,
+    client: _client,
+    wsManager: _wsManager,
+  };
+}
+
 export async function onLoad(context: PluginContext): Promise<PluginAPI> {
-  const { client, logger } = context;
+  const { client, logger, commandManager, redis, mongoose, wsManager } = context;
+
+  // Store references for the dev panel
+  _commandManager = commandManager;
+  _redis = redis;
+  _mongoose = mongoose;
+  _client = client as unknown as HeimdallClient;
+  _wsManager = wsManager;
 
   // ── Restore persisted activity/rotation on startup ───────────────────────
   try {

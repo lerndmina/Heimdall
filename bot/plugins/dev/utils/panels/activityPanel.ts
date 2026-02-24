@@ -1,8 +1,10 @@
 /**
- * /dev activity — Interactive panel for managing the bot's Discord presence.
+ * Activity Panel — Manages the bot's Discord presence (status, presets, rotation).
  *
- * Panel layout (ephemeral, 15-minute TTL):
- *   Row 0  — Buttons: [Add Preset] [Clear Activity] [Toggle Rotation]
+ * Refactored from the original /dev activity subcommand into the unified panel system.
+ *
+ * Panel layout (up to 5 rows):
+ *   Row 0  — Buttons: [◀ Back] [Add Preset] [Clear Activity] [Toggle Rotation]
  *   Row 1  — Select: Online Status
  *   Row 2  — Select: Rotation Interval
  *   Row 3  — Select: Activate a Preset       (only when presets exist)
@@ -18,21 +20,18 @@ import {
   TextInputBuilder,
   TextInputStyle,
   type ButtonInteraction,
-  type ChatInputCommandInteraction,
   type StringSelectMenuInteraction,
 } from "discord.js";
 import { nanoid } from "nanoid";
-import type { CommandContext } from "../../../../src/core/CommandManager.js";
 import type { LibAPI } from "../../../lib/index.js";
 import type { HeimdallClient } from "../../../../src/types/Client.js";
 import BotActivityModel, { type BotActivityConfig, type BotActivityPreset } from "../../models/BotActivityModel.js";
 import { activityRotationService, applyPreset } from "../../services/ActivityRotationService.js";
+import { createBackButton, PANEL_TTL, PanelId, type DevPanelContext, type PanelResult } from "../devPanel.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
-
-const PANEL_TTL = 900; // 15 minutes
 
 const ACTIVITY_TYPE_MAP: Record<string, ActivityType> = {
   playing: ActivityType.Playing,
@@ -130,10 +129,11 @@ function buildEmbed(lib: LibAPI, config: BotActivityConfig | null) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Panel builder — creates all component rows
+// Panel builder
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function buildPanel(lib: LibAPI, client: HeimdallClient, originalInteraction: ChatInputCommandInteraction) {
+export async function buildActivityPanel(ctx: DevPanelContext): Promise<PanelResult> {
+  const { lib, client } = ctx;
   const config = await getConfig();
   const presets = config?.presets ?? [];
   const rotation = config?.rotation ?? { enabled: false, intervalSeconds: 60, currentIndex: 0 };
@@ -142,13 +142,12 @@ async function buildPanel(lib: LibAPI, client: HeimdallClient, originalInteracti
   const embed = buildEmbed(lib, config);
   const components: ActionRowBuilder<any>[] = [];
 
-  /** Re-builds the panel and edits the original ephemeral reply. */
-  const refresh = async () => {
-    const { embeds, components: comps } = await buildPanel(lib, client, originalInteraction);
-    await originalInteraction.editReply({ embeds, components: comps });
-  };
+  /** Re-render this panel in-place. */
+  const refresh = () => ctx.navigate(PanelId.ACTIVITY);
 
-  // ── Row 0 — Buttons ────────────────────────────────────────────────────────
+  // ── Row 0 — Buttons ─────────────────────────────────────────────────────
+
+  const backBtn = await createBackButton(ctx);
 
   const addBtn = lib
     .createButtonBuilder(async (i: ButtonInteraction) => {
@@ -243,10 +242,9 @@ async function buildPanel(lib: LibAPI, client: HeimdallClient, originalInteracti
       } else if (newEnabled && updated.presets.length === 0) {
         // Can't rotate with no presets — revert
         await BotActivityModel.updateOne({ _id: "global" }, { $set: { "rotation.enabled": false } });
-        await originalInteraction.followUp({ content: "⚠️ Add at least one preset before enabling rotation.", ephemeral: true });
+        await ctx.originalInteraction.followUp({ content: "⚠️ Add at least one preset before enabling rotation.", ephemeral: true });
       } else {
         activityRotationService.stop();
-        // Restore the manually active preset if any
         if (updated.activePresetId) {
           const preset = updated.presets.find((p) => p.id === updated.activePresetId);
           if (preset) applyPreset(client, preset, updated.status ?? "online");
@@ -259,17 +257,15 @@ async function buildPanel(lib: LibAPI, client: HeimdallClient, originalInteracti
     .setStyle(rotation.enabled ? ButtonStyle.Secondary : ButtonStyle.Primary);
 
   await Promise.all([addBtn.ready(), clearBtn.ready(), toggleRotationBtn.ready()]);
-  components.push(new ActionRowBuilder<any>().addComponents(addBtn, clearBtn, toggleRotationBtn));
+  components.push(new ActionRowBuilder<any>().addComponents(backBtn, addBtn, clearBtn, toggleRotationBtn));
 
-  // ── Row 1 — Status Select ──────────────────────────────────────────────────
+  // ── Row 1 — Status Select ──────────────────────────────────────────────
 
   const statusSelect = lib
     .createStringSelectMenuBuilder(async (i: StringSelectMenuInteraction) => {
       await i.deferUpdate();
       const newStatus = i.values[0]!;
       await BotActivityModel.updateOne({ _id: "global" }, { $set: { status: newStatus } }, { upsert: true });
-
-      // Apply status immediately — keep existing activity
       client.user.setStatus(newStatus as any);
       await refresh();
     }, PANEL_TTL)
@@ -279,7 +275,7 @@ async function buildPanel(lib: LibAPI, client: HeimdallClient, originalInteracti
   await statusSelect.ready();
   components.push(new ActionRowBuilder<any>().addComponents(statusSelect));
 
-  // ── Row 2 — Interval Select ────────────────────────────────────────────────
+  // ── Row 2 — Interval Select ────────────────────────────────────────────
 
   const currentInterval = rotation.intervalSeconds ?? 60;
   const intervalPlaceholder = INTERVAL_OPTIONS.find((o) => o.value !== "custom" && parseInt(o.value, 10) === currentInterval)?.label ?? `Custom (${formatInterval(currentInterval)})`;
@@ -329,10 +325,9 @@ async function buildPanel(lib: LibAPI, client: HeimdallClient, originalInteracti
   await intervalSelect.ready();
   components.push(new ActionRowBuilder<any>().addComponents(intervalSelect));
 
-  // ── Rows 3 & 4 — Preset selects (only when presets exist) ─────────────────
+  // ── Rows 3 & 4 — Preset selects (only when presets exist) ─────────────
 
   if (presets.length > 0) {
-    // Cap at 25 (Discord select menu limit)
     const visiblePresets = presets.slice(0, 25);
     const activeId = config?.activePresetId ?? null;
 
@@ -342,7 +337,6 @@ async function buildPanel(lib: LibAPI, client: HeimdallClient, originalInteracti
         await i.deferUpdate();
         const presetId = i.values[0]!;
 
-        // Stop rotation — manual activation takes precedence
         activityRotationService.stop();
         await BotActivityModel.updateOne({ _id: "global" }, { $set: { activePresetId: presetId, "rotation.enabled": false } });
 
@@ -388,7 +382,6 @@ async function buildPanel(lib: LibAPI, client: HeimdallClient, originalInteracti
           if (updated.presets.length > 0) {
             activityRotationService.restart(client, updated.presets, updated.rotation.intervalSeconds, updated.status ?? "online");
           } else {
-            // No presets left — disable rotation
             activityRotationService.stop();
             await BotActivityModel.updateOne({ _id: "global" }, { $set: { "rotation.enabled": false } });
             client.user.setActivity();
@@ -412,23 +405,4 @@ async function buildPanel(lib: LibAPI, client: HeimdallClient, originalInteracti
   }
 
   return { embeds: [embed], components };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Entry point
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function handleActivity(context: CommandContext): Promise<void> {
-  const { interaction, client, getPluginAPI } = context;
-
-  const lib = getPluginAPI<LibAPI>("lib");
-  if (!lib) {
-    await interaction.reply({ content: "❌ lib plugin not available.", ephemeral: true });
-    return;
-  }
-
-  await interaction.deferReply({ ephemeral: true });
-
-  const { embeds, components } = await buildPanel(lib, client as unknown as HeimdallClient, interaction);
-  await interaction.editReply({ embeds, components });
 }
