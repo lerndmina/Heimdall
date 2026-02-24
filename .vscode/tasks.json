@@ -4,10 +4,13 @@
     {
       "label": "Build Bot (tsc)",
       "type": "shell",
-      "command": "npm",
+      "command": "/home/wild/.bun/bin/bun",
       "args": ["run", "build"],
       "options": {
-        "cwd": "${workspaceFolder}/bot"
+        "cwd": "${workspaceFolder}/bot",
+        "env": {
+          "NODE_ENV": "production"
+        }
       },
       "isBackground": false,
       "problemMatcher": [],
@@ -16,10 +19,13 @@
     {
       "label": "Build Dashboard",
       "type": "shell",
-      "command": "npm",
+      "command": "/home/wild/.bun/bin/bun",
       "args": ["run", "build:dashboard"],
       "options": {
-        "cwd": "${workspaceFolder}/bot"
+        "cwd": "${workspaceFolder}/bot",
+        "env": {
+          "NODE_ENV": "production"
+        }
       },
       "isBackground": false,
       "problemMatcher": [],
