@@ -10,6 +10,8 @@ const StarboardBoardSchema = new Schema(
     boardId: {
       type: String,
       required: true,
+      trim: true,
+      minlength: 1,
     },
     name: {
       type: String,

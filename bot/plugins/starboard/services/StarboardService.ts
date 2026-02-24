@@ -25,6 +25,12 @@ const log = createLogger("starboard:service");
 
 type OperationResult = { ok: true } | { ok: false; error: string };
 
+function normalizeBoardId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function normalizeEmoji(value: string): string {
   return value.trim();
 }
@@ -49,12 +55,7 @@ function canSendMessages(channel: unknown): channel is { id: string; send: (payl
 }
 
 function canFetchMessages(channel: unknown): channel is { messages: { fetch: (id: string) => Promise<Message> } } {
-  return (
-    typeof channel === "object" &&
-    channel !== null &&
-    "messages" in channel &&
-    typeof (channel as { messages?: { fetch?: unknown } }).messages?.fetch === "function"
-  );
+  return typeof channel === "object" && channel !== null && "messages" in channel && typeof (channel as { messages?: { fetch?: unknown } }).messages?.fetch === "function";
 }
 
 export class StarboardService {
@@ -77,7 +78,7 @@ export class StarboardService {
   }
 
   async upsertBoard(guildId: string, board: Partial<IStarboardBoard> & { boardId?: string }): Promise<StarboardConfigDocument> {
-    const boardId = board.boardId ?? nanoid(10);
+    const boardId = normalizeBoardId(board.boardId) ?? nanoid(10);
     const normalizedBoard = {
       boardId,
       name: (board.name ?? "Starboard").trim(),
@@ -97,15 +98,9 @@ export class StarboardService {
       moderationChannelId: board.moderationChannelId ?? null,
     } satisfies IStarboardBoard;
 
-    const updatedExisting = await StarboardConfigModel.findOneAndUpdate(
-      { guildId, "boards.boardId": boardId },
-      { $set: { "boards.$": normalizedBoard } },
-      { new: true },
-    );
+    const updatedExisting = await StarboardConfigModel.findOneAndUpdate({ guildId, "boards.boardId": boardId }, { $set: { "boards.$": normalizedBoard } }, { new: true });
 
-    const config =
-      updatedExisting ??
-      (await StarboardConfigModel.findOneAndUpdate({ guildId }, { $setOnInsert: { guildId }, $push: { boards: normalizedBoard } }, { new: true, upsert: true }));
+    const config = updatedExisting ?? (await StarboardConfigModel.findOneAndUpdate({ guildId }, { $setOnInsert: { guildId }, $push: { boards: normalizedBoard } }, { new: true, upsert: true }));
 
     if (!config) {
       throw new Error("Failed to upsert starboard configuration");
@@ -116,20 +111,51 @@ export class StarboardService {
     return config;
   }
 
+  private async ensureBoardIds(config: StarboardConfigDocument): Promise<void> {
+    let changed = false;
+    const seen = new Set<string>();
+
+    for (const board of config.boards) {
+      let boardId = normalizeBoardId(board.boardId);
+      if (!boardId || seen.has(boardId)) {
+        boardId = nanoid(10);
+        board.boardId = boardId;
+        changed = true;
+      }
+      seen.add(boardId);
+    }
+
+    if (changed) {
+      await config.save();
+      log.warn(`Repaired invalid starboard board IDs for guild ${config.guildId}`);
+    }
+  }
+
   async removeBoard(guildId: string, boardId: string): Promise<boolean> {
-    const config = await StarboardConfigModel.findOneAndUpdate({ guildId, "boards.boardId": boardId }, { $pull: { boards: { boardId } } }, { new: true });
+    const normalizedBoardId = normalizeBoardId(boardId);
+    if (!normalizedBoardId) return false;
+
+    const config = await StarboardConfigModel.findOneAndUpdate(
+      { guildId, "boards.boardId": normalizedBoardId },
+      { $pull: { boards: { boardId: normalizedBoardId } } },
+      { new: true },
+    );
     if (!config) return false;
 
-    await StarboardEntryModel.deleteMany({ guildId, boardId });
+    await StarboardEntryModel.deleteMany({ guildId, boardId: normalizedBoardId });
 
     broadcastDashboardChange(guildId, "starboard", "config_updated", { requiredAction: "starboard.manage_config" });
     return true;
   }
 
   async getBoard(guildId: string, boardId: string): Promise<IStarboardBoard | null> {
+    const normalizedBoardId = normalizeBoardId(boardId);
+    if (!normalizedBoardId) return null;
+
     const config = await this.getConfig(guildId);
     if (!config) return null;
-    return getBoardById(config, boardId);
+    await this.ensureBoardIds(config);
+    return getBoardById(config, normalizedBoardId);
   }
 
   async getEntries(guildId: string, options?: { status?: string; boardId?: string; limit?: number }): Promise<StarboardEntryDocument[]> {
@@ -321,8 +347,10 @@ export class StarboardService {
 
     const config = await this.getConfig(message.guildId);
     if (!config || config.boards.length === 0) return;
+    await this.ensureBoardIds(config);
 
     for (const board of config.boards) {
+      if (!normalizeBoardId(board.boardId)) continue;
       if (!reactionMatchesEmoji(reaction, board.emoji)) continue;
       if (!this.isEligibleByBoardRules(message, user.id, board)) continue;
 
@@ -370,8 +398,10 @@ export class StarboardService {
 
     const config = await this.getConfig(message.guildId);
     if (!config || config.boards.length === 0) return;
+    await this.ensureBoardIds(config);
 
     for (const board of config.boards) {
+      if (!normalizeBoardId(board.boardId)) continue;
       if (!reactionMatchesEmoji(reaction, board.emoji)) continue;
 
       const entry = await StarboardEntryModel.findOne({

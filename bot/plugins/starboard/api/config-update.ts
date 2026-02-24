@@ -4,6 +4,12 @@ import type { StarboardApiDependencies } from "./index.js";
 export function createConfigUpdateRoutes(deps: StarboardApiDependencies): Router {
   const router = Router({ mergeParams: true });
 
+  const normalizeBoardId = (value: unknown): string | undefined => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  };
+
   router.put("/boards", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const guildId = req.params.guildId as string;
@@ -37,7 +43,7 @@ export function createConfigUpdateRoutes(deps: StarboardApiDependencies): Router
       }
 
       const config = await deps.starboardService.upsertBoard(guildId, {
-        boardId: typeof board.boardId === "string" ? board.boardId : undefined,
+        boardId: normalizeBoardId(board.boardId),
         name: typeof board.name === "string" ? board.name : "Starboard",
         emoji,
         channelId,
