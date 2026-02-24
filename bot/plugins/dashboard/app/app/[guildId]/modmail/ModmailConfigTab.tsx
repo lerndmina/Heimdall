@@ -15,6 +15,7 @@ import NumberInput from "@/components/ui/NumberInput";
 import TextInput from "@/components/ui/TextInput";
 import Toggle from "@/components/ui/Toggle";
 import SetupWizard, { NotConfigured, EditButton, FieldDisplay, ReviewSection, ReviewRow, type WizardStep } from "@/components/ui/SetupWizard";
+import DiscordEmoji from "@/components/ui/DiscordEmoji";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
@@ -298,7 +299,7 @@ export default function ModmailConfigTab({ guildId }: { guildId: string }) {
               {config.categories.map((cat) => (
                 <div key={cat.id} className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-2">
-                    {cat.emoji && <span>{cat.emoji}</span>}
+                    {cat.emoji && <DiscordEmoji value={cat.emoji} size={16} />}
                     <span className="text-sm text-zinc-200">{cat.name}</span>
                     {!cat.enabled && <span className="inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-500">Disabled</span>}
                   </div>

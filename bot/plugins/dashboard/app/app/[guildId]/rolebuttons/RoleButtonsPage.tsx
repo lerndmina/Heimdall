@@ -6,6 +6,7 @@ import TextInput from "@/components/ui/TextInput";
 import Textarea from "@/components/ui/Textarea";
 import Toggle from "@/components/ui/Toggle";
 import NumberInput from "@/components/ui/NumberInput";
+import DiscordEmoji from "@/components/ui/DiscordEmoji";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
 import Combobox from "@/components/ui/Combobox";
@@ -426,7 +427,7 @@ export default function RoleButtonsPage({ guildId }: { guildId: string }) {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {draft.buttons.map((button) => (
                     <span key={button.id} className="rounded-md border border-zinc-700/50 px-2.5 py-1 text-xs text-zinc-200">
-                      {button.emoji ? `${button.emoji} ` : ""}
+                      {button.emoji && <DiscordEmoji value={button.emoji} size={14} className="mr-1" />}
                       {button.label || "Button"}
                     </span>
                   ))}

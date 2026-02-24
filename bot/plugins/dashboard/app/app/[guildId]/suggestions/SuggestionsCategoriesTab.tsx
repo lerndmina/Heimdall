@@ -18,6 +18,7 @@ import Textarea from "@/components/ui/Textarea";
 import Toggle from "@/components/ui/Toggle";
 import Modal from "@/components/ui/Modal";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
+import DiscordEmoji from "@/components/ui/DiscordEmoji";
 import { NotConfigured } from "@/components/ui/SetupWizard";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { fetchApi } from "@/lib/api";
@@ -222,7 +223,7 @@ export default function SuggestionsCategoriesTab({ guildId }: { guildId: string 
             <Card key={cat.id}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {cat.emoji && <span className="text-xl">{cat.emoji}</span>}
+                  {cat.emoji && <DiscordEmoji value={cat.emoji} size={20} />}
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-zinc-200">{cat.name}</p>

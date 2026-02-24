@@ -8,6 +8,7 @@ import TextInput from "@/components/ui/TextInput";
 import NumberInput from "@/components/ui/NumberInput";
 import Toggle from "@/components/ui/Toggle";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
+import DiscordEmoji from "@/components/ui/DiscordEmoji";
 import { fetchApi } from "@/lib/api";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 
@@ -198,6 +199,13 @@ export default function StarboardConfigPage({ guildId }: Props) {
             disabled={!canManage || saving}
           />
 
+          <div className="-mt-2">
+            <p className="text-xs text-zinc-500">Selected emoji</p>
+            <div className="mt-1 inline-flex rounded-lg border border-zinc-700/50 bg-zinc-900/40 px-2 py-1">
+              <DiscordEmoji value={board.emoji} size={16} />
+            </div>
+          </div>
+
           {topEmojiSuggestions.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs text-zinc-500">Server emoji quick pick</p>
@@ -209,7 +217,7 @@ export default function StarboardConfigPage({ guildId }: Props) {
                     onClick={() => setBoard((prev) => ({ ...prev, emoji: emoji.identifier }))}
                     disabled={!canManage || saving}
                     className="rounded-lg border border-zinc-700/50 bg-zinc-900/40 px-2 py-1 text-sm text-zinc-200 transition hover:border-zinc-600 disabled:opacity-50">
-                    {emoji.identifier}
+                    <DiscordEmoji value={emoji.identifier} size={16} withLabel label={emoji.name} />
                   </button>
                 ))}
               </div>
