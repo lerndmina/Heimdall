@@ -529,6 +529,11 @@ export class ApplicationFlowService {
       }
 
       if (interaction.isModalSubmit?.()) {
+        if (interaction.message && !interaction.deferred && !interaction.replied) {
+          await interaction.update(body);
+          return;
+        }
+
         if (!interaction.deferred && !interaction.replied) {
           await interaction.reply(body);
           return;
