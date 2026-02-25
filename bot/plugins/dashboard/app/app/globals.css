@@ -10,17 +10,33 @@
  * Values follow the indigo scale from Tailwind's default palette.
  */
 @theme {
-  --color-primary-50: #eef2ff;
-  --color-primary-100: #e0e7ff;
-  --color-primary-200: #c7d2fe;
-  --color-primary-300: #a5b4fc;
-  --color-primary-400: #818cf8;
-  --color-primary-500: #6366f1;
-  --color-primary-600: #4f46e5;
-  --color-primary-700: #4338ca;
-  --color-primary-800: #3730a3;
-  --color-primary-900: #312e81;
-  --color-primary-950: #1e1b4b;
+  --color-primary-50: #f3f4ff;
+  --color-primary-100: #e8eaff;
+  --color-primary-200: #d4d8ff;
+  --color-primary-300: #b8beff;
+  --color-primary-400: #8f98ff;
+  --color-primary-500: #7280ff;
+  --color-primary-600: #5865f2;
+  --color-primary-700: #4a56d4;
+  --color-primary-800: #3c45aa;
+  --color-primary-900: #2d347f;
+  --color-primary-950: #1f244f;
+
+  --color-ui-bg-canvas: #1e1f22;
+  --color-ui-bg-subtle: #232428;
+  --color-ui-bg-surface: #2b2d31;
+  --color-ui-bg-surface-hover: #32343a;
+  --color-ui-bg-overlay: #111214cc;
+  --color-ui-border: #3f4147;
+  --color-ui-border-strong: #4b4d55;
+  --color-ui-text-primary: #f2f3f5;
+  --color-ui-text-muted: #b5bac1;
+  --color-ui-text-faint: #949ba4;
+  --color-ui-danger: #ed4245;
+  --color-ui-success: #3ba55c;
+  --color-ui-scrollbar-track: #1f2024;
+  --color-ui-scrollbar-thumb: #3f4147;
+  --color-ui-scrollbar-thumb-hover: #4b4d55;
 
   /* Animation delays */
   --animate-delay-1000: 1000ms;
@@ -40,5 +56,77 @@
 
   .animation-delay-3000 {
     animation-delay: var(--animate-delay-3000);
+  }
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--color-ui-bg-canvas);
+    color: var(--color-ui-text-primary);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ui-scrollbar-thumb) var(--color-ui-scrollbar-track);
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--color-ui-scrollbar-track);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-ui-scrollbar-thumb);
+    border-radius: 999px;
+    border: 2px solid var(--color-ui-scrollbar-track);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ui-scrollbar-thumb-hover);
+  }
+}
+
+@layer components {
+  .ui-surface {
+    background: var(--color-ui-bg-surface);
+    border-color: color-mix(in srgb, var(--color-ui-border) 70%, transparent);
+  }
+
+  .ui-surface-hover {
+    transition: background-color 150ms ease, border-color 150ms ease;
+  }
+
+  .ui-surface-hover:hover {
+    background: var(--color-ui-bg-surface-hover);
+    border-color: color-mix(in srgb, var(--color-ui-border-strong) 65%, transparent);
+  }
+
+  .ui-panel-flat {
+    background: color-mix(in srgb, var(--color-ui-bg-surface) 92%, black 8%);
+    border-color: color-mix(in srgb, var(--color-ui-border) 70%, transparent);
+  }
+
+  .ui-input {
+    background: var(--color-ui-bg-subtle);
+    border-color: var(--color-ui-border);
+    color: var(--color-ui-text-primary);
+  }
+
+  .ui-input::placeholder {
+    color: var(--color-ui-text-faint);
+  }
+
+  .ui-input:focus {
+    border-color: var(--color-primary-600);
+  }
+
+  .ui-input-error {
+    border-color: var(--color-ui-danger);
   }
 }

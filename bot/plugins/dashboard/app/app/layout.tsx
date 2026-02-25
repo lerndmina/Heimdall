@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-linear-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-zinc-100 antialiased">
+      <body className="min-h-screen bg-ui-bg-canvas text-ui-text-primary antialiased">
         <AnimatedBackground />
 
         <div className="relative z-10">
@@ -26,10 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           position="bottom-right"
           toastOptions={{
             style: {
-              background: "rgba(24, 24, 27, 0.8)",
-              backdropFilter: "blur(16px)",
-              border: "1px solid rgba(63, 63, 70, 0.3)",
-              color: "#f4f4f5",
+              background: "var(--color-ui-bg-surface)",
+              border: "1px solid color-mix(in srgb, var(--color-ui-border) 70%, transparent)",
+              color: "var(--color-ui-text-primary)",
             },
           }}
         />

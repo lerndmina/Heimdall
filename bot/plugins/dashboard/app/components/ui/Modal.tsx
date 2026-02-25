@@ -31,12 +31,12 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
   if (!open) return null;
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className={`mx-4 w-full ${maxWidth} rounded-2xl border border-zinc-700/30 bg-zinc-900/70 shadow-2xl shadow-black/50 backdrop-blur-2xl`}>
+    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-ui-bg-overlay)]">
+      <div className={`ui-panel-flat mx-4 w-full ${maxWidth} rounded-2xl border`}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-700/30 px-6 py-4">
-          <h2 className="text-lg font-semibold text-zinc-100">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
+        <div className="flex items-center justify-between border-b border-[color-mix(in_srgb,var(--color-ui-border)_70%,transparent)] px-6 py-4">
+          <h2 className="text-lg font-semibold text-[var(--color-ui-text-primary)]">{title}</h2>
+          <button onClick={onClose} className="rounded-lg p-1 text-[var(--color-ui-text-faint)] transition hover:bg-[var(--color-ui-bg-surface-hover)] hover:text-[var(--color-ui-text-primary)]">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -47,7 +47,7 @@ export default function Modal({ open, onClose, title, children, footer, maxWidth
         <div className="max-h-[70vh] overflow-y-auto px-6 py-4">{children}</div>
 
         {/* Footer */}
-        {footer && <div className="flex items-center justify-end gap-3 border-t border-zinc-700/30 px-6 py-4">{footer}</div>}
+        {footer && <div className="flex items-center justify-end gap-3 border-t border-[color-mix(in_srgb,var(--color-ui-border)_70%,transparent)] px-6 py-4">{footer}</div>}
       </div>
     </div>
   );

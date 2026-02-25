@@ -144,10 +144,10 @@ export default function Combobox({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm outline-none transition ${
-          error ? "border-red-500 ring-1 ring-red-500/30" : open ? "border-primary-500 ring-1 ring-primary-500" : "border-zinc-700 hover:border-zinc-600"
-        } bg-white/5 backdrop-blur-sm ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
-        <span className={`flex items-center gap-1.5 ${selectedOption ? "text-zinc-100" : "text-zinc-500"}`}>
+        className={`ui-input flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm outline-none transition ${
+          error ? "ui-input-error ring-1 ring-[color-mix(in_srgb,var(--color-ui-danger)_30%,transparent)]" : open ? "border-primary-600 ring-1 ring-[color-mix(in_srgb,var(--color-primary-600)_35%,transparent)]" : "hover:border-ui-border-strong"
+        } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+        <span className={`flex items-center gap-1.5 ${selectedOption ? "text-ui-text-primary" : "text-ui-text-faint"}`}>
           {loading ? (
             "Loading…"
           ) : selectedOption ? (
@@ -161,7 +161,7 @@ export default function Combobox({
           )}
         </span>
         {/* Chevron */}
-        <svg className={`ml-2 h-4 w-4 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`ml-2 h-4 w-4 shrink-0 text-ui-text-faint transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -169,7 +169,7 @@ export default function Combobox({
       {/* Popover — rendered via portal to escape overflow containers */}
       {open &&
         createPortal(
-          <div ref={popoverRef} style={popoverStyle} className="rounded-lg border border-zinc-700/30 bg-zinc-900/90 shadow-xl shadow-black/40 backdrop-blur-2xl" onKeyDown={handleKeyDown}>
+          <div ref={popoverRef} style={popoverStyle} className="ui-panel-flat rounded-lg border" onKeyDown={handleKeyDown}>
             {/* Refresh button */}
             {onRefresh && (
               <button
@@ -178,7 +178,7 @@ export default function Combobox({
                   e.stopPropagation();
                   onRefresh();
                 }}
-                className="flex w-full items-center gap-2 border-b border-zinc-700/30 px-3 py-2 text-xs text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200">
+                className="flex w-full items-center gap-2 border-b border-[color-mix(in_srgb,var(--color-ui-border)_70%,transparent)] px-3 py-2 text-xs text-ui-text-faint transition hover:bg-ui-bg-surface-hover hover:text-ui-text-primary">
                 <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
@@ -187,8 +187,8 @@ export default function Combobox({
             )}
 
             {/* Search input */}
-            <div className="flex items-center gap-2 border-b border-zinc-700/30 px-3 py-2">
-              <svg className="h-4 w-4 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-2 border-b border-[color-mix(in_srgb,var(--color-ui-border)_70%,transparent)] px-3 py-2">
+              <svg className="h-4 w-4 shrink-0 text-ui-text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -197,13 +197,13 @@ export default function Combobox({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 outline-none"
+                className="w-full bg-transparent text-sm text-ui-text-primary placeholder-ui-text-faint outline-none"
               />
             </div>
 
             {/* List */}
             <div ref={listRef} className="max-h-52 overflow-y-auto p-1">
-              {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-zinc-500">{emptyMessage}</p>}
+              {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-ui-text-faint">{emptyMessage}</p>}
               {filtered.map((opt, i) => {
                 const isSelected = opt.value === value;
                 const isHighlighted = i === highlightIndex;
@@ -213,7 +213,7 @@ export default function Combobox({
                     type="button"
                     onClick={() => select(opt.value)}
                     onMouseEnter={() => setHighlightIndex(i)}
-                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition ${isHighlighted ? "bg-white/10 text-zinc-100" : "text-zinc-300 hover:bg-white/5"}`}>
+                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition ${isHighlighted ? "bg-ui-bg-surface-hover text-ui-text-primary" : "text-ui-text-muted hover:bg-ui-bg-surface-hover"}`}>
                     {/* Checkmark */}
                     <svg className={`h-4 w-4 shrink-0 ${isSelected ? "text-primary-400" : "text-transparent"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
