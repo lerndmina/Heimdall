@@ -14,6 +14,36 @@ const DEFAULT_DENY_MESSAGE = "Your application #{application_number} for {form_n
 const DEFAULT_COMPLETION_MESSAGE_EMBED = { description: DEFAULT_COMPLETION_MESSAGE, color: "#5865f2" };
 const DEFAULT_ACCEPT_MESSAGE_EMBED = { description: DEFAULT_ACCEPT_MESSAGE, color: "#57f287" };
 const DEFAULT_DENY_MESSAGE_EMBED = { description: DEFAULT_DENY_MESSAGE, color: "#ed4245" };
+const APPLICATION_TEXT_LIMIT = 2000;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function sanitizeQuestions(rawQuestions: unknown): unknown[] {
+  if (!Array.isArray(rawQuestions)) return [];
+
+  return rawQuestions.map((question) => {
+    if (!question || typeof question !== "object") return question;
+
+    const nextQuestion = { ...(question as Record<string, unknown>) };
+    const hasMinLength = typeof nextQuestion.minLength === "number" && Number.isFinite(nextQuestion.minLength as number);
+    const hasMaxLength = typeof nextQuestion.maxLength === "number" && Number.isFinite(nextQuestion.maxLength as number);
+
+    const minLength = hasMinLength ? clamp(Math.trunc(nextQuestion.minLength as number), 0, APPLICATION_TEXT_LIMIT) : undefined;
+    const maxLength = hasMaxLength ? clamp(Math.trunc(nextQuestion.maxLength as number), 1, APPLICATION_TEXT_LIMIT) : undefined;
+
+    if (typeof minLength === "number") {
+      nextQuestion.minLength = typeof maxLength === "number" ? Math.min(minLength, maxLength) : minLength;
+    }
+
+    if (typeof maxLength === "number") {
+      nextQuestion.maxLength = typeof minLength === "number" ? Math.max(maxLength, minLength) : maxLength;
+    }
+
+    return nextQuestion;
+  });
+}
 
 export interface CreateFormInput {
   guildId: string;
@@ -86,7 +116,7 @@ export class ApplicationService {
     if (updates.name !== undefined) payload.name = String(updates.name).trim();
     if (updates.enabled !== undefined) payload.enabled = !!updates.enabled;
     if (updates.embed !== undefined) payload.embed = updates.embed;
-    if (updates.questions !== undefined) payload.questions = Array.isArray(updates.questions) ? updates.questions : [];
+    if (updates.questions !== undefined) payload.questions = sanitizeQuestions(updates.questions);
     if (updates.submissionChannelId !== undefined) payload.submissionChannelId = updates.submissionChannelId || null;
     if (updates.submissionChannelType !== undefined) payload.submissionChannelType = updates.submissionChannelType;
     if (updates.reviewRoleIds !== undefined) payload.reviewRoleIds = Array.isArray(updates.reviewRoleIds) ? updates.reviewRoleIds : [];

@@ -10,8 +10,8 @@ const ApplicationAnswerSchema = new Schema(
       required: true,
       enum: ["short", "long", "select_single", "select_multi", "button", "number"],
     },
-    value: { type: String },
-    values: { type: [String], default: undefined },
+    value: { type: String, trim: true, maxlength: 2000 },
+    values: { type: [{ type: String, trim: true, maxlength: 2000 }], default: undefined },
   },
   { _id: false },
 );

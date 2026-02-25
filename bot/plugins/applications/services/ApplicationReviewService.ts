@@ -16,7 +16,7 @@ import type { HeimdallClient } from "../../../src/types/Client.js";
 import type { ModmailPluginAPI } from "../../modmail/index.js";
 import type { ApplicationSession } from "./ApplicationSessionService.js";
 import { ApplicationService } from "./ApplicationService.js";
-import { buildReviewComponents, buildSubmissionEmbed } from "../utils/ApplicationEmbeds.js";
+import { buildReviewComponents, buildSubmissionEmbeds } from "../utils/ApplicationEmbeds.js";
 import { formatApplicationMessage, formatApplicationMessageEmbed, hasApplicationMessageEmbedContent } from "../utils/messagePlaceholders.js";
 
 export class ApplicationReviewService {
@@ -56,7 +56,7 @@ export class ApplicationReviewService {
 
     const dashboardUrl = process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/${form.guildId}/applications` : undefined;
     const components = await buildReviewComponents(this.lib, submission.applicationId, dashboardUrl, false);
-    const embed = buildSubmissionEmbed(this.lib, submission as any);
+    const embeds = buildSubmissionEmbeds(this.lib, submission as any);
 
     const roleMentions = Array.isArray(form.pingRoleIds) && form.pingRoleIds.length > 0 ? form.pingRoleIds.map((id: string) => `<@&${id}>`).join(" ") : "";
 
@@ -67,7 +67,7 @@ export class ApplicationReviewService {
         name: `Application #${submission.applicationNumber} — ${session.userDisplayName}`,
         message: {
           content: roleMentions || undefined,
-          embeds: [embed],
+          embeds,
           components: components as any,
         },
       });
@@ -82,7 +82,7 @@ export class ApplicationReviewService {
       if (!targetChannel.isTextBased()) return { success: false, error: "Configured submission channel is not text-based" };
       const message = await targetChannel.send({
         content: roleMentions || undefined,
-        embeds: [embed],
+        embeds,
         components: components as any,
       } as any);
 
@@ -355,8 +355,8 @@ export class ApplicationReviewService {
 
     const dashboardUrl = process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/${guildId}/applications` : undefined;
     const components = await buildReviewComponents(this.lib, submission.applicationId, dashboardUrl, submission.status !== "pending");
-    const embed = buildSubmissionEmbed(this.lib, submission as any);
+    const embeds = buildSubmissionEmbeds(this.lib, submission as any);
 
-    await message.edit({ embeds: [embed], components: components as any }).catch(() => null);
+    await message.edit({ embeds, components: components as any }).catch(() => null);
   }
 }

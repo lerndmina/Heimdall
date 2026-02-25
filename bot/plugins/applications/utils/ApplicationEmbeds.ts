@@ -8,6 +8,14 @@ export function toAnswerText(value?: string | null, values?: string[] | null): s
   return "_No answer_";
 }
 
+function chunkArray<T>(values: T[], chunkSize: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += chunkSize) {
+    chunks.push(values.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
 export async function buildReviewComponents(lib: LibAPI, applicationId: string, dashboardUrl?: string, disabled = false): Promise<ActionRowBuilder<MessageActionRowComponentBuilder>[]> {
   const approveButton = lib.createButtonBuilderPersistent("applications.review.approve", { applicationId });
   approveButton.setLabel("Approve").setEmoji("✅").setStyle(ButtonStyle.Success).setDisabled(disabled);
@@ -45,38 +53,79 @@ export async function buildReviewComponents(lib: LibAPI, applicationId: string, 
   return [firstRow, secondRow];
 }
 
-export function buildSubmissionEmbed(lib: LibAPI, submission: IApplicationSubmission): ReturnType<LibAPI["createEmbedBuilder"]> {
-  const embed = lib
-    .createEmbedBuilder()
-    .setTitle(`Application #${submission.applicationNumber} — ${submission.formName}`)
-    .setColor(submission.status === "approved" ? "Green" : submission.status === "denied" ? "Red" : "Blurple")
-    .setTimestamp(new Date(submission.createdAt || Date.now()))
-    .setFooter({ text: `Application ID: ${submission.applicationId}` });
-
-  embed.setAuthor({
-    name: submission.userDisplayName,
-    iconURL: submission.userAvatarUrl || undefined,
-  });
-
-  const fields: APIEmbedField[] = submission.responses.slice(0, 25).map((response) => ({
+export function buildSubmissionEmbeds(lib: LibAPI, submission: IApplicationSubmission): ReturnType<LibAPI["createEmbedBuilder"]>[] {
+  const responseFields: APIEmbedField[] = submission.responses.map((response) => ({
     name: response.questionLabel,
     value: toAnswerText(response.value, response.values).slice(0, 1024),
     inline: false,
   }));
 
-  if (fields.length > 0) embed.addFields(fields);
+  const responseChunks = chunkArray(responseFields, 25);
+  const color = submission.status === "approved" ? "Green" : submission.status === "denied" ? "Red" : "Blurple";
+  const embeds: ReturnType<LibAPI["createEmbedBuilder"]>[] = [];
 
+  const totalResponseEmbeds = Math.max(1, responseChunks.length);
+  for (let index = 0; index < totalResponseEmbeds; index += 1) {
+    const embed = lib
+      .createEmbedBuilder()
+      .setTitle(
+        totalResponseEmbeds > 1
+          ? `Application #${submission.applicationNumber} — ${submission.formName} (${index + 1}/${totalResponseEmbeds})`
+          : `Application #${submission.applicationNumber} — ${submission.formName}`,
+      )
+      .setColor(color)
+      .setTimestamp(new Date(submission.createdAt || Date.now()))
+      .setFooter({ text: `Application ID: ${submission.applicationId}` });
+
+    if (index === 0) {
+      embed.setAuthor({
+        name: submission.userDisplayName,
+        iconURL: submission.userAvatarUrl || undefined,
+      });
+    }
+
+    const responseChunk = responseChunks[index] ?? [];
+    if (responseChunk.length > 0) {
+      embed.addFields(responseChunk);
+    }
+
+    embeds.push(embed);
+  }
+
+  const metaFields: APIEmbedField[] = [];
   if (submission.status !== "pending") {
-    embed.addFields(
+    metaFields.push(
       { name: "Status", value: submission.status.toUpperCase(), inline: true },
       { name: "Reviewed By", value: submission.reviewedBy ? `<@${submission.reviewedBy}>` : "Unknown", inline: true },
       { name: "Reason", value: submission.reviewReason || "No reason provided", inline: false },
     );
   }
-
   if (submission.linkedModmailId) {
-    embed.addFields({ name: "Linked Modmail", value: submission.linkedModmailId, inline: true });
+    metaFields.push({ name: "Linked Modmail", value: submission.linkedModmailId, inline: true });
   }
 
-  return embed;
+  if (metaFields.length > 0) {
+    const lastEmbed = embeds[embeds.length - 1];
+    const lastChunk = responseChunks.length > 0 ? responseChunks[responseChunks.length - 1] : undefined;
+    const lastChunkFieldCount = lastChunk?.length ?? 0;
+
+    if (lastEmbed && lastChunkFieldCount + metaFields.length <= 25) {
+      lastEmbed.addFields(metaFields);
+    } else if (embeds.length < 10) {
+      const metaEmbed = lib
+        .createEmbedBuilder()
+        .setTitle(`Application #${submission.applicationNumber} — ${submission.formName} (Meta)`)
+        .setColor(color)
+        .setTimestamp(new Date(submission.createdAt || Date.now()))
+        .setFooter({ text: `Application ID: ${submission.applicationId}` })
+        .addFields(metaFields);
+      embeds.push(metaEmbed);
+    }
+  }
+
+  if (embeds.length > 10) {
+    return embeds.slice(0, 10);
+  }
+
+  return embeds;
 }

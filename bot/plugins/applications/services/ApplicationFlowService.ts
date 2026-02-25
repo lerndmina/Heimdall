@@ -36,6 +36,17 @@ interface ApplicationQuestion {
   options?: Array<{ id: string; label: string; value: string; description?: string; emoji?: string }>;
 }
 
+const APPLICATION_TEXT_LIMIT = 2000;
+const FINAL_REVIEW_SELECT_PAGE_SIZE = 25;
+const FINAL_REVIEW_EMBED_DESCRIPTION_LIMIT = 3900;
+const MAX_STAGE_EMBEDS = 10;
+
+function truncateWithIndicator(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  if (maxLength <= 1) return "…";
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
 export class ApplicationFlowService {
   constructor(
     private readonly client: HeimdallClient,
@@ -149,16 +160,16 @@ export class ApplicationFlowService {
 
   private async renderTextQuestion(interaction: BaseInteraction | MessageComponentInteraction | ModalSubmitInteraction, form: any, sessionId: string, question: ApplicationQuestion): Promise<void> {
     const openModalButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
-      const modal = new ModalBuilder().setCustomId(`application.answer.${sessionId}.${question.id}`).setTitle(form.name.length > 45 ? form.name.slice(0, 45) : form.name);
+      const modal = new ModalBuilder().setCustomId(`application.answer.${sessionId}.${question.id}`).setTitle(truncateWithIndicator(form.name, 45));
       const input = new TextInputBuilder()
         .setCustomId("answer")
-        .setLabel(question.label.slice(0, 45))
+        .setLabel(truncateWithIndicator(question.label, 45))
         .setStyle(question.type === "long" ? TextInputStyle.Paragraph : TextInputStyle.Short)
         .setRequired(question.required !== false)
         .setPlaceholder(question.placeholder || "Type your answer");
 
-      if (typeof question.minLength === "number") input.setMinLength(Math.max(0, question.minLength));
-      if (typeof question.maxLength === "number") input.setMaxLength(Math.min(4000, Math.max(1, question.maxLength)));
+      if (typeof question.minLength === "number") input.setMinLength(Math.min(APPLICATION_TEXT_LIMIT, Math.max(0, question.minLength)));
+      if (typeof question.maxLength === "number") input.setMaxLength(Math.min(APPLICATION_TEXT_LIMIT, Math.max(1, question.maxLength)));
       if (question.type === "number") input.setPlaceholder("Enter a number");
 
       modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
@@ -318,6 +329,12 @@ export class ApplicationFlowService {
   }
 
   private async renderAnswerConfirmation(interaction: MessageComponentInteraction | ModalSubmitInteraction, form: any, sessionId: string, draftAnswer: ApplicationAnswer): Promise<void> {
+    const normalizedAnswer: ApplicationAnswer = {
+      ...draftAnswer,
+      value: draftAnswer.value ? draftAnswer.value.slice(0, APPLICATION_TEXT_LIMIT) : draftAnswer.value,
+      values: Array.isArray(draftAnswer.values) ? draftAnswer.values.map((entry) => entry.slice(0, APPLICATION_TEXT_LIMIT)) : draftAnswer.values,
+    };
+
     const confirmButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
       const session = await this.sessionService.getSession(sessionId);
       if (!session) {
@@ -325,7 +342,7 @@ export class ApplicationFlowService {
         return;
       }
 
-      await this.sessionService.setAnswer(sessionId, draftAnswer);
+      await this.sessionService.setAnswer(sessionId, normalizedAnswer);
       await this.sessionService.setCurrentIndex(sessionId, session.currentIndex + 1);
       const latestForm = await this.applicationService.getForm(session.guildId, session.formId);
       if (!latestForm) {
@@ -356,17 +373,17 @@ export class ApplicationFlowService {
     editButton.setLabel("Edit").setEmoji("✏️").setStyle(ButtonStyle.Secondary);
     await editButton.ready();
 
-    const valuePreview = Array.isArray(draftAnswer.values) ? draftAnswer.values.map((entry) => `• ${entry}`).join("\n") : draftAnswer.value || "_No answer_";
+    const valuePreview = Array.isArray(normalizedAnswer.values) ? normalizedAnswer.values.map((entry) => `• ${entry}`).join("\n") : normalizedAnswer.value || "_No answer_";
 
     await this.sendStageMessage(interaction, {
       title: `${form.name} — Confirm Answer`,
-      description: `**${draftAnswer.questionLabel}**\n\n${valuePreview}`,
+      description: `**${normalizedAnswer.questionLabel}**\n\n${valuePreview}`,
       footer: "Confirm this answer or edit it",
       components: [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(confirmButton as any, editButton as any)],
     });
   }
 
-  private async renderFinalReview(interaction: BaseInteraction | MessageComponentInteraction | ModalSubmitInteraction, form: any, sessionId: string): Promise<void> {
+  private async renderFinalReview(interaction: BaseInteraction | MessageComponentInteraction | ModalSubmitInteraction, form: any, sessionId: string, page = 0): Promise<void> {
     const session = await this.sessionService.getSession(sessionId);
     if (!session) {
       await this.replyEphemeral(interaction, "❌ Session expired.");
@@ -374,11 +391,69 @@ export class ApplicationFlowService {
     }
 
     const questions = (form.questions || []) as ApplicationQuestion[];
+    const totalPages = Math.max(1, Math.ceil(questions.length / FINAL_REVIEW_SELECT_PAGE_SIZE));
+    const safePage = Math.min(Math.max(0, page), totalPages - 1);
+    const selectStart = safePage * FINAL_REVIEW_SELECT_PAGE_SIZE;
+    const selectEnd = selectStart + FINAL_REVIEW_SELECT_PAGE_SIZE;
+
     const lines = questions.map((question, index) => {
       const answer = session.answers[question.id];
       if (!answer) return `**${index + 1}. ${question.label}**\n_No answer_`;
       if (Array.isArray(answer.values) && answer.values.length > 0) return `**${index + 1}. ${question.label}**\n${answer.values.map((entry) => `• ${entry}`).join("\n")}`;
       return `**${index + 1}. ${question.label}**\n${answer.value || "_No answer_"}`;
+    });
+
+    const embedDescriptions: string[] = [];
+    let currentDescription = "";
+    for (const line of lines) {
+      const candidate = currentDescription.length === 0 ? line : `${currentDescription}\n\n${line}`;
+      if (candidate.length <= FINAL_REVIEW_EMBED_DESCRIPTION_LIMIT) {
+        currentDescription = candidate;
+        continue;
+      }
+
+      if (currentDescription.length > 0) {
+        embedDescriptions.push(currentDescription);
+      }
+
+      if (line.length <= FINAL_REVIEW_EMBED_DESCRIPTION_LIMIT) {
+        currentDescription = line;
+      } else {
+        embedDescriptions.push(line.slice(0, FINAL_REVIEW_EMBED_DESCRIPTION_LIMIT - 1) + "…");
+        currentDescription = "";
+      }
+    }
+    if (currentDescription.length > 0) {
+      embedDescriptions.push(currentDescription);
+    }
+
+    const limitedDescriptions = embedDescriptions.slice(0, MAX_STAGE_EMBEDS);
+    if (limitedDescriptions.length === 0) {
+      limitedDescriptions.push("No questions are currently configured for this form.");
+    }
+    if (embedDescriptions.length > MAX_STAGE_EMBEDS && limitedDescriptions.length > 0) {
+      const lastIndex = limitedDescriptions.length - 1;
+      const lastDescription = limitedDescriptions[lastIndex];
+      if (!lastDescription) {
+        // no-op guard for strict indexed access
+      } else {
+        const overflowNotice = `\n\n_Only the first ${MAX_STAGE_EMBEDS} review embeds are shown in Discord._`;
+        const available = FINAL_REVIEW_EMBED_DESCRIPTION_LIMIT - lastDescription.length;
+        if (available > overflowNotice.length) {
+          limitedDescriptions[lastIndex] += overflowNotice;
+        }
+      }
+    }
+
+    const reviewEmbeds = limitedDescriptions.map((description, embedIndex) => {
+      const titleBase = `${form.name} — Final Review`;
+      const title = limitedDescriptions.length > 1 ? `${titleBase} (${embedIndex + 1}/${limitedDescriptions.length})` : titleBase;
+      return this.lib
+        .createEmbedBuilder()
+        .setTitle(truncateWithIndicator(title, 256))
+        .setDescription(description)
+        .setColor("Blurple")
+        .setFooter({ text: `Review your answers, then submit • Selector page ${safePage + 1}/${totalPages}` });
     });
 
     const submitButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
@@ -450,34 +525,62 @@ export class ApplicationFlowService {
     submitButton.setLabel("Submit Application").setEmoji("✅").setStyle(ButtonStyle.Success);
     await submitButton.ready();
 
-    const editButton = this.lib.createStringSelectMenuBuilder(async (selectInteraction) => {
-      const selected = selectInteraction.values[0];
-      const selectedIndex = Number(selected);
-      if (!Number.isFinite(selectedIndex)) {
-        await selectInteraction.reply({ content: "❌ Invalid question selection.", ephemeral: true });
-        return;
-      }
+    const selectorRows: ActionRowBuilder<MessageActionRowComponentBuilder>[] = [];
+    if (questions.length > 0) {
+      const editButton = this.lib.createStringSelectMenuBuilder(async (selectInteraction) => {
+        const selected = selectInteraction.values[0];
+        const selectedIndex = Number(selected);
+        if (!Number.isFinite(selectedIndex)) {
+          await selectInteraction.reply({ content: "❌ Invalid question selection.", ephemeral: true });
+          return;
+        }
 
-      const latestSession = await this.sessionService.setCurrentIndex(sessionId, selectedIndex);
-      if (!latestSession) {
-        await selectInteraction.reply({ content: "❌ Session expired.", ephemeral: true });
-        return;
-      }
+        const latestSession = await this.sessionService.setCurrentIndex(sessionId, selectedIndex);
+        if (!latestSession) {
+          await selectInteraction.reply({ content: "❌ Session expired.", ephemeral: true });
+          return;
+        }
 
-      await this.renderCurrentStep(selectInteraction, form, sessionId);
-    }, 900);
+        await this.renderCurrentStep(selectInteraction, form, sessionId);
+      }, 900);
 
-    editButton
-      .setPlaceholder("Select a question to edit")
-      .setMinValues(1)
-      .setMaxValues(1)
-      .addOptions(
-        questions.slice(0, 25).map((question, index) => ({
-          label: question.label.slice(0, 100),
-          value: String(index),
-        })),
-      );
-    await editButton.ready();
+      editButton
+        .setPlaceholder(`Select a question to edit (${safePage + 1}/${totalPages})`)
+        .setMinValues(1)
+        .setMaxValues(1)
+        .addOptions(
+          questions.slice(selectStart, selectEnd).map((question, pageIndex) => ({
+            label: truncateWithIndicator(question.label, 100),
+            value: String(selectStart + pageIndex),
+          })),
+        );
+      await editButton.ready();
+
+      selectorRows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(editButton as any));
+    }
+    if (totalPages > 1) {
+      const previousButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
+        await this.renderFinalReview(buttonInteraction, form, sessionId, safePage - 1);
+      }, 900);
+      previousButton
+        .setLabel("Previous")
+        .setEmoji("◀️")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(safePage <= 0);
+      await previousButton.ready();
+
+      const nextButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
+        await this.renderFinalReview(buttonInteraction, form, sessionId, safePage + 1);
+      }, 900);
+      nextButton
+        .setLabel("Next")
+        .setEmoji("▶️")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(safePage >= totalPages - 1);
+      await nextButton.ready();
+
+      selectorRows.push(new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(previousButton as any, nextButton as any));
+    }
 
     const cancelButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
       await this.sessionService.deleteSession(sessionId);
@@ -486,14 +589,9 @@ export class ApplicationFlowService {
     cancelButton.setLabel("Cancel").setEmoji("❌").setStyle(ButtonStyle.Secondary);
     await cancelButton.ready();
 
-    await this.sendStageMessage(interaction, {
-      title: `${form.name} — Final Review`,
-      description: lines.join("\n\n").slice(0, 3900),
-      footer: "Review your answers, then submit",
-      components: [
-        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(submitButton as any, cancelButton as any),
-        new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(editButton as any),
-      ],
+    await this.replyEphemeral(interaction, {
+      embeds: reviewEmbeds,
+      components: [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(submitButton as any, cancelButton as any), ...selectorRows],
     });
   }
 
