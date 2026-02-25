@@ -128,7 +128,9 @@ export class ModmailEmbeds {
       `Your message must be at least **${minimumLength}** characters.\n` +
         `Current length: **${currentLength}** characters.\n\n` +
         `Please provide more details about your issue.\n\n` +
-        ModmailEmbeds.detailedMessageTips,
+        ModmailEmbeds.detailedMessageTips +
+        "\n\n" +
+        "-# This check is defined by the server you are contacting and may be different for other servers.",
     );
   }
 
