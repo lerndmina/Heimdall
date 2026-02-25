@@ -17,7 +17,7 @@ import type { ModmailPluginAPI } from "../../modmail/index.js";
 import type { ApplicationSession } from "./ApplicationSessionService.js";
 import { ApplicationService } from "./ApplicationService.js";
 import { buildReviewComponents, buildSubmissionEmbed } from "../utils/ApplicationEmbeds.js";
-import { formatApplicationMessage } from "../utils/messagePlaceholders.js";
+import { formatApplicationMessage, formatApplicationMessageEmbed, hasApplicationMessageEmbedContent } from "../utils/messagePlaceholders.js";
 
 export class ApplicationReviewService {
   constructor(
@@ -292,11 +292,12 @@ export class ApplicationReviewService {
 
   private async tryNotifyApplicant(submission: any, form: any, status: "approved" | "denied", reason?: string): Promise<void> {
     const text = status === "approved" ? form.acceptMessage : form.denyMessage;
-    if (!text || typeof text !== "string") return;
+    const embedTemplateRaw = status === "approved" ? form.acceptMessageEmbed : form.denyMessageEmbed;
+    if ((!text || typeof text !== "string") && !hasApplicationMessageEmbedContent(embedTemplateRaw)) return;
 
     try {
       const user = await this.client.users.fetch(submission.userId);
-      const content = formatApplicationMessage(text, {
+      const context = {
         userId: submission.userId,
         userDisplayName: submission.userDisplayName,
         formName: submission.formName || form?.name,
@@ -306,8 +307,34 @@ export class ApplicationReviewService {
         reason,
         reviewerId: submission.reviewedBy,
         guildId: submission.guildId,
-      });
-      await user.send({ content });
+      } as const;
+
+      const content = text ? formatApplicationMessage(text, context) : undefined;
+      const embedTemplate = formatApplicationMessageEmbed(embedTemplateRaw, context);
+      const embed = hasApplicationMessageEmbedContent(embedTemplate) ? this.lib.createEmbedBuilder() : null;
+
+      if (embed) {
+        if (embedTemplate.title) embed.setTitle(embedTemplate.title);
+        if (embedTemplate.description) embed.setDescription(embedTemplate.description);
+        if (embedTemplate.color) {
+          try {
+            embed.setColor(embedTemplate.color as any);
+          } catch {
+            // ignore invalid colors to avoid blocking DMs
+          }
+        }
+        if (embedTemplate.image) embed.setImage(embedTemplate.image);
+        if (embedTemplate.thumbnail) embed.setThumbnail(embedTemplate.thumbnail);
+        if (embedTemplate.footer) embed.setFooter({ text: embedTemplate.footer });
+      }
+
+      const payload: { content?: string; embeds?: any[] } = {};
+      if (content && content.trim().length > 0) payload.content = content;
+      if (embed) payload.embeds = [embed];
+
+      if (payload.content || payload.embeds) {
+        await user.send(payload);
+      }
     } catch (error) {
       this.logger.debug("Could not DM applicant", error);
     }

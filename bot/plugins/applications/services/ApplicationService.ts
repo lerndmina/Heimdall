@@ -11,6 +11,9 @@ type SubmissionDoc = IApplicationSubmission & { _id: unknown; createdAt: Date; u
 const DEFAULT_COMPLETION_MESSAGE = "Thanks {user_mention}, your application #{application_number} for {form_name} was submitted.";
 const DEFAULT_ACCEPT_MESSAGE = "Your application #{application_number} for {form_name} was {status} by {reviewer_mention}.";
 const DEFAULT_DENY_MESSAGE = "Your application #{application_number} for {form_name} was {status}. Reason: {reason}";
+const DEFAULT_COMPLETION_MESSAGE_EMBED = { description: DEFAULT_COMPLETION_MESSAGE, color: "#5865f2" };
+const DEFAULT_ACCEPT_MESSAGE_EMBED = { description: DEFAULT_ACCEPT_MESSAGE, color: "#57f287" };
+const DEFAULT_DENY_MESSAGE_EMBED = { description: DEFAULT_DENY_MESSAGE, color: "#ed4245" };
 
 export interface CreateFormInput {
   guildId: string;
@@ -60,6 +63,9 @@ export class ApplicationService {
       completionMessage: DEFAULT_COMPLETION_MESSAGE,
       acceptMessage: DEFAULT_ACCEPT_MESSAGE,
       denyMessage: DEFAULT_DENY_MESSAGE,
+      completionMessageEmbed: DEFAULT_COMPLETION_MESSAGE_EMBED,
+      acceptMessageEmbed: DEFAULT_ACCEPT_MESSAGE_EMBED,
+      denyMessageEmbed: DEFAULT_DENY_MESSAGE_EMBED,
       createdBy: input.createdBy,
     });
 
@@ -95,6 +101,9 @@ export class ApplicationService {
     if (updates.completionMessage !== undefined) payload.completionMessage = updates.completionMessage || null;
     if (updates.acceptMessage !== undefined) payload.acceptMessage = updates.acceptMessage || null;
     if (updates.denyMessage !== undefined) payload.denyMessage = updates.denyMessage || null;
+    if (updates.completionMessageEmbed !== undefined) payload.completionMessageEmbed = updates.completionMessageEmbed || {};
+    if (updates.acceptMessageEmbed !== undefined) payload.acceptMessageEmbed = updates.acceptMessageEmbed || {};
+    if (updates.denyMessageEmbed !== undefined) payload.denyMessageEmbed = updates.denyMessageEmbed || {};
     if (updates.modmailCategoryId !== undefined) payload.modmailCategoryId = updates.modmailCategoryId || null;
 
     return (await ApplicationForm.findOneAndUpdate({ guildId, formId }, { $set: payload }, { new: true, runValidators: true })) as FormDoc | null;

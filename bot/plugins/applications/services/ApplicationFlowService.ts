@@ -18,7 +18,7 @@ import type { LibAPI } from "../../lib/index.js";
 import { ApplicationService } from "./ApplicationService.js";
 import { ApplicationSessionService, type ApplicationAnswer, type ApplicationQuestionType } from "./ApplicationSessionService.js";
 import { ApplicationReviewService } from "./ApplicationReviewService.js";
-import { formatApplicationMessage } from "../utils/messagePlaceholders.js";
+import { formatApplicationMessage, formatApplicationMessageEmbed, hasApplicationMessageEmbedContent } from "../utils/messagePlaceholders.js";
 
 type QuestionType = "short" | "long" | "select_single" | "select_multi" | "button" | "number";
 
@@ -402,17 +402,43 @@ export class ApplicationFlowService {
 
       await this.sessionService.deleteSession(sessionId);
 
-      if (latestForm.completionMessage) {
+      if (latestForm.completionMessage || hasApplicationMessageEmbedContent(latestForm.completionMessageEmbed)) {
         const user = await this.client.users.fetch(latestSession.userId).catch(() => null);
         if (user) {
-          const content = formatApplicationMessage(latestForm.completionMessage, {
+          const context = {
             userId: latestSession.userId,
             userDisplayName: latestSession.userDisplayName,
             formName: latestForm.name,
             applicationId: result.applicationId,
             guildId: latestSession.guildId,
-          });
-          await user.send({ content }).catch(() => null);
+          } as const;
+
+          const content = latestForm.completionMessage ? formatApplicationMessage(latestForm.completionMessage, context) : undefined;
+          const embedTemplate = formatApplicationMessageEmbed(latestForm.completionMessageEmbed, context);
+          const embed = hasApplicationMessageEmbedContent(embedTemplate) ? this.lib.createEmbedBuilder() : null;
+
+          if (embed) {
+            if (embedTemplate.title) embed.setTitle(embedTemplate.title);
+            if (embedTemplate.description) embed.setDescription(embedTemplate.description);
+            if (embedTemplate.color) {
+              try {
+                embed.setColor(embedTemplate.color as any);
+              } catch {
+                // ignore invalid colors to avoid blocking DMs
+              }
+            }
+            if (embedTemplate.image) embed.setImage(embedTemplate.image);
+            if (embedTemplate.thumbnail) embed.setThumbnail(embedTemplate.thumbnail);
+            if (embedTemplate.footer) embed.setFooter({ text: embedTemplate.footer });
+          }
+
+          const payload: { content?: string; embeds?: any[] } = {};
+          if (content && content.trim().length > 0) payload.content = content;
+          if (embed) payload.embeds = [embed];
+
+          if (payload.content || payload.embeds) {
+            await user.send(payload).catch(() => null);
+          }
         }
       }
 

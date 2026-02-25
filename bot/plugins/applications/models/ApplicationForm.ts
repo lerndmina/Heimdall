@@ -93,6 +93,9 @@ const ApplicationFormSchema = new Schema(
     completionMessage: { type: String, trim: true, maxlength: 2000 },
     acceptMessage: { type: String, trim: true, maxlength: 2000 },
     denyMessage: { type: String, trim: true, maxlength: 2000 },
+    completionMessageEmbed: { type: ApplicationEmbedSchema, default: {} },
+    acceptMessageEmbed: { type: ApplicationEmbedSchema, default: {} },
+    denyMessageEmbed: { type: ApplicationEmbedSchema, default: {} },
     modmailCategoryId: { type: String, trim: true },
 
     panels: { type: [ApplicationPanelPostSchema], default: [] },
