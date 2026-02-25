@@ -14,7 +14,6 @@ import Toggle from "@/components/ui/Toggle";
 import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
-import Combobox from "@/components/ui/Combobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
 import NumberInput from "@/components/ui/NumberInput";
 import Tabs from "@/components/ui/Tabs";
@@ -1114,21 +1113,16 @@ export default function AttachmentBlockerPage({ guildId }: { guildId: string }) 
         }>
         <div className="space-y-4">
           {!editingChannel && (
-            <div className="space-y-1.5">
-              <p className="block text-sm font-medium text-zinc-200">Channel</p>
-              <p className="text-xs text-zinc-500">Select the channel to override rules for (text or forum channels)</p>
-              <Combobox
-                options={Object.entries(channelNames).map(([id, name]) => ({
-                  value: id,
-                  label: `#${name}`,
-                }))}
-                value={channelFormId}
-                onChange={setChannelFormId}
-                placeholder="Select a channel…"
-                disabled={savingChannel}
-                loading={loading}
-              />
-            </div>
+            <ChannelCombobox
+              guildId={guildId}
+              value={channelFormId}
+              onChange={setChannelFormId}
+              channelType="all"
+              label="Channel"
+              description="Select the channel to override rules for (text or forum channels)"
+              placeholder="Select a channel…"
+              disabled={savingChannel}
+            />
           )}
 
           <Toggle label="Enabled" description="Whether attachment blocking is active for this channel" checked={channelFormEnabled} onChange={setChannelFormEnabled} disabled={savingChannel} />
