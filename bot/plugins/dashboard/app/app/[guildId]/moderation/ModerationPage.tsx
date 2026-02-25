@@ -38,6 +38,7 @@ import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 import StickyMessagesTab from "./StickyMessagesTab";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -160,11 +161,6 @@ export default function ModerationPage({ guildId }: { guildId: string }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Moderation</h1>
-        <p className="text-zinc-400">Manage automod rules, infractions, escalation tiers, and settings.</p>
-      </div>
-
       <Tabs
         defaultTab="overview"
         tabs={[
@@ -209,7 +205,7 @@ function OverviewTab({ guildId }: { guildId: string }) {
       <Card>
         <CardTitle>Automod</CardTitle>
         <CardContent>
-          <p className={stats.automodEnabled ? "text-green-400" : "text-red-400"}>{stats.automodEnabled ? "✅ Enabled" : "❌ Disabled"}</p>
+          <StatusBadge variant={stats.automodEnabled ? "success" : "error"}>{stats.automodEnabled ? "Enabled" : "Disabled"}</StatusBadge>
           <p className="text-zinc-400 text-sm mt-1">
             {stats.enabledRules}/{stats.totalRules} rules active
           </p>
@@ -307,10 +303,10 @@ function ConfirmDialog({ open, title, message, onConfirm, onCancel }: { open: bo
       maxWidth="sm"
       footer={
         <div className="flex justify-end gap-2">
-          <button onClick={onCancel} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 rounded-md border border-zinc-600 hover:border-zinc-500">
+          <button onClick={onCancel} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
             Cancel
           </button>
-          <button onClick={onConfirm} className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-500 font-medium">
+          <button onClick={onConfirm} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500">
             Confirm
           </button>
         </div>
@@ -579,7 +575,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
     <div className="space-y-4">
       {canManage && (
         <div className="flex justify-end">
-          <button onClick={openCreate} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium">
+          <button onClick={openCreate} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500">
             + New Rule
           </button>
         </div>
@@ -695,7 +691,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                   }
                 }}
                 className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all ${
-                  wizardStep === step ? "bg-indigo-600 text-white ring-2 ring-indigo-400/30" : wizardStep > step ? "bg-green-600/80 text-white cursor-pointer" : "bg-zinc-700 text-zinc-400"
+                  wizardStep === step ? "bg-primary-600 text-white ring-2 ring-primary-400/30" : wizardStep > step ? "bg-green-600/80 text-white cursor-pointer" : "bg-zinc-700 text-zinc-400"
                 }`}>
                 {wizardStep > step ? "✓" : step}
               </button>
@@ -719,7 +715,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
               <button
                 onClick={() => setWizardStep(2)}
                 disabled={!step1Valid}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
                 Next →
               </button>
             </div>
@@ -735,7 +731,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
             <div className="bg-zinc-800/30 rounded-lg p-3 space-y-2 border border-zinc-700/40">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-medium text-zinc-200">Simple Patterns</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">Easy</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-300">Easy</span>
               </div>
               <p className="text-xs text-zinc-500">
                 Separate with commas or one per line. Use <code className="text-amber-400/70">*</code> to match any characters.
@@ -794,13 +790,13 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                     value={testInput}
                     onChange={(e) => setTestInput(e.target.value)}
                     placeholder="Type a test message…"
-                    className="w-full rounded-md border border-zinc-700 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                   />
                 </div>
                 <button
                   onClick={wildcardText.trim() ? handleTestWildcard : handleTestRegex}
                   disabled={(!wildcardText.trim() && !patternsText.trim()) || !testInput.trim()}
-                  className="px-3 py-1.5 bg-zinc-700 text-zinc-200 rounded-md text-sm hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                  className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm text-zinc-200 transition hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed">
                   Test
                 </button>
               </div>
@@ -827,7 +823,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
               <button
                 onClick={() => setWizardStep(3)}
                 disabled={!step2Valid}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
                 Next →
               </button>
             </div>
@@ -849,7 +845,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                     key={t.value}
                     onClick={() => setTarget((prev) => (prev.includes(t.value) ? prev.filter((v) => v !== t.value) : [...prev, t.value]))}
                     className={`p-2.5 rounded-lg border text-left transition-all text-sm ${
-                      target.includes(t.value) ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+                      target.includes(t.value) ? "border-primary-500 bg-primary-500/10 ring-1 ring-primary-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
                     }`}>
                     <div className="font-medium text-zinc-100">{t.label}</div>
                     <div className="text-xs text-zinc-400">{t.description}</div>
@@ -870,7 +866,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                     key={a.value}
                     onClick={() => toggleAction(a.value)}
                     className={`p-2 rounded-lg border text-left transition-all text-sm flex items-center gap-2 ${
-                      actions.includes(a.value) ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+                      actions.includes(a.value) ? "border-primary-500 bg-primary-500/10 ring-1 ring-primary-500/30" : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
                     }`}>
                     <span>{a.icon}</span>
                     <span className="text-zinc-100">{a.label}</span>
@@ -945,7 +941,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                 <select
                   value={matchMode}
                   onChange={(e) => setMatchMode(e.target.value as "any" | "all")}
-                  className="w-full rounded-lg border border-zinc-700 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                  className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
                   <option value="any">Any pattern (OR)</option>
                   <option value="all">All patterns (AND)</option>
                 </select>
@@ -958,7 +954,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
                   onChange={(e) => setWarnPoints(parseInt(e.target.value) || 0)}
                   min={0}
                   max={100}
-                  className="w-full rounded-lg border border-zinc-700 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -970,7 +966,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
               <button
                 onClick={() => setWizardStep(4)}
                 disabled={!step3Valid}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
                 Next →
               </button>
             </div>
@@ -1025,7 +1021,7 @@ function RulesTab({ guildId, canManage }: { guildId: string; canManage: boolean 
               <button
                 onClick={handleSave}
                 disabled={saving || !step1Valid || !step2Valid || !step3Valid}
-                className="px-5 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed">
                 {saving ? "Saving…" : editRule ? "Update Rule" : "Create Rule"}
               </button>
             </div>
@@ -1194,7 +1190,7 @@ function PresetsTab({ guildId, canManage }: { guildId: string; canManage: boolea
                     Uninstall
                   </button>
                 ) : (
-                  <button onClick={() => install(preset.id)} className="text-sm text-indigo-400 hover:text-indigo-300">
+                  <button onClick={() => install(preset.id)} className="text-sm text-primary-400 hover:text-primary-300 transition-colors">
                     Install
                   </button>
                 ))}
@@ -1358,7 +1354,7 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
                   <select
                     value={tier.action}
                     onChange={(e) => updateTier(i, "action", e.target.value)}
-                    className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm">
+                    className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
                     <option value="timeout">Timeout</option>
                     <option value="kick">Kick</option>
                     <option value="ban">Ban</option>
@@ -1395,10 +1391,10 @@ function EscalationTab({ guildId, canManage }: { guildId: string; canManage: boo
           </div>
           {canManage && (
             <div className="flex justify-between mt-4">
-              <button onClick={addTier} className="text-sm text-indigo-400 hover:text-indigo-300">
+              <button onClick={addTier} className="text-sm text-primary-400 transition-colors hover:text-primary-300">
                 + Add Tier
               </button>
-              <button onClick={saveTiers} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50">
+              <button onClick={saveTiers} disabled={saving} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50">
                 {saving ? "Saving..." : "Save Tiers"}
               </button>
             </div>
@@ -1702,7 +1698,7 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
                 value={muteMode}
                 onChange={(e) => setMuteMode(e.target.value as "native" | "role")}
                 disabled={!canManage}
-                className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm disabled:opacity-50">
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 disabled:opacity-50">
                 <option value="native">Discord Native Timeout</option>
                 <option value="role">Specific Mute Role</option>
               </select>
@@ -1736,7 +1732,7 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
                 value={dmMode}
                 onChange={(e) => setDmMode(e.target.value)}
                 disabled={!canManage}
-                className="w-full rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm disabled:opacity-50">
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 disabled:opacity-50">
                 <option value="text">Plain Text</option>
                 <option value="embed">Embed</option>
                 <option value="both">Both</option>
@@ -1808,8 +1804,8 @@ function SettingsTab({ guildId, canManage }: { guildId: string; canManage: boole
 
       {canManage && (
         <div className="flex justify-end">
-          <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 text-sm font-medium disabled:opacity-50">
-            {saving ? "Saving..." : "Save Settings"}
+          <button onClick={handleSave} disabled={saving} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50">
+            {saving ? "Saving…" : "Save Settings"}
           </button>
         </div>
       )}

@@ -447,7 +447,7 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
-                    <select value="delay" disabled className="rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm">
+                    <select value="delay" disabled className="rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none">
                       <option value="delay">With delay</option>
                     </select>
                     <div className="w-20">
@@ -486,7 +486,7 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
                   <select
                     value={draftConversationDeleteBehavior}
                     onChange={(e) => setDraftConversationDeleteBehavior(e.target.value as "immediate" | "after_conversation")}
-                    className="rounded-md bg-zinc-800 border border-zinc-600 text-zinc-100 px-3 py-2 text-sm">
+                    className="rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
                     <option value="after_conversation">After conversation end</option>
                     <option value="immediate">Immediately</option>
                   </select>
