@@ -307,9 +307,7 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
                   <p className="truncate text-sm font-semibold text-ui-text-primary">{guild.name}</p>
                   <p className="text-xs text-ui-text-faint">Click to manage</p>
                 </div>
-                <span className="shrink-0 rounded-md bg-primary-600/20 px-2.5 py-1 text-xs font-medium text-primary-400 transition-colors group-hover:bg-primary-600/30">
-                  Manage
-                </span>
+                <span className="shrink-0 rounded-md bg-primary-600/20 px-2.5 py-1 text-xs font-medium text-primary-400 transition-colors group-hover:bg-primary-600/30">Manage</span>
               </Link>
             );
           }
@@ -329,9 +327,7 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
                   <p className="truncate text-sm font-semibold text-ui-text-muted">{guild.name}</p>
                   <p className="text-xs text-ui-text-faint">Bot not in server</p>
                 </div>
-                <span className="shrink-0 rounded-md bg-emerald-600/20 px-2.5 py-1 text-xs font-medium text-emerald-400 transition-colors group-hover:bg-emerald-600/30">
-                  Invite
-                </span>
+                <span className="shrink-0 rounded-md bg-emerald-600/20 px-2.5 py-1 text-xs font-medium text-emerald-400 transition-colors group-hover:bg-emerald-600/30">Invite</span>
               </a>
             );
           }
