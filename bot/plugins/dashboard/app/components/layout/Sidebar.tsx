@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { MdLogout, MdSettings } from "react-icons/md";
 import GuildIcon from "@/components/ui/GuildIcon";
 import { useUnsavedChanges } from "@/components/providers/UnsavedChangesProvider";
 import ConnectionIndicator from "@/components/layout/ConnectionIndicator";
@@ -150,19 +151,10 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
               <p className="truncate text-sm font-medium text-zinc-200">{session.user.name}</p>
             </div>
             <button onClick={() => setSettingsOpen((current) => !current)} className="text-xs text-zinc-500 transition hover:text-zinc-300" title="User settings" aria-label="User settings">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11.983 6.968a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM11.983 20.032a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM4.968 13.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM19.032 13.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM7.31 8.69a1.5 1.5 0 112.122-2.122A1.5 1.5 0 017.31 8.69zm9.38 9.38a1.5 1.5 0 112.122-2.122 1.5 1.5 0 01-2.122 2.122zM7.31 18.31a1.5 1.5 0 112.122 2.122A1.5 1.5 0 017.31 18.31zm9.38-9.38a1.5 1.5 0 112.122 2.122 1.5 1.5 0 01-2.122-2.122z"
-                />
-              </svg>
+              <MdSettings className="h-4 w-4" aria-hidden="true" />
             </button>
             <button onClick={() => signOut({ callbackUrl: "/login" })} className="text-xs text-zinc-500 transition hover:text-zinc-300" title="Sign out">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <MdLogout className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
 
