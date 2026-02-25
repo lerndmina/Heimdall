@@ -375,6 +375,7 @@ function CategoryCard({ guildId, meta, currentConfig, canManage, saving, onSave 
               value={channelId}
               onChange={setChannelId}
               channelType="text"
+              excludeForums
               label="Log Channel"
               description="The channel where log messages will be sent"
               disabled={saving}

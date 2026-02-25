@@ -265,6 +265,7 @@ export default function StarboardConfigPage({ guildId }: Props) {
             value={board.channelId}
             onChange={(value) => setBoard((prev) => ({ ...prev, channelId: value }))}
             channelType="text"
+            excludeForums
             label="Starboard Channel"
             description="Where approved starboard posts are sent."
             disabled={!canManage || saving}
@@ -306,6 +307,7 @@ export default function StarboardConfigPage({ guildId }: Props) {
               value={board.moderationChannelId ?? ""}
               onChange={(value) => setBoard((prev) => ({ ...prev, moderationChannelId: value }))}
               channelType="text"
+              excludeForums
               label="Moderation Channel"
               description="Queue channel where staff approve or deny candidates."
               disabled={!canManage || saving}

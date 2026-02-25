@@ -289,6 +289,7 @@ export default function SuggestionsCategoriesTab({ guildId }: { guildId: string 
             value={draft.channelId}
             onChange={(v) => setDraft((d) => ({ ...d, channelId: v }))}
             channelType="text"
+            excludeForums
             label="Override Channel"
             description="Optional: send suggestions in this category to a specific channel"
           />

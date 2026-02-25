@@ -837,6 +837,7 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
                     addChannel(v);
                   }}
                   channelType="text"
+                  excludeForums
                   placeholder="Add a channel…"
                 />
               )}

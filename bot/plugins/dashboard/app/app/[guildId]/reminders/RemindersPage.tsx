@@ -415,7 +415,15 @@ export default function RemindersPage({ guildId }: { guildId: string }) {
           <DateTimePicker label="Trigger At" description="When should this reminder fire?" value={draftTriggerAt} onChange={setDraftTriggerAt} min={new Date().toISOString()} />
 
           {!editReminder && (
-            <ChannelCombobox guildId={guildId} value={draftChannelId} onChange={setDraftChannelId} channelType="text" label="Channel" description="Which channel should the reminder be sent in?" />
+            <ChannelCombobox
+              guildId={guildId}
+              value={draftChannelId}
+              onChange={setDraftChannelId}
+              channelType="text"
+              excludeForums
+              label="Channel"
+              description="Which channel should the reminder be sent in?"
+            />
           )}
         </div>
       </Modal>

@@ -661,12 +661,20 @@ function StepChannels({
   return (
     <div className="space-y-4">
       <p className="text-sm text-zinc-400">Configure where PlanetSide events and status updates are posted.</p>
-      <ChannelCombobox label="Log Channel" guildId={guildId} value={draft.channels.log ?? ""} onChange={(v) => updateChannels("log", v)} description="Account link/unlink events are logged here." />
+      <ChannelCombobox
+        label="Log Channel"
+        guildId={guildId}
+        value={draft.channels.log ?? ""}
+        onChange={(v) => updateChannels("log", v)}
+        excludeForums
+        description="Account link/unlink events are logged here."
+      />
       <ChannelCombobox
         label="Census Status Channel"
         guildId={guildId}
         value={draft.channels.censusStatus ?? ""}
         onChange={(v) => updateChannels("censusStatus", v)}
+        excludeForums
         description="Census/Honu API health updates are posted here."
       />
       <ChannelCombobox
@@ -674,6 +682,7 @@ function StepChannels({
         guildId={guildId}
         value={draft.channels.panel ?? ""}
         onChange={(v) => updateChannels("panel", v)}
+        excludeForums
         description="Persistent panel where users can link/manage their account."
       />
     </div>

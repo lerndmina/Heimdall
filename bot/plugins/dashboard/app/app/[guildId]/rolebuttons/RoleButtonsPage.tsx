@@ -509,7 +509,7 @@ export default function RoleButtonsPage({ guildId }: { guildId: string }) {
             </button>
           </>
         }>
-        <ChannelCombobox guildId={guildId} value={postChannelId} onChange={setPostChannelId} channelType="text" label="Channel" />
+        <ChannelCombobox guildId={guildId} value={postChannelId} onChange={setPostChannelId} channelType="text" excludeForums label="Channel" />
       </Modal>
     </div>
   );

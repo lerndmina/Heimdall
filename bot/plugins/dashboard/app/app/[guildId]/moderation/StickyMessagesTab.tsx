@@ -396,6 +396,7 @@ export default function StickyMessagesTab({ guildId, canManage }: { guildId: str
               value={draftChannel}
               onChange={setDraftChannel}
               channelType="text"
+              excludeForums
               label="Channel"
               description="Select the text channel for the sticky message"
               placeholder="Select a channel…"

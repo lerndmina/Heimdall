@@ -459,6 +459,7 @@ export default function TicketOpenersTab({ guildId }: { guildId: string }) {
                   setArchDirty(true);
                 }}
                 channelType="text"
+                excludeForums
                 label="Transcript Channel"
                 description="Optional channel to post ticket transcripts"
               />

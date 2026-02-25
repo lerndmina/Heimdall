@@ -247,6 +247,7 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
               value={draftChannel}
               onChange={setDraftChannel}
               channelType="text"
+              excludeForums
               label="Welcome Channel"
               description="The channel where welcome messages will be sent"
               placeholder="Select a channel…"
