@@ -262,14 +262,9 @@ async function startNewModmailFlow(client: HeimdallClient, pluginAPI: ModmailPlu
       return;
     }
 
-    if (eligibleGuilds.length === 1) {
-      // Single guild - proceed directly
-      const guild = eligibleGuilds[0]!;
-      await handleSingleGuild(client, pluginAPI, message, guild);
-    } else {
-      // Multiple guilds - show selection menu
-      await showGuildSelection(client, pluginAPI, message, eligibleGuilds);
-    }
+    // Always show the guild selection dropdown, even for a single eligible guild.
+    // This lets the user cancel if the listed server isn't the one they intended to contact.
+    await showGuildSelection(client, pluginAPI, message, eligibleGuilds);
   } finally {
     // Clear flow lock immediately — the flow is done (success or failure).
     // Menu interactions are handled by persistent component handlers, not this flow.
@@ -471,13 +466,29 @@ async function showGuildSelection(client: HeimdallClient, pluginAPI: ModmailPlug
   selectMenu.addOptions(options);
   await selectMenu.ready();
 
-  const row = new ActionRowBuilder<typeof selectMenu>().addComponents(selectMenu);
+  // Cancel button — lets the user abort if none of the listed servers is their intended target
+  const cancelButton = pluginAPI.lib.createButtonBuilder(async (interaction) => {
+    await interaction.update({
+      embeds: [ModmailEmbeds.info("Cancelled", "Modmail creation cancelled. Feel free to message again when you're ready.")],
+      components: [],
+    });
+  }, 900);
+  cancelButton.setLabel("Cancel").setStyle(4); // Danger
+  await cancelButton.ready();
 
-  const embed = ModmailEmbeds.info("Select a Server", `You are a member of **${guilds.length}** server(s) with modmail enabled.\n\nPlease select which server you want to contact:`);
+  const row = new ActionRowBuilder<typeof selectMenu>().addComponents(selectMenu);
+  const cancelRow = new ActionRowBuilder<typeof cancelButton>().addComponents(cancelButton);
+
+  const description =
+    guilds.length === 1
+      ? `The following server has modmail enabled. Select it to open a ticket, or press **Cancel** if this isn't the server you intended to contact.`
+      : `You are a member of **${guilds.length}** servers with modmail enabled.\n\nPlease select which server you want to contact, or press **Cancel** to abort.`;
+
+  const embed = ModmailEmbeds.info("Select a Server", description);
 
   await message.reply({
     embeds: [embed],
-    components: [row],
+    components: [row, cancelRow],
   });
 }
 
