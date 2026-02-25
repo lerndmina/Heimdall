@@ -8,7 +8,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
 import Textarea from "@/components/ui/Textarea";
 import Modal from "@/components/ui/Modal";
@@ -348,10 +348,10 @@ export default function WelcomeConfigPage({ guildId }: { guildId: string }) {
   return (
     <div className="space-y-6">
       <Card>
-        <div className="flex items-center justify-between">
+        <CardHeader>
           <CardTitle>Configuration</CardTitle>
           <StatusBadge variant="success">Active</StatusBadge>
-        </div>
+        </CardHeader>
         <CardContent className="mt-4 space-y-4">
           <FieldDisplay label="Channel" value={`<#${config.channelId}>`}>
             <span className="text-sm text-zinc-200">#{config.channelId}</span>

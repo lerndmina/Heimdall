@@ -11,7 +11,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Combobox from "@/components/ui/Combobox";
@@ -487,10 +487,10 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
     <div className="space-y-6">
       {/* ── Mode Section ── */}
       <Card>
-        <div className="flex items-center justify-between">
+        <CardHeader>
           <CardTitle>Transcription Mode</CardTitle>
           <StatusBadge variant={mode === "disabled" ? "neutral" : mode === "auto" ? "success" : "info"}>{mode === "disabled" ? "Disabled" : mode === "auto" ? "Auto" : "Reactions"}</StatusBadge>
-        </div>
+        </CardHeader>
         <CardDescription className="mt-1">Choose how voice messages are transcribed in your server.</CardDescription>
         <CardContent className="mt-4">
           <div className="space-y-1.5">
@@ -574,10 +574,10 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
       {/* ── API Key Section (only for OpenAI) ── */}
       {provider === "openai" && (
         <Card>
-          <div className="flex items-center justify-between">
+          <CardHeader>
             <CardTitle>OpenAI API Key</CardTitle>
             <StatusBadge variant={hasApiKey ? "success" : "warning"}>{hasApiKey ? "Configured" : "Not Set"}</StatusBadge>
-          </div>
+          </CardHeader>
           <CardDescription className="mt-1">Your API key is encrypted at rest using AES-256-CBC and never exposed via the API.</CardDescription>
           <CardContent className="mt-4 space-y-4">
             {hasApiKey && (
@@ -646,10 +646,10 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
       {/* ── Translation Toggle (OpenAI only) ── */}
       {provider === "openai" && (
         <Card>
-          <div className="flex items-center justify-between">
+          <CardHeader>
             <CardTitle>English Translation</CardTitle>
             <StatusBadge variant={translationEnabled ? "info" : "neutral"}>{translationEnabled ? "Enabled" : "Disabled"}</StatusBadge>
-          </div>
+          </CardHeader>
           <CardDescription className="mt-1">Translate non-English voice messages into English alongside the original transcription.</CardDescription>
           <CardContent className="mt-4 space-y-3">
             <label className="inline-flex items-center gap-3 text-sm text-zinc-200">
@@ -674,10 +674,10 @@ export default function VCTranscriptionConfigPage({ guildId }: { guildId: string
 
       {/* ── Language Gate Section ── */}
       <Card>
-        <div className="flex items-center justify-between">
+        <CardHeader>
           <CardTitle>Language Gate</CardTitle>
           <StatusBadge variant={languageGateEnabled ? "info" : "neutral"}>{languageGateEnabled ? "Enabled" : "Disabled"}</StatusBadge>
-        </div>
+        </CardHeader>
         <CardDescription className="mt-1">Detect language before transcription and allow only selected language codes.</CardDescription>
         <CardContent className="mt-4 space-y-4">
           <div className="space-y-2">

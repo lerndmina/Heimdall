@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
 import Modal from "@/components/ui/Modal";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
@@ -170,14 +170,14 @@ export default function TempVCActiveTab({ guildId }: { guildId: string }) {
         </Card>
       ) : (
         <Card>
-          <div className="flex items-center justify-between">
+          <CardHeader>
             <CardTitle>Active Channels ({channels.length ?? 0})</CardTitle>
             <button onClick={fetchData} className="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200" title="Refresh">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
-          </div>
+          </CardHeader>
           <CardContent className="mt-3">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
