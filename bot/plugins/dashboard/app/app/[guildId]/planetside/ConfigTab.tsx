@@ -403,7 +403,7 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
                   handleSendPanel();
                 }}
                 disabled={sendingPanel}
-                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
                 {sendingPanel ? "Posting…" : "Post Panel"}
               </button>
               <span className="text-xs text-zinc-400">
@@ -422,7 +422,7 @@ export default function ConfigTab({ guildId }: { guildId: string }) {
                   handleStartMonitor();
                 }}
                 disabled={startingMonitor}
-                className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed">
                 {startingMonitor ? "Starting…" : "Start Monitoring"}
               </button>
               <span className="text-xs text-zinc-400">
@@ -550,7 +550,7 @@ function StepOutfit({
           type="button"
           onClick={handleLookup}
           disabled={lookupLoading || !draft.outfitTag.trim()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed">
           {lookupLoading ? (
             <>
               <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">

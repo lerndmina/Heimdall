@@ -143,7 +143,7 @@ export default function StatusTab({ guildId }: { guildId: string }) {
             <CardTitle>API Health</CardTitle>
             <CardDescription>Real-time status of PlanetSide 2 APIs.</CardDescription>
           </div>
-          <button onClick={handleTest} disabled={testing} className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors">
+          <button onClick={handleTest} disabled={testing} className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-500 disabled:opacity-50">
             {testing ? "Testing…" : "Test Connectivity"}
           </button>
         </div>

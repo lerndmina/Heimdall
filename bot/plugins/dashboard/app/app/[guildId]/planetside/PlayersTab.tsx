@@ -347,8 +347,8 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 setStatusFilter(f);
                 setPage(1);
               }}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                statusFilter === f ? "bg-indigo-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === f ? "bg-primary-600 text-white" : "bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
               }`}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
@@ -361,9 +361,9 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
             placeholder="Search by name or Discord ID…"
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="rounded-md border border-zinc-700/50 bg-white/5 px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className="rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
           />
-          <button onClick={() => setShowManualLink(true)} className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition-colors">
+          <button onClick={() => setShowManualLink(true)} className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-500">
             + Manual Link
           </button>
         </div>
@@ -522,7 +522,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 type="text"
                 value={editForm.characterName}
                 onChange={(e) => setEditForm((f) => ({ ...f, characterName: e.target.value }))}
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-primary-500"
               />
             </div>
             <div>
@@ -531,7 +531,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 type="text"
                 value={editForm.characterId}
                 onChange={(e) => setEditForm((f) => ({ ...f, characterId: e.target.value }))}
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-primary-500"
               />
             </div>
             <div>
@@ -541,7 +541,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 value={editForm.discordId}
                 onChange={(e) => setEditForm((f) => ({ ...f, discordId: e.target.value }))}
                 placeholder="e.g. 234439833802637312"
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-primary-500"
               />
             </div>
             <div>
@@ -549,7 +549,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
               <select
                 value={editForm.factionId}
                 onChange={(e) => setEditForm((f) => ({ ...f, factionId: Number(e.target.value) }))}
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-indigo-500">
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
                 {Object.entries(FACTION_NAMES).map(([id, name]) => (
                   <option key={id} value={id}>
                     {name}
@@ -562,7 +562,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
               <select
                 value={editForm.serverId}
                 onChange={(e) => setEditForm((f) => ({ ...f, serverId: Number(e.target.value) }))}
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-indigo-500">
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
                 <option value={0}>Select server…</option>
                 {Object.entries(SERVER_NAMES).map(([id, name]) => (
                   <option key={id} value={id}>
@@ -573,13 +573,13 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setEditTarget(null)} className="rounded-md px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
+            <button onClick={() => setEditTarget(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
               onClick={handleEdit}
               disabled={actionLoading || !editForm.characterName.trim()}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
+              className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50">
               {actionLoading ? "Saving…" : "Save Changes"}
             </button>
           </div>
@@ -605,7 +605,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
               value={revokeReason}
               onChange={(e) => setRevokeReason(e.target.value)}
               placeholder="e.g. Left outfit"
-              className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-primary-500"
             />
           </div>
           <div className="flex justify-end gap-2">
@@ -614,10 +614,10 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 setRevokeTarget(null);
                 setRevokeReason("");
               }}
-              className="rounded-md px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
+              className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
-            <button onClick={handleRevoke} disabled={actionLoading} className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 disabled:opacity-50">
+            <button onClick={handleRevoke} disabled={actionLoading} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-500 disabled:opacity-50">
               {actionLoading ? "Revoking…" : "Revoke"}
             </button>
           </div>
@@ -631,10 +631,10 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
             This will <strong>permanently delete</strong> the record for <strong>{deleteTarget?.characterName}</strong>. This cannot be undone.
           </p>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setDeleteTarget(null)} className="rounded-md px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
+            <button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
-            <button onClick={handleDelete} disabled={actionLoading} className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50">
+            <button onClick={handleDelete} disabled={actionLoading} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50">
               {actionLoading ? "Deleting…" : "Delete Permanently"}
             </button>
           </div>
@@ -653,7 +653,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 value={manualForm.characterName}
                 onChange={(e) => setManualForm((f) => ({ ...f, characterName: e.target.value }))}
                 placeholder="e.g. Wrel"
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-primary-500"
               />
             </div>
             <div>
@@ -663,7 +663,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 value={manualForm.characterId}
                 onChange={(e) => setManualForm((f) => ({ ...f, characterId: e.target.value }))}
                 placeholder="Census character ID"
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-primary-500"
               />
             </div>
             <div>
@@ -673,7 +673,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
                 value={manualForm.discordId}
                 onChange={(e) => setManualForm((f) => ({ ...f, discordId: e.target.value }))}
                 placeholder="e.g. 234439833802637312"
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-primary-500"
               />
             </div>
             <div>
@@ -681,7 +681,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
               <select
                 value={manualForm.factionId}
                 onChange={(e) => setManualForm((f) => ({ ...f, factionId: Number(e.target.value) }))}
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-indigo-500">
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
                 {Object.entries(FACTION_NAMES).map(([id, name]) => (
                   <option key={id} value={id}>
                     {name}
@@ -694,7 +694,7 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
               <select
                 value={manualForm.serverId}
                 onChange={(e) => setManualForm((f) => ({ ...f, serverId: Number(e.target.value) }))}
-                className="w-full rounded-md border border-zinc-700/50 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-indigo-500">
+                className="w-full rounded-lg border border-zinc-700/30 bg-white/5 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary-500">
                 <option value={0}>Select server…</option>
                 {Object.entries(SERVER_NAMES).map(([id, name]) => (
                   <option key={id} value={id}>
@@ -705,13 +705,13 @@ export default function PlayersTab({ guildId, defaultFilter }: { guildId: string
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setShowManualLink(false)} className="rounded-md px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
+            <button onClick={() => setShowManualLink(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
               onClick={handleManualLink}
               disabled={actionLoading || (!manualForm.characterName && !manualForm.characterId) || !manualForm.discordId}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50">
               {actionLoading ? "Linking…" : "Link Player"}
             </button>
           </div>
