@@ -573,11 +573,7 @@ ModmailSchema.statics.userHasOpenModmail = async function (guildId: string, user
 /**
  * Check if user has a blocking modmail in guild based on duplicate policy
  */
-ModmailSchema.statics.userHasBlockingModmail = async function (
-  guildId: string,
-  userId: string,
-  policy: "open-only" | "open-or-resolved",
-): Promise<boolean> {
+ModmailSchema.statics.userHasBlockingModmail = async function (guildId: string, userId: string, policy: "open-only" | "open-or-resolved"): Promise<boolean> {
   const statuses = policy === "open-or-resolved" ? [ModmailStatus.OPEN, ModmailStatus.RESOLVED] : [ModmailStatus.OPEN];
 
   const existing = await this.findOne({

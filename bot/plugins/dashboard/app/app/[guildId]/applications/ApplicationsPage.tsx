@@ -100,6 +100,10 @@ interface ApplicationsPageProps {
   guildId: string;
 }
 
+const DEFAULT_COMPLETION_MESSAGE = "Thanks {user_mention}, your application #{application_number} for {form_name} was submitted.";
+const DEFAULT_ACCEPT_MESSAGE = "Your application #{application_number} for {form_name} was {status} by {reviewer_mention}.";
+const DEFAULT_DENY_MESSAGE = "Your application #{application_number} for {form_name} was {status}. Reason: {reason}";
+
 const MESSAGE_PLACEHOLDERS: Array<{ token: string; description: string }> = [
   { token: "{user_mention}", description: "Applicant mention" },
   { token: "{user_id}", description: "Applicant user ID" },
@@ -136,7 +140,16 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
   const selectedForm = useMemo(() => forms.find((entry) => entry.formId === selectedFormId) || null, [forms, selectedFormId]);
 
   useEffect(() => {
-    setDraft(selectedForm ? JSON.parse(JSON.stringify(selectedForm)) : null);
+    if (!selectedForm) {
+      setDraft(null);
+      return;
+    }
+
+    const nextDraft: ApplicationForm = JSON.parse(JSON.stringify(selectedForm));
+    if (!nextDraft.completionMessage) nextDraft.completionMessage = DEFAULT_COMPLETION_MESSAGE;
+    if (!nextDraft.acceptMessage) nextDraft.acceptMessage = DEFAULT_ACCEPT_MESSAGE;
+    if (!nextDraft.denyMessage) nextDraft.denyMessage = DEFAULT_DENY_MESSAGE;
+    setDraft(nextDraft);
   }, [selectedForm]);
 
   useRealtimeEvent("applications:updated", () => {
@@ -722,30 +735,9 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                     label: "Messages",
                     content: (
                       <div className="space-y-3">
-                        <Textarea
-                          label="Completion Message"
-                          value={draft.completionMessage || ""}
-                          onChange={(value) => setDraft({ ...draft, completionMessage: value })}
-                          placeholder="Thanks {user_mention}, your application #{application_number} for {form_name} was submitted."
-                          rows={3}
-                          maxLength={2000}
-                        />
-                        <Textarea
-                          label="Accept Message"
-                          value={draft.acceptMessage || ""}
-                          onChange={(value) => setDraft({ ...draft, acceptMessage: value })}
-                          placeholder="Your application #{application_number} for {form_name} was {status} by {reviewer_mention}."
-                          rows={3}
-                          maxLength={2000}
-                        />
-                        <Textarea
-                          label="Deny Message"
-                          value={draft.denyMessage || ""}
-                          onChange={(value) => setDraft({ ...draft, denyMessage: value })}
-                          placeholder="Your application #{application_number} for {form_name} was {status}. Reason: {reason}"
-                          rows={3}
-                          maxLength={2000}
-                        />
+                        <Textarea label="Completion Message" value={draft.completionMessage || ""} onChange={(value) => setDraft({ ...draft, completionMessage: value })} rows={3} maxLength={2000} />
+                        <Textarea label="Accept Message" value={draft.acceptMessage || ""} onChange={(value) => setDraft({ ...draft, acceptMessage: value })} rows={3} maxLength={2000} />
+                        <Textarea label="Deny Message" value={draft.denyMessage || ""} onChange={(value) => setDraft({ ...draft, denyMessage: value })} rows={3} maxLength={2000} />
                         <div className="rounded border border-zinc-700/30 p-3 text-xs text-zinc-300">
                           <p className="text-zinc-100">Available placeholders</p>
                           <div className="mt-2 grid gap-1 sm:grid-cols-2">

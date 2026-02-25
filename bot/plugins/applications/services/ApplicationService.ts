@@ -8,6 +8,10 @@ import type { HeimdallClient } from "../../../src/types/Client.js";
 type FormDoc = IApplicationForm & { _id: unknown; createdAt: Date; updatedAt: Date };
 type SubmissionDoc = IApplicationSubmission & { _id: unknown; createdAt: Date; updatedAt: Date };
 
+const DEFAULT_COMPLETION_MESSAGE = "Thanks {user_mention}, your application #{application_number} for {form_name} was submitted.";
+const DEFAULT_ACCEPT_MESSAGE = "Your application #{application_number} for {form_name} was {status} by {reviewer_mention}.";
+const DEFAULT_DENY_MESSAGE = "Your application #{application_number} for {form_name} was {status}. Reason: {reason}";
+
 export interface CreateFormInput {
   guildId: string;
   name: string;
@@ -53,6 +57,9 @@ export class ApplicationService {
       enabled: false,
       embed: {},
       questions: [],
+      completionMessage: DEFAULT_COMPLETION_MESSAGE,
+      acceptMessage: DEFAULT_ACCEPT_MESSAGE,
+      denyMessage: DEFAULT_DENY_MESSAGE,
       createdBy: input.createdBy,
     });
 
