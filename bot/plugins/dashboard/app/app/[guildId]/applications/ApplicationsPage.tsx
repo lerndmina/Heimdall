@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchApi } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import TextInput from "@/components/ui/TextInput";
@@ -90,6 +90,9 @@ interface ApplicationForm {
   completionMessage?: string;
   acceptMessage?: string;
   denyMessage?: string;
+  completionMessageEmbed?: EmbedData;
+  acceptMessageEmbed?: EmbedData;
+  denyMessageEmbed?: EmbedData;
   modmailCategoryId?: string;
   panels: PanelPost[];
   createdAt: string;
@@ -103,6 +106,9 @@ interface ApplicationsPageProps {
 const DEFAULT_COMPLETION_MESSAGE = "Thanks {user_mention}, your application #{application_number} for {form_name} was submitted.";
 const DEFAULT_ACCEPT_MESSAGE = "Your application #{application_number} for {form_name} was {status} by {reviewer_mention}.";
 const DEFAULT_DENY_MESSAGE = "Your application #{application_number} for {form_name} was {status}. Reason: {reason}";
+const DEFAULT_COMPLETION_MESSAGE_EMBED: EmbedData = { description: DEFAULT_COMPLETION_MESSAGE, color: "#5865f2" };
+const DEFAULT_ACCEPT_MESSAGE_EMBED: EmbedData = { description: DEFAULT_ACCEPT_MESSAGE, color: "#57f287" };
+const DEFAULT_DENY_MESSAGE_EMBED: EmbedData = { description: DEFAULT_DENY_MESSAGE, color: "#ed4245" };
 
 const MESSAGE_PLACEHOLDERS: Array<{ token: string; description: string }> = [
   { token: "{user_mention}", description: "Applicant mention" },
@@ -117,6 +123,23 @@ const MESSAGE_PLACEHOLDERS: Array<{ token: string; description: string }> = [
   { token: "{reviewer_id}", description: "Reviewer user ID" },
   { token: "{guild_id}", description: "Guild ID" },
 ];
+
+function hydrateFormDraft(form: ApplicationForm): ApplicationForm {
+  const nextDraft: ApplicationForm = JSON.parse(JSON.stringify(form));
+  if (!nextDraft.completionMessage) nextDraft.completionMessage = DEFAULT_COMPLETION_MESSAGE;
+  if (!nextDraft.acceptMessage) nextDraft.acceptMessage = DEFAULT_ACCEPT_MESSAGE;
+  if (!nextDraft.denyMessage) nextDraft.denyMessage = DEFAULT_DENY_MESSAGE;
+  if (!nextDraft.completionMessageEmbed || Object.keys(nextDraft.completionMessageEmbed).length === 0) {
+    nextDraft.completionMessageEmbed = { ...(nextDraft.completionMessage ? { description: nextDraft.completionMessage } : DEFAULT_COMPLETION_MESSAGE_EMBED) };
+  }
+  if (!nextDraft.acceptMessageEmbed || Object.keys(nextDraft.acceptMessageEmbed).length === 0) {
+    nextDraft.acceptMessageEmbed = { ...(nextDraft.acceptMessage ? { description: nextDraft.acceptMessage } : DEFAULT_ACCEPT_MESSAGE_EMBED) };
+  }
+  if (!nextDraft.denyMessageEmbed || Object.keys(nextDraft.denyMessageEmbed).length === 0) {
+    nextDraft.denyMessageEmbed = { ...(nextDraft.denyMessage ? { description: nextDraft.denyMessage } : DEFAULT_DENY_MESSAGE_EMBED) };
+  }
+  return nextDraft;
+}
 
 export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
   const canManage = useCanManage("applications.manage");
@@ -136,8 +159,15 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [stats, setStats] = useState<ApplicationStats>({ total: 0, pending: 0, approved: 0, denied: 0 });
   const [submissionStatusFilter, setSubmissionStatusFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
+  const [pendingScrollQuestionId, setPendingScrollQuestionId] = useState<string | null>(null);
+  const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const selectedForm = useMemo(() => forms.find((entry) => entry.formId === selectedFormId) || null, [forms, selectedFormId]);
+  const hydratedSelectedForm = useMemo(() => (selectedForm ? hydrateFormDraft(selectedForm) : null), [selectedForm]);
+  const isDraftDirty = useMemo(() => {
+    if (!draft || !hydratedSelectedForm) return false;
+    return JSON.stringify(draft) !== JSON.stringify(hydratedSelectedForm);
+  }, [draft, hydratedSelectedForm]);
 
   useEffect(() => {
     if (!selectedForm) {
@@ -145,12 +175,27 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
       return;
     }
 
-    const nextDraft: ApplicationForm = JSON.parse(JSON.stringify(selectedForm));
-    if (!nextDraft.completionMessage) nextDraft.completionMessage = DEFAULT_COMPLETION_MESSAGE;
-    if (!nextDraft.acceptMessage) nextDraft.acceptMessage = DEFAULT_ACCEPT_MESSAGE;
-    if (!nextDraft.denyMessage) nextDraft.denyMessage = DEFAULT_DENY_MESSAGE;
-    setDraft(nextDraft);
+    setDraft(hydrateFormDraft(selectedForm));
   }, [selectedForm]);
+
+  useEffect(() => {
+    if (!pendingScrollQuestionId) return;
+    const target = questionRefs.current[pendingScrollQuestionId];
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    setPendingScrollQuestionId(null);
+  }, [pendingScrollQuestionId, draft?.questions?.length]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDraftDirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDraftDirty]);
 
   useRealtimeEvent("applications:updated", () => {
     void loadForms();
@@ -367,14 +412,21 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
 
   const addQuestion = () => {
     if (!draft) return;
+    const questionId = crypto.randomUUID();
     const next: ApplicationQuestion = {
-      id: crypto.randomUUID(),
+      id: questionId,
       type: "short",
       label: "New question",
       required: true,
       options: [],
     };
     setDraft({ ...draft, questions: [...(draft.questions || []), next] });
+    setPendingScrollQuestionId(questionId);
+  };
+
+  const resetDraft = () => {
+    if (!selectedForm) return;
+    setDraft(hydrateFormDraft(selectedForm));
   };
 
   const updateQuestion = (questionId: string, patch: Partial<ApplicationQuestion>) => {
@@ -543,269 +595,304 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
             {!draft ? (
               <p className="text-sm text-zinc-400">Select a form to begin.</p>
             ) : (
-              <Tabs
-                tabs={[
-                  {
-                    id: "general",
-                    label: "General",
-                    content: (
-                      <div className="space-y-4">
-                        <TextInput label="Form Name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
-                        <Toggle label="Enabled" checked={draft.enabled} onChange={(checked) => setDraft({ ...draft, enabled: checked })} />
-                        <Combobox
-                          options={[
-                            { value: "text", label: "Text Channel" },
-                            { value: "forum", label: "Forum Channel" },
-                          ]}
-                          value={draft.submissionChannelType || "text"}
-                          onChange={(value) => setDraft({ ...draft, submissionChannelType: value as "text" | "forum" })}
-                          placeholder="Submission channel type"
-                        />
-                        <ChannelCombobox
-                          guildId={guildId}
-                          value={draft.submissionChannelId || ""}
-                          onChange={(value) => setDraft({ ...draft, submissionChannelId: value })}
-                          channelType={draft.submissionChannelType === "forum" ? "forum" : "text"}
-                          label="Submission Channel"
-                        />
-                        <NumberInput
-                          label="Reapply Cooldown (seconds)"
-                          value={draft.cooldownSeconds || 0}
-                          min={0}
-                          max={31536000}
-                          onChange={(value) => setDraft({ ...draft, cooldownSeconds: Number.isFinite(value) ? Math.max(0, value) : 0 })}
-                        />
-                      </div>
-                    ),
-                  },
-                  {
-                    id: "embed",
-                    label: "Embed",
-                    content: <EmbedEditor value={draft.embed || {}} onChange={(value) => setDraft({ ...draft, embed: value })} />,
-                  },
-                  {
-                    id: "questions",
-                    label: "Questions",
-                    content: (
-                      <div className="space-y-4">
-                        <button type="button" className="rounded-md border border-zinc-700/30 px-3 py-1.5 text-sm text-zinc-200" onClick={addQuestion}>
-                          Add Question
-                        </button>
-                        {(draft.questions || []).map((question, index) => (
-                          <div key={question.id} className="space-y-3 rounded-lg border border-zinc-700/30 p-3">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-semibold text-zinc-200">Question {index + 1}</p>
-                              <div className="flex gap-2">
-                                <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs" onClick={() => moveQuestion(question.id, -1)}>
-                                  ↑
-                                </button>
-                                <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs" onClick={() => moveQuestion(question.id, 1)}>
-                                  ↓
-                                </button>
-                                <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs text-rose-300" onClick={() => deleteQuestion(question.id)}>
-                                  Delete
-                                </button>
+              <>
+                <Tabs
+                  tabs={[
+                    {
+                      id: "general",
+                      label: "General",
+                      content: (
+                        <div className="space-y-4">
+                          <TextInput label="Form Name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
+                          <Toggle label="Enabled" checked={draft.enabled} onChange={(checked) => setDraft({ ...draft, enabled: checked })} />
+                          <Combobox
+                            options={[
+                              { value: "text", label: "Text Channel" },
+                              { value: "forum", label: "Forum Channel" },
+                            ]}
+                            value={draft.submissionChannelType || "text"}
+                            onChange={(value) => setDraft({ ...draft, submissionChannelType: value as "text" | "forum" })}
+                            placeholder="Submission channel type"
+                          />
+                          <ChannelCombobox
+                            guildId={guildId}
+                            value={draft.submissionChannelId || ""}
+                            onChange={(value) => setDraft({ ...draft, submissionChannelId: value })}
+                            channelType={draft.submissionChannelType === "forum" ? "forum" : "text"}
+                            excludeForums={draft.submissionChannelType !== "forum"}
+                            label="Submission Channel"
+                          />
+                          <NumberInput
+                            label="Reapply Cooldown (seconds)"
+                            value={draft.cooldownSeconds || 0}
+                            min={0}
+                            max={31536000}
+                            onChange={(value) => setDraft({ ...draft, cooldownSeconds: Number.isFinite(value) ? Math.max(0, value) : 0 })}
+                          />
+                        </div>
+                      ),
+                    },
+                    {
+                      id: "embed",
+                      label: "Embed",
+                      content: <EmbedEditor value={draft.embed || {}} onChange={(value) => setDraft({ ...draft, embed: value })} />,
+                    },
+                    {
+                      id: "questions",
+                      label: "Questions",
+                      content: (
+                        <div className="space-y-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-zinc-700/30 p-2">
+                            <p className="text-sm text-zinc-300">
+                              {(draft.questions || []).length} question{(draft.questions || []).length === 1 ? "" : "s"}
+                            </p>
+                            <button type="button" className="rounded-md border border-zinc-700/30 px-3 py-1.5 text-sm text-zinc-200" onClick={addQuestion}>
+                              Add Question
+                            </button>
+                          </div>
+                          {(draft.questions || []).map((question, index) => (
+                            <div
+                              key={question.id}
+                              ref={(node) => {
+                                questionRefs.current[question.id] = node;
+                              }}
+                              className="space-y-3 rounded-lg border border-zinc-700/30 p-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold text-zinc-200">Question {index + 1}</p>
+                                <div className="flex gap-2">
+                                  <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs" onClick={() => moveQuestion(question.id, -1)}>
+                                    ↑
+                                  </button>
+                                  <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs" onClick={() => moveQuestion(question.id, 1)}>
+                                    ↓
+                                  </button>
+                                  <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs text-rose-300" onClick={() => deleteQuestion(question.id)}>
+                                    Delete
+                                  </button>
+                                </div>
                               </div>
+
+                              <Combobox
+                                options={questionTypeOptions}
+                                value={question.type}
+                                onChange={(value) => updateQuestion(question.id, { type: value as QuestionType })}
+                                placeholder="Question type"
+                              />
+                              <TextInput label="Label" value={question.label} onChange={(value) => updateQuestion(question.id, { label: value })} />
+                              <Textarea label="Description" value={question.description || ""} onChange={(value) => updateQuestion(question.id, { description: value })} rows={2} />
+                              <TextInput label="Placeholder" value={question.placeholder || ""} onChange={(value) => updateQuestion(question.id, { placeholder: value })} />
+                              <Toggle label="Required" checked={question.required !== false} onChange={(checked) => updateQuestion(question.id, { required: checked })} />
+
+                              {(question.type === "short" || question.type === "long") && (
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  <NumberInput
+                                    label="Min Length"
+                                    value={question.minLength || 0}
+                                    min={0}
+                                    max={4000}
+                                    onChange={(value) => updateQuestion(question.id, { minLength: value || undefined })}
+                                  />
+                                  <NumberInput
+                                    label="Max Length"
+                                    value={question.maxLength || 200}
+                                    min={1}
+                                    max={4000}
+                                    onChange={(value) => updateQuestion(question.id, { maxLength: value || undefined })}
+                                  />
+                                </div>
+                              )}
+
+                              {question.type === "number" && (
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  <NumberInput label="Min Value" value={question.minValue || 0} onChange={(value) => updateQuestion(question.id, { minValue: value || undefined })} />
+                                  <NumberInput label="Max Value" value={question.maxValue || 0} onChange={(value) => updateQuestion(question.id, { maxValue: value || undefined })} />
+                                </div>
+                              )}
+
+                              {(question.type === "select_single" || question.type === "select_multi" || question.type === "button") && (
+                                <div className="space-y-2 rounded-md border border-zinc-700/30 p-2">
+                                  <p className="text-sm text-zinc-300">Options</p>
+                                  {(question.options || []).map((option, optionIndex) => (
+                                    <div key={option.id} className="grid gap-2 sm:grid-cols-12">
+                                      <div className="sm:col-span-4">
+                                        <TextInput
+                                          label="Label"
+                                          value={option.label}
+                                          onChange={(value) => {
+                                            const next = [...(question.options || [])];
+                                            next[optionIndex] = { ...next[optionIndex], label: value, value: next[optionIndex].value || value };
+                                            updateQuestion(question.id, { options: next });
+                                          }}
+                                        />
+                                      </div>
+                                      <div className="sm:col-span-4">
+                                        <TextInput
+                                          label="Value"
+                                          value={option.value}
+                                          onChange={(value) => {
+                                            const next = [...(question.options || [])];
+                                            next[optionIndex] = { ...next[optionIndex], value };
+                                            updateQuestion(question.id, { options: next });
+                                          }}
+                                        />
+                                      </div>
+                                      <div className="sm:col-span-3">
+                                        <TextInput
+                                          label="Emoji"
+                                          value={option.emoji || ""}
+                                          onChange={(value) => {
+                                            const next = [...(question.options || [])];
+                                            next[optionIndex] = { ...next[optionIndex], emoji: value };
+                                            updateQuestion(question.id, { options: next });
+                                          }}
+                                        />
+                                      </div>
+                                      <div className="sm:col-span-1 flex items-end">
+                                        <button
+                                          type="button"
+                                          className="h-10 w-full rounded border border-zinc-700/30 text-xs text-rose-300"
+                                          onClick={() => {
+                                            const next = [...(question.options || [])];
+                                            next.splice(optionIndex, 1);
+                                            updateQuestion(question.id, { options: next });
+                                          }}>
+                                          X
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+
+                                  <button
+                                    type="button"
+                                    className="rounded border border-zinc-700/30 px-3 py-1.5 text-xs"
+                                    onClick={() => {
+                                      const next = [...(question.options || []), { id: crypto.randomUUID(), label: "Option", value: "option" }];
+                                      updateQuestion(question.id, { options: next });
+                                    }}>
+                                    Add Option
+                                  </button>
+                                </div>
+                              )}
                             </div>
+                          ))}
+                          <div className="flex justify-center">
+                            <button type="button" className="rounded-md border border-zinc-700/30 px-3 py-1.5 text-sm text-zinc-200" onClick={addQuestion}>
+                              Add Question
+                            </button>
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      id: "roles",
+                      label: "Roles",
+                      content: (
+                        <div className="space-y-3">
+                          <RoleListEditor label="Review Roles" values={draft.reviewRoleIds || []} onChange={(values) => updateRoleList("reviewRoleIds", values)} />
+                          <RoleListEditor label="Required Roles" values={draft.requiredRoleIds || []} onChange={(values) => updateRoleList("requiredRoleIds", values)} />
+                          <RoleListEditor label="Restricted Roles" values={draft.restrictedRoleIds || []} onChange={(values) => updateRoleList("restrictedRoleIds", values)} />
+                          <RoleListEditor label="Ping Roles" values={draft.pingRoleIds || []} onChange={(values) => updateRoleList("pingRoleIds", values)} />
+                          <RoleListEditor label="Accept Roles" values={draft.acceptRoleIds || []} onChange={(values) => updateRoleList("acceptRoleIds", values)} />
+                          <RoleListEditor label="Deny Roles" values={draft.denyRoleIds || []} onChange={(values) => updateRoleList("denyRoleIds", values)} />
+                          <RoleListEditor label="Accept Remove Roles" values={draft.acceptRemoveRoleIds || []} onChange={(values) => updateRoleList("acceptRemoveRoleIds", values)} />
+                          <RoleListEditor label="Deny Remove Roles" values={draft.denyRemoveRoleIds || []} onChange={(values) => updateRoleList("denyRemoveRoleIds", values)} />
+                        </div>
+                      ),
+                    },
+                    {
+                      id: "messages",
+                      label: "Messages",
+                      content: (
+                        <div className="space-y-3">
+                          <div className="rounded border border-zinc-700/30 p-3">
+                            <EmbedEditor heading="Completion Message Embed" value={draft.completionMessageEmbed || {}} onChange={(value) => setDraft({ ...draft, completionMessageEmbed: value })} />
+                          </div>
+                          <div className="rounded border border-zinc-700/30 p-3">
+                            <EmbedEditor heading="Accept Message Embed" value={draft.acceptMessageEmbed || {}} onChange={(value) => setDraft({ ...draft, acceptMessageEmbed: value })} />
+                          </div>
+                          <div className="rounded border border-zinc-700/30 p-3">
+                            <EmbedEditor heading="Deny Message Embed" value={draft.denyMessageEmbed || {}} onChange={(value) => setDraft({ ...draft, denyMessageEmbed: value })} />
+                          </div>
+                          <div className="rounded border border-zinc-700/30 p-3 text-xs text-zinc-300">
+                            <p className="text-zinc-100">Available placeholders</p>
+                            <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                              {MESSAGE_PLACEHOLDERS.map((entry) => (
+                                <p key={entry.token}>
+                                  <span className="text-zinc-100">{entry.token}</span> — {entry.description}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                          <TextInput
+                            label="Modmail Category ID"
+                            value={draft.modmailCategoryId || ""}
+                            onChange={(value) => setDraft({ ...draft, modmailCategoryId: value })}
+                            placeholder="Optional modmail category id"
+                          />
+                        </div>
+                      ),
+                    },
+                    {
+                      id: "panels",
+                      label: "Panels",
+                      content: (
+                        <div className="space-y-3">
+                          <ChannelCombobox guildId={guildId} value={postChannelId} onChange={setPostChannelId} channelType="text" excludeForums label="Post Panel To Channel" />
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm" onClick={postPanel} disabled={!postChannelId || !canManage}>
+                              Post Panel
+                            </button>
+                            <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm" onClick={updatePostedPanels} disabled={!canManage}>
+                              Update Posted Panels
+                            </button>
+                          </div>
 
-                            <Combobox
-                              options={questionTypeOptions}
-                              value={question.type}
-                              onChange={(value) => updateQuestion(question.id, { type: value as QuestionType })}
-                              placeholder="Question type"
-                            />
-                            <TextInput label="Label" value={question.label} onChange={(value) => updateQuestion(question.id, { label: value })} />
-                            <Textarea label="Description" value={question.description || ""} onChange={(value) => updateQuestion(question.id, { description: value })} rows={2} />
-                            <TextInput label="Placeholder" value={question.placeholder || ""} onChange={(value) => updateQuestion(question.id, { placeholder: value })} />
-                            <Toggle label="Required" checked={question.required !== false} onChange={(checked) => updateQuestion(question.id, { required: checked })} />
-
-                            {(question.type === "short" || question.type === "long") && (
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                <NumberInput
-                                  label="Min Length"
-                                  value={question.minLength || 0}
-                                  min={0}
-                                  max={4000}
-                                  onChange={(value) => updateQuestion(question.id, { minLength: value || undefined })}
-                                />
-                                <NumberInput
-                                  label="Max Length"
-                                  value={question.maxLength || 200}
-                                  min={1}
-                                  max={4000}
-                                  onChange={(value) => updateQuestion(question.id, { maxLength: value || undefined })}
-                                />
-                              </div>
-                            )}
-
-                            {question.type === "number" && (
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                <NumberInput label="Min Value" value={question.minValue || 0} onChange={(value) => updateQuestion(question.id, { minValue: value || undefined })} />
-                                <NumberInput label="Max Value" value={question.maxValue || 0} onChange={(value) => updateQuestion(question.id, { maxValue: value || undefined })} />
-                              </div>
-                            )}
-
-                            {(question.type === "select_single" || question.type === "select_multi" || question.type === "button") && (
-                              <div className="space-y-2 rounded-md border border-zinc-700/30 p-2">
-                                <p className="text-sm text-zinc-300">Options</p>
-                                {(question.options || []).map((option, optionIndex) => (
-                                  <div key={option.id} className="grid gap-2 sm:grid-cols-12">
-                                    <div className="sm:col-span-4">
-                                      <TextInput
-                                        label="Label"
-                                        value={option.label}
-                                        onChange={(value) => {
-                                          const next = [...(question.options || [])];
-                                          next[optionIndex] = { ...next[optionIndex], label: value, value: next[optionIndex].value || value };
-                                          updateQuestion(question.id, { options: next });
-                                        }}
-                                      />
-                                    </div>
-                                    <div className="sm:col-span-4">
-                                      <TextInput
-                                        label="Value"
-                                        value={option.value}
-                                        onChange={(value) => {
-                                          const next = [...(question.options || [])];
-                                          next[optionIndex] = { ...next[optionIndex], value };
-                                          updateQuestion(question.id, { options: next });
-                                        }}
-                                      />
-                                    </div>
-                                    <div className="sm:col-span-3">
-                                      <TextInput
-                                        label="Emoji"
-                                        value={option.emoji || ""}
-                                        onChange={(value) => {
-                                          const next = [...(question.options || [])];
-                                          next[optionIndex] = { ...next[optionIndex], emoji: value };
-                                          updateQuestion(question.id, { options: next });
-                                        }}
-                                      />
-                                    </div>
-                                    <div className="sm:col-span-1 flex items-end">
-                                      <button
-                                        type="button"
-                                        className="h-10 w-full rounded border border-zinc-700/30 text-xs text-rose-300"
-                                        onClick={() => {
-                                          const next = [...(question.options || [])];
-                                          next.splice(optionIndex, 1);
-                                          updateQuestion(question.id, { options: next });
-                                        }}>
-                                        X
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-
+                          <div className="space-y-2">
+                            {(draft.panels || []).length === 0 ? <p className="text-sm text-zinc-500">No posted panels yet.</p> : null}
+                            {(draft.panels || []).map((panel) => (
+                              <div key={panel.panelId} className="flex items-center justify-between rounded border border-zinc-700/30 p-2 text-sm">
+                                <div>
+                                  <p className="text-zinc-200">
+                                    Channel: <span className="text-zinc-400">{panel.channelId}</span>
+                                  </p>
+                                  <p className="text-zinc-500">Message: {panel.messageId}</p>
+                                </div>
                                 <button
                                   type="button"
-                                  className="rounded border border-zinc-700/30 px-3 py-1.5 text-xs"
-                                  onClick={() => {
-                                    const next = [...(question.options || []), { id: crypto.randomUUID(), label: "Option", value: "option" }];
-                                    updateQuestion(question.id, { options: next });
-                                  }}>
-                                  Add Option
+                                  className="rounded border border-zinc-700/30 px-2 py-1 text-xs text-rose-300"
+                                  onClick={() => removePostedPanel(panel.panelId)}
+                                  disabled={!canManage}>
+                                  Remove
                                 </button>
                               </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ),
-                  },
-                  {
-                    id: "roles",
-                    label: "Roles",
-                    content: (
-                      <div className="space-y-3">
-                        <RoleListEditor label="Review Roles" values={draft.reviewRoleIds || []} onChange={(values) => updateRoleList("reviewRoleIds", values)} />
-                        <RoleListEditor label="Required Roles" values={draft.requiredRoleIds || []} onChange={(values) => updateRoleList("requiredRoleIds", values)} />
-                        <RoleListEditor label="Restricted Roles" values={draft.restrictedRoleIds || []} onChange={(values) => updateRoleList("restrictedRoleIds", values)} />
-                        <RoleListEditor label="Ping Roles" values={draft.pingRoleIds || []} onChange={(values) => updateRoleList("pingRoleIds", values)} />
-                        <RoleListEditor label="Accept Roles" values={draft.acceptRoleIds || []} onChange={(values) => updateRoleList("acceptRoleIds", values)} />
-                        <RoleListEditor label="Deny Roles" values={draft.denyRoleIds || []} onChange={(values) => updateRoleList("denyRoleIds", values)} />
-                        <RoleListEditor label="Accept Remove Roles" values={draft.acceptRemoveRoleIds || []} onChange={(values) => updateRoleList("acceptRemoveRoleIds", values)} />
-                        <RoleListEditor label="Deny Remove Roles" values={draft.denyRemoveRoleIds || []} onChange={(values) => updateRoleList("denyRemoveRoleIds", values)} />
-                      </div>
-                    ),
-                  },
-                  {
-                    id: "messages",
-                    label: "Messages",
-                    content: (
-                      <div className="space-y-3">
-                        <Textarea label="Completion Message" value={draft.completionMessage || ""} onChange={(value) => setDraft({ ...draft, completionMessage: value })} rows={3} maxLength={2000} />
-                        <Textarea label="Accept Message" value={draft.acceptMessage || ""} onChange={(value) => setDraft({ ...draft, acceptMessage: value })} rows={3} maxLength={2000} />
-                        <Textarea label="Deny Message" value={draft.denyMessage || ""} onChange={(value) => setDraft({ ...draft, denyMessage: value })} rows={3} maxLength={2000} />
-                        <div className="rounded border border-zinc-700/30 p-3 text-xs text-zinc-300">
-                          <p className="text-zinc-100">Available placeholders</p>
-                          <div className="mt-2 grid gap-1 sm:grid-cols-2">
-                            {MESSAGE_PLACEHOLDERS.map((entry) => (
-                              <p key={entry.token}>
-                                <span className="text-zinc-100">{entry.token}</span> — {entry.description}
-                              </p>
                             ))}
                           </div>
                         </div>
-                        <TextInput
-                          label="Modmail Category ID"
-                          value={draft.modmailCategoryId || ""}
-                          onChange={(value) => setDraft({ ...draft, modmailCategoryId: value })}
-                          placeholder="Optional modmail category id"
-                        />
-                      </div>
-                    ),
-                  },
-                  {
-                    id: "panels",
-                    label: "Panels",
-                    content: (
-                      <div className="space-y-3">
-                        <ChannelCombobox guildId={guildId} value={postChannelId} onChange={setPostChannelId} channelType="text" label="Post Panel To Channel" />
-                        <div className="flex flex-wrap gap-2">
-                          <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm" onClick={postPanel} disabled={!postChannelId || !canManage}>
-                            Post Panel
-                          </button>
-                          <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm" onClick={updatePostedPanels} disabled={!canManage}>
-                            Update Posted Panels
-                          </button>
-                        </div>
-
-                        <div className="space-y-2">
-                          {(draft.panels || []).length === 0 ? <p className="text-sm text-zinc-500">No posted panels yet.</p> : null}
-                          {(draft.panels || []).map((panel) => (
-                            <div key={panel.panelId} className="flex items-center justify-between rounded border border-zinc-700/30 p-2 text-sm">
-                              <div>
-                                <p className="text-zinc-200">
-                                  Channel: <span className="text-zinc-400">{panel.channelId}</span>
-                                </p>
-                                <p className="text-zinc-500">Message: {panel.messageId}</p>
-                              </div>
-                              <button
-                                type="button"
-                                className="rounded border border-zinc-700/30 px-2 py-1 text-xs text-rose-300"
-                                onClick={() => removePostedPanel(panel.panelId)}
-                                disabled={!canManage}>
-                                Remove
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ),
-                  },
-                ]}
-              />
+                      ),
+                    },
+                  ]}
+                />
+              </>
             )}
             {draft ? (
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-700/30 pt-4">
-                <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm" onClick={saveForm} disabled={saving || !canManage}>
-                  {saving ? "Saving..." : "Save Form"}
-                </button>
-                <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm text-rose-300" onClick={() => deleteForm(draft.formId)} disabled={!canManage}>
-                  Delete Form
-                </button>
+              <div className="sticky bottom-0 z-10 mt-4 border-t border-zinc-700/30 bg-[#11131a]/95 pb-2 pt-3 backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`inline-block h-2 w-2 rounded-full ${isDraftDirty ? "bg-amber-400" : "bg-emerald-400"}`} />
+                    <span className={isDraftDirty ? "text-amber-300" : "text-emerald-300"}>{isDraftDirty ? "Unsaved changes" : "All changes saved"}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm" onClick={resetDraft} disabled={!isDraftDirty || !canManage}>
+                      Reset Changes
+                    </button>
+                    <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm" onClick={saveForm} disabled={saving || !canManage || !isDraftDirty}>
+                      {saving ? "Saving..." : "Save Form"}
+                    </button>
+                    <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm text-rose-300" onClick={() => deleteForm(draft.formId)} disabled={!canManage}>
+                      Delete Form
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : null}
           </CardContent>
