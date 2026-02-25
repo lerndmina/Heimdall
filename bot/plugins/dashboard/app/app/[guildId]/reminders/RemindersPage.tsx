@@ -265,7 +265,7 @@ export default function RemindersPage({ guildId }: { guildId: string }) {
       <Card>
         <CardContent>
           <p className="text-sm text-red-400">{error}</p>
-          <button onClick={fetchReminders} className="mt-3 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-700">
+          <button onClick={fetchReminders} className="mt-3 rounded-lg border border-zinc-700/30 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/10">
             Retry
           </button>
         </CardContent>
@@ -324,7 +324,7 @@ export default function RemindersPage({ guildId }: { guildId: string }) {
                 </div>
                 {!r.triggered && (
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => openEditModal(r)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200" title="Edit">
+                    <button onClick={() => openEditModal(r)} className="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200" title="Edit">
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                           strokeLinecap="round"
@@ -367,7 +367,7 @@ export default function RemindersPage({ guildId }: { guildId: string }) {
                 <button
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                   Previous
                 </button>
                 <span className="text-xs text-zinc-500">
@@ -376,7 +376,7 @@ export default function RemindersPage({ guildId }: { guildId: string }) {
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
                   Next
                 </button>
               </div>
@@ -392,13 +392,13 @@ export default function RemindersPage({ guildId }: { guildId: string }) {
         title={editReminder ? "Edit Reminder" : "New Reminder"}
         footer={
           <>
-            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={modalSaving || !draftMessage.trim() || !draftTriggerAt}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed">
               {modalSaving && (
                 <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
@@ -435,7 +435,7 @@ export default function RemindersPage({ guildId }: { guildId: string }) {
         title="Delete Reminder"
         footer={
           <>
-            <button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setDeleteTarget(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button

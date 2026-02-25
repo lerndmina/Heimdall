@@ -390,7 +390,7 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-700 hover:text-zinc-100 disabled:opacity-50">
+          className="flex items-center gap-2 rounded-lg border border-zinc-700/30 bg-white/5 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/10 hover:text-zinc-100 disabled:opacity-50">
           <svg className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
@@ -489,7 +489,7 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
                           if (e.key === "Enter" || e.key === " ") setSelectedRoleId(doc.discordRoleId);
                         }}
                         className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition cursor-pointer ${
-                          isSelected ? "bg-primary-500/10 text-primary-400" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                          isSelected ? "bg-primary-500/10 text-primary-400" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
                         }`}>
                         <div className="flex items-center gap-2">
                           <span className="h-3 w-3 rounded-full" style={{ backgroundColor: role?.color ?? "#99aab5" }} />
@@ -603,13 +603,16 @@ export default function SettingsPage({ guildId }: SettingsPageProps) {
         }`}>
         <p className="text-sm text-zinc-300">Careful — you have unsaved changes!</p>
         <div className="flex items-center gap-3">
-          <button onClick={cancelPending} disabled={saving} className="rounded-md px-4 py-1.5 text-sm font-medium text-zinc-300 transition hover:text-zinc-100 hover:underline disabled:opacity-50">
+          <button
+            onClick={cancelPending}
+            disabled={saving}
+            className="rounded-lg border border-zinc-700/30 px-4 py-1.5 text-sm font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-50">
             Reset
           </button>
           <button
             onClick={saveAllPending}
             disabled={saving}
-            className="flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50">
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50">
             {saving && <Spinner />}
             {saving ? "Saving…" : "Save Changes"}
           </button>

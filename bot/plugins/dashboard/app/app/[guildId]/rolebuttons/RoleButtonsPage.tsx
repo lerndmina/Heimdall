@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import TextInput from "@/components/ui/TextInput";
 import Textarea from "@/components/ui/Textarea";
 import Toggle from "@/components/ui/Toggle";
@@ -264,17 +264,19 @@ export default function RoleButtonsPage({ guildId }: { guildId: string }) {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Card className="lg:col-span-1">
-        <div className="flex items-center justify-between">
+        <CardHeader>
           <CardTitle>Panels</CardTitle>
           {canManage && (
             <button onClick={() => setCreateOpen(true)} className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500">
               Create New
             </button>
           )}
-        </div>
+        </CardHeader>
         <CardContent className="space-y-2">
           {panels.length === 0 ? (
-            <CardDescription>No panels yet.</CardDescription>
+            <div className="py-4 text-center">
+              <CardDescription>No panels yet. Click “Create New” to get started.</CardDescription>
+            </div>
           ) : (
             panels.map((panel) => (
               <button
@@ -436,7 +438,11 @@ export default function RoleButtonsPage({ guildId }: { guildId: string }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 border-t border-zinc-700/30 pt-3">
-              <button onClick={savePanel} disabled={!canManage || saving} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-500 disabled:opacity-50">
+              <button
+                onClick={savePanel}
+                disabled={!canManage || saving}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50">
+                {saving && <Spinner size="h-4 w-4" />}
                 Save
               </button>
               <button onClick={() => setPostOpen(true)} disabled={!canManage} className="rounded-lg border border-zinc-700/40 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:opacity-50">
