@@ -8,6 +8,7 @@ import Textarea from "@/components/ui/Textarea";
 import Toggle from "@/components/ui/Toggle";
 import NumberInput from "@/components/ui/NumberInput";
 import Tabs from "@/components/ui/Tabs";
+import Modal from "@/components/ui/Modal";
 import Combobox from "@/components/ui/Combobox";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
@@ -160,6 +161,8 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
   const [stats, setStats] = useState<ApplicationStats>({ total: 0, pending: 0, approved: 0, denied: 0 });
   const [submissionStatusFilter, setSubmissionStatusFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
   const [pendingScrollQuestionId, setPendingScrollQuestionId] = useState<string | null>(null);
+  const [confirmDeleteFormId, setConfirmDeleteFormId] = useState<string | null>(null);
+  const [confirmDeleteSubmissionId, setConfirmDeleteSubmissionId] = useState<string | null>(null);
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const selectedForm = useMemo(() => forms.find((entry) => entry.formId === selectedFormId) || null, [forms, selectedFormId]);
@@ -310,16 +313,14 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
   }
 
   async function deleteForm(formId: string) {
-    const ok = window.confirm("Delete this application form?");
-    if (!ok) return;
-
     const response = await fetchApi(guildId, `applications/forms/${formId}`, { method: "DELETE" });
     if (!response.success) {
       toast.error(response.error?.message ?? "Failed to delete form");
+      setConfirmDeleteFormId(null);
       return;
     }
-
     toast.success("Form deleted");
+    setConfirmDeleteFormId(null);
     await loadForms();
   }
 
@@ -399,13 +400,14 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
   }
 
   async function deleteSubmission(applicationId: string) {
-    if (!window.confirm("Delete this submission?")) return;
     const response = await fetchApi(guildId, `applications/submissions/${applicationId}`, { method: "DELETE" });
     if (!response.success) {
       toast.error(response.error?.message ?? "Failed to delete submission");
+      setConfirmDeleteSubmissionId(null);
       return;
     }
     toast.success("Submission deleted");
+    setConfirmDeleteSubmissionId(null);
     await loadSubmissions();
     await loadStats();
   }
@@ -500,12 +502,12 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
             <div className="flex-1">
               <RoleCombobox guildId={guildId} value={entry} onChange={(value) => update(index, value)} includeEveryone={false} />
             </div>
-            <button type="button" className="rounded-md border border-zinc-700/30 px-2 py-2 text-xs text-zinc-300" onClick={() => remove(index)}>
+            <button type="button" className="rounded-lg border border-zinc-700/30 px-2 py-2 text-xs text-zinc-300 transition hover:bg-white/5" onClick={() => remove(index)}>
               Remove
             </button>
           </div>
         ))}
-        <button type="button" className="rounded-md border border-zinc-700/30 px-3 py-1.5 text-xs text-zinc-300" onClick={add}>
+        <button type="button" className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-xs text-zinc-300 transition hover:bg-white/5" onClick={add}>
           Add Role
         </button>
       </div>
@@ -646,7 +648,7 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                             <p className="text-sm text-zinc-300">
                               {(draft.questions || []).length} question{(draft.questions || []).length === 1 ? "" : "s"}
                             </p>
-                            <button type="button" className="rounded-md border border-zinc-700/30 px-3 py-1.5 text-sm text-zinc-200" onClick={addQuestion}>
+                            <button type="button" className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-sm text-zinc-200 transition hover:bg-white/5" onClick={addQuestion}>
                               Add Question
                             </button>
                           </div>
@@ -689,14 +691,14 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                                     label="Min Length"
                                     value={question.minLength || 0}
                                     min={0}
-                                    max={4000}
+                                    max={2000}
                                     onChange={(value) => updateQuestion(question.id, { minLength: value || undefined })}
                                   />
                                   <NumberInput
                                     label="Max Length"
                                     value={question.maxLength || 200}
                                     min={1}
-                                    max={4000}
+                                    max={2000}
                                     onChange={(value) => updateQuestion(question.id, { maxLength: value || undefined })}
                                   />
                                 </div>
@@ -710,7 +712,7 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                               )}
 
                               {(question.type === "select_single" || question.type === "select_multi" || question.type === "button") && (
-                                <div className="space-y-2 rounded-md border border-zinc-700/30 p-2">
+                                <div className="space-y-2 rounded-lg border border-zinc-700/30 p-2">
                                   <p className="text-sm text-zinc-300">Options</p>
                                   {(question.options || []).map((option, optionIndex) => (
                                     <div key={option.id} className="grid gap-2 sm:grid-cols-12">
@@ -776,7 +778,7 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                             </div>
                           ))}
                           <div className="flex justify-center">
-                            <button type="button" className="rounded-md border border-zinc-700/30 px-3 py-1.5 text-sm text-zinc-200" onClick={addQuestion}>
+                            <button type="button" className="rounded-lg border border-zinc-700/30 px-3 py-1.5 text-sm text-zinc-200 transition hover:bg-white/5" onClick={addQuestion}>
                               Add Question
                             </button>
                           </div>
@@ -882,13 +884,25 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                     <span className={isDraftDirty ? "text-amber-300" : "text-emerald-300"}>{isDraftDirty ? "Unsaved changes" : "All changes saved"}</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm" onClick={resetDraft} disabled={!isDraftDirty || !canManage}>
+                    <button
+                      type="button"
+                      className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm font-medium text-zinc-300 transition hover:bg-white/5"
+                      onClick={resetDraft}
+                      disabled={!isDraftDirty || !canManage}>
                       Reset Changes
                     </button>
-                    <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm" onClick={saveForm} disabled={saving || !canManage || !isDraftDirty}>
-                      {saving ? "Saving..." : "Save Form"}
+                    <button
+                      type="button"
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                      onClick={saveForm}
+                      disabled={saving || !canManage || !isDraftDirty}>
+                      {saving ? "Saving…" : "Save Form"}
                     </button>
-                    <button type="button" className="rounded border border-zinc-700/30 px-3 py-1.5 text-sm text-rose-300" onClick={() => deleteForm(draft.formId)} disabled={!canManage}>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-red-900/40 bg-red-600/10 px-3 py-1.5 text-sm font-medium text-rose-300 transition hover:bg-red-600/20"
+                      onClick={() => setConfirmDeleteFormId(draft.formId)}
+                      disabled={!canManage}>
                       Delete Form
                     </button>
                   </div>
@@ -964,7 +978,7 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                       <button
                         type="button"
                         className="rounded border border-zinc-700/30 px-2 py-1 text-xs text-rose-300"
-                        onClick={() => deleteSubmission(submission.applicationId)}
+                        onClick={() => setConfirmDeleteSubmissionId(submission.applicationId)}
                         disabled={!canManage}>
                         Delete
                       </button>
@@ -983,6 +997,44 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
           )}
         </CardContent>
       </Card>
+
+      <Modal
+        open={!!confirmDeleteFormId}
+        onClose={() => setConfirmDeleteFormId(null)}
+        title="Delete Form"
+        maxWidth="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setConfirmDeleteFormId(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
+              Cancel
+            </button>
+            <button onClick={() => confirmDeleteFormId && deleteForm(confirmDeleteFormId)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500">
+              Delete Form
+            </button>
+          </div>
+        }>
+        <p className="text-sm text-zinc-300">Are you sure you want to delete this application form? All associated submissions will remain but the form will be removed.</p>
+      </Modal>
+
+      <Modal
+        open={!!confirmDeleteSubmissionId}
+        onClose={() => setConfirmDeleteSubmissionId(null)}
+        title="Delete Submission"
+        maxWidth="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setConfirmDeleteSubmissionId(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
+              Cancel
+            </button>
+            <button
+              onClick={() => confirmDeleteSubmissionId && deleteSubmission(confirmDeleteSubmissionId)}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500">
+              Delete Submission
+            </button>
+          </div>
+        }>
+        <p className="text-sm text-zinc-300">This will permanently delete the submission. This cannot be undone.</p>
+      </Modal>
     </div>
   );
 }
