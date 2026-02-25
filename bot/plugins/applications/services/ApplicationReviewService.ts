@@ -19,6 +19,21 @@ import { ApplicationService } from "./ApplicationService.js";
 import { buildReviewComponents, buildSubmissionEmbeds } from "../utils/ApplicationEmbeds.js";
 import { formatApplicationMessage, formatApplicationMessageEmbed, hasApplicationMessageEmbedContent } from "../utils/messagePlaceholders.js";
 
+type ApplicationMessageMode = "text" | "embed" | "both";
+const APPLICATION_TEXT_LIMIT = 2000;
+
+function normalizeMessageMode(value: unknown): ApplicationMessageMode {
+  return value === "text" || value === "embed" || value === "both" ? value : "embed";
+}
+
+function buildDashboardApplicationUrl(baseUrl: string, params: { applicationId: string; formId?: string; userId?: string }): string {
+  const url = new URL(baseUrl);
+  url.searchParams.set("applicationId", params.applicationId);
+  if (params.formId) url.searchParams.set("formId", params.formId);
+  if (params.userId) url.searchParams.set("userId", params.userId);
+  return url.toString();
+}
+
 export class ApplicationReviewService {
   constructor(
     private readonly client: HeimdallClient,
@@ -28,7 +43,7 @@ export class ApplicationReviewService {
     private readonly modmailApi?: ModmailPluginAPI,
   ) {}
 
-  async submitFromSession(form: any, session: ApplicationSession): Promise<{ success: boolean; applicationId?: string; error?: string }> {
+  async submitFromSession(form: any, session: ApplicationSession): Promise<{ success: boolean; applicationId?: string; applicationNumber?: number; error?: string }> {
     const answers = Object.values(session.answers);
     if (answers.length === 0) return { success: false, error: "No answers were provided" };
     if (!form.submissionChannelId) return { success: false, error: "Submission channel is not configured" };
@@ -54,7 +69,13 @@ export class ApplicationReviewService {
     const targetChannel = await guild.channels.fetch(form.submissionChannelId);
     if (!targetChannel) return { success: false, error: "Submission channel no longer exists" };
 
-    const dashboardUrl = process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/${form.guildId}/applications` : undefined;
+    const dashboardUrl = process.env.NEXTAUTH_URL
+      ? buildDashboardApplicationUrl(`${process.env.NEXTAUTH_URL}/${form.guildId}/applications`, {
+          applicationId: submission.applicationId,
+          formId: submission.formId,
+          userId: submission.userId,
+        })
+      : undefined;
     const components = await buildReviewComponents(this.lib, submission.applicationId, dashboardUrl, false);
     const embeds = buildSubmissionEmbeds(this.lib, submission as any);
 
@@ -93,7 +114,7 @@ export class ApplicationReviewService {
     }
 
     broadcastDashboardChange(form.guildId, "applications", "updated", { requiredAction: "applications.view" });
-    return { success: true, applicationId: submission.applicationId };
+    return { success: true, applicationId: submission.applicationId, applicationNumber: submission.applicationNumber };
   }
 
   async handleDecision(interaction: MessageComponentInteraction, applicationId: string, status: "approved" | "denied", reason?: string): Promise<void> {
@@ -184,7 +205,7 @@ export class ApplicationReviewService {
 
   async handleDecisionWithModal(interaction: ButtonInteraction, applicationId: string, status: "approved" | "denied"): Promise<void> {
     const modal = new ModalBuilder().setCustomId(`application.review.reason.${applicationId}.${status}`).setTitle(status === "approved" ? "Approve with Reason" : "Deny with Reason");
-    const input = new TextInputBuilder().setCustomId("reason").setLabel("Reason").setRequired(true).setStyle(TextInputStyle.Paragraph).setMaxLength(1000).setPlaceholder("Enter review reason");
+    const input = new TextInputBuilder().setCustomId("reason").setLabel("Reason").setRequired(true).setStyle(TextInputStyle.Paragraph).setMaxLength(2000).setPlaceholder("Enter review reason");
     modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
     await interaction.showModal(modal);
   }
@@ -292,6 +313,7 @@ export class ApplicationReviewService {
 
   private async tryNotifyApplicant(submission: any, form: any, status: "approved" | "denied", reason?: string): Promise<void> {
     const text = status === "approved" ? form.acceptMessage : form.denyMessage;
+    const messageMode = normalizeMessageMode(status === "approved" ? form.acceptMessageMode : form.denyMessageMode);
     const embedTemplateRaw = status === "approved" ? form.acceptMessageEmbed : form.denyMessageEmbed;
     if ((!text || typeof text !== "string") && !hasApplicationMessageEmbedContent(embedTemplateRaw)) return;
 
@@ -309,7 +331,7 @@ export class ApplicationReviewService {
         guildId: submission.guildId,
       } as const;
 
-      const content = text ? formatApplicationMessage(text, context) : undefined;
+      const content = text ? formatApplicationMessage(text, context).slice(0, APPLICATION_TEXT_LIMIT) : undefined;
       const embedTemplate = formatApplicationMessageEmbed(embedTemplateRaw, context);
       const embed = hasApplicationMessageEmbedContent(embedTemplate) ? this.lib.createEmbedBuilder() : null;
 
@@ -329,8 +351,8 @@ export class ApplicationReviewService {
       }
 
       const payload: { content?: string; embeds?: any[] } = {};
-      if (content && content.trim().length > 0) payload.content = content;
-      if (embed) payload.embeds = [embed];
+      if ((messageMode === "text" || messageMode === "both") && content && content.trim().length > 0) payload.content = content;
+      if ((messageMode === "embed" || messageMode === "both") && embed) payload.embeds = [embed];
 
       if (payload.content || payload.embeds) {
         await user.send(payload);
@@ -353,7 +375,13 @@ export class ApplicationReviewService {
     const message = await channel.messages.fetch(submission.submissionMessageId).catch(() => null);
     if (!message) return;
 
-    const dashboardUrl = process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL}/${guildId}/applications` : undefined;
+    const dashboardUrl = process.env.NEXTAUTH_URL
+      ? buildDashboardApplicationUrl(`${process.env.NEXTAUTH_URL}/${guildId}/applications`, {
+          applicationId: submission.applicationId,
+          formId: submission.formId,
+          userId: submission.userId,
+        })
+      : undefined;
     const components = await buildReviewComponents(this.lib, submission.applicationId, dashboardUrl, submission.status !== "pending");
     const embeds = buildSubmissionEmbeds(this.lib, submission as any);
 

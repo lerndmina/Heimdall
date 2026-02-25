@@ -90,6 +90,9 @@ export class ApplicationService {
       enabled: false,
       embed: {},
       questions: [],
+      completionMessageMode: "embed",
+      acceptMessageMode: "embed",
+      denyMessageMode: "embed",
       completionMessage: DEFAULT_COMPLETION_MESSAGE,
       acceptMessage: DEFAULT_ACCEPT_MESSAGE,
       denyMessage: DEFAULT_DENY_MESSAGE,
@@ -128,6 +131,9 @@ export class ApplicationService {
     if (updates.denyRemoveRoleIds !== undefined) payload.denyRemoveRoleIds = Array.isArray(updates.denyRemoveRoleIds) ? updates.denyRemoveRoleIds : [];
     if (updates.pingRoleIds !== undefined) payload.pingRoleIds = Array.isArray(updates.pingRoleIds) ? updates.pingRoleIds : [];
     if (updates.cooldownSeconds !== undefined) payload.cooldownSeconds = Number.isFinite(Number(updates.cooldownSeconds)) ? Number(updates.cooldownSeconds) : 0;
+    if (updates.completionMessageMode !== undefined) payload.completionMessageMode = updates.completionMessageMode;
+    if (updates.acceptMessageMode !== undefined) payload.acceptMessageMode = updates.acceptMessageMode;
+    if (updates.denyMessageMode !== undefined) payload.denyMessageMode = updates.denyMessageMode;
     if (updates.completionMessage !== undefined) payload.completionMessage = updates.completionMessage || null;
     if (updates.acceptMessage !== undefined) payload.acceptMessage = updates.acceptMessage || null;
     if (updates.denyMessage !== undefined) payload.denyMessage = updates.denyMessage || null;

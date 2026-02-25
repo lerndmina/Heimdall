@@ -9,6 +9,8 @@ const routeMap: Record<string, string> = {
   "GET /permission-defs": "dashboard.manage_permissions",
   "GET /dashboard-settings": "dashboard.manage_settings",
   "PUT /dashboard-settings": "dashboard.manage_settings",
+  "GET /dashboard-user-settings": "dashboard.can_access",
+  "PUT /dashboard-user-settings": "dashboard.can_access",
 
   // Attachment Blocker
   "GET /attachment-blocker/config": "attachment-blocker.view_config",

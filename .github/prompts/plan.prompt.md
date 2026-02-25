@@ -1,64 +1,73 @@
-## Plan: Full Dashboard UI Consistency Pass
+## Plan: Applications UX + Messaging Overhaul (DRAFT)
 
-**15 issues across 25+ files.** Core decisions: canonical save button is `bg-emerald-600`, all `bg-indigo-*` non-save primaries become `bg-primary-*`, `confirm()` dialogs become styled Modals, `DataTable`/`RowActionMenu` are deleted. Work is grouped by type to batch-edit efficiently.
-
----
-
-### Decisions
-
-- **Save/confirm color**: `bg-emerald-600 hover:bg-emerald-500` everywhere (SetupWizard already uses this — ripples to all other save buttons that currently use `bg-primary-600`)
-- **Other primary actions** (Add, Post, Create, etc.): `bg-primary-600 hover:bg-primary-500` — not emerald
-- **Destructive**: `bg-red-600 hover:bg-red-500` (already standard in most places)
-- **Delete confirm**: styled `<Modal>` in every case
-- **Scope**: all 15 issues
-
----
+This plan upgrades the applications dashboard from a flat card list into a clickable, accordion-style review workspace with deep-linking to a specific submission, user-based drilldown, and in-dashboard approve/deny with optional reasons. It also fixes completion-message placeholder issues and introduces reusable “message mode” controls (text/embed/both) by extending the shared embed editor component instead of ad-hoc per-page fields. Your decisions are applied: deep-link via query params, right pane scoped to same-form history, per-type message mode, and accordion preference persisted as per-user server settings with a new settings button in the sidebar footer (left of logout).
 
 **Steps**
 
-1. **[Issue 1] Replace `indigo-*` tokens with `primary-*`** in ModerationPage.tsx, planetside/ConfigTab.tsx, planetside/StatusTab.tsx, planetside/PlayersTab.tsx:
-   - `bg-indigo-600 hover:bg-indigo-500` → `bg-primary-600 hover:bg-primary-500` (for non-save actions like "Test Connections", "Post Panel")
-   - `focus:border-indigo-500 focus:ring-indigo-500` → `focus:border-primary-500 focus:ring-primary-500`
+1. Add per-user dashboard preferences backend
+   - Create a new per-user settings model (for dashboard UI preferences) and CRUD endpoints in ApiManager.ts patterned after guild dashboard settings.
+   - Keep preference key explicit for this feature (for example, `applicationsAccordionMultiOpen`) and enforce defaults on read.
+   - Add route permission mappings for new endpoints in dashboardRoutePermissions.ts and dashboard-side resolver in routePermissions.ts.
 
-2. **[Issue 2] Standardize save button to `bg-emerald-600`** — update every page that uses `bg-primary-600` for its save/confirm button: RoleButtonsPage.tsx, ModmailCategoriesTab.tsx, TicketCategoriesTab.tsx, ApplicationsPage.tsx sticky save, plus anywhere else `bg-primary-600` is a final save action. `SetupWizard.tsx` already uses `bg-emerald-600` so it needs no change.
+2. Expose preference controls in dashboard shell/footer
+   - Update sidebar footer in Sidebar.tsx to add a settings button left of logout.
+   - Implement a lightweight user-preferences UI entry point from that button (popover/modal) and wire load/save through the existing dashboard proxy path [bot/plugins/dashboard/app/app/api/guilds/[guildId]/[...path]/route.ts](bot/plugins/dashboard/app/app/api/guilds/[guildId]/[...path]/route.ts).
 
-3. **[Issue 3] Normalize border radius to `rounded-lg`** — replace `rounded-md` on all buttons in: ApplicationsPage.tsx, SettingsPage.tsx, planetside/ConfigTab.tsx, planetside/PlayersTab.tsx, ModerationPage.tsx.
+3. Rework submissions list into clickable accordion + selected state
+   - Refactor submissions section in [bot/plugins/dashboard/app/app/[guildId]/applications/ApplicationsPage.tsx](bot/plugins/dashboard/app/app/%5BguildId%5D/applications/ApplicationsPage.tsx):
+     - Entire row clickable to select/expand.
+     - Expansion behavior controlled by per-user preference (`single-open` vs `multi-open`).
+     - Keep current permission/disabled logic for handled submissions.
+   - Replace truncated preview-only rendering with expandable detail panel.
 
-4. **[Issue 4] Replace inline border-trick spinners with `<Spinner>`** in ModmailCategoriesTab.tsx and CategoryAssignmentWizard.tsx.
+4. Add split expanded view (left answers, right prior history)
+   - In expanded item, implement:
+     - Left: scrollable full answer list for selected submission.
+     - Right: same-user previous submissions scoped to same form, loaded via existing `userId + formId` list API (extend UI query-building to include user filter).
+   - Make applicant identity clickable in row/header to filter list by that user and synchronize selected state.
 
-5. **[Issue 5] Replace raw `<input>` / `<select>` with shared components** (`TextInput`, `NumberInput`, `Combobox`):
-   - planetside/PlayersTab.tsx — 5+ raw inputs with indigo focus rings
-   - suggestions/SuggestionsListTab.tsx — search input + sort select
-   - moderation/StickyMessagesTab.tsx — raw `<select>`
-   - moderation/ModerationPage.tsx — raw pattern `<input>`
+5. Add direct deep-link behavior to a submission
+   - Support query params on applications page (at minimum `applicationId`, optional `userId`/`formId`) in [bot/plugins/dashboard/app/app/[guildId]/applications/page.tsx](bot/plugins/dashboard/app/app/%5BguildId%5D/applications/page.tsx) and [bot/plugins/dashboard/app/app/[guildId]/applications/ApplicationsPage.tsx](bot/plugins/dashboard/app/app/%5BguildId%5D/applications/ApplicationsPage.tsx).
+   - Auto-load and expand the target submission, scroll into view, and apply any filter params.
+   - Update dashboard button URL generation in ApplicationReviewService.ts and ApplicationEmbeds.ts to include submission deep-link query params.
 
-6. **[Issue 6] Replace `confirm()` / `window.confirm()` with styled `<Modal>`** in:
-   - ApplicationsPage.tsx — "Delete this application form?" and "Delete this submission?"
-   - ModmailCategoriesTab.tsx — "Are you sure you want to delete this category?"
-     Each gets a local `confirmDelete` state (`{open: boolean, id: string | null}`) and a confirmation `<Modal>` with a red confirm button.
+6. Replace prompt-based reason flow with dashboard-native modal
+   - In [bot/plugins/dashboard/app/app/[guildId]/applications/ApplicationsPage.tsx](bot/plugins/dashboard/app/app/%5BguildId%5D/applications/ApplicationsPage.tsx), replace `window.prompt` reason collection with reusable modal-based inputs for approve/deny with reason.
+   - Preserve existing API contract (`PUT /submissions/:applicationId/status`) and disabled states for already-reviewed items.
 
-7. **[Issue 7] Standardize page headers** — define the canonical pattern: no standalone `<h1>` at page level; each card's `<CardTitle>` + `<CardDescription>` serves as the section header. Remove the freestanding `<h1>` + `<p>` block from ModerationPage.tsx. The Overview page's stat-card layout is distinct enough to keep its header.
+7. Extend shared embed editor into reusable message composer
+   - Upgrade base component EmbedEditor.tsx to support reusable message composition options:
+     - Send mode selector: text-only, embed-only, both.
+     - Plaintext content input (2000 max).
+     - Existing embed fields unchanged.
+   - Use this upgraded base component in applications message config areas in [bot/plugins/dashboard/app/app/[guildId]/applications/ApplicationsPage.tsx](bot/plugins/dashboard/app/app/%5BguildId%5D/applications/ApplicationsPage.tsx) for completion/accept/deny templates (per-type mode).
+   - Keep component API backward-compatible so existing consumers (welcome/moderation/etc.) continue functioning with defaults.
 
-8. **[Issue 8] Standardize cancel/ghost button border** — replace `border-zinc-700` + `hover:bg-zinc-800` with `border-zinc-700/30` + `hover:bg-white/5` in SuggestionsCategoriesTab.tsx and SettingsPage.tsx ("Sync Permissions").
-
-9. **[Issue 9] Standardize error-retry buttons** — replace solid `bg-zinc-800 hover:bg-zinc-700` with glassmorphic `bg-white/5 hover:bg-white/10 backdrop-blur-sm` in RemindersPage.tsx.
-
-10. **[Issue 10] Replace emoji status indicators with `<StatusBadge>`** in ModerationPage.tsx OverviewTab — `✅ Enabled` / `❌ Disabled` → `<StatusBadge variant="success">Enabled</StatusBadge>` / `<StatusBadge variant="error">Disabled</StatusBadge>`.
-
-11. **[Issue 11] Use `<CardHeader>` consistently** — replace inline `<div className="flex items-center justify-between">` with the `<CardHeader>` component across all pages that reconstruct it manually.
-
-12. **[Issue 12] Normalize empty states** — adopt a single standard: an SVG icon circle + `<CardTitle>` + `<CardDescription>` + optional CTA button. Align the minimal/missing patterns in ModmailConversationsTab.tsx and RoleButtonsPage.tsx.
-
-13. **[Issue 13] Delete dead components** — remove components/ui/DataTable.tsx and components/ui/RowActionMenu.tsx. Verify nothing imports them first.
-
-14. **[Issue 14] Add loading spinner to RoleButtonsPage save button** — match the inline SVG spinner pattern used everywhere else; also add `transition` class.
-
-15. **[Issue 15] Fix ModmailCategoriesTab API client** — replace `fetchDashboardApi` import with `fetchApi` and align the endpoint path to match the bot backend directly, consistent with `ModmailConfigTab.tsx`.
-
----
+8. Fix message rendering bugs and align send semantics
+   - Fix missing `{application_number}` in completion context in ApplicationFlowService.ts by including `applicationNumber`.
+   - Update send logic in ApplicationFlowService.ts and ApplicationReviewService.ts to obey new per-type mode:
+     - text-only => send content only
+     - embed-only => send embed only
+     - both => send both
+   - Ensure placeholder substitution remains centralized in messagePlaceholders.ts.
 
 **Verification**
 
-After each group of edits: `bun run build` inside bot — TypeScript + Next.js build must pass. No runtime testing environment is available, so TypeScript must be clean.
+- Build/typecheck: run `bun run build` from bot.
+- Functional checks:
+  - Submissions render as clickable accordion; expand/collapse matches saved user preference.
+  - Clicking applicant filters list to that user; right pane shows same-form prior submissions.
+  - Deep-link URL opens and focuses exact submission from “View in Dashboard.”
+  - Approve/deny with reason works via modal and disables correctly after handling.
+  - Completion/accept/deny messages respect selected mode (no unintended dual send).
+  - `{application_number}` resolves in completion message output.
+- Regression checks:
+  - Existing pages using EmbedEditor.tsx still render/save correctly with defaults.
 
-**Ordering**: Steps 1–3 first (color/radius — purely cosmetic, low risk, high blast radius), then 4–6 (component substitutions), then 7–12 (structural/layout), then 13–15 (cleanup + isolated fixes).
+**Decisions**
+
+- Deep-link format: query params.
+- Right-side history scope: same form only.
+- Message mode: configurable per message type (completion/accept/deny).
+- Accordion behavior: user preference supports multi-open.
+- Preference persistence: per-user server setting with footer settings entry (left of logout).

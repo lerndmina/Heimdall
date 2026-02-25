@@ -90,6 +90,9 @@ const ApplicationFormSchema = new Schema(
     pingRoleIds: { type: [String], default: [] },
 
     cooldownSeconds: { type: Number, min: 0, max: 60 * 60 * 24 * 365, default: 0 },
+    completionMessageMode: { type: String, enum: ["text", "embed", "both"], default: "embed" },
+    acceptMessageMode: { type: String, enum: ["text", "embed", "both"], default: "embed" },
+    denyMessageMode: { type: String, enum: ["text", "embed", "both"], default: "embed" },
     completionMessage: { type: String, trim: true, maxlength: 2000 },
     acceptMessage: { type: String, trim: true, maxlength: 2000 },
     denyMessage: { type: String, trim: true, maxlength: 2000 },

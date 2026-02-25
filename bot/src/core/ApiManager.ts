@@ -23,6 +23,7 @@ import { ThingGetter } from "../../plugins/lib/utils/ThingGetter.js";
 import { DASHBOARD_TEXT_CHANNEL_TYPES } from "../../plugins/lib/utils/channelTypes.js";
 import DashboardPermission from "../../plugins/dashboard/models/DashboardPermission.js";
 import DashboardSettings from "../../plugins/dashboard/models/DashboardSettings.js";
+import DashboardUserSettings from "../../plugins/dashboard/models/DashboardUserSettings.js";
 import LoggingConfig, { LoggingCategory } from "../../plugins/logging/models/LoggingConfig.js";
 import { permissionRegistry } from "./PermissionRegistry.js";
 
@@ -1083,6 +1084,73 @@ export class ApiManager {
         );
       } catch (err) {
         log.error("[API] Error updating dashboard settings:", err);
+        res.status(500).json({ success: false, error: "Database error" });
+      }
+    });
+
+    // GET per-user dashboard settings for a guild
+    this.app.get("/api/guilds/:guildId/dashboard-user-settings", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      const userId = req.header("X-User-Id");
+      if (!key || !this.verifyApiKey(key)) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      if (!userId) {
+        res.status(400).json({ success: false, error: "Missing X-User-Id header" });
+        return;
+      }
+
+      try {
+        const { guildId } = req.params;
+        const doc = await DashboardUserSettings.findOne({ guildId, userId }).lean();
+        res.json({
+          success: true,
+          data: {
+            settings: doc ?? {
+              guildId,
+              userId,
+              applicationsAccordionMultiOpen: false,
+            },
+          },
+        });
+      } catch (err) {
+        log.error("[API] Error fetching dashboard user settings:", err);
+        res.status(500).json({ success: false, error: "Database error" });
+      }
+    });
+
+    // PUT per-user dashboard settings for a guild
+    this.app.put("/api/guilds/:guildId/dashboard-user-settings", async (req: Request, res: Response) => {
+      const key = req.header("X-API-Key");
+      const userId = req.header("X-User-Id");
+      if (!key || !this.verifyApiKey(key)) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      if (!userId) {
+        res.status(400).json({ success: false, error: "Missing X-User-Id header" });
+        return;
+      }
+
+      try {
+        const { guildId } = req.params;
+        const { applicationsAccordionMultiOpen } = req.body as { applicationsAccordionMultiOpen?: boolean };
+        const doc = await DashboardUserSettings.findOneAndUpdate(
+          { guildId, userId },
+          {
+            $set: {
+              applicationsAccordionMultiOpen: !!applicationsAccordionMultiOpen,
+            },
+          },
+          { upsert: true, new: true },
+        ).lean();
+
+        res.json({ success: true, data: { settings: doc } });
+      } catch (err) {
+        log.error("[API] Error updating dashboard user settings:", err);
         res.status(500).json({ success: false, error: "Database error" });
       }
     });

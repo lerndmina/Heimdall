@@ -3,6 +3,7 @@
  */
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import GuildIcon from "@/components/ui/GuildIcon";
@@ -32,6 +33,47 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
   const { confirmNavigation } = useUnsavedChanges();
   const normalizedPathname = pathname?.replace(/\/+$/, "") || "/";
   const guildRoot = `/${guildId}`;
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [loadingUserSettings, setLoadingUserSettings] = useState(false);
+  const [savingUserSettings, setSavingUserSettings] = useState(false);
+  const [applicationsAccordionMultiOpen, setApplicationsAccordionMultiOpen] = useState(false);
+
+  async function loadUserSettings() {
+    setLoadingUserSettings(true);
+    try {
+      const response = await fetch(`/api/guilds/${guildId}/dashboard-user-settings`, { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      const value = !!json?.data?.settings?.applicationsAccordionMultiOpen;
+      setApplicationsAccordionMultiOpen(value);
+    } finally {
+      setLoadingUserSettings(false);
+    }
+  }
+
+  async function saveUserSettings() {
+    setSavingUserSettings(true);
+    try {
+      const response = await fetch(`/api/guilds/${guildId}/dashboard-user-settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationsAccordionMultiOpen }),
+      });
+
+      if (response.ok) {
+        window.dispatchEvent(
+          new CustomEvent("dashboard:user-settings-updated", {
+            detail: { applicationsAccordionMultiOpen },
+          }),
+        );
+      }
+    } finally {
+      setSavingUserSettings(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadUserSettings();
+  }, [guildId]);
 
   function guardedNavigate(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
     e.preventDefault();
@@ -107,12 +149,50 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-zinc-200">{session.user.name}</p>
             </div>
+            <button onClick={() => setSettingsOpen((current) => !current)} className="text-xs text-zinc-500 transition hover:text-zinc-300" title="User settings" aria-label="User settings">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11.983 6.968a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM11.983 20.032a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM4.968 13.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM19.032 13.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zM7.31 8.69a1.5 1.5 0 112.122-2.122A1.5 1.5 0 017.31 8.69zm9.38 9.38a1.5 1.5 0 112.122-2.122 1.5 1.5 0 01-2.122 2.122zM7.31 18.31a1.5 1.5 0 112.122 2.122A1.5 1.5 0 017.31 18.31zm9.38-9.38a1.5 1.5 0 112.122 2.122 1.5 1.5 0 01-2.122-2.122z"
+                />
+              </svg>
+            </button>
             <button onClick={() => signOut({ callbackUrl: "/login" })} className="text-xs text-zinc-500 transition hover:text-zinc-300" title="Sign out">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
             </button>
           </div>
+
+          {settingsOpen && (
+            <div className="mt-2 rounded-lg border border-zinc-700/30 bg-zinc-900/90 p-3">
+              <p className="text-xs font-medium text-zinc-200">User Preferences</p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <label className="text-xs text-zinc-300">Multi-open application accordion</label>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-zinc-600 bg-zinc-900"
+                  checked={applicationsAccordionMultiOpen}
+                  onChange={(event) => setApplicationsAccordionMultiOpen(event.target.checked)}
+                  disabled={loadingUserSettings || savingUserSettings}
+                />
+              </div>
+              <div className="mt-3 flex justify-end gap-2">
+                <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs text-zinc-300 transition hover:bg-white/5" onClick={() => setSettingsOpen(false)}>
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-zinc-700/30 px-2 py-1 text-xs text-zinc-300 transition hover:bg-white/5 disabled:opacity-50"
+                  onClick={() => void saveUserSettings()}
+                  disabled={loadingUserSettings || savingUserSettings}>
+                  {savingUserSettings ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </aside>

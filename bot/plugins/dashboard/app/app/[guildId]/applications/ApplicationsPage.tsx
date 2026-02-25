@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { fetchApi } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import TextInput from "@/components/ui/TextInput";
@@ -12,7 +13,7 @@ import Modal from "@/components/ui/Modal";
 import Combobox from "@/components/ui/Combobox";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
-import EmbedEditor, { type EmbedData } from "@/components/ui/EmbedEditor";
+import EmbedEditor, { type EmbedData, type EmbedMessageMode } from "@/components/ui/EmbedEditor";
 import { useCanManage } from "@/components/providers/PermissionsProvider";
 import { toast } from "sonner";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
@@ -88,6 +89,9 @@ interface ApplicationForm {
   denyRemoveRoleIds: string[];
   pingRoleIds: string[];
   cooldownSeconds: number;
+  completionMessageMode?: EmbedMessageMode;
+  acceptMessageMode?: EmbedMessageMode;
+  denyMessageMode?: EmbedMessageMode;
   completionMessage?: string;
   acceptMessage?: string;
   denyMessage?: string;
@@ -102,6 +106,12 @@ interface ApplicationForm {
 
 interface ApplicationsPageProps {
   guildId: string;
+}
+
+interface DashboardUserSettingsPayload {
+  settings: {
+    applicationsAccordionMultiOpen?: boolean;
+  };
 }
 
 const DEFAULT_COMPLETION_MESSAGE = "Thanks {user_mention}, your application #{application_number} for {form_name} was submitted.";
@@ -127,9 +137,12 @@ const MESSAGE_PLACEHOLDERS: Array<{ token: string; description: string }> = [
 
 function hydrateFormDraft(form: ApplicationForm): ApplicationForm {
   const nextDraft: ApplicationForm = JSON.parse(JSON.stringify(form));
-  if (!nextDraft.completionMessage) nextDraft.completionMessage = DEFAULT_COMPLETION_MESSAGE;
-  if (!nextDraft.acceptMessage) nextDraft.acceptMessage = DEFAULT_ACCEPT_MESSAGE;
-  if (!nextDraft.denyMessage) nextDraft.denyMessage = DEFAULT_DENY_MESSAGE;
+  if (!nextDraft.completionMessageMode) nextDraft.completionMessageMode = "embed";
+  if (!nextDraft.acceptMessageMode) nextDraft.acceptMessageMode = "embed";
+  if (!nextDraft.denyMessageMode) nextDraft.denyMessageMode = "embed";
+  if (typeof nextDraft.completionMessage !== "string") nextDraft.completionMessage = "";
+  if (typeof nextDraft.acceptMessage !== "string") nextDraft.acceptMessage = "";
+  if (typeof nextDraft.denyMessage !== "string") nextDraft.denyMessage = "";
   if (!nextDraft.completionMessageEmbed || Object.keys(nextDraft.completionMessageEmbed).length === 0) {
     nextDraft.completionMessageEmbed = { ...(nextDraft.completionMessage ? { description: nextDraft.completionMessage } : DEFAULT_COMPLETION_MESSAGE_EMBED) };
   }
@@ -143,6 +156,7 @@ function hydrateFormDraft(form: ApplicationForm): ApplicationForm {
 }
 
 export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
+  const searchParams = useSearchParams();
   const canManage = useCanManage("applications.manage");
   const canReview = useCanManage("applications.review");
 
@@ -160,13 +174,27 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [stats, setStats] = useState<ApplicationStats>({ total: 0, pending: 0, approved: 0, denied: 0 });
   const [submissionStatusFilter, setSubmissionStatusFilter] = useState<"all" | "pending" | "approved" | "denied">("all");
+  const [submissionUserIdFilter, setSubmissionUserIdFilter] = useState("");
   const [pendingScrollQuestionId, setPendingScrollQuestionId] = useState<string | null>(null);
   const [confirmDeleteFormId, setConfirmDeleteFormId] = useState<string | null>(null);
   const [confirmDeleteSubmissionId, setConfirmDeleteSubmissionId] = useState<string | null>(null);
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+  const [expandedSubmissionIds, setExpandedSubmissionIds] = useState<Set<string>>(new Set());
+  const [applicationsAccordionMultiOpen, setApplicationsAccordionMultiOpen] = useState(false);
+  const [relatedSubmissions, setRelatedSubmissions] = useState<ApplicationSubmission[]>([]);
+  const [reviewModal, setReviewModal] = useState<{ applicationId: string; status: "approved" | "denied" } | null>(null);
+  const [reviewReason, setReviewReason] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const submissionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const deepLinkAppliedRef = useRef(false);
 
   const selectedForm = useMemo(() => forms.find((entry) => entry.formId === selectedFormId) || null, [forms, selectedFormId]);
+  const selectedSubmission = useMemo(() => submissions.find((entry) => entry.applicationId === selectedSubmissionId) || null, [submissions, selectedSubmissionId]);
   const hydratedSelectedForm = useMemo(() => (selectedForm ? hydrateFormDraft(selectedForm) : null), [selectedForm]);
+  const deepLinkApplicationId = searchParams.get("applicationId") || "";
+  const deepLinkFormId = searchParams.get("formId") || "";
+  const deepLinkUserId = searchParams.get("userId") || "";
   const isDraftDirty = useMemo(() => {
     if (!draft || !hydratedSelectedForm) return false;
     return JSON.stringify(draft) !== JSON.stringify(hydratedSelectedForm);
@@ -240,6 +268,7 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
       const query: string[] = ["limit=100"];
       if (selectedFormId) query.push(`formId=${encodeURIComponent(selectedFormId)}`);
       if (submissionStatusFilter !== "all") query.push(`status=${submissionStatusFilter}`);
+      if (submissionUserIdFilter) query.push(`userId=${encodeURIComponent(submissionUserIdFilter)}`);
 
       const response = await fetchApi<ApplicationSubmission[]>(guildId, `applications/submissions?${query.join("&")}`, { skipCache: true });
       if (!response.success || !response.data) {
@@ -251,16 +280,104 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
     } finally {
       setSubmissionsLoading(false);
     }
-  }, [guildId, selectedFormId, submissionStatusFilter]);
+  }, [guildId, selectedFormId, submissionStatusFilter, submissionUserIdFilter]);
+
+  const loadUserSettings = useCallback(async () => {
+    const response = await fetchApi<DashboardUserSettingsPayload>(guildId, "dashboard-user-settings", { skipCache: true });
+    if (response.success && response.data?.settings) {
+      setApplicationsAccordionMultiOpen(!!response.data.settings.applicationsAccordionMultiOpen);
+    }
+  }, [guildId]);
 
   useEffect(() => {
     void loadForms();
     void loadStats();
-  }, [guildId, loadForms, loadStats]);
+    void loadUserSettings();
+  }, [guildId, loadForms, loadStats, loadUserSettings]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ applicationsAccordionMultiOpen?: boolean }>).detail;
+      if (typeof detail?.applicationsAccordionMultiOpen === "boolean") {
+        setApplicationsAccordionMultiOpen(detail.applicationsAccordionMultiOpen);
+      }
+    };
+    window.addEventListener("dashboard:user-settings-updated", handler as EventListener);
+    return () => window.removeEventListener("dashboard:user-settings-updated", handler as EventListener);
+  }, []);
 
   useEffect(() => {
     void loadSubmissions();
   }, [loadSubmissions]);
+
+  useEffect(() => {
+    if (deepLinkAppliedRef.current) return;
+    if (!deepLinkApplicationId && !deepLinkFormId && !deepLinkUserId) return;
+
+    if (deepLinkFormId) setSelectedFormId(deepLinkFormId);
+    if (deepLinkUserId) setSubmissionUserIdFilter(deepLinkUserId);
+    if (deepLinkApplicationId) setSelectedSubmissionId(deepLinkApplicationId);
+    deepLinkAppliedRef.current = true;
+  }, [deepLinkApplicationId, deepLinkFormId, deepLinkUserId]);
+
+  useEffect(() => {
+    if (!selectedSubmissionId) return;
+    setExpandedSubmissionIds((current) => {
+      if (applicationsAccordionMultiOpen) {
+        if (current.has(selectedSubmissionId)) return current;
+        const next = new Set(current);
+        next.add(selectedSubmissionId);
+        return next;
+      }
+
+      if (current.size === 1 && current.has(selectedSubmissionId)) return current;
+      return new Set([selectedSubmissionId]);
+    });
+
+    const target = submissionRefs.current[selectedSubmissionId];
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [applicationsAccordionMultiOpen, selectedSubmissionId, submissions.length]);
+
+  useEffect(() => {
+    if (!selectedSubmission) {
+      setRelatedSubmissions([]);
+      return;
+    }
+
+    const run = async () => {
+      const query = [
+        "limit=100",
+        `formId=${encodeURIComponent(selectedSubmission.formId)}`,
+        `userId=${encodeURIComponent(selectedSubmission.userId)}`,
+      ];
+      const response = await fetchApi<ApplicationSubmission[]>(guildId, `applications/submissions?${query.join("&")}`, { skipCache: true });
+      if (!response.success || !response.data) {
+        setRelatedSubmissions([]);
+        return;
+      }
+      setRelatedSubmissions(response.data.filter((entry) => entry.applicationId !== selectedSubmission.applicationId));
+    };
+
+    void run();
+  }, [guildId, selectedSubmission]);
+
+  const toggleSubmissionExpanded = (applicationId: string) => {
+    setSelectedSubmissionId(applicationId);
+    setExpandedSubmissionIds((current) => {
+      const next = new Set(current);
+      const currentlyExpanded = next.has(applicationId);
+
+      if (applicationsAccordionMultiOpen) {
+        if (currentlyExpanded) next.delete(applicationId);
+        else next.add(applicationId);
+        return next;
+      }
+
+      if (currentlyExpanded) return new Set();
+      return new Set([applicationId]);
+    });
+  };
 
   async function createForm() {
     const trimmed = newFormName.trim();
@@ -363,17 +480,10 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
     await loadForms();
   }
 
-  async function reviewSubmission(applicationId: string, status: "approved" | "denied", withReason: boolean) {
-    let reason = "";
-    if (withReason) {
-      const value = window.prompt(`Provide a ${status === "approved" ? "approval" : "denial"} reason:`);
-      if (!value) return;
-      reason = value;
-    }
-
+  async function reviewSubmission(applicationId: string, status: "approved" | "denied", reason?: string) {
     const response = await fetchApi<ApplicationSubmission>(guildId, `applications/submissions/${applicationId}/status`, {
       method: "PUT",
-      body: JSON.stringify({ status, reason: reason || undefined }),
+      body: JSON.stringify({ status, reason: reason?.trim() || undefined }),
     });
 
     if (!response.success) {
@@ -385,6 +495,29 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
     await loadSubmissions();
     await loadStats();
     await loadForms();
+  }
+
+  function openReasonModal(applicationId: string, status: "approved" | "denied") {
+    setReviewReason("");
+    setReviewModal({ applicationId, status });
+  }
+
+  async function submitReviewWithReason() {
+    if (!reviewModal) return;
+    const trimmedReason = reviewReason.trim();
+    if (!trimmedReason) {
+      toast.error("Reason is required");
+      return;
+    }
+
+    setReviewSubmitting(true);
+    try {
+      await reviewSubmission(reviewModal.applicationId, reviewModal.status, trimmedReason);
+      setReviewModal(null);
+      setReviewReason("");
+    } finally {
+      setReviewSubmitting(false);
+    }
   }
 
   async function openSubmissionModmail(applicationId: string) {
@@ -807,13 +940,43 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                       content: (
                         <div className="space-y-3">
                           <div className="rounded border border-zinc-700/30 p-3">
-                            <EmbedEditor heading="Completion Message Embed" value={draft.completionMessageEmbed || {}} onChange={(value) => setDraft({ ...draft, completionMessageEmbed: value })} />
+                            <EmbedEditor
+                              heading="Completion Message"
+                              value={draft.completionMessageEmbed || {}}
+                              onChange={(value) => setDraft({ ...draft, completionMessageEmbed: value })}
+                              showMessageModeControls
+                              messageMode={draft.completionMessageMode || "embed"}
+                              onMessageModeChange={(mode) => setDraft({ ...draft, completionMessageMode: mode })}
+                              textContent={draft.completionMessage || ""}
+                              onTextContentChange={(value) => setDraft({ ...draft, completionMessage: value })}
+                              textContentPlaceholder="Thanks {user_mention}, your application #{application_number} for {form_name} was submitted."
+                            />
                           </div>
                           <div className="rounded border border-zinc-700/30 p-3">
-                            <EmbedEditor heading="Accept Message Embed" value={draft.acceptMessageEmbed || {}} onChange={(value) => setDraft({ ...draft, acceptMessageEmbed: value })} />
+                            <EmbedEditor
+                              heading="Accept Message"
+                              value={draft.acceptMessageEmbed || {}}
+                              onChange={(value) => setDraft({ ...draft, acceptMessageEmbed: value })}
+                              showMessageModeControls
+                              messageMode={draft.acceptMessageMode || "embed"}
+                              onMessageModeChange={(mode) => setDraft({ ...draft, acceptMessageMode: mode })}
+                              textContent={draft.acceptMessage || ""}
+                              onTextContentChange={(value) => setDraft({ ...draft, acceptMessage: value })}
+                              textContentPlaceholder="Your application #{application_number} for {form_name} was {status} by {reviewer_mention}."
+                            />
                           </div>
                           <div className="rounded border border-zinc-700/30 p-3">
-                            <EmbedEditor heading="Deny Message Embed" value={draft.denyMessageEmbed || {}} onChange={(value) => setDraft({ ...draft, denyMessageEmbed: value })} />
+                            <EmbedEditor
+                              heading="Deny Message"
+                              value={draft.denyMessageEmbed || {}}
+                              onChange={(value) => setDraft({ ...draft, denyMessageEmbed: value })}
+                              showMessageModeControls
+                              messageMode={draft.denyMessageMode || "embed"}
+                              onMessageModeChange={(mode) => setDraft({ ...draft, denyMessageMode: mode })}
+                              textContent={draft.denyMessage || ""}
+                              onTextContentChange={(value) => setDraft({ ...draft, denyMessage: value })}
+                              textContentPlaceholder="Your application #{application_number} for {form_name} was {status}. Reason: {reason}"
+                            />
                           </div>
                           <div className="rounded border border-zinc-700/30 p-3 text-xs text-zinc-300">
                             <p className="text-zinc-100">Available placeholders</p>
@@ -926,6 +1089,15 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
             </button>
           </div>
 
+          {submissionUserIdFilter ? (
+            <div className="flex items-center justify-between rounded border border-zinc-700/30 bg-zinc-900/30 p-2 text-xs text-zinc-300">
+              <span>Filtering by user: {submissionUserIdFilter}</span>
+              <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs" onClick={() => setSubmissionUserIdFilter("")}>
+                Clear
+              </button>
+            </div>
+          ) : null}
+
           {submissionsLoading ? (
             <p className="text-sm text-zinc-500">Loading submissions...</p>
           ) : filteredSubmissions.length === 0 ? (
@@ -933,70 +1105,151 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
           ) : (
             <div className="space-y-2">
               {filteredSubmissions.map((submission) => (
-                <div key={submission.applicationId} className="space-y-2 rounded-lg border border-zinc-700/30 p-3">
-                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                <div
+                  key={submission.applicationId}
+                  ref={(node) => {
+                    submissionRefs.current[submission.applicationId] = node;
+                  }}
+                  className="rounded-lg border border-zinc-700/30 p-3">
+                  <button type="button" className="flex w-full items-center justify-between gap-2 text-left" onClick={() => toggleSubmissionExpanded(submission.applicationId)}>
                     <div>
-                      <p className="font-medium text-zinc-100">
-                        #{submission.applicationNumber} • {submission.formName} • {submission.userDisplayName}
-                      </p>
-                      <p className="text-xs text-zinc-400">
-                        Status: {submission.status} {submission.linkedModmailId ? `• Modmail: ${submission.linkedModmailId}` : ""}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
+                      <p className="font-medium text-zinc-100">#{submission.applicationNumber} • {submission.formName}</p>
+                      <p className="text-xs text-zinc-400">Status: {submission.status} {submission.linkedModmailId ? `• Modmail: ${submission.linkedModmailId}` : ""}</p>
                       <button
                         type="button"
-                        className="rounded border border-zinc-700/30 px-2 py-1 text-xs"
-                        onClick={() => reviewSubmission(submission.applicationId, "approved", false)}
-                        disabled={!canReview || submission.status !== "pending"}>
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-zinc-700/30 px-2 py-1 text-xs"
-                        onClick={() => reviewSubmission(submission.applicationId, "approved", true)}
-                        disabled={!canReview || submission.status !== "pending"}>
-                        Approve + Reason
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-zinc-700/30 px-2 py-1 text-xs"
-                        onClick={() => reviewSubmission(submission.applicationId, "denied", false)}
-                        disabled={!canReview || submission.status !== "pending"}>
-                        Deny
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-zinc-700/30 px-2 py-1 text-xs"
-                        onClick={() => reviewSubmission(submission.applicationId, "denied", true)}
-                        disabled={!canReview || submission.status !== "pending"}>
-                        Deny + Reason
-                      </button>
-                      <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs" onClick={() => openSubmissionModmail(submission.applicationId)} disabled={!canReview}>
-                        Open Modmail
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-zinc-700/30 px-2 py-1 text-xs text-rose-300"
-                        onClick={() => setConfirmDeleteSubmissionId(submission.applicationId)}
-                        disabled={!canManage}>
-                        Delete
+                        className="mt-1 text-xs text-primary-400 hover:text-primary-300"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSubmissionUserIdFilter(submission.userId);
+                        }}>
+                        {submission.userDisplayName}
                       </button>
                     </div>
-                  </div>
-                  <div className="space-y-1 rounded border border-zinc-700/20 bg-zinc-900/20 p-2">
-                    {submission.responses.slice(0, 5).map((answer, index) => (
-                      <p key={`${submission.applicationId}-${index}`} className="text-xs text-zinc-300">
-                        <span className="font-semibold text-zinc-100">{answer.questionLabel}:</span> {answer.values?.join(", ") || answer.value || "_No answer_"}
-                      </p>
-                    ))}
-                  </div>
+                    <span className="text-xs text-zinc-400">{expandedSubmissionIds.has(submission.applicationId) ? "Hide" : "View"}</span>
+                  </button>
+
+                  {expandedSubmissionIds.has(submission.applicationId) && (
+                    <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                      <div className="rounded border border-zinc-700/20 bg-zinc-900/20 p-2 lg:col-span-2">
+                        <p className="mb-2 text-xs font-medium text-zinc-300">Submission answers</p>
+                        <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+                          {submission.responses.map((answer, index) => (
+                            <div key={`${submission.applicationId}-${index}`} className="rounded border border-zinc-700/20 bg-zinc-900/30 p-2 text-xs text-zinc-300">
+                              <p className="font-semibold text-zinc-100">{index + 1}. {answer.questionLabel}</p>
+                              <p className="mt-1 whitespace-pre-wrap">{answer.values?.join(", ") || answer.value || "_No answer_"}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded border border-zinc-700/20 bg-zinc-900/20 p-2">
+                        <p className="mb-2 text-xs font-medium text-zinc-300">Previous applications (same form)</p>
+                        <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+                          {selectedSubmissionId === submission.applicationId && relatedSubmissions.length > 0 ? (
+                            relatedSubmissions.map((entry) => (
+                              <button
+                                key={entry.applicationId}
+                                type="button"
+                                className="w-full rounded border border-zinc-700/20 bg-zinc-900/30 p-2 text-left text-xs text-zinc-300 transition hover:bg-white/5"
+                                onClick={() => toggleSubmissionExpanded(entry.applicationId)}>
+                                <p className="font-semibold text-zinc-100">#{entry.applicationNumber} • {entry.status}</p>
+                                <p className="text-zinc-500">{new Date(entry.createdAt).toLocaleString()}</p>
+                              </button>
+                            ))
+                          ) : (
+                            <p className="text-xs text-zinc-500">No previous submissions for this form.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 rounded border border-zinc-700/20 bg-zinc-900/20 p-2 lg:col-span-3">
+                        <button
+                          type="button"
+                          className="rounded border border-zinc-700/30 px-2 py-1 text-xs"
+                          onClick={() => reviewSubmission(submission.applicationId, "approved")}
+                          disabled={!canReview || submission.status !== "pending"}>
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-zinc-700/30 px-2 py-1 text-xs"
+                          onClick={() => openReasonModal(submission.applicationId, "approved")}
+                          disabled={!canReview || submission.status !== "pending"}>
+                          Approve + Reason
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-zinc-700/30 px-2 py-1 text-xs"
+                          onClick={() => reviewSubmission(submission.applicationId, "denied")}
+                          disabled={!canReview || submission.status !== "pending"}>
+                          Deny
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-zinc-700/30 px-2 py-1 text-xs"
+                          onClick={() => openReasonModal(submission.applicationId, "denied")}
+                          disabled={!canReview || submission.status !== "pending"}>
+                          Deny + Reason
+                        </button>
+                        <button type="button" className="rounded border border-zinc-700/30 px-2 py-1 text-xs" onClick={() => openSubmissionModmail(submission.applicationId)} disabled={!canReview}>
+                          Open Modmail
+                        </button>
+                        <button
+                          type="button"
+                          className="ml-auto rounded border border-zinc-700/30 px-2 py-1 text-xs text-rose-300"
+                          onClick={() => setConfirmDeleteSubmissionId(submission.applicationId)}
+                          disabled={!canManage}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <Modal
+        open={!!reviewModal}
+        onClose={() => {
+          if (reviewSubmitting) return;
+          setReviewModal(null);
+          setReviewReason("");
+        }}
+        title={reviewModal?.status === "approved" ? "Approve with Reason" : "Deny with Reason"}
+        maxWidth="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => {
+                if (reviewSubmitting) return;
+                setReviewModal(null);
+                setReviewReason("");
+              }}
+              className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5"
+              disabled={reviewSubmitting}>
+              Cancel
+            </button>
+            <button
+              onClick={() => void submitReviewWithReason()}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60"
+              disabled={reviewSubmitting || reviewReason.trim().length === 0}>
+              {reviewSubmitting ? "Submitting…" : "Submit"}
+            </button>
+          </div>
+        }>
+        <Textarea
+          label="Reason"
+          value={reviewReason}
+          onChange={setReviewReason}
+          placeholder="Enter review reason"
+          rows={4}
+          maxLength={2000}
+          disabled={reviewSubmitting}
+        />
+      </Modal>
 
       <Modal
         open={!!confirmDeleteFormId}

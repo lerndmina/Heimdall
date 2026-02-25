@@ -40,6 +40,11 @@ const APPLICATION_TEXT_LIMIT = 2000;
 const FINAL_REVIEW_SELECT_PAGE_SIZE = 25;
 const FINAL_REVIEW_EMBED_DESCRIPTION_LIMIT = 3900;
 const MAX_STAGE_EMBEDS = 10;
+type ApplicationMessageMode = "text" | "embed" | "both";
+
+function normalizeMessageMode(value: unknown): ApplicationMessageMode {
+  return value === "text" || value === "embed" || value === "both" ? value : "embed";
+}
 
 function truncateWithIndicator(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
@@ -480,15 +485,17 @@ export class ApplicationFlowService {
       if (latestForm.completionMessage || hasApplicationMessageEmbedContent(latestForm.completionMessageEmbed)) {
         const user = await this.client.users.fetch(latestSession.userId).catch(() => null);
         if (user) {
+          const messageMode = normalizeMessageMode(latestForm.completionMessageMode);
           const context = {
             userId: latestSession.userId,
             userDisplayName: latestSession.userDisplayName,
             formName: latestForm.name,
             applicationId: result.applicationId,
+            applicationNumber: result.applicationNumber,
             guildId: latestSession.guildId,
           } as const;
 
-          const content = latestForm.completionMessage ? formatApplicationMessage(latestForm.completionMessage, context) : undefined;
+          const content = latestForm.completionMessage ? formatApplicationMessage(latestForm.completionMessage, context).slice(0, APPLICATION_TEXT_LIMIT) : undefined;
           const embedTemplate = formatApplicationMessageEmbed(latestForm.completionMessageEmbed, context);
           const embed = hasApplicationMessageEmbedContent(embedTemplate) ? this.lib.createEmbedBuilder() : null;
 
@@ -508,8 +515,8 @@ export class ApplicationFlowService {
           }
 
           const payload: { content?: string; embeds?: any[] } = {};
-          if (content && content.trim().length > 0) payload.content = content;
-          if (embed) payload.embeds = [embed];
+          if ((messageMode === "text" || messageMode === "both") && content && content.trim().length > 0) payload.content = content;
+          if ((messageMode === "embed" || messageMode === "both") && embed) payload.embeds = [embed];
 
           if (payload.content || payload.embeds) {
             await user.send(payload).catch(() => null);
