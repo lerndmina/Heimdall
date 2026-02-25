@@ -99,7 +99,9 @@
   }
 
   .ui-surface-hover {
-    transition: background-color 150ms ease, border-color 150ms ease;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease;
   }
 
   .ui-surface-hover:hover {
@@ -128,5 +130,97 @@
 
   .ui-input-error {
     border-color: var(--color-ui-danger);
+  }
+}
+
+@layer utilities {
+  .text-zinc-100,
+  .text-zinc-200,
+  .text-zinc-300 {
+    color: var(--color-ui-text-primary) !important;
+  }
+
+  .text-zinc-400 {
+    color: var(--color-ui-text-muted) !important;
+  }
+
+  .text-zinc-500,
+  .text-zinc-600 {
+    color: var(--color-ui-text-faint) !important;
+  }
+
+  .bg-zinc-900\/20,
+  .bg-zinc-900\/30,
+  .bg-zinc-900\/40,
+  .bg-zinc-800\/30,
+  .bg-zinc-800\/40,
+  .bg-zinc-800\/50,
+  .bg-zinc-800\/60,
+  .bg-zinc-700,
+  .bg-zinc-700\/20,
+  .bg-zinc-700\/30,
+  .bg-zinc-700\/40,
+  .bg-zinc-700\/50,
+  .bg-zinc-700\/60,
+  .bg-white\/5,
+  .bg-white\/10 {
+    background-color: var(--color-ui-bg-subtle) !important;
+  }
+
+  .border-zinc-700,
+  .border-zinc-700\/20,
+  .border-zinc-700\/30,
+  .border-zinc-700\/40,
+  .border-zinc-700\/50,
+  .border-zinc-700\/60,
+  .border-zinc-600,
+  .border-zinc-600\/40,
+  .border-zinc-600\/50,
+  .border-zinc-500,
+  .border-zinc-500\/20,
+  .border-zinc-500\/30 {
+    border-color: color-mix(in srgb, var(--color-ui-border) 75%, transparent) !important;
+  }
+
+  .hover\:bg-white\/5:hover,
+  .hover\:bg-white\/10:hover,
+  .hover\:bg-zinc-700:hover,
+  .hover\:bg-zinc-600:hover,
+  .hover\:bg-zinc-800:hover,
+  .hover\:bg-zinc-900\/40:hover {
+    background-color: var(--color-ui-bg-surface-hover) !important;
+  }
+
+  .hover\:text-zinc-100:hover,
+  .hover\:text-zinc-200:hover,
+  .hover\:text-zinc-300:hover,
+  .hover\:text-zinc-400:hover {
+    color: var(--color-ui-text-primary) !important;
+  }
+
+  .backdrop-blur,
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg,
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl,
+  .hover\:shadow-lg:hover,
+  .hover\:shadow-xl:hover,
+  .hover\:shadow-2xl:hover,
+  .shadow-primary-500\/5,
+  .shadow-primary-500\/20,
+  .shadow-primary-500\/25,
+  .shadow-primary-500\/40,
+  .hover\:shadow-primary-500\/5:hover,
+  .hover\:shadow-primary-500\/20:hover,
+  .hover\:shadow-primary-500\/25:hover,
+  .hover\:shadow-primary-500\/40:hover {
+    box-shadow: none !important;
   }
 }

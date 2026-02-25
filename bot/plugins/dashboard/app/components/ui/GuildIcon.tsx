@@ -38,7 +38,7 @@ export default function GuildIcon({ name, icon, guildId, className = "h-10 w-10"
   const initials = guildInitials(name);
 
   return (
-    <div className={`flex shrink-0 items-center justify-center rounded-full bg-zinc-600 text-white font-medium select-none text-xs ${className}`} aria-label={name}>
+    <div className={`flex shrink-0 items-center justify-center rounded-full bg-ui-border text-ui-text-primary font-medium select-none text-xs ${className}`} aria-label={name}>
       {initials}
     </div>
   );

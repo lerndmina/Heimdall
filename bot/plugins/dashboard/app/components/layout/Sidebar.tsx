@@ -83,9 +83,11 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
 
   return (
     <aside className="relative flex w-full flex-col border-b border-[color-mix(in_srgb,var(--color-ui-border)_70%,transparent)] bg-ui-bg-subtle lg:h-screen lg:w-64 lg:border-b-0 lg:border-r">
-
       {/* Guild header */}
-      <a href="/" onClick={(e) => guardedNavigate(e, "/")} className="relative flex items-center gap-3 border-b border-[color-mix(in_srgb,var(--color-ui-border)_70%,transparent)] px-4 py-4 transition hover:bg-ui-bg-surface-hover">
+      <a
+        href="/"
+        onClick={(e) => guardedNavigate(e, "/")}
+        className="relative flex items-center gap-3 border-b border-[color-mix(in_srgb,var(--color-ui-border)_70%,transparent)] px-4 py-4 transition hover:bg-ui-bg-surface-hover">
         <GuildIcon name={guildName} icon={guildIcon} guildId={guildId} className="h-10 w-10" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-ui-text-primary">{guildName}</p>
@@ -146,7 +148,11 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-ui-text-primary">{session.user.name}</p>
             </div>
-            <button onClick={() => setSettingsOpen((current) => !current)} className="text-xs text-ui-text-faint transition hover:text-ui-text-primary" title="User settings" aria-label="User settings">
+            <button
+              onClick={() => setSettingsOpen((current) => !current)}
+              className="text-xs text-ui-text-faint transition hover:text-ui-text-primary"
+              title="User settings"
+              aria-label="User settings">
               <MdSettings className="h-4 w-4" aria-hidden="true" />
             </button>
             <button onClick={() => signOut({ callbackUrl: "/login" })} className="text-xs text-ui-text-faint transition hover:text-ui-text-primary" title="Sign out">
@@ -168,7 +174,10 @@ export default function Sidebar({ guildId, guildName, guildIcon, items }: Sideba
                 />
               </div>
               <div className="mt-3 flex justify-end gap-2">
-                <button type="button" className="rounded border border-[color-mix(in_srgb,var(--color-ui-border)_70%,transparent)] px-2 py-1 text-xs text-ui-text-muted transition hover:bg-ui-bg-surface-hover" onClick={() => setSettingsOpen(false)}>
+                <button
+                  type="button"
+                  className="rounded border border-[color-mix(in_srgb,var(--color-ui-border)_70%,transparent)] px-2 py-1 text-xs text-ui-text-muted transition hover:bg-ui-bg-surface-hover"
+                  onClick={() => setSettingsOpen(false)}>
                   Close
                 </button>
                 <button

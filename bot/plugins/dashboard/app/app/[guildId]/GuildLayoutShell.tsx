@@ -108,16 +108,16 @@ function GuildLayoutInner({ guild, children }: { guild: GuildInfo; children: Rea
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-zinc-700/30 bg-zinc-900/40 backdrop-blur-xl">
-            <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-ui-border bg-ui-bg-surface">
+            <svg className="h-8 w-8 text-ui-text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
           </div>
-          <h2 className="text-lg font-semibold text-zinc-200">Dashboard Access Denied</h2>
-          <p className="mt-1 text-sm text-zinc-500">Your role has been restricted from accessing this server&apos;s dashboard.</p>
+          <h2 className="text-lg font-semibold text-ui-text-primary">Dashboard Access Denied</h2>
+          <p className="mt-1 text-sm text-ui-text-faint">Your role has been restricted from accessing this server&apos;s dashboard.</p>
           <a
             href="/"
-            className="mt-4 inline-block rounded-lg border border-zinc-700/30 bg-zinc-900/40 px-4 py-2 text-sm font-medium text-zinc-300 backdrop-blur-xl transition-all duration-300 hover:border-zinc-600/40 hover:text-zinc-100 hover:shadow-lg">
+            className="mt-4 inline-block rounded-lg border border-ui-border bg-ui-bg-subtle px-4 py-2 text-sm font-medium text-ui-text-muted transition-colors hover:border-ui-border-strong hover:bg-ui-bg-surface-hover hover:text-ui-text-primary">
             ← Back to servers
           </a>
         </div>

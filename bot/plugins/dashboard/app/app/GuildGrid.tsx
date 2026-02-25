@@ -245,21 +245,21 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-1.5 rounded-lg border border-zinc-700/30 bg-zinc-900/40 px-3 py-1.5 text-xs font-medium text-zinc-400 backdrop-blur-xl transition-all duration-300 hover:border-zinc-600/40 hover:text-zinc-200 hover:shadow-lg disabled:opacity-50">
+            className="flex items-center gap-1.5 rounded-lg border border-ui-border bg-ui-bg-subtle px-3 py-1.5 text-xs font-medium text-ui-text-muted transition-colors hover:border-ui-border-strong hover:bg-ui-bg-surface-hover hover:text-ui-text-primary disabled:opacity-50">
             <svg className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             {isRefreshing ? "Refreshing…" : "Refresh"}
           </button>
         </div>
-        <div className="rounded-2xl border border-zinc-700/30 bg-zinc-900/40 p-12 text-center backdrop-blur-xl">
+        <div className="rounded-2xl border border-ui-border bg-ui-bg-surface p-12 text-center">
           {hadFetchError ? (
             <div className="space-y-3">
-              <p className="text-zinc-300">Could not load your servers — the bot may still be starting up.</p>
+              <p className="text-ui-text-muted">Could not load your servers — the bot may still be starting up.</p>
               <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-primary-500/25 transition-all hover:bg-primary-500 hover:shadow-primary-500/40 disabled:opacity-50">
+                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-500 disabled:opacity-50">
                 <svg className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
@@ -267,7 +267,7 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
               </button>
             </div>
           ) : (
-            <p className="text-zinc-400">You don&apos;t have permission to manage any servers with Heimdall.</p>
+            <p className="text-ui-text-muted">You don&apos;t have permission to manage any servers with Heimdall.</p>
           )}
         </div>
       </div>
@@ -281,7 +281,7 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="flex items-center gap-1.5 rounded-lg border border-zinc-700/30 bg-zinc-900/40 px-3 py-1.5 text-xs font-medium text-zinc-400 backdrop-blur-xl transition-all duration-300 hover:border-zinc-600/40 hover:text-zinc-200 hover:shadow-lg disabled:opacity-50">
+          className="flex items-center gap-1.5 rounded-lg border border-ui-border bg-ui-bg-subtle px-3 py-1.5 text-xs font-medium text-ui-text-muted transition-colors hover:border-ui-border-strong hover:bg-ui-bg-surface-hover hover:text-ui-text-primary disabled:opacity-50">
           <svg className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
@@ -301,14 +301,13 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
               <Link
                 key={guild.id}
                 href={`/${guild.id}`}
-                className="group relative flex items-center gap-4 rounded-2xl border border-zinc-700/30 bg-zinc-900/40 p-4 backdrop-blur-xl transition-all duration-500 hover:border-zinc-600/40 hover:shadow-2xl hover:shadow-primary-500/5">
-                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-r from-primary-500/0 via-primary-500/5 to-primary-500/0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                className="group flex items-center gap-4 rounded-2xl border border-ui-border bg-ui-bg-surface p-4 transition-colors hover:border-ui-border-strong hover:bg-ui-bg-surface-hover">
                 <GuildIcon name={guild.name} icon={guild.icon} guildId={guild.id} className="relative h-12 w-12 transition-transform duration-300 group-hover:scale-105" />
                 <div className="relative min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-zinc-100">{guild.name}</p>
-                  <p className="text-xs text-zinc-500">Click to manage</p>
+                  <p className="truncate text-sm font-semibold text-ui-text-primary">{guild.name}</p>
+                  <p className="text-xs text-ui-text-faint">Click to manage</p>
                 </div>
-                <span className="relative shrink-0 rounded-md bg-primary-600/20 px-2.5 py-1 text-xs font-medium text-primary-400 transition-all duration-300 group-hover:bg-primary-600/30 group-hover:shadow-sm group-hover:shadow-primary-500/20">
+                <span className="shrink-0 rounded-md bg-primary-600/20 px-2.5 py-1 text-xs font-medium text-primary-400 transition-colors group-hover:bg-primary-600/30">
                   Manage
                 </span>
               </Link>
@@ -324,14 +323,13 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleInviteClick}
-                className="group relative flex items-center gap-4 rounded-2xl border border-zinc-700/30 bg-zinc-900/30 p-4 backdrop-blur-xl transition-all duration-500 hover:border-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-500/5">
-                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-linear-to-r from-emerald-500/0 via-emerald-500/5 to-emerald-500/0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                className="group flex items-center gap-4 rounded-2xl border border-ui-border bg-ui-bg-surface p-4 transition-colors hover:border-emerald-500/35 hover:bg-ui-bg-surface-hover">
                 <GuildIcon name={guild.name} icon={guild.icon} guildId={guild.id} className="relative h-12 w-12 opacity-60 transition-all duration-300 group-hover:opacity-100 group-hover:scale-105" />
                 <div className="relative min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-zinc-300">{guild.name}</p>
-                  <p className="text-xs text-zinc-600">Bot not in server</p>
+                  <p className="truncate text-sm font-semibold text-ui-text-muted">{guild.name}</p>
+                  <p className="text-xs text-ui-text-faint">Bot not in server</p>
                 </div>
-                <span className="relative shrink-0 rounded-md bg-emerald-600/20 px-2.5 py-1 text-xs font-medium text-emerald-400 transition-all duration-300 group-hover:bg-emerald-600/30 group-hover:shadow-sm group-hover:shadow-emerald-500/20">
+                <span className="shrink-0 rounded-md bg-emerald-600/20 px-2.5 py-1 text-xs font-medium text-emerald-400 transition-colors group-hover:bg-emerald-600/30">
                   Invite
                 </span>
               </a>
@@ -340,11 +338,11 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
 
           // Dashboard-only access, bot not in server — can't invite, just show as unavailable
           return (
-            <div key={guild.id} className="flex items-center gap-4 rounded-2xl border border-zinc-700/30 bg-zinc-900/20 p-4 opacity-50 backdrop-blur-xl">
+            <div key={guild.id} className="flex items-center gap-4 rounded-2xl border border-ui-border bg-ui-bg-subtle p-4 opacity-50">
               <GuildIcon name={guild.name} icon={guild.icon} guildId={guild.id} className="h-12 w-12" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-zinc-400">{guild.name}</p>
-                <p className="text-xs text-zinc-600">Bot not in server</p>
+                <p className="truncate text-sm font-semibold text-ui-text-muted">{guild.name}</p>
+                <p className="text-xs text-ui-text-faint">Bot not in server</p>
               </div>
             </div>
           );

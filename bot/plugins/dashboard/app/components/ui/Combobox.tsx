@@ -145,7 +145,11 @@ export default function Combobox({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={`ui-input flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm outline-none transition ${
-          error ? "ui-input-error ring-1 ring-[color-mix(in_srgb,var(--color-ui-danger)_30%,transparent)]" : open ? "border-primary-600 ring-1 ring-[color-mix(in_srgb,var(--color-primary-600)_35%,transparent)]" : "hover:border-ui-border-strong"
+          error
+            ? "ui-input-error ring-1 ring-[color-mix(in_srgb,var(--color-ui-danger)_30%,transparent)]"
+            : open
+              ? "border-primary-600 ring-1 ring-[color-mix(in_srgb,var(--color-primary-600)_35%,transparent)]"
+              : "hover:border-ui-border-strong"
         } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
         <span className={`flex items-center gap-1.5 ${selectedOption ? "text-ui-text-primary" : "text-ui-text-faint"}`}>
           {loading ? (

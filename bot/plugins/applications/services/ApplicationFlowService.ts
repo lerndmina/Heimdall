@@ -52,6 +52,18 @@ function truncateWithIndicator(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
+function formatCooldownDuration(ms: number): string {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.ceil((totalSeconds % 3600) / 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} day${days !== 1 ? "s" : ""}`);
+  if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? "s" : ""}`);
+  if (minutes > 0 && days === 0) parts.push(`${minutes} minute${minutes !== 1 ? "s" : ""}`);
+  return parts.join(", ") || "a moment";
+}
+
 export class ApplicationFlowService {
   constructor(
     private readonly client: HeimdallClient,
@@ -109,8 +121,7 @@ export class ApplicationFlowService {
       const reference = latest.reviewedAt ? new Date(latest.reviewedAt).getTime() : new Date(latest.createdAt || Date.now()).getTime();
       const remaining = reference + cooldownSeconds * 1000 - Date.now();
       if (remaining > 0) {
-        const minutes = Math.ceil(remaining / 60000);
-        await interaction.reply({ content: `❌ You must wait about ${minutes} minute(s) before re-applying.`, ephemeral: true });
+        await interaction.reply({ content: `❌ You must wait about **${formatCooldownDuration(remaining)}** before re-applying.`, ephemeral: true });
         return;
       }
     }

@@ -62,11 +62,11 @@ function StatCard({ title, value, description, icon, accent }: { title: string; 
     <Card className="relative overflow-hidden">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium text-zinc-400">{title}</p>
-          <p className={`mt-1 text-3xl font-bold ${accent ?? "text-zinc-100"}`}>{value}</p>
-          <p className="mt-1 text-xs text-zinc-500">{description}</p>
+          <p className="text-sm font-medium text-ui-text-muted">{title}</p>
+          <p className={`mt-1 text-3xl font-bold ${accent ?? "text-ui-text-primary"}`}>{value}</p>
+          <p className="mt-1 text-xs text-ui-text-faint">{description}</p>
         </div>
-        <div className="rounded-lg bg-white/5 p-2 text-zinc-400 backdrop-blur-sm">{icon}</div>
+        <div className="rounded-lg bg-ui-bg-subtle p-2 text-ui-text-muted">{icon}</div>
       </div>
     </Card>
   );
@@ -223,7 +223,7 @@ export default function GuildOverviewPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{guild?.guildName ?? "Overview"}</h1>
-        <p className="text-zinc-400">Server dashboard at a glance.</p>
+        <p className="text-ui-text-muted">Server dashboard at a glance.</p>
       </div>
 
       {/* ── Primary stats ── */}
@@ -277,18 +277,18 @@ export default function GuildOverviewPage() {
         <Card>
           <CardTitle>Minecraft Servers</CardTitle>
           <CardContent>
-            <div className="mt-3 divide-y divide-zinc-700/30">
+            <div className="mt-3 divide-y divide-ui-border">
               {mcServers.map((srv, i) => (
                 <div key={i} className="flex items-center justify-between py-2">
                   <div>
-                    <p className="text-sm font-medium text-zinc-200">{srv.serverName}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-sm font-medium text-ui-text-primary">{srv.serverName}</p>
+                    <p className="text-xs text-ui-text-faint">
                       {srv.serverIp}:{srv.serverPort}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     {srv.lastPingData?.players && (
-                      <span className="text-sm text-zinc-400">
+                      <span className="text-sm text-ui-text-muted">
                         {srv.lastPingData.players.online}/{srv.lastPingData.players.max}
                       </span>
                     )}
@@ -312,12 +312,12 @@ export default function GuildOverviewPage() {
                   [
                     ["Open", tickets.open, "text-blue-400"],
                     ["Claimed", tickets.claimed, "text-yellow-400"],
-                    ["Closed", tickets.closed, "text-zinc-400"],
-                    ["Archived", tickets.archived, "text-zinc-500"],
+                    ["Closed", tickets.closed, "text-ui-text-muted"],
+                    ["Archived", tickets.archived, "text-ui-text-faint"],
                   ] as const
                 ).map(([label, val, color]) => (
-                  <div key={label} className="rounded-lg border border-zinc-700/20 bg-white/5 p-3 backdrop-blur-sm transition-transform duration-200 hover:scale-[1.02]">
-                    <p className="text-xs text-zinc-500">{label}</p>
+                  <div key={label} className="rounded-lg border border-ui-border bg-ui-bg-subtle p-3">
+                    <p className="text-xs text-ui-text-faint">{label}</p>
                     <p className={`text-xl font-bold ${color}`}>{val.toLocaleString()}</p>
                   </div>
                 ))}
@@ -338,8 +338,8 @@ export default function GuildOverviewPage() {
                     ["Denied", suggestions.denied, "text-red-400"],
                   ] as const
                 ).map(([label, val, color]) => (
-                  <div key={label} className="rounded-lg border border-zinc-700/20 bg-white/5 p-3 backdrop-blur-sm transition-transform duration-200 hover:scale-[1.02]">
-                    <p className="text-xs text-zinc-500">{label}</p>
+                  <div key={label} className="rounded-lg border border-ui-border bg-ui-bg-subtle p-3">
+                    <p className="text-xs text-ui-text-faint">{label}</p>
                     <p className={`text-xl font-bold ${color}`}>{val.toLocaleString()}</p>
                   </div>
                 ))}

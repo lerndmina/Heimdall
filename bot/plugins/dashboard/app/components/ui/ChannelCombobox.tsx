@@ -44,7 +44,7 @@ const FORUM_CHANNEL_TYPE = 15;
 
 /** Small icon representing a Discord channel type, used as the option prefix. */
 function ChannelTypeIcon({ type }: { type: number }) {
-  const cls = "h-3.5 w-3.5 shrink-0 text-zinc-400";
+  const cls = "h-3.5 w-3.5 shrink-0 text-ui-text-muted";
 
   // Forum (15) — speech-bubble with lines
   if (type === FORUM_CHANNEL_TYPE) {
@@ -96,7 +96,7 @@ function ChannelTypeIcon({ type }: { type: number }) {
   }
 
   // Default: text channel — hashtag
-  return <span className="text-xs font-bold text-zinc-400 leading-none">#</span>;
+  return <span className="text-xs leading-none font-bold text-ui-text-muted">#</span>;
 }
 
 const channelDataCache = new Map<string, ChannelData[]>();
@@ -170,8 +170,8 @@ export default function ChannelCombobox({ guildId, value, onChange, channelType 
 
   return (
     <div className="space-y-1.5">
-      {label && <p className="block text-sm font-medium text-zinc-200">{label}</p>}
-      {description && <p className="text-xs text-zinc-500">{description}</p>}
+      {label && <p className="block text-sm font-medium text-ui-text-primary">{label}</p>}
+      {description && <p className="text-xs text-ui-text-faint">{description}</p>}
       <Combobox
         options={options}
         value={value}

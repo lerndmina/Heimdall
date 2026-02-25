@@ -74,8 +74,8 @@ export default function RoleCombobox({ guildId, value, onChange, placeholder, di
 
   return (
     <div className="space-y-1.5">
-      {label && <p className="block text-sm font-medium text-zinc-200">{label}</p>}
-      {description && <p className="text-xs text-zinc-500">{description}</p>}
+      {label && <p className="block text-sm font-medium text-ui-text-primary">{label}</p>}
+      {description && <p className="text-xs text-ui-text-faint">{description}</p>}
       <Combobox
         options={options}
         value={value}

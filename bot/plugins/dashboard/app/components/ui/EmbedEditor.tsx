@@ -83,16 +83,16 @@ export default function EmbedEditor({
 
   return (
     <div className="space-y-3">
-      {!hideHeading && <h3 className="text-sm font-semibold text-zinc-200">{heading}</h3>}
+      {!hideHeading && <h3 className="text-sm font-semibold text-ui-text-primary">{heading}</h3>}
 
       {showMessageModeControls && (
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-200">Send Mode</label>
+          <label className="text-sm font-medium text-ui-text-primary">Send Mode</label>
           <select
             value={messageMode}
             disabled={disabled}
             onChange={(event) => onMessageModeChange?.(event.target.value as EmbedMessageMode)}
-            className="w-full rounded-lg border border-zinc-700/30 bg-zinc-900/40 px-3 py-2 text-sm text-zinc-100 transition focus:border-primary-500/50 focus:outline-none focus:ring-1 focus:ring-primary-500/30">
+            className="ui-input w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-1 focus:ring-primary-500/30">
             <option value="embed">Embed only</option>
             <option value="text">Text only</option>
             <option value="both">Embed + text</option>

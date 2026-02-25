@@ -94,7 +94,7 @@ export default function DiscordMention({ type, id, guildId }: DiscordMentionProp
   // ── Loading / unknown fallback ─────────────────────────────
   if (!resolved) {
     return (
-      <span className="inline-flex cursor-default items-center rounded px-1.5 py-0.5 font-mono text-xs font-medium bg-zinc-700 text-zinc-400" title={`ID: ${id}`}>
+      <span className="inline-flex cursor-default items-center rounded bg-ui-bg-subtle px-1.5 py-0.5 font-mono text-xs font-medium text-ui-text-muted" title={`ID: ${id}`}>
         {type === "channel" ? "#" : "@"}
         {id.slice(-6)}…
       </span>

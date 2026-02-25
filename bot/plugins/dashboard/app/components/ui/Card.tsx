@@ -8,9 +8,7 @@ interface CardProps {
 }
 
 export function Card({ children, className = "" }: CardProps) {
-  return (
-    <div className={`ui-surface ui-surface-hover rounded-2xl border p-6 ${className}`}>{children}</div>
-  );
+  return <div className={`ui-surface ui-surface-hover rounded-2xl border p-6 ${className}`}>{children}</div>;
 }
 
 export function CardHeader({ children, className = "" }: CardProps) {
