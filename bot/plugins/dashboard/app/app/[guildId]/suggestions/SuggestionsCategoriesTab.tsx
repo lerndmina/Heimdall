@@ -269,13 +269,13 @@ export default function SuggestionsCategoriesTab({ guildId }: { guildId: string 
         title={editCat ? `Edit Category: ${editCat.name}` : "New Category"}
         footer={
           <>
-            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setModalOpen(false)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={modalSaving || !draft.name.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed">
               {modalSaving ? (editCat ? "Updating…" : "Creating…") : editCat ? "Update" : "Create"}
             </button>
           </>
@@ -306,7 +306,7 @@ export default function SuggestionsCategoriesTab({ guildId }: { guildId: string 
         title="Delete Category"
         footer={
           <>
-            <button onClick={() => setDeleteCat(null)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800">
+            <button onClick={() => setDeleteCat(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
               Cancel
             </button>
             <button

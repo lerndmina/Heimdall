@@ -11,7 +11,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import NumberInput from "@/components/ui/NumberInput";
@@ -329,10 +329,10 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
     <div className="space-y-6">
       {/* Global Settings */}
       <Card>
-        <div className="flex items-center justify-between">
+        <CardHeader>
           <CardTitle>Global Settings</CardTitle>
           <StatusBadge variant={config.enableCategories ? "success" : "neutral"}>{config.enableCategories ? "Categories On" : "Categories Off"}</StatusBadge>
-        </div>
+        </CardHeader>
         <CardContent>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <FieldDisplay label="Max Channels" value={String(config.maxChannels)} />
@@ -344,10 +344,10 @@ export default function SuggestionsConfigTab({ guildId }: { guildId: string }) {
       </Card>
 
       <Card>
-        <div className="flex items-center justify-between">
+        <CardHeader>
           <CardTitle>AI Title API Key</CardTitle>
           <StatusBadge variant={hasAiApiKey ? "success" : "neutral"}>{hasAiApiKey ? "Configured" : "Not Configured"}</StatusBadge>
-        </div>
+        </CardHeader>
         <CardDescription className="mt-1">Per-guild encrypted OpenAI key used for AI-generated suggestion titles.</CardDescription>
         <CardContent>
           <div className="mt-4 space-y-3">
