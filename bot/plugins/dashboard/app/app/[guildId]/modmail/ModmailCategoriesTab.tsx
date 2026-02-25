@@ -9,12 +9,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardTitle, CardContent } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import TextInput from "@/components/ui/TextInput";
 import Toggle from "@/components/ui/Toggle";
 import ChannelCombobox from "@/components/ui/ChannelCombobox";
 import RoleCombobox from "@/components/ui/RoleCombobox";
-import { fetchDashboardApi, fetchApi } from "@/lib/api";
+import Modal from "@/components/ui/Modal";
+import Spinner from "@/components/ui/Spinner";
+import { fetchApi } from "@/lib/api";
 import { useRealtimeEvent } from "@/hooks/useRealtimeEvent";
 import { toast } from "sonner";
 
@@ -66,6 +68,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
   const [categories, setCategories] = useState<Category[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
 
   // Form state for add/edit
   const [formData, setFormData] = useState<Partial<Category>>({ ...EMPTY_FORM });
@@ -93,8 +96,8 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
   const loadCategories = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchDashboardApi<{ categories: Category[] }>(`guilds/${guildId}/modmail/config`, {
-        method: "GET",
+      const res = await fetchApi<{ categories: Category[] }>(guildId, "modmail/config", {
+        skipCache: true,
       });
 
       if (res.success && res.data) {
@@ -167,7 +170,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
       }
 
       // Save via API
-      const res = await fetchDashboardApi(`guilds/${guildId}/modmail/config`, {
+      const res = await fetchApi(guildId, "modmail/config", {
         method: "PUT",
         body: JSON.stringify({ categories: updatedCategories }),
       });
@@ -197,13 +200,11 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
   };
 
   const handleDelete = async (index: number) => {
-    if (!confirm("Are you sure you want to delete this category?")) return;
-
     setSaving(true);
     try {
       const updatedCategories = categories.filter((_, i) => i !== index);
 
-      const res = await fetchDashboardApi(`guilds/${guildId}/modmail/config`, {
+      const res = await fetchApi(guildId, "modmail/config", {
         method: "PUT",
         body: JSON.stringify({ categories: updatedCategories }),
       });
@@ -213,6 +214,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
       }
 
       setCategories(updatedCategories);
+      setConfirmDeleteIndex(null);
       toast.success("Category deleted");
     } catch (error: any) {
       toast.error(error.message || "Failed to delete category");
@@ -229,7 +231,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
   if (loading && categories.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="inline-flex h-8 w-8 animate-spin rounded-full border-4 border-zinc-600 border-t-primary-500" />
+        <Spinner />
       </div>
     );
   }
@@ -237,10 +239,10 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <CardHeader>
         <div>
-          <h2 className="text-xl font-semibold text-zinc-100">Categories</h2>
-          <p className="mt-1 text-sm text-zinc-400">Manage modmail categories with custom forms and workflows</p>
+          <CardTitle>Categories</CardTitle>
+          <CardDescription className="mt-1">Manage modmail categories with custom forms and workflows</CardDescription>
         </div>
         {!showAddForm && (
           <button
@@ -253,7 +255,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
             + Add Category
           </button>
         )}
-      </div>
+      </CardHeader>
 
       {/* Add/Edit Form */}
       {showAddForm && (
@@ -359,10 +361,10 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
                   resetForm();
                 }}
                 disabled={saving}
-                className="flex-1 rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-600 disabled:opacity-50">
+                className="flex-1 rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5 disabled:opacity-50">
                 Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50">
                 {saving ? "Saving..." : editingIndex !== null ? "Save Changes" : "Add Category"}
               </button>
             </div>
@@ -421,7 +423,7 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
                       Edit
                     </button>
                     <button
-                      onClick={() => handleDelete(index)}
+                      onClick={() => setConfirmDeleteIndex(index)}
                       disabled={saving}
                       className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/20 disabled:opacity-50">
                       Delete
@@ -433,6 +435,29 @@ export default function ModmailCategoriesTab({ guildId }: ModmailCategoriesTabPr
           ))}
         </div>
       )}
+
+      <Modal
+        open={confirmDeleteIndex !== null}
+        onClose={() => setConfirmDeleteIndex(null)}
+        title="Delete Category"
+        maxWidth="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setConfirmDeleteIndex(null)} className="rounded-lg border border-zinc-700/30 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5">
+              Cancel
+            </button>
+            <button
+              onClick={() => confirmDeleteIndex !== null && handleDelete(confirmDeleteIndex)}
+              disabled={saving}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50">
+              {saving ? "Deleting…" : "Delete Category"}
+            </button>
+          </div>
+        }>
+        <p className="text-sm text-zinc-300">
+          Are you sure you want to delete <strong>{confirmDeleteIndex !== null ? categories[confirmDeleteIndex]?.name : ""}</strong>? This cannot be undone.
+        </p>
+      </Modal>
     </div>
   );
 }

@@ -8,7 +8,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
 import StatusBadge from "@/components/ui/StatusBadge";
 import NumberInput from "@/components/ui/NumberInput";
@@ -253,10 +253,10 @@ export default function ModmailConfigTab({ guildId }: { guildId: string }) {
     <div className="space-y-6">
       {/* General Settings */}
       <Card>
-        <div className="flex items-center justify-between">
+        <CardHeader>
           <CardTitle>General</CardTitle>
           <StatusBadge variant={config.enabled ? "success" : "neutral"}>{config.enabled ? "Enabled" : "Disabled"}</StatusBadge>
-        </div>
+        </CardHeader>
         <CardContent>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <FieldDisplay label="Thread Naming" value={config.threadNamingPattern} />

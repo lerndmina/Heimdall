@@ -8,6 +8,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardTitle, CardContent } from "@/components/ui/Card";
 import { fetchDashboardApi } from "@/lib/api";
+import Spinner from "@/components/ui/Spinner";
 import { toast } from "sonner";
 
 interface ModmailThread {
@@ -155,8 +156,7 @@ export default function CategoryAssignmentWizard({ guildId, onClose, onComplete 
       <Card>
         <CardTitle>Assign Categories to Imported Threads</CardTitle>
         <CardContent className="mt-4 text-center">
-          <div className="inline-flex h-8 w-8 animate-spin rounded-full border-4 border-zinc-600 border-t-primary-500" />
-          <p className="mt-4 text-sm text-zinc-400">Loading threads and categories...</p>
+          <Spinner label="Loading threads and categories…" />
         </CardContent>
       </Card>
     );
@@ -290,11 +290,11 @@ export default function CategoryAssignmentWizard({ guildId, onClose, onComplete 
           <button
             onClick={handleSave}
             disabled={saving || Object.keys(assignments).length === 0}
-            className="flex-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             {saving ? (
               <>
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <span>Saving...</span>
+                <Spinner />
+                <span>Saving…</span>
               </>
             ) : (
               <>Save Assignments</>

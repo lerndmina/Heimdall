@@ -222,6 +222,11 @@ export default function ModmailConversationsTab({ guildId }: { guildId: string }
       {/* Conversation list */}
       {conversations.length === 0 ? (
         <Card className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="mb-4 rounded-full bg-white/5 p-4 backdrop-blur-sm">
+            <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </div>
           <CardTitle>No Conversations</CardTitle>
           <CardDescription className="mt-2">{search ? `No results for "${search}"` : "No modmail conversations found."}</CardDescription>
         </Card>
