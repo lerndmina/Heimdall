@@ -346,11 +346,7 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
     }
 
     const run = async () => {
-      const query = [
-        "limit=100",
-        `formId=${encodeURIComponent(selectedSubmission.formId)}`,
-        `userId=${encodeURIComponent(selectedSubmission.userId)}`,
-      ];
+      const query = ["limit=100", `formId=${encodeURIComponent(selectedSubmission.formId)}`, `userId=${encodeURIComponent(selectedSubmission.userId)}`];
       const response = await fetchApi<ApplicationSubmission[]>(guildId, `applications/submissions?${query.join("&")}`, { skipCache: true });
       if (!response.success || !response.data) {
         setRelatedSubmissions([]);
@@ -1113,8 +1109,12 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                   className="rounded-lg border border-zinc-700/30 p-3">
                   <button type="button" className="flex w-full items-center justify-between gap-2 text-left" onClick={() => toggleSubmissionExpanded(submission.applicationId)}>
                     <div>
-                      <p className="font-medium text-zinc-100">#{submission.applicationNumber} • {submission.formName}</p>
-                      <p className="text-xs text-zinc-400">Status: {submission.status} {submission.linkedModmailId ? `• Modmail: ${submission.linkedModmailId}` : ""}</p>
+                      <p className="font-medium text-zinc-100">
+                        #{submission.applicationNumber} • {submission.formName}
+                      </p>
+                      <p className="text-xs text-zinc-400">
+                        Status: {submission.status} {submission.linkedModmailId ? `• Modmail: ${submission.linkedModmailId}` : ""}
+                      </p>
                       <button
                         type="button"
                         className="mt-1 text-xs text-primary-400 hover:text-primary-300"
@@ -1135,7 +1135,9 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                         <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
                           {submission.responses.map((answer, index) => (
                             <div key={`${submission.applicationId}-${index}`} className="rounded border border-zinc-700/20 bg-zinc-900/30 p-2 text-xs text-zinc-300">
-                              <p className="font-semibold text-zinc-100">{index + 1}. {answer.questionLabel}</p>
+                              <p className="font-semibold text-zinc-100">
+                                {index + 1}. {answer.questionLabel}
+                              </p>
                               <p className="mt-1 whitespace-pre-wrap">{answer.values?.join(", ") || answer.value || "_No answer_"}</p>
                             </div>
                           ))}
@@ -1152,7 +1154,9 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                                 type="button"
                                 className="w-full rounded border border-zinc-700/20 bg-zinc-900/30 p-2 text-left text-xs text-zinc-300 transition hover:bg-white/5"
                                 onClick={() => toggleSubmissionExpanded(entry.applicationId)}>
-                                <p className="font-semibold text-zinc-100">#{entry.applicationNumber} • {entry.status}</p>
+                                <p className="font-semibold text-zinc-100">
+                                  #{entry.applicationNumber} • {entry.status}
+                                </p>
                                 <p className="text-zinc-500">{new Date(entry.createdAt).toLocaleString()}</p>
                               </button>
                             ))
@@ -1240,15 +1244,7 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
             </button>
           </div>
         }>
-        <Textarea
-          label="Reason"
-          value={reviewReason}
-          onChange={setReviewReason}
-          placeholder="Enter review reason"
-          rows={4}
-          maxLength={2000}
-          disabled={reviewSubmitting}
-        />
+        <Textarea label="Reason" value={reviewReason} onChange={setReviewReason} placeholder="Enter review reason" rows={4} maxLength={2000} disabled={reviewSubmitting} />
       </Modal>
 
       <Modal
