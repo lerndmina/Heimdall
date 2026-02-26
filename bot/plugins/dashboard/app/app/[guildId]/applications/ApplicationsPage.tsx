@@ -1052,7 +1052,7 @@ export default function ApplicationsPage({ guildId }: ApplicationsPageProps) {
                     </button>
                     <button
                       type="button"
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                      className="rounded border border-emerald-500/40 bg-emerald-600/15 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-600/25 disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={saveForm}
                       disabled={saving || !canManage || !isDraftDirty}>
                       {saving ? "Saving…" : "Save Form"}

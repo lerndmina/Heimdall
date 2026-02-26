@@ -107,6 +107,22 @@ const routeMap: Record<string, string> = {
   "POST /rolebuttons/*/update-posts": "rolebuttons.manage",
   "DELETE /rolebuttons/*/posts/*": "rolebuttons.manage",
 
+  // Applications
+  "GET /applications/forms": "applications.view",
+  "GET /applications/forms/*": "applications.view",
+  "POST /applications/forms": "applications.manage",
+  "PUT /applications/forms/*": "applications.manage",
+  "DELETE /applications/forms/*": "applications.manage",
+  "POST /applications/forms/*/post": "applications.manage",
+  "PUT /applications/forms/*/update-posts": "applications.manage",
+  "DELETE /applications/forms/*/posts/*": "applications.manage",
+  "GET /applications/submissions": "applications.view",
+  "GET /applications/submissions/*": "applications.view",
+  "PUT /applications/submissions/*/status": "applications.review",
+  "POST /applications/submissions/*/open-modmail": "applications.review",
+  "DELETE /applications/submissions/*": "applications.manage",
+  "GET /applications/stats": "applications.view",
+
   "GET /logging": "logging.view_config",
   "GET /logging/config": "logging.view_config",
   "GET /logging/events": "logging.view_config",

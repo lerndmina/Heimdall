@@ -10,6 +10,7 @@ import type { MinecraftApiDependencies } from "./index.js";
 import MinecraftConfig from "../models/MinecraftConfig.js";
 import MinecraftPlayer from "../models/MinecraftPlayer.js";
 import { createLogger } from "../../../src/core/Logger.js";
+import crypto from "crypto";
 
 const log = createLogger("minecraft:api:link");
 
@@ -79,7 +80,7 @@ export function createLinkRoutes(deps: MinecraftApiDependencies): Router {
       // Generate auth code
       let authCode = "";
       for (let i = 0; i < 10; i++) {
-        authCode = Math.floor(100000 + Math.random() * 900000).toString();
+        authCode = crypto.randomInt(100000, 1000000).toString();
         const exists = await MinecraftPlayer.exists({ authCode });
         if (!exists) break;
       }

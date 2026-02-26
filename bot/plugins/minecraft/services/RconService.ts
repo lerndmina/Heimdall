@@ -146,6 +146,11 @@ export class RconService {
       return { success: false, results: [{ command: "", response: "RCON password not configured", success: false, error: "RCON password not configured" }] };
     }
 
+    // Validate player name to prevent RCON command injection
+    if (!/^[a-zA-Z0-9_]{3,16}$/.test(playerName)) {
+      return { success: false, results: [{ command: "", response: "Invalid player name", success: false, error: "Invalid player name" }] };
+    }
+
     const addTemplate = config.roleSync?.rconAddCommand || "lp user {player} parent add {group}";
     const removeTemplate = config.roleSync?.rconRemoveCommand || "lp user {player} parent remove {group}";
 
@@ -153,9 +158,11 @@ export class RconService {
 
     // Remove old groups first, then add new ones
     for (const group of groupsToRemove) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(group)) continue; // skip invalid group names
       commands.push(removeTemplate.replace(/\{player\}/g, playerName).replace(/\{group\}/g, group));
     }
     for (const group of groupsToAdd) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(group)) continue; // skip invalid group names
       commands.push(addTemplate.replace(/\{player\}/g, playerName).replace(/\{group\}/g, group));
     }
 

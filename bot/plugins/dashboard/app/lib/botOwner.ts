@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * Bot owner check utility — queries the bot API to determine if a user
  * is listed in OWNER_IDS. Results are cached for 5 minutes.

@@ -13,6 +13,7 @@ import { RconService } from "../services/RconService.js";
 import { RoleSyncService } from "../services/RoleSyncService.js";
 import { createLogger } from "../../../src/core/Logger.js";
 import { escapeRegex } from "../../lib/utils/escapeRegex.js";
+import crypto from "crypto";
 
 const log = createLogger("minecraft:api:connection");
 
@@ -153,7 +154,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
 
       // Expired auth code — regenerate automatically for better UX
       if (player.authCode && player.expiresAt && player.expiresAt <= new Date() && !player.linkedAt) {
-        const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const newCode = crypto.randomInt(100000, 1000000).toString();
         const newExpiry = new Date(Date.now() + (config.authCodeExpiry || 300) * 1000);
 
         player.authCode = newCode;
@@ -235,7 +236,7 @@ export function createConnectionRoutes(deps: MinecraftApiDependencies): Router {
       // Check for existing-player linking opportunity
       if (currentlyWhitelisted && !player.discordId) {
         // Player is on whitelist but not linked — offer linking
-        const authCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const authCode = crypto.randomInt(100000, 1000000).toString();
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
         player.authCode = authCode;

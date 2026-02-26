@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * Shared server-side bot API client.
  *

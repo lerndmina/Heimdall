@@ -17,6 +17,13 @@ export type DynamicPermissionProvider = (guildId: string) => Promise<DynamicPerm
 
 const log = createLogger("permissions:registry");
 
+function compareActionsByNormalizedLabel(a: PermissionActionDefinition, b: PermissionActionDefinition): number {
+  const normalize = (label: string) => label.trim().replace(/^\//, "");
+  const byLabel = normalize(a.label).localeCompare(normalize(b.label), undefined, { sensitivity: "base", numeric: true });
+  if (byLabel !== 0) return byLabel;
+  return a.key.localeCompare(b.key, undefined, { sensitivity: "base", numeric: true });
+}
+
 function cloneCategories(categories: PermissionCategory[]): PermissionCategory[] {
   return categories.map((cat) => ({
     key: cat.key,
@@ -72,6 +79,7 @@ export class PermissionRegistry {
   async getCategories(guildId?: string): Promise<PermissionCategory[]> {
     const categories = cloneCategories(this.baseCategories);
     const categoryMap = new Map<string, PermissionCategory>(categories.map((cat) => [cat.key, cat]));
+    const baseCategoryMap = new Map<string, PermissionCategory>(this.baseCategories.map((cat) => [cat.key, cat]));
 
     for (const [categoryKey, actionMap] of this.registeredActions.entries()) {
       let category = categoryMap.get(categoryKey);
@@ -120,6 +128,30 @@ export class PermissionRegistry {
           log.warn("Dynamic permission provider failed:", error);
         }
       }
+    }
+
+    for (const category of categories) {
+      const baseCategory = baseCategoryMap.get(category.key);
+      if (!baseCategory) {
+        category.actions = [...category.actions].sort(compareActionsByNormalizedLabel);
+        continue;
+      }
+
+      const baseActionOrder = new Map(baseCategory.actions.map((action, index) => [action.key, index]));
+      const baseActions: PermissionActionDefinition[] = [];
+      const extraActions: PermissionActionDefinition[] = [];
+
+      for (const action of category.actions) {
+        if (baseActionOrder.has(action.key)) {
+          baseActions.push(action);
+        } else {
+          extraActions.push(action);
+        }
+      }
+
+      baseActions.sort((a, b) => (baseActionOrder.get(a.key) ?? Number.MAX_SAFE_INTEGER) - (baseActionOrder.get(b.key) ?? Number.MAX_SAFE_INTEGER));
+      extraActions.sort(compareActionsByNormalizedLabel);
+      category.actions = [...baseActions, ...extraActions];
     }
 
     return categories;

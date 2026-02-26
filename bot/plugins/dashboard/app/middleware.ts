@@ -41,9 +41,9 @@ export async function middleware(request: NextRequest) {
   else if (request.nextUrl.pathname.startsWith("/api/")) {
     response.headers.set("Cache-Control", "no-cache, must-revalidate");
   }
-  // Dynamic pages - cache for 1 minute, revalidate in background
+  // Dynamic pages — authenticated, never cache in shared proxies
   else {
-    response.headers.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+    response.headers.set("Cache-Control", "private, no-store");
   }
 
   // Security headers

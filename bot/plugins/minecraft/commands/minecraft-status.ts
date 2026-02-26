@@ -15,6 +15,13 @@ export const data = new SlashCommandBuilder().setName("minecraft-status").setDes
 
 export const config = { allowInDMs: false };
 
+export const permissions = {
+  key: "commands.link-minecraft",
+  label: "Link Minecraft",
+  description: "Manage your Minecraft account linking",
+  defaultAllow: true,
+};
+
 export async function execute(context: CommandContext): Promise<void> {
   const { interaction, getPluginAPI } = context;
   await interaction.deferReply({ ephemeral: true });

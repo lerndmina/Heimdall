@@ -556,11 +556,11 @@ export class PluginLoader {
 
     if (subcommands.length > 0) {
       for (const sub of subcommands) {
-        const actionKey = `commands.${commandName}.${sub.path}`;
+        const override = permissions?.subcommands?.[sub.path];
+        const actionKey = override?.key ?? `commands.${commandName}.${sub.path}`;
         const fullKey = `${pluginName}.${actionKey}`;
         keys.subcommands[sub.path] = fullKey;
 
-        const override = permissions?.subcommands?.[sub.path];
         const label = override?.label ?? `/${commandName} ${sub.path.replace(/\./g, " ")}`;
         const description = override?.description ?? sub.description ?? permissions?.description ?? "";
         const defaultAllow = override?.defaultAllow ?? permissions?.defaultAllow;
@@ -576,7 +576,7 @@ export class PluginLoader {
       return keys;
     }
 
-    const actionKey = `commands.${commandName}`;
+    const actionKey = permissions?.key ?? `commands.${commandName}`;
     keys.base = `${pluginName}.${actionKey}`;
 
     permissionRegistry.registerAction(pluginName, {
@@ -592,7 +592,7 @@ export class PluginLoader {
   private buildContextMenuPermissionKey(pluginName: string, commandName: string | undefined, permissions?: CommandPermissionDefinition): string | undefined {
     if (!commandName) return undefined;
 
-    const actionKey = `commands.${commandName}`;
+    const actionKey = permissions?.key ?? `commands.${commandName}`;
     const fullKey = `${pluginName}.${actionKey}`;
 
     permissionRegistry.registerAction(pluginName, {

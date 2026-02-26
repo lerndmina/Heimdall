@@ -27,10 +27,11 @@ export interface PluginCommandConfig {
 }
 
 export interface CommandPermissionDefinition {
+  key?: string;
   label?: string;
   description?: string;
   defaultAllow?: boolean;
-  subcommands?: Record<string, { label?: string; description?: string; defaultAllow?: boolean }>;
+  subcommands?: Record<string, { key?: string; label?: string; description?: string; defaultAllow?: boolean }>;
 }
 
 export interface CommandPermissionKeys {
