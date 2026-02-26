@@ -301,13 +301,13 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
               <Link
                 key={guild.id}
                 href={`/${guild.id}`}
-                className="group flex items-center gap-4 rounded-2xl border border-ui-border bg-ui-bg-surface p-4 transition-colors hover:border-ui-border-strong hover:bg-ui-bg-surface-hover">
-                <GuildIcon name={guild.name} icon={guild.icon} guildId={guild.id} className="relative h-12 w-12 transition-transform duration-300 group-hover:scale-105" />
+                className="flex items-center gap-4 rounded-2xl border border-ui-border bg-ui-bg-surface p-4">
+                <GuildIcon name={guild.name} icon={guild.icon} guildId={guild.id} className="relative h-12 w-12" />
                 <div className="relative min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ui-text-primary">{guild.name}</p>
                   <p className="text-xs text-ui-text-faint">Click to manage</p>
                 </div>
-                <span className="shrink-0 rounded-md bg-primary-600/20 px-2.5 py-1 text-xs font-medium text-primary-400 transition-colors group-hover:bg-primary-600/30">Manage</span>
+                <span className="shrink-0 rounded-md bg-primary-600/20 px-2.5 py-1 text-xs font-medium text-primary-400">Manage</span>
               </Link>
             );
           }
@@ -321,13 +321,13 @@ export default function GuildGrid({ clientId }: GuildGridProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleInviteClick}
-                className="group flex items-center gap-4 rounded-2xl border border-ui-border bg-ui-bg-surface p-4 transition-colors hover:border-emerald-500/35 hover:bg-ui-bg-surface-hover">
-                <GuildIcon name={guild.name} icon={guild.icon} guildId={guild.id} className="relative h-12 w-12 opacity-60 transition-all duration-300 group-hover:opacity-100 group-hover:scale-105" />
+                className="flex items-center gap-4 rounded-2xl border border-ui-border bg-ui-bg-surface p-4">
+                <GuildIcon name={guild.name} icon={guild.icon} guildId={guild.id} className="relative h-12 w-12 opacity-60" />
                 <div className="relative min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ui-text-muted">{guild.name}</p>
                   <p className="text-xs text-ui-text-faint">Bot not in server</p>
                 </div>
-                <span className="shrink-0 rounded-md bg-emerald-600/20 px-2.5 py-1 text-xs font-medium text-emerald-400 transition-colors group-hover:bg-emerald-600/30">Invite</span>
+                <span className="shrink-0 rounded-md bg-emerald-600/20 px-2.5 py-1 text-xs font-medium text-emerald-400">Invite</span>
               </a>
             );
           }
