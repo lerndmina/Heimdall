@@ -229,8 +229,9 @@ export class ApplicationFlowService {
     await openModalButton.ready();
 
     const cancelButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
-      await this.sessionService.deleteSession(sessionId);
-      await buttonInteraction.reply({ content: "✅ Application cancelled.", ephemeral: true });
+      await this.renderCancelConfirmation(buttonInteraction, sessionId, async (backInteraction) => {
+        await this.renderCurrentStep(backInteraction, form, sessionId);
+      });
     }, 900);
     cancelButton.setLabel("Cancel").setEmoji("❌").setStyle(ButtonStyle.Secondary);
     await cancelButton.ready();
@@ -279,8 +280,9 @@ export class ApplicationFlowService {
     await selectMenu.ready();
 
     const cancelButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
-      await this.sessionService.deleteSession(sessionId);
-      await buttonInteraction.reply({ content: "✅ Application cancelled.", ephemeral: true });
+      await this.renderCancelConfirmation(buttonInteraction, sessionId, async (backInteraction) => {
+        await this.renderCurrentStep(backInteraction, form, sessionId);
+      });
     }, 900);
     cancelButton.setLabel("Cancel").setEmoji("❌").setStyle(ButtonStyle.Secondary);
     await cancelButton.ready();
@@ -328,8 +330,9 @@ export class ApplicationFlowService {
     }
 
     const cancelButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
-      await this.sessionService.deleteSession(sessionId);
-      await buttonInteraction.reply({ content: "✅ Application cancelled.", ephemeral: true });
+      await this.renderCancelConfirmation(buttonInteraction, sessionId, async (backInteraction) => {
+        await this.renderCurrentStep(backInteraction, form, sessionId);
+      });
     }, 900);
     cancelButton.setLabel("Cancel").setEmoji("❌").setStyle(ButtonStyle.Secondary);
     await cancelButton.ready();
@@ -601,8 +604,9 @@ export class ApplicationFlowService {
     }
 
     const cancelButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
-      await this.sessionService.deleteSession(sessionId);
-      await buttonInteraction.reply({ content: "✅ Application cancelled.", ephemeral: true });
+      await this.renderCancelConfirmation(buttonInteraction, sessionId, async (backInteraction) => {
+        await this.renderFinalReview(backInteraction, form, sessionId, safePage);
+      });
     }, 900);
     cancelButton.setLabel("Cancel").setEmoji("❌").setStyle(ButtonStyle.Secondary);
     await cancelButton.ready();
@@ -628,6 +632,26 @@ export class ApplicationFlowService {
     await this.replyEphemeral(interaction, {
       embeds: [embed],
       components: payload.components || [],
+    });
+  }
+
+  private async renderCancelConfirmation(interaction: MessageComponentInteraction, sessionId: string, onBack: (interaction: MessageComponentInteraction) => Promise<void>): Promise<void> {
+    const confirmCancelButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
+      await this.sessionService.deleteSession(sessionId);
+      await this.replyEphemeral(buttonInteraction, "✅ Application cancelled.");
+    }, 900);
+    confirmCancelButton.setLabel("Yes, cancel").setEmoji("🛑").setStyle(ButtonStyle.Danger);
+    await confirmCancelButton.ready();
+
+    const backButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
+      await onBack(buttonInteraction);
+    }, 900);
+    backButton.setLabel("Go Back").setEmoji("↩️").setStyle(ButtonStyle.Secondary);
+    await backButton.ready();
+
+    await this.replyEphemeral(interaction, {
+      embeds: [this.lib.createEmbedBuilder().setTitle("Cancel Application?").setDescription("Are you sure you want to cancel your application? Your progress will be lost.").setColor("Orange")],
+      components: [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(confirmCancelButton as any, backButton as any)],
     });
   }
 
