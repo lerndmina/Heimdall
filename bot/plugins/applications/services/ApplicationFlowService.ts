@@ -638,7 +638,11 @@ export class ApplicationFlowService {
   private async renderCancelConfirmation(interaction: MessageComponentInteraction, sessionId: string, onBack: (interaction: MessageComponentInteraction) => Promise<void>): Promise<void> {
     const confirmCancelButton = this.lib.createButtonBuilder(async (buttonInteraction) => {
       await this.sessionService.deleteSession(sessionId);
-      await this.replyEphemeral(buttonInteraction, "✅ Application cancelled.");
+      await this.replyEphemeral(buttonInteraction, {
+        content: "",
+        embeds: [this.lib.createEmbedBuilder().setTitle("Application Cancelled").setDescription("Your application has been cancelled and your progress has been lost.").setColor("Red")],
+        components: [],
+      });
     }, 900);
     confirmCancelButton.setLabel("Yes, cancel").setEmoji("🛑").setStyle(ButtonStyle.Danger);
     await confirmCancelButton.ready();
